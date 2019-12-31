@@ -1,3 +1,7 @@
+import numpy as numpy
+import angles
+import dates
+
 class SpaceRock:
     
     def __init__(self, a, e, i, node, omega, tau, date):
