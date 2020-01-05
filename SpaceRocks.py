@@ -4,17 +4,17 @@ import dates
 
 class SpaceRock:
     
-    def __init__(self, a, e, i, node, omega, tau, date):
+    def __init__(self, a, e, i, node, omega, tau, epoch):
         self.a = a
         self.e = e
         self.i = i
         self.node = node
         self.omega = omega
-        self.date = date
+        self.epoch = epoch
         self.tau = tau
         self.T = self.a**(3/2)
         self.n = (2*np.pi)/self.T
-        self.M = self.n * (self.date - self.tau)
+        self.M = self.n * (self.epoch - self.tau)
         
     def E(self):
         E_guess = self.M
