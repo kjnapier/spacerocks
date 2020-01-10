@@ -2,25 +2,41 @@ import numpy as numpy
 import angles
 import dates
 
+precise = True
+
 class SpaceRock:
     
     def __init__(self, a, e, i, node, omega, tau, epoch):
+
         self.a = a
         self.e = e
         self.i = i
         self.node = node
         self.omega = omega
         self.epoch = epoch
-        self.tau = tau
+        self.tau = tau # obs_date
         self.T = self.a**(3/2)
         self.n = (2*np.pi)/self.T
         self.M = self.n * (self.epoch - self.tau)
         
-    def E(self):
-        E_guess = self.M
-        for kk in range(100):
-            E_guess = self.M + self.e * np.sin(E_guess)
-        return E_guess
+    if precise == True:
+
+        def E(self):
+            calc_E = self.M
+            for kk in range(100):
+                calc_E = self.M + self.e * np.sin(calc_E)
+            return calc_E
+
+    else:
+
+        def cal_E(self, e, M):
+            # compute eccentric anomaly E
+            f = lambda calc_E, M, e: calc_E - e * np.sin(E) - M
+            E0 = M
+            calc_E = newton(f, E0, args=(M, e))
+            return calc_E
+
+
     
     def x(self):
         return self.a * (np.cos(self.E()) - self.e)
