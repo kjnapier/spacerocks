@@ -5,21 +5,44 @@ SpaceRocks is an open-source software written in Python. It is a suite of tools 
 <details>
 <summary><strong> Date Handling </strong></summary>
 <br>
-How to calculate dates
 </details>
 
-## Ephemeride Calculation
+<details>
+<summary><strong> Ephemeride Calculation </strong></summary>
+<br>
+</details>
 
-## Dynamical Integration
+<details>
+<summary><strong> Dynamical Integration </strong></summary>
+<br>
+</details>
 
-## Astrometric Calibration (Astrometry.net)
+<details>
+<summary><strong> Astrometric Calibration (Astrometry.net) </strong></summary>
+<br>
+</details>
 
-## Source Detection (Source Extractor)
+<details>
+<summary><strong> Source Detection (Source Extractor) </strong></summary>
+<br>
+</details>
 
-## Object Linking
+<details>
+<summary><strong> Object Linking </strong></summary>
+<br>
+</details>
 
-## Orbit Fitting (PyOrbfit)
+<details>
+<summary><strong> Orbit Fitting (PyOrbfit) </strong></summary>
+<br>
+</details>
 
-## Calls to Horizons
+<details>
+<summary><strong> Calls to JPL Horizons </strong></summary>
+<br>
+</details>
 
-## Check for known objects (MPChecker)
+<details>
+<summary><strong> Check for known objects (MPChecker) </strong></summary>
+<br>
+</details>
