@@ -2,7 +2,11 @@
 
 SpaceRocks is an open-source software written in Python. It is a suite of tools needed to perform a number of tasks relevant to Solar System dynamics, both observational and theoretical.
 
-## Date Handling
+<details open>
+<summary>## Date Handling</summary>
+<br>
+How to calculate dates
+</details>
 
 ## Ephemeride Calculation
 
