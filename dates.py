@@ -1,6 +1,6 @@
-# Take an input date (in any single form), and return the date in the desired form.
+# Take an date (in Universal Time), and return the date in the desired form.
 
-class Dates:
+class Date:
 
     def __init__(self, day, month, year, UT):
 
@@ -8,9 +8,6 @@ class Dates:
         self.month = month
         self.year = year
         self.UT = UT # Universal Time
-
-    def Calendar(self):
-        return '{}/{}/{}'.format(month, day, year)
         
     def JD(self):
 
@@ -40,5 +37,3 @@ class Dates:
 
     def MJD(self):
         return self.JD - 2400000.5
-
-JD(0,0,0,0)
