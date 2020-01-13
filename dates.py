@@ -1,4 +1,4 @@
-# Take an date (in Universal Time), and return the date in the desired form.
+# Take a date (in Universal Time), and return the it in the desired form.
 
 class Date:
 
