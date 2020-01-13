@@ -1,5 +1,6 @@
 # Take a date (in Universal Time), and return the it in the desired form.
 
+
 class Date:
 
     def __init__(self, day, month, year, UT):
@@ -20,7 +21,7 @@ class Date:
 
         if self.year > 1582:
             B = int(y / 400) - int(y / 100)
-        elif year < 1582:
+        elif self.year < 1582:
             B = -2
         else:
             if self.month < 10:
@@ -36,4 +37,4 @@ class Date:
         return int(365.25 * y) + int(30.6001 * (m + 1)) + 1720996.5 + B + self.day + self.UT / 24
 
     def MJD(self):
-        return self.JD - 2400000.5
+        return self.JD() - 2400000.5
