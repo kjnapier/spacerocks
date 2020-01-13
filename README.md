@@ -13,7 +13,7 @@ SpaceRocks is an open-source software written in Python. It is a suite of tools 
 </details>
 
 <details>
-<summary><strong> Dynamical Integration </strong></summary>
+<summary><strong> Dynamical Integration (Rebound) </strong></summary>
 <br>
 </details>
 
