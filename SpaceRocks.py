@@ -1,6 +1,5 @@
-import numpy as numpy
+import numpy as np
 import angles
-import dates
 
 precise = True
 
@@ -73,3 +72,48 @@ class SpaceRock:
     
     def R(self):
         return np.sqrt(np.sum(self.XYZ() * self.XYZ()))
+
+class Date:
+
+    def __init__(self, day, month, year, UT):
+    
+        self.day = day
+        self.month = month
+        self.year = year
+        self.UT = UT # Universal Time
+        self.JD = np.vectorize(self.jd)
+    
+    def test(self):
+        for ii in range(len(self.day)):
+            if self.day[ii] > 1:
+                return self.day[ii] * 10
+    
+    def jd(self):
+    
+        if self.month > 2:
+            y = self.year
+            m = self.month
+        else:
+            y = self.year - 1
+            m = self.month + 12
+    
+        if self.year > 1582:
+            B = y // 400 - y // 100
+        elif self.year < 1582:
+            B = -2
+        else:
+            if self.month < 10:
+                B = -2
+            elif self.month > 10:
+                B = y // 400 - y // 100
+            else:
+                if self.day <= 4:
+                    B = -2
+                elif self.day >= 15:
+                    B = y // 400 - y // 100
+    
+        return np.array(int(365.25 * y) + int(30.6001 * (m + 1)) + 1720996.5 + B + self.day + self.UT / 24)
+    
+    def MJD(self):
+        return self.JD() - 2400000.5
+    
