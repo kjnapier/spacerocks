@@ -196,45 +196,7 @@ class SpaceRock:
         return a, e, Angle(i, u.radian), Angle(ω, u.radian), \
                Angle(Ω, u.radian), Angle(M, u.radian)
 
-    def equatorial_to_tangent(self):
-        β = np.arcsin(np.cos(ε) * np.sin(self.dec) -  \
-            np.sin(ε) * np.cos(self.dec) * np.sin(self.ra))
-        λ = np.arctan((np.cos(ε) * np.cos(self.dec) * np.sin(self.ra) + \
-            np.sin(ε) * np.sin(self.dec)) / (np.cos(self.dec) * np.cos(self.ra)))
 
-        θx = (np.cos(β) * np.sin(λ - λ[0])) / (np.sin(b[0]) * np.sin(β) - \
-                  np.cos(β[0]) * np.cos(β) * np.cos(λ - λ[0]))
-        θy = (np.cos(β[0]) * np.cos(β) - np.sin(β[0]) * np.sin(β) * np.cos(λ - λ[0]))/ \
-                  (np.sin(β[0]) * np.sin(β) + np.cos(β[0]) * np.cos(β) * np.cos(λ - λ[0]))
-
-        dβ_ddec = (np.cos(self.dec)*np.cos(ε) + np.sin(self.ra)*np.sin(self.dec)*np.sin(ε))**2 / \
-                  (1 - (np.cos(ε)*np.sin(self.dec) - np.cos(self.dec)*np.sin(self.ra)*np.sin(ε))**2)
-
-        dβ_dra = (np.cos(self.ra) * np.cos(self.dec) * np.sin(ε))**2 / \
-                 (1 - (np.cos(ε)*np.sin(self.dec) - np.cos(self.dec)*np.sin(self.ra)*np.sin(ε))**2)
-
-        return θx, θy, σθx, σθy
-
-
-
-    #def try_fit(self):
-    #    beta=np.zeros(6)
-    #    alpha=np.zeros([6, 6])
-    #    soln=np.zeros(6)
-    #    dx=np.zeros(6)
-    #    dy=np.zeros(6)
-
-    #def fit_orbit(self):
-
-    #    Nobs = len(self.ra)
-
-    #    if Nobs < 2:
-    #        raise ValueError('Not enough observations to fit an orbit for \
-    #                          object {}'.format(self.hash))
-    #    elif Nobs == 2:
-    #        fit_params = 4
-    #    else:
-    #        try_fit(self.ra, self.dec, Nobs, )
 
 class Date:
 
