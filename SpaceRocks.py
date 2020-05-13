@@ -112,11 +112,11 @@ class SpaceRock:
 
     else:
 
-        def cal_E(self, e, M):
+        def cal_E(self):
             # compute eccentric anomaly E
-            f = lambda calc_E, M, e: calc_E - e * np.sin(E) - M
-            E0 = M
-            calc_E = newton(f, E0, args=(M, e))
+            f = lambda calc_E, M, e: calc_E - e * np.sin(calc_E) * u.rad - M
+            E0 = self.M
+            calc_E = newton(f, E0, args=(self.M, self.e))
             return calc_E
 
 
@@ -159,11 +159,11 @@ class SpaceRock:
         Y = ox * (np.cos(self.omega)*np.sin(self.node) + np.sin(self.omega)*np.cos(self.node)*np.cos(self.inc)) + oy * (np.cos(self.omega)*np.cos(self.node)*np.cos(self.inc) - np.sin(self.omega)*np.sin(self.node))
         Z = ox * (np.sin(self.omega)*np.sin(self.inc)) + oy * (np.cos(self.omega)*np.sin(self.inc))
         VX = ovx * (np.cos(self.omega)*np.cos(self.node) - np.sin(self.omega)*np.sin(self.node)*np.cos(self.inc)) - ovy * (np.sin(self.omega)*np.cos(self.node) + np.cos(self.omega)*np.sin(self.node)*np.cos(self.inc))
-        VY = ovx * (np.cos(self.omega)*np.sin(self.node) + np.sin(self.omega)*np.cos(self.node)*np.cos(self.inc)) + ovy * (np.cos(self.omega)*np.cos(self.node)*np.cos(self.inc) - np.sin(self.omega)*np.sin(self.node))
+        VY = ovx * (np.cos(self.omega)*np.sin(self.node) + np.sin(self.omega)*np.cos(self.node)*np.cos(self.inc)) + ovy * (np.cos(self.omega)*np.cos(self.node)*np.cos(self.inc) - np.sin(self.omega)*np.sin(self.node)) 
         VZ = ovx * (np.sin(self.omega)*np.sin(self.inc)) + ovy * (np.cos(self.omega)*np.sin(self.inc))
-        return X, Y, Z, VX, VY, VZ
+        return X, Y, Z, VX/u.rad, VY/u.rad, VZ/u.rad
 
-    #def kep_to_xyz(self):self.
+    #def kep_to_xyz(self).
     #    # compute eccentric anomaly E
     #    #E = np.array(list(map(self.cal_E, self.e, self.M)))
     #    E = self.cal_E()
