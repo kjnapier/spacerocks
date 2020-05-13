@@ -1,10 +1,11 @@
+import healpy as hp
+
 import numpy as np
 from scipy.optimize import newton
 from skyfield.api import Topos, Loader
 from astropy import units as u
 from astropy.coordinates import Angle
-import healpy as hp
-from aeiderivs import aeiderivs
+#from aeiderivs import aeiderivs
 
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 planets = load('de423.bsp')
@@ -17,14 +18,14 @@ ts = load.timescale()
 
 # obliquity of the Earth
 ε = Angle(23.43929111, u.degree).radian
-
+precise=False
 class SpaceRock:
 
-    def __init__(self, Keplerian=False, precise=False, input_angles='degree',
-                 uncertainties=False, *args, **kwargs):
+    def __init__(self, coordinates='keplerian', precise=False, input_angles='degrees', *args, **kwargs):
 
         # a, e, inc, node, omega, M0, x, y, z, vx, vy, vz, tau, epoch,
 
+        # scalar input -> arrays
         for idx, key in enumerate([*kwargs]):
             if np.isscalar(kwargs.get(key)):
                 kwargs[key] = np.array([kwargs.get(key)])
@@ -37,22 +38,23 @@ class SpaceRock:
             raise ValueError('The input_angles argument must be a string \
                               that reads either degrees or radians.')
 
-        self.M0 = Angle(kwargs.get('M0'), angle_unit).radian
-        self.epoch = kwargs.get('epoch') * u.day
+        # self.M0 = Angle(kwargs.get('M0'), angle_unit).radian
+        self.epoch = kwargs.get('epoch') * u.day # time at perihelion
         self.tau = kwargs.get('tau') * u.day # obs_date
 
-        if Keplerian == True:
+        if coordinates == 'keplerian':
 
             self.a = kwargs.get('a') * u.au
             self.e = kwargs.get('e') * u.dimensionless_unscaled
-            self.inc = Angle(kwargs.get('inc'), angle_unit).radian
-            self.node = Angle(kwargs.get('node'), angle_unit).radian
-            self.omega = Angle(kwargs.get('omega'), angle_unit).radian
+            self.inc = Angle(kwargs.get('inc'), angle_unit).to(u.rad)
+            self.node = Angle(kwargs.get('node'), angle_unit).to(u.rad)
+            self.omega = Angle(kwargs.get('omega'), angle_unit).to(u.rad)
 
-            self.M = np.sqrt(μ / self.a**3) * (self.tau - self.epoch) + self.M0
+            self.M = np.sqrt(μ / self.a**3) * (self.tau - self.epoch)
+            # self.M = np.sqrt(μ / self.a**3) * (self.tau - self.epoch) + self.M0
             self.X, self.Y, self.Z, self.VX, self.VY, self.VZ = self.kep_to_xyz()
 
-        elif Cartesian == True:
+        elif coordinates == 'cartesian':
             self.X = kwargs.get('X') * u.au
             self.Y = kwargs.get('Y') * u.au
             self.Z = kwargs.get('Z') * u.au
@@ -63,18 +65,18 @@ class SpaceRock:
             self.a, self.e, self.inc, self.omega, self.node, self.M = self.xyz_to_kep()
 
         else:
-            self.ra = Angle(kwargs.get('ra'), angle_unit).radian
-            self.dec = Angle(kwargs.get('dec'), angle_unit).radian
+            self.ra = Angle(kwargs.get('ra'), angle_unit).to(u.rad)
+            self.dec = Angle(kwargs.get('dec'), angle_unit).to(u.rad)
 
-        self.varpi = (self.omega + self.node) % (2*np.pi)
-        self.ra, self.dec, self.delta, self.r, self.ltt, self.phase_angle, self.elong = self.xyz_to_equa()
+        self.varpi = (self.omega + self.node).wrap_at(2 * np.pi * u.rad)
+        #self.ra, self.dec, self.delta, self.r, self.ltt, self.phase_angle, self.elong = self.xyz_to_equa()
 
     if precise == False:
 
-        def E(self):
+        def cal_E(self):
             calc_E = self.M
             for kk in range(100):
-                calc_E = self.M + self.e * np.sin(calc_E)
+                calc_E = self.M + self.e * np.sin(calc_E) * u.rad
             return calc_E
 
         def calcradec(self):
@@ -140,7 +142,8 @@ class SpaceRock:
 
     def kep_to_xyz(self):
         # compute eccentric anomaly E
-        E = np.array(list(map(self.cal_E, self.e, self.M)))
+        #E = np.array(list(map(self.cal_E, self.e, self.M)))
+        E = self.cal_E()
 
         # compute true anomaly v
         ν = 2 * np.arctan2(np.sqrt(1 + self.e) * np.sin(E/2), np.sqrt(1 - self.e) * np.cos(E/2))
