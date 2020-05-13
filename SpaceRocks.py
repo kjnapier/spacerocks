@@ -142,23 +142,46 @@ class SpaceRock:
 
     def kep_to_xyz(self):
         # compute eccentric anomaly E
-        #E = np.array(list(map(self.cal_E, self.e, self.M)))
         E = self.cal_E()
-
         # compute true anomaly v
-        ν = 2 * np.arctan2(np.sqrt(1 + self.e) * np.sin(E/2), np.sqrt(1 - self.e) * np.cos(E/2))
-
+        v = 2 * np.arctan2((1 + self.e)**0.5*np.sin(E/2.), (1 - self.e)**0.5*np.cos(E/2.))
         # compute the distance to the central body r
-        r = self.a * (1 - self.e * np.cos(E))
-
+        r = self.a * (1 - self.e*np.cos(E))
         # obtain the position o and velocity ov vector
-        ox, oy, oz = r * np.array([np.cos(ν), np.sin(ν), 0])
-        ovx, ovy, ovz = np.sqrt(μ * self.a) / r * np.array([-np.sin(E), np.sqrt(1 - self.e**2) * np.cos(E), 0])
-
-        X, Y, Z = np.dot([ox, oy, oz], self.Rotation())
-        VX, VY, VZ = np.dot([ovx, ovy, ovz], self.Rotation())
-
+        ox = r * np.cos(v)
+        oy = r * np.sin(v)
+        oz = 0
+        ovx = (μ * self.a)**0.5 / r * (-np.sin(E))
+        ovy = (μ * self.a)**0.5 / r * ((1-self.e**2)**0.5 * np.cos(E))
+        ovz = 0
+        # Transform o and ov to the inertial frame
+        X = ox * (np.cos(self.omega)*np.cos(self.node) - np.sin(self.omega)*np.sin(self.node)*np.cos(self.inc)) - oy * (np.sin(self.omega)*np.cos(self.node) + np.cos(self.omega)*np.sin(self.node)*np.cos(self.inc))
+        Y = ox * (np.cos(self.omega)*np.sin(self.node) + np.sin(self.omega)*np.cos(self.node)*np.cos(self.inc)) + oy * (np.cos(self.omega)*np.cos(self.node)*np.cos(self.inc) - np.sin(self.omega)*np.sin(self.node))
+        Z = ox * (np.sin(self.omega)*np.sin(self.inc)) + oy * (np.cos(self.omega)*np.sin(self.inc))
+        VX = ovx * (np.cos(self.omega)*np.cos(self.node) - np.sin(self.omega)*np.sin(self.node)*np.cos(self.inc)) - ovy * (np.sin(self.omega)*np.cos(self.node) + np.cos(self.omega)*np.sin(self.node)*np.cos(self.inc))
+        VY = ovx * (np.cos(self.omega)*np.sin(self.node) + np.sin(self.omega)*np.cos(self.node)*np.cos(self.inc)) + ovy * (np.cos(self.omega)*np.cos(self.node)*np.cos(self.inc) - np.sin(self.omega)*np.sin(self.node))
+        VZ = ovx * (np.sin(self.omega)*np.sin(self.inc)) + ovy * (np.cos(self.omega)*np.sin(self.inc))
         return X, Y, Z, VX, VY, VZ
+
+    #def kep_to_xyz(self):self.
+    #    # compute eccentric anomaly E
+    #    #E = np.array(list(map(self.cal_E, self.e, self.M)))
+    #    E = self.cal_E()
+
+    #    # compute true anomaly v
+    #    ν = 2 * np.arctan2(np.sqrt(1 + self.e) * np.sin(E/2), np.sqrt(1 - self.e) * np.cos(E/2))
+
+    #    # compute the distance to the central body r
+    #    r = self.a * (1 - self.e * np.cos(E))
+
+    #    # obtain the position o and velocity ov vector
+    #    ox, oy, oz = r * np.array([np.cos(ν), np.sin(ν), 0])
+    #    ovx, ovy, ovz = np.sqrt(μ * self.a) / r * np.array([-np.sin(E), np.sqrt(1 - self.e**2) * np.cos(E), 0])
+
+    #    X, Y, Z = np.dot([ox, oy, oz], self.Rotation())
+    #    VX, VY, VZ = np.dot([ovx, ovy, ovz], self.Rotation())
+
+    #    return X, Y, Z, VX, VY, VZ
 
 
     def xyz_to_kep(self):
