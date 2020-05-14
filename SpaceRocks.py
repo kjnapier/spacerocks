@@ -7,6 +7,17 @@ from astropy import units as u
 from astropy.coordinates import Angle
 #from aeiderivs import aeiderivs
 
+def long_function_name(
+        var_one, var_two, var_three,
+        var_four):
+    print(var_one)
+a,b,c,d=1,1,1,1
+foo = long_function_name(a,b,
+c,
+{key: value for key, value in variable}
+{key: value for key, value in variable})
+# DEBUG: 
+
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 planets = load('de423.bsp')
 earth = planets['earth']
@@ -38,9 +49,7 @@ class SpaceRock:
             raise ValueError('The input_angles argument must be a string \
                               that reads either degrees or radians.')
 
-        # self.M0 = Angle(kwargs.get('M0'), angle_unit).radian
-        self.epoch = kwargs.get('epoch') * u.day # time at perihelion
-        self.tau = kwargs.get('tau') * u.day # obs_date
+
 
         if coordinates == 'keplerian':
 
@@ -50,6 +59,10 @@ class SpaceRock:
             self.node = Angle(kwargs.get('node'), angle_unit).to(u.rad)
             self.omega = Angle(kwargs.get('omega'), angle_unit).to(u.rad)
 
+            # self.M0 = Angle(kwargs.get('M0'), angle_unit).radian
+            self.epoch = kwargs.get('epoch') * u.day # time at perihelion
+            self.tau = kwargs.get('tau') * u.day # obs_date
+
             self.M = np.sqrt(μ / self.a**3) * (self.tau - self.epoch)
             # self.M = np.sqrt(μ / self.a**3) * (self.tau - self.epoch) + self.M0
             self.X, self.Y, self.Z, self.VX, self.VY, self.VZ = self.kep_to_xyz()
@@ -58,9 +71,9 @@ class SpaceRock:
             self.X = kwargs.get('X') * u.au
             self.Y = kwargs.get('Y') * u.au
             self.Z = kwargs.get('Z') * u.au
-            self.VX = kwargs.get('VX') * u.au / u.year
-            self.VY = kwargs.get('VY') * u.au / u.year
-            self.VZ = kwargs.get('VZ') * u.au / u.year
+            self.VX = kwargs.get('VX') * (u.au / u.year)
+            self.VY = kwargs.get('VY') * (u.au / u.year)
+            self.VZ = kwargs.get('VZ') * (u.au / u.year)
             self.r = np.sqrt(self.X**2 + self.Y**2 + self.Z**2)
             self.a, self.e, self.inc, self.omega, self.node, self.M = self.xyz_to_kep()
 
@@ -159,7 +172,7 @@ class SpaceRock:
         Y = ox * (np.cos(self.omega)*np.sin(self.node) + np.sin(self.omega)*np.cos(self.node)*np.cos(self.inc)) + oy * (np.cos(self.omega)*np.cos(self.node)*np.cos(self.inc) - np.sin(self.omega)*np.sin(self.node))
         Z = ox * (np.sin(self.omega)*np.sin(self.inc)) + oy * (np.cos(self.omega)*np.sin(self.inc))
         VX = ovx * (np.cos(self.omega)*np.cos(self.node) - np.sin(self.omega)*np.sin(self.node)*np.cos(self.inc)) - ovy * (np.sin(self.omega)*np.cos(self.node) + np.cos(self.omega)*np.sin(self.node)*np.cos(self.inc))
-        VY = ovx * (np.cos(self.omega)*np.sin(self.node) + np.sin(self.omega)*np.cos(self.node)*np.cos(self.inc)) + ovy * (np.cos(self.omega)*np.cos(self.node)*np.cos(self.inc) - np.sin(self.omega)*np.sin(self.node)) 
+        VY = ovx * (np.cos(self.omega)*np.sin(self.node) + np.sin(self.omega)*np.cos(self.node)*np.cos(self.inc)) + ovy * (np.cos(self.omega)*np.cos(self.node)*np.cos(self.inc) - np.sin(self.omega)*np.sin(self.node))
         VZ = ovx * (np.sin(self.omega)*np.sin(self.inc)) + ovy * (np.cos(self.omega)*np.sin(self.inc))
         return X, Y, Z, VX/u.rad, VY/u.rad, VZ/u.rad
 
@@ -192,9 +205,9 @@ class SpaceRock:
         hz = self.X * self.VY - self.Y * self.VX
         h = (hx**2 + hy**2 + hz**2)**0.5
         # compute eccentricity vector
-        ex = (self.VY * hz - self.VZ * hy)/μ - self.X/self.r
-        ey = (self.VZ * hx - self.VX * hz)/μ - self.Y/self.r
-        ez = (self.VX * hy - self.VY * hx)/μ - self.Z/self.r
+        ex = (self.VY * hz - self.VZ * hy) * u.rad**2 /μ - self.X/self.r
+        ey = (self.VZ * hx - self.VX * hz) * u.rad**2 /μ - self.Y/self.r
+        ez = (self.VX * hy - self.VY * hx) * u.rad**2 /μ - self.Z/self.r
         e = (ex**2 + ey**2 + ez**2)**0.5
         # compute vector n
         nx = -hy
@@ -203,22 +216,22 @@ class SpaceRock:
         n = np.sqrt(nx**2 + ny**2)
         # compute true anomaly v, the angle between e and r
         ν = np.arccos((ex * self.X + ey * self.Y + ez * self.Z) / (e*self.r))
-        ν[rrdot < 0] = 2 * np.pi - v[rrdot < 0]
+        ν[rrdot < 0] = 2 * np.pi * u.rad - ν[rrdot < 0]
         # compute inclination
         i = np.arccos(hz / h)
         # compute eccentric anomaly E
-        E = 2 * np.sqrt(np.arctan2((1 - e)) * np.sin(ν / 2), np.sqrt(1 + e) * np.cos(ν / 2))
+        E = 2 * np.arctan2(np.sqrt(1 - e) * np.sin(ν / 2), np.sqrt(1 + e) * np.cos(ν / 2))
         # compute ascending node
         Ω = np.arccos(nx / n)
-        Ω[ny < 0] = 2 * np.pi - Ω[ny < 0]
+        Ω[ny < 0] = 2 * np.pi * u.rad - Ω[ny < 0]
         # compute argument of periapsis, the angle between e and n
-        ω = np.arccos((nx * ex + ny * ey + nz *ez) / (n * e))
-        ω[ez < 0] = 2 * np.pi - ω[ez < 0]
+        ω = np.arccos((nx * ex + ny * ey) / (n * e))
+        ω[ez < 0] = 2 * np.pi * u.rad - ω[ez < 0]
         # compute mean anomaly
-        M = E - e * np.sin(E)
-        M[M < 0] += 2 * np.pi
+        M = E - e * np.sin(E) * u.rad
+        M[M < 0] += 2 * np.pi * u.rad
         # compute a
-        a = 1/(2/self.r - (self.VX**2 + self.VY**2 + self.VZ**2)/μ)
+        a = 1/(2/self.r - u.rad**2 * (self.VX**2 + self.VY**2 + self.VZ**2)/μ)
         return a, e, Angle(i, u.radian), Angle(ω, u.radian), \
                Angle(Ω, u.radian), Angle(M, u.radian)
 
