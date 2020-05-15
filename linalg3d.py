@@ -1,4 +1,4 @@
-bfrom numba import jit
+from numba import jit
 # Optimized pure-Python vector algebra in three dimensions.
 
 @jit
