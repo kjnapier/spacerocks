@@ -167,8 +167,8 @@ class SpaceRock:
               0]
 
         # Rotate o and ov to the inertial frame
-        x, y, z = euler_rotation(self.omega, self.inc, self.node, [ox, oy, oz])
-        vx, vy, vz = euler_rotation(self.omega, self.inc, self.node, [ovx, ovy, ovz])
+        x, y, z = euler_rotation(self.omega, self.inc, self.node, o)
+        vx, vy, vz = euler_rotation(self.omega, self.inc, self.node, ov)
 
         return x, y, z, vx/u.rad, vy/u.rad, vz/u.rad
 
