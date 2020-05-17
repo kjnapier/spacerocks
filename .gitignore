@@ -14,3 +14,4 @@ dates.py
 prototypes.py
 
 /build/
+/spacerocks/__pycache__/
