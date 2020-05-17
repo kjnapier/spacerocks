@@ -75,8 +75,8 @@ class SpaceRock:
                     'x', 'y', 'z', 'vx', 'vy', 'vz',
                     'tau', 'epoch', 'h', 'name']
 
-        if args is not None:
-            raise ValueError('SpaceRock doesn\'t take any non-keyword arguments.')
+        #if args is not None:
+    #        raise ValueError('SpaceRock doesn\'t take any non-keyword arguments.')
 
         if not all(key in keywords for key in [*kwargs]):
             print('Keywords are limited to a, e, inc, node, \
