@@ -1,24 +1,30 @@
 ###############################################################################
-# SpaceRocks.py, version 0.4
+# SpaceRocks, version 0.5
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
 
+import sys
+import random
+
 import healpy as hp
 
 import numpy as np
-import random
+
 from scipy.optimize import newton
+
 from skyfield.api import Topos, Loader
+
 from astropy import units as u
 from astropy.table import Table
 from astropy.coordinates import Angle
-from linalg3d import dot, norm, cross, euler_rotation
 from astropy.constants import c
+
 import matplotlib.pyplot as plt
 from numba import jit
 import pandas as pd
-import sys
+
+from .linalg3d import dot, norm, cross, euler_rotation
 
 # to do: implement obscode
 # to do: implement plotting distributions
@@ -63,12 +69,14 @@ class SpaceRock:
                 self.obscode = obscode
                 earth += Topos('30.169 S', '70.804 W', elevation_m=2200) # topocentric calculation
 
-
         # Case-insensitive keyword arguments.
         kwargs = {key.lower(): data for key, data in kwargs.items()}
         keywords = ['a', 'e', 'inc', 'node', 'arg', 'M',
                     'x', 'y', 'z', 'vx', 'vy', 'vz',
                     'tau', 'epoch', 'h', 'name']
+
+        if args is not None:
+            raise ValueError('SpaceRock doesn\'t take any non-keyword arguments.')
 
         if not all(key in keywords for key in [*kwargs]):
             print('Keywords are limited to a, e, inc, node, \
