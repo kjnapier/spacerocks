@@ -1,5 +1,5 @@
 ###############################################################################
-# SpaceRocks, version 0.5.1
+# SpaceRocks, version 0.5.2
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -28,7 +28,6 @@ from .linalg3d import dot, norm, cross, euler_rotation
 
 # to do: implement obscode
 # to do: implement plotting distributions
-# to do: complete polite kwarg rejection
 # to do: test everything. write unit tests.
 
 # Load in planets for ephemeride calculation.
@@ -61,6 +60,7 @@ class SpaceRock:
                  uncertainties=None, *args, **kwargs):
 
         self.frame = input_frame
+        self.tau = kwargs.get('tau') * u.day
 
         if self.frame == 'barycentric':
             mu = mu_bary
@@ -114,16 +114,6 @@ class SpaceRock:
         else:
             raise ValueError('The input_angles argument must be a string \
                               that reads either degrees or radians.')
-
-
-        if input_coordinates == 'keplerian':
-            N_obj = len(kwargs.get('a'))
-        elif input_coordinates == 'cartesian':
-            N_obj = len(kwargs.get('x'))
-
-
-        self.tau = kwargs.get('tau') * u.day
-        self.H = kwargs.get('h')
 
 
         if input_coordinates == 'keplerian':
@@ -189,6 +179,7 @@ class SpaceRock:
             # produces random, non-repeting integers between 0 and 1e10 - 1
             self.name = ['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.a))]
 
+        self.H = kwargs.get('h')
         if self.H is not None:
             self.mag = self.estimate_mag()
         if NSIDE is not None:
@@ -217,7 +208,7 @@ class SpaceRock:
         '''
         if self.precise == True:
 
-            t = ts.tt(jd=self.epoch.value)
+            t = ts.tt(jd=self.tau.value)
             x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
             earth_dis = norm([x_earth, y_earth, z_earth])
             x0, y0, z0 = self.x, self.y, self.z
@@ -238,7 +229,7 @@ class SpaceRock:
             elong = Angle(np.arccos(-(self.r**2 - delta**2 - earth_dis**2)/(2 * delta * earth_dis)), u.rad)
 
         else:
-            t = ts.tt(jd=self.epoch.value)
+            t = ts.tt(jd=self.tau.value)
             x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
             earth_dis = norm([x_earth, y_earth, z_earth])
             # transfer ecliptic to ICRS and shift to Geocentric (topocentric)
