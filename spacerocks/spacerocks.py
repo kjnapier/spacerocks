@@ -70,8 +70,7 @@ class SpaceRock:
         self.precise = precise
 
         if (self.precise is not True) and (self.precise is not False):
-            print('The parameter precise must be set to either True or False.')
-            sys.exit()
+            raise ValueError('The parameter precise must be set to either True or False.')
 
         # Only used for the topocentric calculation.
         if self.precise == True:
@@ -86,10 +85,9 @@ class SpaceRock:
                     'tau', 'epoch', 'h', 'name']
 
         if not all(key in keywords for key in [*kwargs]):
-            print('Keywords are limited to a, e, inc, node, \
-                   arg, M, x, y, z, vx, vy, vz, tau, epoch,\
-                   H, name')
-            sys.exit()
+            raise ValueError('Keywords are limited to a, e, inc, node,\
+                              arg, M, x, y, z, vx, vy, vz, tau, epoch,\
+                              H, name')
 
         input_coordinates = input_coordinates.lower()
         input_frame = input_frame.lower()
@@ -134,16 +132,14 @@ class SpaceRock:
 
             # this looks redundant but it allows for broadcasring.
             self.tau = self.epoch + self.M / np.sqrt(mu / self.a**3)
-
-            self.x, self.y, self.z, self.vx, self.vy, self.vz = self.kep_to_xyz(mu)
-            self.r = norm([self.x, self.y, self.z])
+            self.kep_to_xyz(mu)
 
             if self.frame == 'barycentric':
-                self.ra, self.dec, self.delta, self.ltt, self.phase_angle, self.elong = self.xyz_to_equa()
+                self.xyz_to_equa()
 
             elif self.frame == 'heliocentric':
                 self.to_bary()
-                self.ra, self.dec, self.delta, self.ltt, self.phase_angle, self.elong = self.xyz_to_equa()
+                self.xyz_to_equa()
                 self.to_helio()
 
 
@@ -156,19 +152,18 @@ class SpaceRock:
             self.vy = kwargs.get('vy') * (u.au / u.day)
             self.vz = kwargs.get('vz') * (u.au / u.day)
 
-            self.r = norm([self.x, self.y, self.z])
-            self.a, self.e, self.inc, self.arg, self.node, self.M = self.xyz_to_kep(mu)
+            self.xyz_to_kep(mu)
             self.epoch = self.tau - self.M / np.sqrt(mu / self.a**3)
 
             # this looks redundant but it allows for broadcasring.
             self.tau = self.epoch + self.M / np.sqrt(mu / self.a**3)
 
             if self.frame == 'barycentric':
-                self.ra, self.dec, self.delta, self.ltt, self.phase_angle, self.elong = self.xyz_to_equa()
+                self.xyz_to_equa()
 
             elif self.frame == 'heliocentric':
                 self.to_bary()
-                self.ra, self.dec, self.delta, self.ltt, self.phase_angle, self.elong = self.xyz_to_equa()
+                self.xyz_to_equa()
                 self.to_helio()
 
         self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
@@ -188,16 +183,6 @@ class SpaceRock:
                         'HPIX_{}'.format(value),
                         self.radec_to_hpix(value))
 
-
-    def cal_E(self, e, M):
-        '''
-        This method employs Newton's method to solve Kepler's Equation.
-        '''
-        f = lambda calc_E, M, e: calc_E - e * np.sin(calc_E) - M
-        E0 = M
-        calc_E = newton(f, E0, args=(M, e))
-        return calc_E
-
     def xyz_to_equa(self):
         '''
         Transform from barycentric Cartesian coordinates to equatorial
@@ -206,54 +191,47 @@ class SpaceRock:
         See https://en.wikipedia.org/wiki/Horizontal_coordinate_system.
         This results in a significant slowdown to the code.
         '''
-        if self.precise == True:
 
-            t = ts.tt(jd=self.tau.value)
-            x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
-            earth_dis = norm([x_earth, y_earth, z_earth])
-            x0, y0, z0 = self.x, self.y, self.z
-            for idx in range(3):
-                # transfer ecliptic to ICRS and shift to Geocentric (topocentric)
-                x = x0 - x_earth
-                y = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
-                z = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_earth
-                delta = norm([x, y, z])
-                ltt = delta / c
-                M = self.M - ltt * (mu_bary / self.a**3)**0.5
-                if idx < max(range(3)):
-                    x0, y0, z0, _, _, _ = self.kep_to_xyz(mu_bary)
-            # Cartesian to spherical coordinate
-            dec = Angle(np.arcsin(z / norm([x, y, z])), u.rad)
-            ra = Angle(np.arctan2(y, x), u.rad).wrap_at(2 * np.pi * u.rad)
-            phase_angle = Angle(np.arccos(-(earth_dis**2 - self.r**2 - delta**2)/(2 * self.r* delta)), u.rad)
-            elong = Angle(np.arccos(-(self.r**2 - delta**2 - earth_dis**2)/(2 * delta * earth_dis)), u.rad)
-
-        else:
-            t = ts.tt(jd=self.tau.value)
-            x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
-            earth_dis = norm([x_earth, y_earth, z_earth])
+        t = ts.tt(jd=self.tau.value)
+        x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
+        earth_dis = norm([x_earth, y_earth, z_earth])
+        x0, y0, z0 = self.x, self.y, self.z
+        for idx in range(3):
             # transfer ecliptic to ICRS and shift to Geocentric (topocentric)
-            dx = self.x - x_earth
-            dy = self.y * np.cos(epsilon) - self.z * np.sin(epsilon) - y_earth
-            dz = self.y * np.sin(epsilon) + self.z * np.cos(epsilon) - z_earth
-            delta = norm([dx, dy, dz])
+            x = x0 - x_earth
+            y = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
+            z = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_earth
+            delta = norm([x, y, z])
             ltt = delta / c
+            M = self.M - ltt * (mu_bary / self.a**3)**0.5
+            x, y, z = self.kep_to_xyz_pos(self.a, self.e, self.inc,
+                                          self.arg, self.node, M, self.precise)
 
-            # Cartesian to spherical coordinate
-            dec = Angle(np.arcsin(dz/delta), u.rad)
-            ra = Angle(np.arctan2(dy, dx), u.rad).wrap_at(2 * np.pi * u.rad)
+        self.delta = norm([x, y, z])
+        self.ltt = self.delta / c
+        # Cartesian to spherical coordinate
+        self.dec = Angle(np.arcsin(z / self.delta), u.rad)
+        self.ra = Angle(np.arctan2(y, x), u.rad).wrap_at(2 * np.pi * u.rad)
+        self.phase_angle = Angle(np.arccos(-(earth_dis**2 - self.r**2 - self.delta**2)/(2 * self.r* self.delta)), u.rad)
+        self.elong = Angle(np.arccos(-(self.r**2 - self.delta**2 - earth_dis**2)/(2 * self.delta * earth_dis)), u.rad)
 
-            phase_angle = Angle(np.arccos(-(earth_dis**2 - self.r**2 - delta**2)/(2 * self.r* delta)), u.rad)
-            elong = Angle(np.arccos(-(self.r**2 - delta**2 - earth_dis**2)/(2 * delta * earth_dis)), u.rad)
+        return self
 
-        return ra, dec, delta, ltt, phase_angle, elong
+    def calc_E(self, e, M):
+        '''
+        This method employs Newton's method to solve Kepler's Equation.
+        '''
+        f = lambda E, M, e: E - e * np.sin(E) - M
+        E0 = M
+        E = newton(f, E0, args=(M, e))
+        return E
 
     @jit
-    def cal_E_fast(self):
-        calc_E = self.M
+    def calc_E_fast(self):
+        E = self.M
         for kk in range(100):
-            calc_E = self.M + self.e * np.sin(calc_E) * u.rad
-        return calc_E
+            E = self.M + self.e * np.sin(E) * u.rad
+        return E
 
     def radec_to_hpix(self, NSIDE):
         '''
@@ -292,27 +270,49 @@ class SpaceRock:
         '''
         # compute eccentric anomaly E
         if self.precise == True:
-            E = np.array(list(map(self.cal_E, self.e.value, self.M.value))) * u.rad
+            E = np.array(list(map(self.calc_E, self.e.value, self.M.value))) * u.rad
         else:
-            E = self.cal_E_fast()
+            E = self.calc_E_fast()
 
         # compute true anomaly v
         ν = 2 * np.arctan2((1 + self.e)**0.5*np.sin(E/2.), (1 - self.e)**0.5*np.cos(E/2.))
 
         # compute the distance to the central body r
-        r = self.a * (1 - self.e*np.cos(E))
+        self.r = self.a * (1 - self.e * np.cos(E))
 
         # obtain the position o and velocity ov vector
-        o = [r * np.cos(ν), r * np.sin(ν), np.zeros(len(ν))]
-        ov = [(mu * self.a)**0.5 / r * (-np.sin(E)),
-              (mu * self.a)**0.5 / r * ((1-self.e**2)**0.5 * np.cos(E)),
+        o = [self.r * np.cos(ν), self.r * np.sin(ν), np.zeros(len(ν))]
+        ov = [(mu * self.a)**0.5 / self.r * (-np.sin(E)),
+              (mu * self.a)**0.5 / self.r * ((1-self.e**2)**0.5 * np.cos(E)),
               np.zeros(len(ν))]
 
         # Rotate o and ov to the inertial frame
-        x, y, z = euler_rotation(self.arg, self.inc, self.node, o) * u.au
-        vx, vy, vz = euler_rotation(self.arg, self.inc, self.node, ov) * u.au / u.year
+        self.x, self.y, self.z = euler_rotation(self.arg, self.inc, self.node, o) * u.au
+        self.vx, self.vy, self.vz = euler_rotation(self.arg, self.inc, self.node, ov) * u.au / u.year
 
-        return x, y, z, vx, vy, vz
+        return self
+
+    def kep_to_xyz_pos(self, a, e, inc, arg, node, M, precision):
+        # compute eccentric anomaly E
+        if precision == True:
+            E = np.array(list(map(self.calc_E, e.value, M.value))) * u.rad
+        else:
+            E = self.calc_E_fast()
+
+        # compute true anomaly v
+        ν = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2.), (1 - e)**0.5*np.cos(E/2.))
+
+        # compute the distance to the central body r
+        r = a * (1 - e * np.cos(E))
+
+        # obtain the position o and velocity ov vector
+        o = [r * np.cos(ν), r * np.sin(ν), np.zeros(len(ν))]
+
+        # Rotate o to the inertial frame
+        x, y, z = euler_rotation(arg, inc, node, o) * u.au
+
+        return x, y, z
+
 
     def xyz_to_kep(self, mu):
         '''
@@ -322,6 +322,7 @@ class SpaceRock:
         '''
         ## there are a lot of hacky units in here because astropy doesn't behave as expected.
         # compute the barycentric distance r
+        self.r = norm([self.x, self.y, self.z])
         rrdot = dot([self.x, self.y, self.z], [self.vx, self.vy, self.vz])
 
         # compute the specific angular momentum h
@@ -332,7 +333,7 @@ class SpaceRock:
         ### hacky units
         ex, ey, ez = u.au**3 * u.rad**2/ u.day**2 * np.array(cross([self.vx, self.vy, self.vz], \
                      [hx, hy, hz])) / mu  - [self.x, self.y, self.z]*u.au/self.r
-        e = norm([ex, ey, ez])
+        self.e = norm([ex, ey, ez])
 
         # compute vector n
         ### hacky units
@@ -340,31 +341,33 @@ class SpaceRock:
         n = norm([nx, ny, nz])
 
         # compute true anomaly ν, the angle between e and r
-        ν = np.arccos(dot([ex, ey, ez], [self.x, self.y, self.z]) / (e*self.r))
+        ν = np.arccos(dot([ex, ey, ez], [self.x, self.y, self.z]) / (self.e*self.r))
         ν[rrdot < 0] = 2 * np.pi * u.rad - ν[rrdot < 0]
 
         # compute inclination
-        inc = np.arccos(hz/h)
+        self.inc = Angle(np.arccos(hz/h), u.rad)
 
         # compute eccentric anomaly E
-        E = 2 * np.arctan2(np.sqrt(1-e) * np.sin(ν/2), np.sqrt(1+e) * np.cos(ν/2))
+        E = 2 * np.arctan2(np.sqrt(1-self.e) * np.sin(ν/2), np.sqrt(1+self.e) * np.cos(ν/2))
 
         # compute ascending node
-        node = np.arccos(nx/n) * u.rad
-        node[ny < 0] = 2 * np.pi * u.rad - node[ny < 0]
+        self.node = Angle(np.arccos(nx/n) * u.rad, u.rad)
+        self.node[ny < 0] = 2 * np.pi * u.rad - self.node[ny < 0]
+
 
         # compute argument of periapsis, the angle between e and n
-        arg = np.arccos(dot([nx, ny, nz], [ex, ey, ez]) / (n*e))
-        arg[ez < 0] = 2 * np.pi * u.rad - arg[ez < 0]
+        self.arg = Angle(np.arccos(dot([nx, ny, nz], [ex, ey, ez]) / (n*self.e)), u.rad)
+        self.arg[ez < 0] = 2 * np.pi * u.rad - self.arg[ez < 0]
 
         # compute mean anomaly
-        M = E - e * np.sin(E) * u.rad
-        M[M < 0] += 2 * np.pi * u.rad
+        self.M = E - self.e * np.sin(E) * u.rad
+        self.M[self.M < 0] += 2 * np.pi * u.rad
 
         # compute a
-        a = 1 / (2 / self.r - norm([self.vx, self.vy, self.vz])**2 / mu * u.rad**2)
+        self.a = 1 / (2 / self.r - norm([self.vx, self.vy, self.vz])**2 / mu * u.rad**2)
 
-        return a, e, Angle(inc, u.rad), Angle(arg, u.rad), Angle(node, u.rad), Angle(M, u.rad)
+        return self
+        #return a, e, Angle(inc, u.rad), Angle(arg, u.rad), Angle(node, u.rad), Angle(M, u.rad)
 
     def to_bary(self):
         '''
@@ -383,7 +386,7 @@ class SpaceRock:
             self.vz += vz_sun
             self.r = norm([self.x, self.y, self.z])
             # calculate barycentric keplerian elements
-            self.a, self.e, self.i, self.arg, self.node, self.M = self.xyz_to_kep(mu_bary)
+            self.xyz_to_kep(mu_bary)
 
             self.frame = 'barycentric'
 
@@ -406,7 +409,7 @@ class SpaceRock:
             self.vz -= vz_sun
             self.r = norm([self.x, self.y, self.z])
             # calculate heliocentric keplerian elements
-            self.a, self.e, self.i, self.arg, self.node, self.M = self.xyz_to_kep(mu_helio)
+            self.xyz_to_kep(mu_helio)
 
             self.frame = 'heliocentric'
 
@@ -516,8 +519,6 @@ class SpaceRock:
             for idx, date in enumerate(obsdate):
                 df = df.append(self.predict_function(date, M0), ignore_index=True)
 
-
-
         return df
 
 
@@ -543,34 +544,22 @@ class SpaceRock:
 
 
         self.M = M0 + (mu/self.a**3)**0.5 * (self.tau - self.epoch)
-        self.x, self.y, self.z, self.vx, self.vy, self.vz = self.kep_to_xyz(mu)
+        self.kep_to_xyz(mu)
 
         if self.frame == 'barycentric':
-            self.r = norm([self.x, self.y, self.z])
-            self.ra, self.dec, self.delta, self.ltt, self.phase_angle, self.elong = self.xyz_to_equa()
+            self.xyz_to_equa()
 
         # If the input frame is heliocentric, convert to bary to calculate
         # equatorial coordinates. Then go back to heliocentric.
         elif self.frame == 'heliocentric':
-
-            # convert to barycentric to calculate equatorial coordinates
             self.to_bary()
-            self.frame = 'barycentric'
-
-            self.r = norm([self.x, self.y, self.z])
-            self.ra, self.dec, self.delta, self.ltt, self.phase_angle, self.elong = self.xyz_to_equa()
-
-            # convert back to heliocentric to match input frame
+            self.xyz_to_equa()
             self.to_helio()
-            self.frame = 'heliocentric'
-
-
 
         data = {'name':np.repeat(self.name, len(self.tau)), 'tau':np.repeat(self.tau, len(M0)),
                 'ra':self.ra, 'dec':self.dec, 'M':self.M,
                 'delta':self.delta, 'r':self.r, 'ltt':self.ltt,
                 'phase_angle':self.phase_angle, 'elong':self.elong}
-
 
         if self.NSIDE is not None:
             for value in self.NSIDE:
@@ -582,6 +571,3 @@ class SpaceRock:
             data['mag'] = self.mag
 
         return pd.DataFrame(data)
-
-    def plot_distributions(self):
-        return
