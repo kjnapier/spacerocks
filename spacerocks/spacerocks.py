@@ -1,5 +1,5 @@
 ###############################################################################
-# SpaceRocks, version 0.6.3
+# SpaceRocks, version 0.6.4
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -9,11 +9,10 @@ import os
 import random
 
 import healpy as hp
-
 import rebound
-
 import numpy as np
-
+import pandas as pd
+from numba import jit
 from scipy.optimize import newton
 
 from skyfield.api import Topos, Loader
@@ -24,14 +23,11 @@ from astropy.coordinates import Angle
 from astropy.constants import c
 
 import matplotlib.pyplot as plt
-from numba import jit
-import pandas as pd
 
 from .linalg3d import dot, norm, cross, euler_rotation
 
 # Read in the observatory codes file and rehash as a dataframe.
-pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'observatories.csv'))
-#observatories = pd.read_csv('observatories.csv')
+observatories = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'observatories.csv'))
 
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
@@ -79,6 +75,10 @@ class SpaceRock:
 
         if obscode is not None:
             self.obscode = str(obscode).zfill(3)
+            obs = observatories[observatories.obscode == self.obscode]
+            self.obslat = obs.lat.values
+            self.obslon = obs.lon.values
+            self.obselev = obs.elevation.values
         else:
             self.obscode = None
 
@@ -196,6 +196,7 @@ class SpaceRock:
                         'HPIX_{}'.format(value),
                         self.radec_to_hpix(value))
 
+
     def calc_E(self, e, M):
         '''
         This method employs Newton's method to solve Kepler's Equation.
@@ -205,12 +206,14 @@ class SpaceRock:
         E = newton(f, E0, args=(M, e))
         return E
 
+
     @jit
     def calc_E_fast(self):
         E = self.M
         for kk in range(100):
             E = self.M + self.e * np.sin(E) * u.rad
         return E
+
 
     def xyz_to_equa(self):
         '''
@@ -227,11 +230,9 @@ class SpaceRock:
         # Only used for the topocentric calculation.
         if self.precise == True:
             if self.obscode is not None:
-                print('doing topos')
-                obs = observatories[observatories.obscode == self.obscode]
-                earth += Topos(latitude_degrees=obs.lat.values,
-                               longitude_degrees=obs.lon.values,
-                               elevation_m=obs.elevation.values) # topocentric calculation
+                earth += Topos(latitude_degrees=self.obslat,
+                               longitude_degrees=self.obslon,
+                               elevation_m=self.obselev) # topocentric calculation
 
         x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
         earth_dis = norm([x_earth, y_earth, z_earth])
@@ -256,7 +257,6 @@ class SpaceRock:
         self.phase_angle = Angle(np.arccos(-(earth_dis**2 - self.r**2 - self.delta**2)/(2 * self.r* self.delta)), u.rad)
         self.elong = Angle(np.arccos(-(self.r**2 - self.delta**2 - earth_dis**2)/(2 * self.delta * earth_dis)), u.rad)
 
-
         return self
 
 
@@ -265,6 +265,7 @@ class SpaceRock:
         Convert (ra, dec) into healpix
         '''
         return hp.pixelfunc.ang2pix(NSIDE, np.pi/2 - self.dec.radian, self.ra.radian, nest=True)
+
 
     def estimate_mag(self):
         '''
@@ -286,6 +287,7 @@ class SpaceRock:
         mag[not_zero] -= 2.5 * np.log10((1 - G) * Psi_1[not_zero] + G * Psi_2[not_zero])
 
         return mag
+
 
     def kep_to_xyz(self, mu):
         '''
@@ -363,7 +365,6 @@ class SpaceRock:
         node[ny < 0] = 2 * np.pi - node[ny < 0]
         self.node = Angle(node, u.rad)
 
-
         # compute argument of periapsis, the angle between e and n
         arg = np.arccos(dot([nx, ny, nz], [ex, ey, ez]) / (n*self.e))
         arg[ez < 0] = 2 * np.pi * u.rad - arg[ez < 0]
@@ -378,6 +379,7 @@ class SpaceRock:
         self.a = 1 / (2 / self.r - norm([self.vx, self.vy, self.vz])**2 / mu * u.rad**2)
 
         return self
+
 
     def to_bary(self):
         '''
@@ -401,6 +403,7 @@ class SpaceRock:
             self.epoch[self.M.value >= np.pi] = self.tau + (2*np.pi * u.rad - self.M) / np.sqrt(mu_bary / self.a**3)
             self.epoch[self.M.value < np.pi] = self.tau - self.M / np.sqrt(mu_bary / self.a**3)
             self.frame = 'barycentric'
+
 
     def to_helio(self):
         '''
@@ -429,7 +432,12 @@ class SpaceRock:
 
         return self
 
+
     def kep_to_xyz_pos(self, a, e, inc, arg, node, M, precision):
+        '''
+        Just compute the xyz position of an object. Used for iterative equatorial
+        calculation.
+        '''
         # compute eccentric anomaly E
         if precision == True:
             E = np.array(list(map(self.calc_E, e.value, M.value))) * u.rad
@@ -449,6 +457,7 @@ class SpaceRock:
         x, y, z = euler_rotation(arg, inc, node, o) * u.au
 
         return x, y, z
+
 
     def get_dict(self):
         '''
@@ -489,6 +498,7 @@ class SpaceRock:
 
         return data
 
+
     def pandas_df(self):
         '''
         Write the rocks to a pandas dataframe. Pandas can't handle astropy
@@ -497,12 +507,14 @@ class SpaceRock:
         '''
         return pd.DataFrame(self.get_dict())
 
+
     def astropy_table(self):
         '''
         Write the rocks to an astropy table. This can handle units, though
         it is generally less elegant than pandas.
         '''
         return Table(self.get_dict())
+
 
     def write_to_csv(self, path):
         '''
@@ -511,6 +523,7 @@ class SpaceRock:
         df = self.pandas_df()
         df.to_csv(path)
         return 'Data written to {}.csv.'.format(path)
+
 
     def plot_radec(self, color='black', alpha=0.5):
         '''
@@ -571,6 +584,7 @@ class SpaceRock:
         #sim.ri_whfast.corrector = 11
 
         return sim
+
 
     def propagate(self, enddates):
         '''
