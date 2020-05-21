@@ -1,5 +1,5 @@
 ###############################################################################
-# SpaceRocks, version 0.6.0
+# SpaceRocks, version 0.6.3
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -30,7 +30,8 @@ import pandas as pd
 from .linalg3d import dot, norm, cross, euler_rotation
 
 # Read in the observatory codes file and rehash as a dataframe.
-observatories = pd.read_csv('/Users/kjnapier/research/spacerocks/data/observatories.csv')
+pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'observatories.csv'))
+#observatories = pd.read_csv('observatories.csv')
 
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)

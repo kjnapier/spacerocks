@@ -1,4 +1,4 @@
-__version__ = '0.6.0'
+__version__ = '0.6.3'
 __author__ = 'Kevin Napier'
 
 from .spacerocks import SpaceRock
