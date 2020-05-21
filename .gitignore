@@ -15,3 +15,6 @@ prototypes.py
 
 /build/
 /spacerocks/__pycache__/
+
+spacerocks_old
+*.json

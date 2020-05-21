@@ -5,6 +5,7 @@
 ################################################################################
 
 import sys
+import os
 import random
 
 import healpy as hp
@@ -28,21 +29,19 @@ import pandas as pd
 
 from .linalg3d import dot, norm, cross, euler_rotation
 
-# to do: implement obscode
-# to do: test everything. write unit tests.
+# Read in the observatory codes file and rehash as a dataframe.
+observatories = pd.read_csv('/Users/kjnapier/research/spacerocks/data/observatories.csv')
 
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
 planets = load('de423.bsp')
 sun = planets['sun']
-earth = planets['earth']
 jupiter = planets['jupiter barycenter']
 saturn = planets['saturn barycenter']
 uranus = planets['uranus barycenter']
 neptune = planets['neptune barycenter']
 pluto = planets['pluto barycenter']
-
 
 Mercury_mass = 1.6601367952719304E-07
 Venus_mass = 2.4478383396645447E-06
@@ -77,6 +76,11 @@ class SpaceRock:
         self.frame = input_frame
         self.tau = kwargs.get('tau') * u.day
 
+        if obscode is not None:
+            self.obscode = str(obscode).zfill(3)
+        else:
+            self.obscode = None
+
         if self.frame == 'barycentric':
             mu = mu_bary
         elif self.frame == 'heliocentric':
@@ -86,12 +90,6 @@ class SpaceRock:
 
         if (self.precise is not True) and (self.precise is not False):
             raise ValueError('The parameter precise must be set to either True or False.')
-
-        # Only used for the topocentric calculation.
-        if self.precise == True:
-            if obscode is not None:
-                self.obscode = obscode
-                earth += Topos('30.169 S', '70.804 W', elevation_m=2200) # topocentric calculation
 
         # Case-insensitive keyword arguments.
         kwargs = {key.lower(): data for key, data in kwargs.items()}
@@ -223,6 +221,17 @@ class SpaceRock:
         '''
 
         t = ts.tt(jd=self.tau.value)
+        earth = planets['earth']
+
+        # Only used for the topocentric calculation.
+        if self.precise == True:
+            if self.obscode is not None:
+                print('doing topos')
+                obs = observatories[observatories.obscode == self.obscode]
+                earth += Topos(latitude_degrees=obs.lat.values,
+                               longitude_degrees=obs.lon.values,
+                               elevation_m=obs.elevation.values) # topocentric calculation
+
         x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
         earth_dis = norm([x_earth, y_earth, z_earth])
         x0, y0, z0 = self.x, self.y, self.z
@@ -274,7 +283,7 @@ class SpaceRock:
 
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
         mag[not_zero] -= 2.5 * np.log10((1 - G) * Psi_1[not_zero] + G * Psi_2[not_zero])
-        
+
         return mag
 
     def kep_to_xyz(self, mu):
@@ -363,7 +372,6 @@ class SpaceRock:
         M = E - self.e * np.sin(E) * u.rad
         M[M < 0] += 2 * np.pi * u.rad
         self.M = Angle(M, u.rad)
-
 
         # compute a
         self.a = 1 / (2 / self.r - norm([self.vx, self.vy, self.vz])**2 / mu * u.rad**2)
@@ -558,8 +566,8 @@ class SpaceRock:
 
         sim.ri_ias15.min_dt = sim.dt / 1440 # one minute
         sim.ri_mercurius.hillfac = 3
-        sim.ri_whfast.safe_mode = 0
-        sim.ri_whfast.corrector = 11
+        #sim.ri_whfast.safe_mode = 0
+        #sim.ri_whfast.corrector = 11
 
         return sim
 
