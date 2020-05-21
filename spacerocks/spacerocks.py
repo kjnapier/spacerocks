@@ -1,5 +1,5 @@
 ###############################################################################
-# SpaceRocks, version 0.6.4
+# SpaceRocks, version 0.6.5
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -20,7 +20,9 @@ from skyfield.api import Topos, Loader
 from astropy import units as u
 from astropy.table import Table
 from astropy.coordinates import Angle
+from astropy.time import Time
 from astropy.constants import c
+from astropy.coordinates import SkyCoord
 
 import matplotlib.pyplot as plt
 
@@ -67,11 +69,14 @@ G = 0.15
 class SpaceRock:
 
     def __init__(self, input_coordinates='keplerian', input_frame='barycentric',
-                 input_angles='degrees', precise=False, NSIDE=None, obscode=None,
+                 input_angles='degrees', input_time_format='jd',
+                 input_time_scale='utc', precise=False, NSIDE=None, obscode=None,
                  uncertainties=None, *args, **kwargs):
 
         self.frame = input_frame
-        self.tau = kwargs.get('tau') * u.day
+        self.tau = Time(kwargs.get('tau'),
+                        format=input_time_format,
+                        scale=input_time_scale).jd * u.day
 
         if obscode is not None:
             self.obscode = str(obscode).zfill(3)
@@ -140,7 +145,10 @@ class SpaceRock:
                 self.epoch = self.tau - self.M / np.sqrt(mu / self.a**3)
 
             elif (kwargs.get('M') is None) and (kwargs.get('epoch') is not None):
-                self.epoch = kwargs.get('epoch') * u.day # time at perihelion
+                # self.epoch = kwargs.get('epoch') * u.day # time at perihelion
+                self.epoch = Time(kwargs.get('epoch'),
+                                  format=input_time_format,
+                                  scale=input_time_scale).jd * u.day
                 self.M = np.sqrt(mu / self.a**3) * (self.tau - self.epoch)
 
             # this looks redundant but it allows for broadcasring.
@@ -195,6 +203,10 @@ class SpaceRock:
                 setattr(SpaceRock,
                         'HPIX_{}'.format(value),
                         self.radec_to_hpix(value))
+
+        self.epoch = Time(self.epoch, format='jd', scale='utc')
+        self.tau = Time(self.tau, format='jd', scale='utc')
+        self.skycoord = SkyCoord(self.ra, self.dec, frame='icrs')
 
 
     def calc_E(self, e, M):
@@ -482,6 +494,7 @@ class SpaceRock:
                 'vz':self.vz,
                 'ra':self.ra,
                 'dec':self.dec,
+                'skycoord':self.skycoord,
                 'delta':self.delta,
                 'ltt':self.ltt,
                 'phase_angle':self.phase_angle,
