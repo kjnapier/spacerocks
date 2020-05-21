@@ -206,7 +206,6 @@ class SpaceRock:
 
         self.epoch = Time(self.epoch, format='jd', scale='utc')
         self.tau = Time(self.tau, format='jd', scale='utc')
-        self.skycoord = SkyCoord(self.ra, self.dec, frame='icrs')
 
 
     def calc_E(self, e, M):
@@ -268,6 +267,7 @@ class SpaceRock:
         self.ra = Angle(np.arctan2(y, x), u.rad).wrap_at(2 * np.pi * u.rad)
         self.phase_angle = Angle(np.arccos(-(earth_dis**2 - self.r**2 - self.delta**2)/(2 * self.r* self.delta)), u.rad)
         self.elong = Angle(np.arccos(-(self.r**2 - self.delta**2 - earth_dis**2)/(2 * self.delta * earth_dis)), u.rad)
+        self.skycoord = SkyCoord(self.ra, self.dec, frame='icrs')
 
         return self
 
@@ -629,14 +629,15 @@ class SpaceRock:
 
         # Rehash as a dataframe for easy access
         df = self.pandas_df()
+        df['tau'] = df['tau'].apply(lambda idx: idx.jd)
 
         # Integrate all particles to the same tau
-        pickup_times = df.tau.values
+        pickup_times = df.tau
         sim = self.set_simulation(np.min(pickup_times))
-        sim.t = np.min(df.tau.values)
+        sim.t = np.min(df.tau)
 
         for time in np.sort(np.unique(pickup_times)):
-            ps = df[df.tau.values == time]
+            ps = df[df.tau == time]
             for p in ps.itertuples():
                 sim.add(x=p.x, y=p.y, z=p.z,
                 vx=p.vx, vy=p.vy, vz=p.vz,
@@ -661,14 +662,15 @@ class SpaceRock:
         self.vy = vy_values.flatten() * (u.au / u.day)
         self.vz = vz_values.flatten() * (u.au / u.day)
         self.name = name_values.flatten()
-        self.tau = tau_values.flatten() * u.day
+        self.tau = Time(tau_values.flatten(), format='jd', scale='utc')
 
         self.xyz_to_kep(mu_bary)
 
         self.epoch = np.zeros(Nx * Ny)
         lp = self.M < np.pi * u.rad
-        self.epoch[lp] = self.tau[lp] - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
-        self.epoch[~lp] = self.tau[~lp] + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+        self.epoch[lp] = self.tau.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
+        self.epoch[~lp] = self.tau.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+        self.epoch = Time(self.epoch, format='jd', scale='utc')
 
         self.xyz_to_equa()
         self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
