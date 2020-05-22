@@ -115,7 +115,10 @@ class SpaceRock:
 
             if (kwargs.get('epoch') is None) and (kwargs.get('M') is not None):
                 self.M = Angle(kwargs.get('M'), angle_unit) * u.rad
-                self.epoch = self.tau - self.M / np.sqrt(mu / self.a**3)
+                lp = self.M < np.pi * u.rad
+                self.epoch[lp] = self.tau.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
+                self.epoch[~lp] = self.tau.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+                #self.epoch = self.tau - self.M / np.sqrt(mu / self.a**3)
 
             elif (kwargs.get('M') is None) and (kwargs.get('epoch') is not None):
                 # self.epoch = kwargs.get('epoch') * u.day # time at perihelion
@@ -147,7 +150,10 @@ class SpaceRock:
             self.vz = kwargs.get('vz') * (u.au / u.day)
 
             self.xyz_to_kep(mu)
-            self.epoch = self.tau - self.M / np.sqrt(mu / self.a**3)
+            lp = self.M < np.pi * u.rad
+            self.epoch[lp] = self.tau.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
+            self.epoch[~lp] = self.tau.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+            #self.epoch = self.tau - self.M / np.sqrt(mu / self.a**3)
 
             # this looks redundant but it allows for broadcasring.
             self.tau = self.epoch + self.M / np.sqrt(mu / self.a**3)
@@ -384,8 +390,12 @@ class SpaceRock:
             # calculate barycentric keplerian elements
             self.xyz_to_kep(mu_bary)
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
-            self.epoch[self.M.value >= np.pi] = self.tau + (2*np.pi * u.rad - self.M) / np.sqrt(mu_bary / self.a**3)
-            self.epoch[self.M.value < np.pi] = self.tau - self.M / np.sqrt(mu_bary / self.a**3)
+            lp = self.M < np.pi * u.rad
+            self.epoch[lp] = self.tau[lp] - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
+            self.epoch[~lp] = self.tau[~lp] + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+            self.epoch = Time(self.epoch, format='jd', scale='utc')
+            #self.epoch[self.M.value >= np.pi] = self.tau + (2*np.pi * u.rad - self.M) / np.sqrt(mu_bary / self.a**3)
+            #self.epoch[self.M.value < np.pi] = self.tau - self.M / np.sqrt(mu_bary / self.a**3)
             self.frame = 'barycentric'
 
 
@@ -409,8 +419,12 @@ class SpaceRock:
             self.xyz_to_kep(mu_helio)
 
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
-            self.epoch[self.M.value >= np.pi] = self.tau + (2*np.pi * u.rad - self.M) / np.sqrt(mu_helio / self.a**3)
-            self.epoch[self.M.value < np.pi] = self.tau - self.M / np.sqrt(mu_helio / self.a**3)
+            lp = self.M < np.pi * u.rad
+            self.epoch.jd[lp] = self.tau[lp] - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
+            self.epoch.jd[~lp] = self.tau[~lp] + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+            self.epoch = Time(self.epoch, format='jd', scale='utc')
+            #self.epoch[self.M.value >= np.pi] = self.tau + (2*np.pi * u.rad - self.M) / np.sqrt(mu_helio / self.a**3)
+            #self.epoch[self.M.value < np.pi] = self.tau - self.M / np.sqrt(mu_helio / self.a**3)
             self.frame = 'heliocentric'
 
         return self
@@ -427,13 +441,13 @@ class SpaceRock:
         else:
             E = self.calc_E_fast()
 
-        # compute true anomaly v
+        # compute true anomaly ν
         ν = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2.), (1 - e)**0.5*np.cos(E/2.))
 
         # compute the distance to the central body r
         r = a * (1 - e * np.cos(E))
 
-        # obtain the position o and velocity ov vector
+        # obtain the position vector o
         o = [r * np.cos(ν), r * np.sin(ν), np.zeros(len(ν))]
 
         # Rotate o to the inertial frame
@@ -528,7 +542,7 @@ class SpaceRock:
             xdata = self.ra.degree
             xdata[xdata > 180] -= 360
 
-            ax.scatter(xdata, self.dec.degree, color=color, alpha=alpha)
+            ax.scatter(-xdata, self.dec.degree, color=color, alpha=alpha)
 
             gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
                               linewidth=1, color='gray', alpha=0.5, linestyle='-')
@@ -573,7 +587,7 @@ class SpaceRock:
             xdata = self.ra
             xdata[xdata.value > np.pi] -= 2*np.pi * u.rad
 
-            ax.scatter(xdata, self.dec, color=color, alpha=alpha)
+            ax.scatter(-xdata, self.dec, color=color, alpha=alpha)
 
             if ecliptic_plane == True:
                 def radec2project(ra, dec):
