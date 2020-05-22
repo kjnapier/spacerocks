@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 from numba import jit
 from scipy.optimize import newton
+import ephem
 
 from skyfield.api import Topos, Loader
 
@@ -25,6 +26,7 @@ from astropy.constants import c
 from astropy.coordinates import SkyCoord
 
 import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
 
 from .linalg3d import dot, norm, cross, euler_rotation
 
@@ -538,19 +540,97 @@ class SpaceRock:
         return 'Data written to {}.csv.'.format(path)
 
 
-    def plot_radec(self, color='black', alpha=0.5):
+    def plot_radec(self, color='black', alpha=0.5, zoom=False,
+                   galactic_plane=False, ecliptic_plane=True):
         '''
         Plot the right ascension and declination of each object on a Mollweide
         projection. (See https://en.wikipedia.org/wiki/Mollweide_projection)
         '''
-        fig = plt.figure(figsize=(12, 8))
-        ax = fig.add_subplot(111, projection="mollweide")
+        if zoom == True:
 
-        xdata = self.ra
-        xdata[xdata.value > np.pi] -= 2*np.pi * u.rad
+            xmin=np.min(self.ra.degree) - 5
+            xmax=np.max(self.ra.degree) + 5
+            ymin=np.min(self.dec.degree) - 5
+            ymax=np.max(self.dec.degree) + 5
 
-        plt.scatter(xdata, self.dec, color=color, alpha=alpha)
-        return
+            fig = plt.figure(figsize=(12, 8))
+            ax = fig.add_subplot(111, projection=ccrs.PlateCarree())
+
+            xdata = self.ra.degree
+            xdata[xdata > 180] -= 360
+
+            ax.scatter(xdata, self.dec.degree, color=color, alpha=alpha)
+
+            gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                              linewidth=1, color='gray', alpha=0.5, linestyle='-')
+
+            gl.bottom_labels = True
+            gl.top_labels = False
+            gl.left_labels = True
+            gl.right_labels = False
+
+            if ecliptic_plane == True:
+                def radec2project(ra, dec):
+                    ra[ra>180] -= 360
+                    return (ra, dec)
+
+                plane_lon = np.linspace(-np.pi, np.pi, 1000)
+                plane_lat = np.zeros(len(plane_lon))
+                ecl_plane = np.zeros([len(plane_lat), 2])
+
+                for i in range(len(plane_lat)):
+                    ecl_plane[i] = ephem.Equatorial(ephem.Ecliptic(plane_lon[i], plane_lat[i])).get()
+
+                x, y = radec2project(np.degrees(ecl_plane.T[0]), np.degrees(ecl_plane.T[1]))
+                ax.plot(x[1:999], -y[1:999], 'r-', zorder=2)
+
+            if galactic_plane == True:
+
+                galactic = SkyCoord(l=np.linspace(0, 360, 1000)*u.degree, b=np.zeros(1000)*u.degree, frame='galactic')
+                galxdata = galactic.icrs.ra.degree
+                galxdata[galxdata > 180] -= 360
+                galydata = galactic.icrs.dec.degree
+                order = galxdata.argsort()
+                ax.plot(-galxdata[order][1:999], -galydata[order][1:999], 'g-', zorder=3)
+
+            ax.set_extent([xmin, xmax, ymin, ymax], crs=ccrs.PlateCarree())
+
+        else:
+
+            fig = plt.figure(figsize=(12, 8))
+            ax = fig.add_subplot(111, projection="mollweide")
+            ax.grid(True)
+
+            xdata = self.ra
+            xdata[xdata.value > np.pi] -= 2*np.pi * u.rad
+
+            ax.scatter(xdata, self.dec, color=color, alpha=alpha)
+
+            if ecliptic_plane == True:
+                def radec2project(ra, dec):
+                    ra[ra>180] -= 360
+                    return (ra, dec)
+
+                plane_lon = np.linspace(-np.pi, np.pi, 1000)
+                plane_lat = np.zeros(len(plane_lon))
+                ecl_plane = np.zeros([len(plane_lat), 2])
+
+                for i in range(len(plane_lat)):
+                    ecl_plane[i] = ephem.Equatorial(ephem.Ecliptic(plane_lon[i], plane_lat[i])).get()
+
+                x, y = radec2project(np.degrees(ecl_plane.T[0]), np.degrees(ecl_plane.T[1]))
+                ax.plot(np.radians(x[1:999]), -np.radians(y[1:999]), 'r-', zorder=2)
+
+            if galactic_plane == True:
+
+                galactic = SkyCoord(l=np.linspace(0, 360, 1000)*u.degree, b=np.zeros(1000)*u.degree, frame='galactic')
+                galxdata = galactic.icrs.ra.rad
+                galxdata[galxdata > np.pi] -= 2*np.pi
+                galydata = galactic.icrs.dec.rad
+                order = galxdata.argsort()
+                ax.plot(-galxdata[order][1:999], -galydata[order][1:999], 'g-', zorder=3)
+
+        return fig, ax
 
 
     def set_simulation(self, startdate):
