@@ -15,20 +15,19 @@ import pandas as pd
 from numba import jit
 from scipy.optimize import newton
 import ephem
-
 from skyfield.api import Topos, Loader
 
 from astropy import units as u
 from astropy.table import Table
 from astropy.coordinates import Angle
 from astropy.time import Time
-from astropy.constants import c
 from astropy.coordinates import SkyCoord
 
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 
 from .linalg3d import dot, norm, cross, euler_rotation
+from .constants import *
 
 # Read in the observatory codes file and rehash as a dataframe.
 observatories = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'observatories.csv'))
@@ -38,35 +37,7 @@ load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
 planets = load('de423.bsp')
 sun = planets['sun']
-jupiter = planets['jupiter barycenter']
-saturn = planets['saturn barycenter']
-uranus = planets['uranus barycenter']
-neptune = planets['neptune barycenter']
-pluto = planets['pluto barycenter']
 
-Mercury_mass = 1.6601367952719304E-07
-Venus_mass = 2.4478383396645447E-06
-Earth_mass = 3.0404326462685257E-06
-Mars_mass = 3.2271514450538743E-07
-Sun_mass = 1 + Mercury_mass + Venus_mass + Earth_mass + Mars_mass
-Jupiter_mass = 9.547919384243222E-04
-Saturn_mass = 2.858859806661029E-04
-Uranus_mass = 4.3662440433515637E-05
-Neptune_mass = 5.151389020535497E-05
-Pluto_mass = 7.361781606089469e-09
-
-# standard gravitational parameter, GM. This value comes directly from Horizons.
-mu_bary = 0.00029630927492415936 * u.radian**2 * u.au**3 / u.day**2
-mu_helio = 0.00029591220828559093 * u.radian**2 * u.au**3 / u.day**2
-
-# obliquity of the Earth. From Horizons.
-epsilon = Angle(84381.448, u.arcsec).radian
-
-# speed of light
-c = c.to(u.au / u.year)
-
-# G parameter for magnitude estimation
-G = 0.15
 
 class SpaceRock:
 
@@ -285,7 +256,6 @@ class SpaceRock:
         '''
         Estimate the apparent magnitude of a TNO
         '''
-        # H + 5*log10(delta) + 5*log10(r) - 2.5*log10((1-G)*phi1 + G*phi2)
         q = (self.r**2 + self.delta**2 - 1 * u.au**2)/(2 * self.r * self.delta)
 
         ## pyephem
@@ -400,7 +370,7 @@ class SpaceRock:
         Method to convert heliocentric coordinates to barycentric coordinates.
         '''
         if self.frame == 'heliocentric':
-            t = ts.tt(jd=self.tau.value) #37 leap seconds
+            t = ts.tt(jd=self.tau.value)
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
             # calculate the barycentric xyz postion
@@ -424,7 +394,6 @@ class SpaceRock:
         Method to convert barycentric coordinates to heliocentric coordinates.
         '''
         if self.frame == 'barycentric':
-
             t = ts.tt(jd=self.tau.value)
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
@@ -634,6 +603,12 @@ class SpaceRock:
 
 
     def set_simulation(self, startdate):
+
+        jupiter = planets['jupiter barycenter']
+        saturn = planets['saturn barycenter']
+        uranus = planets['uranus barycenter']
+        neptune = planets['neptune barycenter']
+        pluto = planets['pluto barycenter']
 
         t = ts.tt(jd=startdate)
 
