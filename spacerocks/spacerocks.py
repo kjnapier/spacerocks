@@ -573,7 +573,7 @@ class SpaceRock:
                 ax.set_extent([-xmax - xrange * 0.05, -xmin + xrange * 0.05,
                                ymin - yrange * 0.05, ymax + yrange * 0.05], crs=ccrs.PlateCarree())
             except:
-                pass
+                ax.set_extent([-180, 180, -90, 90], crs=ccrs.PlateCarree())
 
             if ecliptic_plane == True:
                 def radec2project(ra, dec):
