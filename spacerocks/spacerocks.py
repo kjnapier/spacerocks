@@ -24,6 +24,7 @@ from astropy.time import Time
 from astropy.coordinates import SkyCoord
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 import cartopy.crs as ccrs
 
 from .linalg3d import dot, norm, cross, euler_rotation
@@ -531,26 +532,48 @@ class SpaceRock:
         '''
         if zoom == True:
 
-            xmin=np.min(self.ra.degree) - 5
-            xmax=np.max(self.ra.degree) + 5
-            ymin=np.min(self.dec.degree) - 5
-            ymax=np.max(self.dec.degree) + 5
-
             fig = plt.figure(figsize=(12, 8))
             ax = fig.add_subplot(111, projection=ccrs.PlateCarree())
 
             xdata = self.ra.degree
             xdata[xdata > 180] -= 360
 
-            ax.scatter(-xdata, self.dec.degree, color=color, alpha=alpha)
+            xmin=np.min(xdata)
+            xmax=np.max(xdata)
+            ymin=np.min(self.dec.degree)
+            ymax=np.max(self.dec.degree)
+
+            ax.scatter(-xdata, self.dec.degree, color='black', alpha=0.5)
+
+            xticks = np.linspace(-xmax, -xmin, 8)
+            yticks = np.linspace(ymin, ymax, 8)
+
+            ax.set_xticks(xticks)
+            ax.set_yticks(yticks)
+            xticklabels = ['${:.2f}\degree$'.format(-value) for value in xticks]
+            yticklabels = ['${:.2f}\degree$'.format(value) for value in yticks]
+            ax.set_xticklabels(xticklabels)
+            ax.set_yticklabels(yticklabels)
 
             gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
                               linewidth=1, color='gray', alpha=0.5, linestyle='-')
+            gl.xlocator = mticker.FixedLocator(xticks)
+            gl.ylocator = mticker.FixedLocator(yticks)
 
-            gl.bottom_labels = True
+
+            gl.bottom_labels = False
             gl.top_labels = False
-            gl.left_labels = True
+            gl.left_labels = False
             gl.right_labels = False
+
+            xrange = xmax - xmin
+            yrange = ymax - ymin
+
+            try:
+                ax.set_extent([-xmax - xrange * 0.05, -xmin + xrange * 0.05,
+                               ymin - yrange * 0.05, ymax + yrange * 0.05], crs=ccrs.PlateCarree())
+            except:
+                pass
 
             if ecliptic_plane == True:
                 def radec2project(ra, dec):
@@ -576,8 +599,6 @@ class SpaceRock:
                 order = galxdata.argsort()
                 ax.plot(-galxdata[order][1:999], -galydata[order][1:999], 'g-', zorder=3)
 
-            ax.set_extent([xmin, xmax, ymin, ymax], crs=ccrs.PlateCarree())
-
         else:
 
             fig = plt.figure(figsize=(12, 8))
@@ -586,6 +607,10 @@ class SpaceRock:
 
             xdata = self.ra
             xdata[xdata.value > np.pi] -= 2*np.pi * u.rad
+            ax.set_xticklabels(['$150\degree$', '$120\degree$', '$90\degree$' ,
+                                '$60\degree$' , '$30\degree$' , '$0\degree$'  ,
+                                '$330\degree$', '$300\degree$', '$270\degree$',
+                                '$240\degree$', '$210\degree$'])
 
             ax.scatter(-xdata, self.dec, color=color, alpha=alpha)
 
@@ -611,7 +636,7 @@ class SpaceRock:
                 galxdata[galxdata > np.pi] -= 2*np.pi
                 galydata = galactic.icrs.dec.rad
                 order = galxdata.argsort()
-                ax.plot(-galxdata[order][1:999], -galydata[order][1:999], 'g-', zorder=3)
+                ax.plot(-galxdata[order][1:999], galydata[order][1:999], 'g-', zorder=3)
 
         return fig, ax
 
