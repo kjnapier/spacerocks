@@ -33,7 +33,7 @@ import cartopy.crs as ccrs
 
 from .linalg3d import *
 from .constants import *
-from .jacobians import *
+#from .jacobians import *
 
 # Read in the observatory codes file and rehash as a dataframe.
 observatories = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'observatories.csv'))
@@ -124,14 +124,15 @@ class SpaceRock:
                 lp = self.M < np.pi * u.rad
                 self.epoch[lp] = self.tau.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
                 self.epoch[~lp] = self.tau.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+                self.epoch = Time(self.epoch, format='jd', scale='utc')
                 #self.epoch = self.tau - self.M / np.sqrt(mu / self.a**3)
 
             elif (kwargs.get('M') is None) and (kwargs.get('epoch') is not None):
                 # self.epoch = kwargs.get('epoch') * u.day # time at perihelion
                 self.epoch = Time(kwargs.get('epoch'),
                                   format=input_time_format,
-                                  scale=input_time_scale).jd * u.day
-                self.M = np.sqrt(mu / self.a**3) * (self.tau - self.epoch)
+                                  scale=input_time_scale)
+                self.M = np.sqrt(mu / self.a**3) * (self.tau - self.epoch.jd * u.day)
 
             # this looks redundant but it allows for broadcasring.
             self.tau = self.epoch +  self.M / np.sqrt(mu / self.a**3)
@@ -158,6 +159,7 @@ class SpaceRock:
             lp = self.M < np.pi * u.rad
             self.epoch[lp] = self.tau.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
             self.epoch[~lp] = self.tau.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+            self.epoch = Time(self.epoch, format='jd', scale='utc')
             #self.epoch = self.tau - self.M / np.sqrt(mu / self.a**3)
 
             # this looks redundant but it allows for broadcasring.
@@ -188,7 +190,6 @@ class SpaceRock:
                         'HPIX_{}'.format(value),
                         self.radec_to_hpix(value))
 
-        self.epoch = Time(self.epoch, format='jd', scale='utc')
         self.tau = Time(self.tau, format='jd', scale='utc')
 
 
@@ -255,7 +256,7 @@ class SpaceRock:
 
         return self
 
-    def calc_sky_error(self):
+    def sky_error(self):
 
         kep_to_xyz_jac = kep_to_xyz_jacobian(self.x.value,
                                              self.y.value,
@@ -267,7 +268,8 @@ class SpaceRock:
         J = np.linalg.inv(kep_to_xyz_jac)
         cov_xyz = np.matmul(J, np.matmul(self.cov_kep, J.T))
 
-        return 0
+
+        return self
 
 
     def radec_to_hpix(self, NSIDE):
@@ -410,8 +412,8 @@ class SpaceRock:
             self.xyz_to_kep(mu_bary)
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
             lp = self.M < np.pi * u.rad
-            self.epoch[lp] = self.tau[lp] - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
-            self.epoch[~lp] = self.tau[~lp] + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+            self.epoch.jd[lp] = self.tau.value[lp] - self.M.value[lp] / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+            self.epoch.jd[~lp] = self.tau.value[~lp] + (2*np.pi - self.M.value[~lp]) / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
             self.epoch = Time(self.epoch, format='jd', scale='utc')
             self.frame = 'barycentric'
 
@@ -437,8 +439,8 @@ class SpaceRock:
 
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
             lp = self.M < np.pi * u.rad
-            self.epoch.jd[lp] = self.tau[lp] - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
-            self.epoch.jd[~lp] = self.tau[~lp] + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+            self.epoch.jd[lp] = self.tau.value[lp] - self.M.value[lp] / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+            self.epoch.jd[~lp] = self.tau.value[~lp] + (2*np.pi - self.M.value[~lp]) / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
             self.epoch = Time(self.epoch, format='jd', scale='utc')
             self.frame = 'heliocentric'
 
@@ -667,34 +669,48 @@ class SpaceRock:
         uranus = planets['uranus barycenter']
         neptune = planets['neptune barycenter']
 
+        M_mercury = 1.6601367952719304e-7
+        M_venus = 2.4478383396645447e-6
+        M_earth = 3.040432648022642e-6 # Earth-Moon Barycenter
+        M_mars = 3.2271560375549977e-7 # Mars Barycenter
+        M_sun = 1
+        M_jupiter = 9.547919384243222e-4
+        M_saturn = 2.858859806661029e-4
+        M_uranus = 4.3662440433515637e-5
+        M_neptune = 5.151389020535497e-5
+        M_pluto = 7.361781606089469e-9
+
         if model == 0:
             active_bodies = [sun]
             names = ['Sun']
-            masses = [M_sun + M_mercury + M_venus + M_earth + M_mars \
-                      + M_jupiter + M_saturn + M_uranus + M_neptune]
+            M_sun += M_mercury + M_venus + M_earth + M_mars \
+                     + M_jupiter + M_saturn + M_uranus + M_neptune
+            masses = [M_sun]
 
         elif model == 1:
             active_bodies = [sun, jupiter, saturn, uranus, neptune]
             names = ['Sun', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            masses = [M_sun + M_mercury + M_venus + M_earth + M_mars,
-                      M_jupiter, M_saturn, M_uranus, M_neptune]
+            M_sun += M_mercury + M_venus + M_earth + M_mars
+            masses = [M_sun, M_jupiter, M_saturn, M_uranus, M_neptune]
 
         elif model == 2:
             active_bodies = [sun, earth, jupiter, saturn, uranus, neptune]
             names = ['Sun', 'Earth', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            masses = [M_sun + M_mercury + M_venus + M_mars, M_earth,
-                      M_jupiter, M_saturn, M_uranus, M_neptune]
+            M_sun += M_mercury + M_venus + M_mars
+            masses = [M_sun, M_earth, M_jupiter, M_saturn, M_uranus, M_neptune]
 
         elif model == 3:
             active_bodies = [sun, earth, mars, jupiter, saturn, uranus, neptune]
             names = ['Sun', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            masses = [M_sun + M_mercury + M_venus, M_earth, M_Mars,
+            M_sun += M_mercury + M_venus
+            masses = [M_sun, M_earth, M_Mars,
                       M_jupiter, M_saturn, M_uranus, M_neptune]
 
         elif model == 4:
             active_bodies = [sun, venus, earth, mars, jupiter, saturn, uranus, neptune]
             names = ['Sun', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            masses = [M_sun + M_mercury, M_venus, M_earth, M_Mars,
+            M_sun += M_mercury
+            masses = [M_sun, M_venus, M_earth, M_Mars,
                       M_jupiter, M_saturn, M_uranus, M_neptune]
 
         elif model == 5:
@@ -723,7 +739,7 @@ class SpaceRock:
         ss['vz'] = vz
         ss['mass'] = masses
         ss['a'] = 1 / (2 / norm([ss.x, ss.y, ss.z]) - norm([ss.vx, ss.vy, ss.vz])**2 / mu_bary.value)
-        ss['hill_radius'] = ss.a * pow(ss.mass/(3.*Sun_mass),1./3.)
+        ss['hill_radius'] = ss.a * pow(ss.mass / (3 * M_sun), 1/3)
         ss['name'] = names
 
         sim = rebound.Simulation()

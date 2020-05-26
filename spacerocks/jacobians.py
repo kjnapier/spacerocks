@@ -28,9 +28,9 @@ def ecl_to_equa_jacobian(ra, dec, ε):
               / (np.cos(ra)**2 + (np.cos(ε)*np.sin(ra) + np.sin(ε)*np.tan(dec))**2)**2
 
     dλ_dra = (np.cos(ε) + np.sin(ra) * np.sin(ε) * np.tan(dec))**2 \
-             / (np.cos(ra)**2 + np.cos(ε)**2 * np.sin(ra)**2) \
+             / ((np.cos(ra)**2 + np.cos(ε)**2 * np.sin(ra)**2) \
              + np.tan(dec) * (np.sin(ra) * np.sin(2*ε) \
-             + np.sin(ε)**2 * np.tan(dec)))**2
+             + np.sin(ε)**2 * np.tan(dec))**2)
 
     return np.array([[dλ_dra, dλ_ddec], [dβ_dra, dβ_ddec]])
 
