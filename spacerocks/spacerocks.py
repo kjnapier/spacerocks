@@ -1,5 +1,5 @@
 ###############################################################################
-# SpaceRocks, version 0.6.6
+# SpaceRocks, version 0.6.7
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -53,9 +53,6 @@ class SpaceRock:
                  uncertainties=None, *args, **kwargs):
 
         self.frame = input_frame
-        self.tau = Time(kwargs.get('tau'),
-                        format=input_time_format,
-                        scale=input_time_scale).jd * u.day
 
         if obscode is not None:
             self.obscode = str(obscode).zfill(3)
@@ -78,13 +75,13 @@ class SpaceRock:
 
         # Case-insensitive keyword arguments.
         kwargs = {key.lower(): data for key, data in kwargs.items()}
-        keywords = ['a', 'e', 'inc', 'node', 'arg', 'M',
+        keywords = ['a', 'e', 'inc', 'node', 'arg', 'm',
                     'x', 'y', 'z', 'vx', 'vy', 'vz',
                     'tau', 'epoch', 'h', 'name']
 
         if not all(key in keywords for key in [*kwargs]):
             raise ValueError('Keywords are limited to a, e, inc, node,\
-                              arg, M, x, y, z, vx, vy, vz, tau, epoch,\
+                              arg, m, x, y, z, vx, vy, vz, tau, epoch,\
                               H, name')
 
         input_coordinates = input_coordinates.lower()
@@ -95,6 +92,10 @@ class SpaceRock:
         for idx, key in enumerate([*kwargs]):
             if np.isscalar(kwargs.get(key)):
                 kwargs[key] = np.array([kwargs.get(key)])
+
+        self.tau = Time(kwargs.get('tau'),
+                        format=input_time_format,
+                        scale=input_time_scale).jd * u.day
 
         if NSIDE is not None:
             if np.isscalar(NSIDE):
@@ -119,16 +120,15 @@ class SpaceRock:
             self.node = Angle(kwargs.get('node'), angle_unit).to(u.rad)
             self.arg = Angle(kwargs.get('arg'), angle_unit).to(u.rad)
 
-            if (kwargs.get('epoch') is None) and (kwargs.get('M') is not None):
-                self.M = Angle(kwargs.get('M'), angle_unit) * u.rad
+            if (kwargs.get('epoch') is None) and (kwargs.get('m') is not None):
+                self.M = Angle(kwargs.get('m'), angle_unit).rad * u.rad
                 lp = self.M < np.pi * u.rad
-                self.epoch[lp] = self.tau.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
-                self.epoch[~lp] = self.tau.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+                self.epoch = np.zeros(len(self.tau))
+                self.epoch[lp] = self.tau.value[lp] - self.M.value[lp] / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+                self.epoch[~lp] = self.tau.value[~lp] + (2*np.pi - self.M.value[~lp]) / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
                 self.epoch = Time(self.epoch, format='jd', scale='utc')
-                #self.epoch = self.tau - self.M / np.sqrt(mu / self.a**3)
 
-            elif (kwargs.get('M') is None) and (kwargs.get('epoch') is not None):
-                # self.epoch = kwargs.get('epoch') * u.day # time at perihelion
+            elif (kwargs.get('m') is None) and (kwargs.get('epoch') is not None):
                 self.epoch = Time(kwargs.get('epoch'),
                                   format=input_time_format,
                                   scale=input_time_scale)
@@ -160,7 +160,6 @@ class SpaceRock:
             self.epoch[lp] = self.tau.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
             self.epoch[~lp] = self.tau.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
             self.epoch = Time(self.epoch, format='jd', scale='utc')
-            #self.epoch = self.tau - self.M / np.sqrt(mu / self.a**3)
 
             # this looks redundant but it allows for broadcasring.
             self.tau = self.epoch + self.M / np.sqrt(mu / self.a**3)
