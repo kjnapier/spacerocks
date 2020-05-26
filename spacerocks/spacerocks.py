@@ -135,7 +135,7 @@ class SpaceRock:
                 self.M = np.sqrt(mu / self.a**3) * (self.tau - self.epoch.jd * u.day)
 
             # this looks redundant but it allows for broadcasring.
-            self.tau = self.epoch +  self.M / np.sqrt(mu / self.a**3)
+            #self.tau = self.epoch +  self.M / np.sqrt(mu / self.a**3)
             self.kep_to_xyz(mu)
 
             if self.frame == 'barycentric':
