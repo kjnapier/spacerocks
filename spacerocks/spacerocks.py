@@ -9,7 +9,11 @@ import os
 import random
 
 import healpy as hp
+
 import rebound
+import reboundx
+from reboundx import constants
+
 import numpy as np
 import pandas as pd
 from numba import jit
@@ -27,8 +31,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import cartopy.crs as ccrs
 
-from .linalg3d import dot, norm, cross, euler_rotation
+from .linalg3d import *
 from .constants import *
+from .jacobians import *
 
 # Read in the observatory codes file and rehash as a dataframe.
 observatories = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'observatories.csv'))
@@ -140,7 +145,6 @@ class SpaceRock:
                 self.xyz_to_equa()
                 self.to_helio()
 
-
         elif input_coordinates == 'cartesian':
 
             self.x = kwargs.get('x') * u.au
@@ -236,9 +240,9 @@ class SpaceRock:
             delta = norm([x, y, z])
             ltt = delta / c
             M = self.M - ltt * (mu_bary / self.a**3)**0.5
-            if idx < max(range(10)):
-                x0, y0, z0 = self.kep_to_xyz_pos(self.a, self.e, self.inc,
-                                                 self.arg, self.node, M, self.precise)
+            x, y, z = self.kep_to_xyz_pos(self.a, self.e, self.inc,
+                                          self.arg, self.node, M, self.precise)
+
 
         # Cartesian to spherical coordinate
         self.delta = norm([x, y, z])
@@ -251,10 +255,24 @@ class SpaceRock:
 
         return self
 
+    def calc_sky_error(self):
+
+        kep_to_xyz_jac = kep_to_xyz_jacobian(self.x.value,
+                                             self.y.value,
+                                             self.z.value,
+                                             self.vx.value,
+                                             self.vy.value,
+                                             self.vz.value,
+                                             mu_bary.value)
+        J = np.linalg.inv(kep_to_xyz_jac)
+        cov_xyz = np.matmul(J, np.matmul(self.cov_kep, J.T))
+
+        return 0
+
 
     def radec_to_hpix(self, NSIDE):
         '''
-        Convert (ra, dec) into healpix
+        Convert (ra, dec) into healpix.
         '''
         return hp.pixelfunc.ang2pix(NSIDE, np.pi/2 - self.dec.radian, self.ra.radian, nest=True)
 
@@ -395,8 +413,6 @@ class SpaceRock:
             self.epoch[lp] = self.tau[lp] - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
             self.epoch[~lp] = self.tau[~lp] + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
             self.epoch = Time(self.epoch, format='jd', scale='utc')
-            #self.epoch[self.M.value >= np.pi] = self.tau + (2*np.pi * u.rad - self.M) / np.sqrt(mu_bary / self.a**3)
-            #self.epoch[self.M.value < np.pi] = self.tau - self.M / np.sqrt(mu_bary / self.a**3)
             self.frame = 'barycentric'
 
 
@@ -424,8 +440,6 @@ class SpaceRock:
             self.epoch.jd[lp] = self.tau[lp] - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
             self.epoch.jd[~lp] = self.tau[~lp] + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
             self.epoch = Time(self.epoch, format='jd', scale='utc')
-            #self.epoch[self.M.value >= np.pi] = self.tau + (2*np.pi * u.rad - self.M) / np.sqrt(mu_helio / self.a**3)
-            #self.epoch[self.M.value < np.pi] = self.tau - self.M / np.sqrt(mu_helio / self.a**3)
             self.frame = 'heliocentric'
 
         return self
@@ -641,20 +655,63 @@ class SpaceRock:
         return fig, ax
 
 
-    def set_simulation(self, startdate):
+    def set_simulation(self, startdate, model, gr=False, gr_fast=False,
+                       gr_full=False, add_pluto=False):
 
+        mercury = planets['mercury']
+        venus = planets['venus']
+        earth = planets['earth']
+        mars = planets['mars']
         jupiter = planets['jupiter barycenter']
         saturn = planets['saturn barycenter']
         uranus = planets['uranus barycenter']
         neptune = planets['neptune barycenter']
-        pluto = planets['pluto barycenter']
+
+        if model == 0:
+            active_bodies = [sun]
+            names = ['Sun']
+            masses = [M_sun + M_mercury + M_venus + M_earth + M_mars \
+                      + M_jupiter + M_saturn + M_uranus + M_neptune]
+
+        elif model == 1:
+            active_bodies = [sun, jupiter, saturn, uranus, neptune]
+            names = ['Sun', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+            masses = [M_sun + M_mercury + M_venus + M_earth + M_mars,
+                      M_jupiter, M_saturn, M_uranus, M_neptune]
+
+        elif model == 2:
+            active_bodies = [sun, earth, jupiter, saturn, uranus, neptune]
+            names = ['Sun', 'Earth', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+            masses = [M_sun + M_mercury + M_venus + M_mars, M_earth,
+                      M_jupiter, M_saturn, M_uranus, M_neptune]
+
+        elif model == 3:
+            active_bodies = [sun, earth, mars, jupiter, saturn, uranus, neptune]
+            names = ['Sun', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+            masses = [M_sun + M_mercury + M_venus, M_earth, M_Mars,
+                      M_jupiter, M_saturn, M_uranus, M_neptune]
+
+        elif model == 4:
+            active_bodies = [sun, venus, earth, mars, jupiter, saturn, uranus, neptune]
+            names = ['Sun', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+            masses = [M_sun + M_mercury, M_venus, M_earth, M_Mars,
+                      M_jupiter, M_saturn, M_uranus, M_neptune]
+
+        elif model == 5:
+            active_bodies = [sun, mercury, venus, earth, mars, jupiter, saturn, uranus, neptune]
+            names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+            masses = [M_sun, M_mercury, M_venus, M_earth, M_Mars, M_jupiter, M_saturn, M_uranus, M_neptune]
+
+        if add_pluto == True:
+            pluto = planets['pluto barycenter']
+            active_bodies.append(pluto)
+            names.append('Pluto')
+            masses.append(M_pluto)
 
         t = ts.tt(jd=startdate)
 
-        active_bodies = [sun, jupiter, saturn, uranus, neptune, pluto]
         x, y, z = np.array([body.at(t).ecliptic_xyz().au for body in active_bodies]).T
         vx, vy, vz = np.array([body.at(t).ecliptic_velocity().au_per_d for body in active_bodies]).T
-        names = ['Sun', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
 
         # create a dataframe of the massive bodies in the solar system
         ss = pd.DataFrame()
@@ -664,7 +721,7 @@ class SpaceRock:
         ss['vx'] = vx
         ss['vy'] = vy
         ss['vz'] = vz
-        ss['mass'] = [Sun_mass, Jupiter_mass, Saturn_mass, Uranus_mass, Neptune_mass, Pluto_mass]
+        ss['mass'] = masses
         ss['a'] = 1 / (2 / norm([ss.x, ss.y, ss.z]) - norm([ss.vx, ss.vy, ss.vz])**2 / mu_bary.value)
         ss['hill_radius'] = ss.a * pow(ss.mass/(3.*Sun_mass),1./3.)
         ss['name'] = names
@@ -679,6 +736,28 @@ class SpaceRock:
 
         sim.move_to_com()
 
+        if gr_fast == True:
+            bodies = sim.particles
+            rebx = reboundx.Extras(sim)
+            gr = rebx.load_force('gr_potential')
+            gr.params['c'] = constants.C
+            rebx.add_force(gr)
+            bodies['Sun'].params['gr_source'] = 1
+
+        elif gr == True:
+            bodies = sim.particles
+            rebx = reboundx.Extras(sim)
+            gr = rebx.load_force('gr')
+            gr.params['c'] = constants.C
+            rebx.add_force(gr)
+            bodies['Sun'].params['gr_source'] = 1
+
+        elif gr_full == True:
+            rebx = reboundx.Extras(sim)
+            gr = rebx.load_force('gr_full')
+            gr.params["c"] = constants.C
+            rebx.add_force(gr)
+
         sim.N_active = len(ss)
         sim.testparticle_type = 0
 
@@ -687,16 +766,14 @@ class SpaceRock:
 
         sim.ri_ias15.min_dt = sim.dt / 1440 # one minute
         sim.ri_mercurius.hillfac = 3
-        #sim.ri_whfast.safe_mode = 0
-        #sim.ri_whfast.corrector = 11
 
         return sim
 
 
-    def propagate(self, enddates):
+    def propagate(self, enddates, model=0):
         '''
         Integrate the bodies to the desired date. The logic could be cleaner
-        but it should work.
+        but it works.
         '''
 
         if np.isscalar(enddates):
@@ -727,7 +804,7 @@ class SpaceRock:
 
         # Integrate all particles to the same tau
         pickup_times = df.tau
-        sim = self.set_simulation(np.min(pickup_times))
+        sim = self.set_simulation(np.min(pickup_times), model)
         sim.t = np.min(df.tau)
 
         for time in np.sort(np.unique(pickup_times)):
