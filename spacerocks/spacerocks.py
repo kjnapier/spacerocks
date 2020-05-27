@@ -1,5 +1,5 @@
 ###############################################################################
-# SpaceRocks, version 0.6.7
+# SpaceRocks, version 0.6.8
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -29,6 +29,7 @@ from astropy.coordinates import SkyCoord
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+from mpl_toolkits.mplot3d import Axes3D
 import cartopy.crs as ccrs
 
 from .linalg3d import *
@@ -203,10 +204,10 @@ class SpaceRock:
 
 
     @jit
-    def calc_E_fast(self):
-        E = self.M
+    def calc_E_fast(self, e, M):
+        E = M
         for kk in range(100):
-            E = self.M + self.e * np.sin(E) * u.rad
+            E = M + e * np.sin(E) * u.rad
         return E
 
 
@@ -240,9 +241,9 @@ class SpaceRock:
             delta = norm([x, y, z])
             ltt = delta / c
             M = self.M - ltt * (mu_bary / self.a**3)**0.5
-            x, y, z = self.kep_to_xyz_pos(self.a, self.e, self.inc,
-                                          self.arg, self.node, M, self.precise)
-
+            if idx < 9:
+                x0, y0, z0 = self.kep_to_xyz_pos(self.a, self.e, self.inc,
+                                                 self.arg, self.node, M, self.precise)
 
         # Cartesian to spherical coordinate
         self.delta = norm([x, y, z])
@@ -313,7 +314,7 @@ class SpaceRock:
         if self.precise == True:
             E = np.array(list(map(self.calc_E, self.e.value, self.M.value))) * u.rad
         else:
-            E = self.calc_E_fast()
+            E = self.calc_E_fast(self.e, self.M)
 
         # compute true anomaly v
         ν = 2 * np.arctan2((1 + self.e)**0.5*np.sin(E/2.), (1 - self.e)**0.5*np.cos(E/2.))
@@ -451,11 +452,12 @@ class SpaceRock:
         Just compute the xyz position of an object. Used for iterative equatorial
         calculation.
         '''
+
         # compute eccentric anomaly E
         if precision == True:
             E = np.array(list(map(self.calc_E, e.value, M.value))) * u.rad
         else:
-            E = self.calc_E_fast()
+            E = self.calc_E_fast(e, M)
 
         # compute true anomaly ν
         ν = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2.), (1 - e)**0.5*np.cos(E/2.))
@@ -470,6 +472,36 @@ class SpaceRock:
         x, y, z = euler_rotation(arg, inc, node, o) * u.au
 
         return x, y, z
+
+    def plot_orbits(self):
+
+        x = np.zeros([500, len(self.a)])
+        y = np.zeros([500, len(self.a)])
+        z = np.zeros([500, len(self.a)])
+        for idx, M in enumerate(np.linspace(0, 2*np.pi, 500)):
+            xx, yy, zz = self.kep_to_xyz_pos(self.a, self.e, self.inc.rad,
+                                        self.arg.rad, self.node.rad,
+                                        np.repeat(M, len(self.a)) * u.rad, False)
+            x[idx] = xx
+            y[idx] = yy
+            z[idx] = zz
+
+        fig = plt.figure(figsize=(12, 12))
+        ax = fig.add_subplot(111, projection='3d')
+        for idx in range(len(self.a)):
+            ax.plot(x.T[idx], y.T[idx], z.T[idx])
+
+        ax.axis('off')
+        ax.view_init(90, 0)
+
+        #xpad = (np.max(x) - np.min(x)) * 0.05
+        #ypad = (np.max(x) - np.min(x)) * 0.05
+        #zpad = (np.max(x) - np.min(x)) * 0.05
+        #ax.set_xlim([np.min(x) - xpad, np.max(x) + xpad])
+        #ax.set_ylim([np.min(y) - ypad, np.max(y) + ypad])
+        #ax.set_zlim([np.min(z) - zpad, np.max(z) + zpad])
+
+        return fig, ax
 
 
     def get_dict(self):
