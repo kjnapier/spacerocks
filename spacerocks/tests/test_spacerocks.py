@@ -1,52 +1,28 @@
 import unittest
 from spacerocks import SpaceRock
-from astropy import units as u
 
-# Mars orbital parameters on obs_date. From JPL Horizons.
-obs_date = 2458982.5
-
-mars_X = 3.629001676703048E-01 * u.au
-mars_Y = -1.370988251351513E+00 * u.au
-mars_Z = -3.784524466405902E-02 * u.au
-mars_VX = 1.404127833852117E-02 * u.au / u.day.to(u.year)
-mars_VY = 4.807854901674583E-03 * u.au / u.day.to(u.year)
-mars_VZ = -2.436304874926014E-04 * u.au / u.day.to(u.year)
-
-mars_a = 1.501181855304217E+00 * u.au
-mars_e = 8.937143360621642E-02 * u.dimensionless_unscaled
-mars_inc = 1.855182144321076E+00 * u.degree.to(u.rad)
-mars_node = 4.935245879721101E+01 * u.degree.to(u.rad)
-mars_omega = 2.917160972199084E+02 * u.degree.to(u.rad)
-mars_epoch = 2.459072070701163E+06 * u.day
+BP = SpaceRock(a=4.487673062316562E+02,
+               e=9.214543710796702E-01,
+               inc=5.411068217470999E+01,
+               arg=3.480587931444684E+02,
+               node=1.352131434907198E+02,
+               epoch=2.473015776611103E+06,
+               tau=2458982.5,
+               H=4.5,
+               name='BP',
+               precise=True,
+               input_coordinates='keplerian',
+               input_frame='barycentric',
+               input_angles='degrees',
+               obscode=304)
 
 class TestSpacerocks(unittest.TestCase):
 
-    def test_xyz_to_kep(self):
-        mars = SpaceRock(X=mars_X, Y=mars_Y, Z=mars_Z,
-                         VX=mars_VX, VY=mars_VY, VZ=mars_VZ,
-                         coordinates='cartesian')
-        self.assertAlmostEqual(mars.a[0], mars_a)
-        self.assertAlmostEqual(mars.e[0], mars_e)
-        self.assertAlmostEqual(mars.inc[0], mars_inc)
-        self.assertAlmostEqual(mars.node[0], mars_node)
-        self.assertAlmostEqual(mars.omega[0], mars_omega)
-        self.assertAlmostEqual(mars.epoch[0], mars_epoch)
-
-
-    #def test_kep_to_xyz(self):
-#        self.assertAlmostEqual()
-
-    #def test_xyz_to_equa(self):
-    #    self.assertAlmostEqual()
-
-    #def test_radec_to_hpix(self):
-    #    self.assertAlmostEqual()
-
-    #def test_helio_to_bary(self):
-    #    self.assertAlmostEqual()
-
-    #def test_bary_to_helio(self):
-    #    self.assertAlmostEqual()
+    def test_BP_ephemerides(self):
+        self.assertAlmostEqual(BP.ra.rad[0], 1.1921539698)
+        self.assertAlmostEqual(BP.dec.rad[0], -0.5464390416)
+        self.assertAlmostEqual(BP.mag.value[0], 21.6360133068)
+        self.assertAlmostEqual(BP.M.value[0], -0.0254097208)
 
 if __name__ == '__main__':
     unittest.main()

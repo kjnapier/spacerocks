@@ -1,5 +1,5 @@
 ###############################################################################
-# SpaceRocks, version 0.6.8
+# SpaceRocks, version 0.6.9
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -256,20 +256,20 @@ class SpaceRock:
 
         return self
 
-    def sky_error(self):
+    #def sky_error(self):
 
-        kep_to_xyz_jac = kep_to_xyz_jacobian(self.x.value,
-                                             self.y.value,
-                                             self.z.value,
-                                             self.vx.value,
-                                             self.vy.value,
-                                             self.vz.value,
-                                             mu_bary.value)
-        J = np.linalg.inv(kep_to_xyz_jac)
-        cov_xyz = np.matmul(J, np.matmul(self.cov_kep, J.T))
+    #    kep_to_xyz_jac = kep_to_xyz_jacobian(self.x.value,
+    #                                         self.y.value,
+    #                                         self.z.value,
+    #                                         self.vx.value,
+    #                                         self.vy.value,
+    #                                         self.vz.value,
+    #                                         mu_bary.value)
+    #    J = np.linalg.inv(kep_to_xyz_jac)
+    #    cov_xyz = np.matmul(J, np.matmul(self.cov_kep, J.T))
 
 
-        return self
+    #    return self
 
 
     def radec_to_hpix(self, NSIDE):
@@ -489,7 +489,7 @@ class SpaceRock:
         fig = plt.figure(figsize=(12, 12))
         ax = fig.add_subplot(111, projection='3d')
         for idx in range(len(self.a)):
-            ax.plot(x.T[idx], y.T[idx], z.T[idx])
+            ax.plot(x.T[idx], y.T[idx], z.T[idx], color=np.random.choice(['#FFCB05', '#00274C']))
 
         ax.axis('off')
         ax.view_init(90, 0)
