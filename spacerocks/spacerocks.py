@@ -50,7 +50,7 @@ class SpaceRock:
 
     def __init__(self, input_coordinates='keplerian', input_frame='barycentric',
                  input_angles='degrees', input_time_format='jd',
-                 input_time_scale='utc', precise=False, NSIDE=None, obscode=None,
+                 input_time_scale='utc', NSIDE=None, obscode=None,
                  uncertainties=None, *args, **kwargs):
 
         self.frame = input_frame
@@ -68,11 +68,6 @@ class SpaceRock:
             mu = mu_bary
         elif self.frame == 'heliocentric':
             mu = mu_helio
-
-        self.precise = precise
-
-        if (self.precise is not True) and (self.precise is not False):
-            raise ValueError('The parameter precise must be set to either True or False.')
 
         # Case-insensitive keyword arguments.
         kwargs = {key.lower(): data for key, data in kwargs.items()}
@@ -192,22 +187,28 @@ class SpaceRock:
 
         self.tau = Time(self.tau, format='jd', scale='utc')
 
-
     def calc_E(self, e, M):
         '''
-        This method employs Newton's method to solve Kepler's Equation.
+        This method solves Kepler's Equation with the algorithm desscribed here:
+        https://ntrs.nasa.gov/archive/nasa/casi.ntrs.nasa.gov/19950021346.pdf
         '''
-        f = lambda E, M, e: E - e * np.sin(E) - M
-        E0 = M
-        E = newton(f, E0, args=(M, e))
-        return E
+        M[M > np.pi] -= 2*np.pi
+        α = (3 * np.pi**2 + 1.6 * (np.pi**2 - np.pi * abs(M))/(1 + e))/(np.pi**2 - 6)
+        d = 3 * (1 - e) + α * e
+        q = 2 * α * d * (1 - e) - M**2
+        r = 3 * α * d * (d - 1 + e) * M + M**3
+        w = (abs(r) + np.sqrt(q**3 + r**2))**(2/3)
+        E1 = (2 * r * w / (w**2 + w*q + q**2) + M)/d
+        f2 = e * np.sin(E1)
+        f3 = e * np.cos(E1)
+        f0 = E1 - f2 - M
+        f1 = 1 - f3
+        δ3 = -f0 / (f1 - f0 * f2 / (2 * f1))
+        δ4 = -f0 / (f1 + f2 * δ3 / 2 + δ3**2 * f3/6)
+        δ5 = -f0 / (f1 + δ4*f2/2 + δ4**2*f3/6 - δ4**3*f2/24)
 
-
-    @jit
-    def calc_E_fast(self, e, M):
-        E = M
-        for kk in range(100):
-            E = M + e * np.sin(E) * u.rad
+        E = E1 + δ5
+        E[E < 0] += 2 * np.pi
         return E
 
 
@@ -224,11 +225,10 @@ class SpaceRock:
         earth = planets['earth']
 
         # Only used for the topocentric calculation.
-        if self.precise == True:
-            if self.obscode is not None:
-                earth += Topos(latitude_degrees=self.obslat,
-                               longitude_degrees=self.obslon,
-                               elevation_m=self.obselev) # topocentric calculation
+        if self.obscode is not None:
+            earth += Topos(latitude_degrees=self.obslat,
+                           longitude_degrees=self.obslon,
+                           elevation_m=self.obselev) # topocentric calculation
 
         x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
         earth_dis = norm([x_earth, y_earth, z_earth])
@@ -243,7 +243,7 @@ class SpaceRock:
             M = self.M - ltt * (mu_bary / self.a**3)**0.5
             if idx < 9:
                 x0, y0, z0 = self.kep_to_xyz_pos(self.a, self.e, self.inc,
-                                                 self.arg, self.node, M, self.precise)
+                                                 self.arg, self.node, M)
 
         # Cartesian to spherical coordinate
         self.delta = norm([x, y, z])
@@ -304,17 +304,10 @@ class SpaceRock:
         '''
         Transform from Keplerian to cartesian coordinates. There is no analytic
         solution to solve Kepler's Equation M = E - eSin[e] for the eccentric
-        anomaly, E. If you need very precise coordinates, the method uses Newton's
-        root-finding method from scipy.optimize. This is very precise, but it is
-        not vectorizable or compilable, so it is rather slow
-        (> factor of 5 slowdown). Otherwise, the .ethod uses a fixed-point
-        iteration method. See https://en.wikipedia.org/wiki/Kepler%27s_equation
+        anomaly (E), but I use a close approximation.
         '''
         # compute eccentric anomaly E
-        if self.precise == True:
-            E = np.array(list(map(self.calc_E, self.e.value, self.M.value))) * u.rad
-        else:
-            E = self.calc_E_fast(self.e, self.M)
+        E = self.calc_E(self.e.value, self.M.value) * u.rad
 
         # compute true anomaly v
         ν = 2 * np.arctan2((1 + self.e)**0.5*np.sin(E/2.), (1 - self.e)**0.5*np.cos(E/2.))
@@ -447,17 +440,14 @@ class SpaceRock:
         return self
 
 
-    def kep_to_xyz_pos(self, a, e, inc, arg, node, M, precision):
+    def kep_to_xyz_pos(self, a, e, inc, arg, node, M):
         '''
         Just compute the xyz position of an object. Used for iterative equatorial
         calculation.
         '''
 
         # compute eccentric anomaly E
-        if precision == True:
-            E = np.array(list(map(self.calc_E, e.value, M.value))) * u.rad
-        else:
-            E = self.calc_E_fast(e, M)
+        E = self.calc_E(e.value, M.value) * u.rad
 
         # compute true anomaly ν
         ν = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2.), (1 - e)**0.5*np.cos(E/2.))
