@@ -10,8 +10,8 @@ def xyz_to_ecl_jacobian(x, y, z):
     dβ_dy = - np.sign(y) * np.sign(z) * np.sqrt(((y**2 * z**2) / ((x**2 + y**2)*(x**2 + y**2 + z**2)**2)))
     dβ_dz = np.sqrt(((x**2 + y**2) / (x**2 + y**2 + z**2)**2))
 
-    jacobian = np.array([[dra_dx, dra_dy, 0, 0, 0, 0],
-                         [ddec_dx, ddec_dy, ddec_dz, 0, 0, 0]])
+    jacobian = np.array([[dλ_dx, dλ_dy, 0, 0, 0, 0],
+                         [dβ_dx, dβ_dy, dβ_dz, 0, 0, 0]])
 
     return jacobian
 

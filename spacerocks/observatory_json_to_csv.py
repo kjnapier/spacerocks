@@ -1,5 +1,6 @@
 import pandas as pd
 from astropy.coordinates import earth
+import numpy as np
 pd.options.mode.chained_assignment = None
 
 observatories = pd.read_json('/Users/kjnapier/research/spacerocks/spacerocks/obscodes_extended.json').T
