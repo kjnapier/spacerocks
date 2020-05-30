@@ -1,7 +1,7 @@
 from numba import jit
 import numpy as np
 # Optimized pure-Python vector algebra in three dimensions.
-### for some reason, jit destroys astropy units. I don't think the speedup is worth the sacrifice.
+# for some reason, jit destroys astropy units. I don't think the speedup is worth the sacrifice.
 # jit
 def cross(a, b):
     x1 = a[1] * b[2] - a[2] * b[1]
