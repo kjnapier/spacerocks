@@ -6,9 +6,11 @@
 
 # Skyfield data
 /Skyfield-Data/
+/spacerocks/Skyfield-Data/
 
 # Ipython checkpoints
 /.ipynb_checkpoints/
+/spacerocks/.ipynb_checkpoints/
 
 dates.py
 prototypes.py

@@ -7,6 +7,7 @@
 import sys
 import os
 import random
+import copy
 
 import healpy as hp
 
@@ -49,35 +50,19 @@ sun = planets['sun']
 class SpaceRock:
 
     def __init__(self, input_coordinates='keplerian', input_frame='barycentric',
-                 input_angles='degrees', input_time_format='jd',
+                 input_angles='degrees', input_time_format='jd', calc_equa=True,
                  input_time_scale='utc', NSIDE=None, obscode=None,
                  uncertainties=None, *args, **kwargs):
-
-        self.frame = input_frame
-
-        if obscode is not None:
-            self.obscode = str(obscode).zfill(3)
-            obs = observatories[observatories.obscode == self.obscode]
-            self.obslat = obs.lat.values
-            self.obslon = obs.lon.values
-            self.obselev = obs.elevation.values
-        else:
-            self.obscode = None
-
-        if self.frame == 'barycentric':
-            mu = mu_bary
-        elif self.frame == 'heliocentric':
-            mu = mu_helio
 
         # Case-insensitive keyword arguments.
         kwargs = {key.lower(): data for key, data in kwargs.items()}
         keywords = ['a', 'e', 'inc', 'node', 'arg', 'm',
                     'x', 'y', 'z', 'vx', 'vy', 'vz',
-                    'tau', 'epoch', 'h', 'name']
+                    'obsdate', 't_peri', 'h', 'name']
 
         if not all(key in keywords for key in [*kwargs]):
             raise ValueError('Keywords are limited to a, e, inc, node,\
-                              arg, m, x, y, z, vx, vy, vz, tau, epoch,\
+                              arg, m, x, y, z, vx, vy, vz, obsdate, t_peri,\
                               H, name')
 
         input_coordinates = input_coordinates.lower()
@@ -89,16 +74,54 @@ class SpaceRock:
             if np.isscalar(kwargs.get(key)):
                 kwargs[key] = np.array([kwargs.get(key)])
 
-        self.tau = Time(kwargs.get('tau'),
+        self.obsdate = Time(kwargs.get('obsdate'),
                         format=input_time_format,
                         scale=input_time_scale).jd * u.day
+
+        self.H = kwargs.get('h')
 
         if NSIDE is not None:
             if np.isscalar(NSIDE):
                 NSIDE = np.array([NSIDE])
-            self.NSIDE = NSIDE
+            SpaceRock.NSIDE = NSIDE
         else:
-            self.NSIDE = None
+            SpaceRock.NSIDE = None
+
+        SpaceRock.calc_equa = calc_equa
+
+        # Base attributes. Required by every object.
+        attributes = ['a', 'e', 'inc', 'node', 'arg', 'M', 't_peri', 'varpi',
+                      'x', 'y', 'z', 'vx', 'vy', 'vz', 'obsdate', 'name', 'r']
+
+        if SpaceRock.calc_equa == True:
+
+            for attr in ['ra', 'dec', 'skycoord', 'elong', 'delta', 'ltt', 'phase_angle']:
+                attributes.append(attr)
+
+            if self.H is not None:
+                attributes.append('H')
+                attributes.append('mag')
+
+            if SpaceRock.NSIDE is not None:
+                for value in SpaceRock.NSIDE:
+                    attributes.append('HPIX_{}'.format(value))
+
+        SpaceRock.attributes = attributes
+        SpaceRock.frame = input_frame
+
+        if obscode is not None:
+            SpaceRock.obscode = str(obscode).zfill(3)
+            obs = observatories[observatories.obscode == SpaceRock.obscode]
+            SpaceRock.obslat = obs.lat.values
+            SpaceRock.obslon = obs.lon.values
+            SpaceRock.obselev = obs.elevation.values
+        else:
+            SpaceRock.obscode = None
+
+        if SpaceRock.frame == 'barycentric':
+            mu = mu_bary
+        elif SpaceRock.frame == 'heliocentric':
+            mu = mu_helio
 
         if input_angles == 'degrees':
             angle_unit = u.degree
@@ -116,31 +139,43 @@ class SpaceRock:
             self.node = Angle(kwargs.get('node'), angle_unit).to(u.rad)
             self.arg = Angle(kwargs.get('arg'), angle_unit).to(u.rad)
 
-            if (kwargs.get('epoch') is None) and (kwargs.get('m') is not None):
+            if (kwargs.get('t_peri') is None) and (kwargs.get('m') is not None):
                 self.M = Angle(kwargs.get('m'), angle_unit).rad * u.rad
                 lp = self.M < np.pi * u.rad
-                self.epoch = np.zeros(len(self.tau))
-                self.epoch[lp] = self.tau.value[lp] - self.M.value[lp] / np.sqrt(mu_bary.value / self.a.value[lp]**3)
-                self.epoch[~lp] = self.tau.value[~lp] + (2*np.pi - self.M.value[~lp]) / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
-                self.epoch = Time(self.epoch, format='jd', scale='utc')
+                self.t_peri = np.zeros(len(self.obsdate))
+                self.t_peri[lp] = self.obsdate.value[lp] - self.M.value[lp] / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+                self.t_peri[~lp] = self.obsdate.value[~lp] + (2*np.pi - self.M.value[~lp]) / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
+                self.t_peri = Time(self.t_peri, format='jd', scale='utc')
 
-            elif (kwargs.get('m') is None) and (kwargs.get('epoch') is not None):
-                self.epoch = Time(kwargs.get('epoch'),
+            elif (kwargs.get('m') is None) and (kwargs.get('t_peri') is not None):
+                self.t_peri = Time(kwargs.get('t_peri'),
                                   format=input_time_format,
                                   scale=input_time_scale)
-                self.M = np.sqrt(mu / self.a**3) * (self.tau - self.epoch.jd * u.day)
+                self.M = np.sqrt(mu / self.a**3) * (self.obsdate - self.t_peri.jd * u.day)
 
             # this looks redundant but it allows for broadcasring.
-            #self.tau = self.epoch +  self.M / np.sqrt(mu / self.a**3)
+            # self.obsdate = self.t_peri + self.M / np.sqrt(mu / self.a**3)
             self.kep_to_xyz(mu)
 
-            if self.frame == 'barycentric':
-                self.xyz_to_equa()
+            if SpaceRock.calc_equa == True:
 
-            elif self.frame == 'heliocentric':
-                self.to_bary()
-                self.xyz_to_equa()
-                self.to_helio()
+                if SpaceRock.frame == 'barycentric':
+                    self.xyz_to_equa()
+
+                elif SpaceRock.frame == 'heliocentric':
+                    self.to_bary()
+                    self.xyz_to_equa()
+                    self.to_helio()
+
+                if self.H is not None:
+                    self.mag = self.estimate_mag()
+
+                if NSIDE is not None:
+                    for value in SpaceRock.NSIDE:
+                        setattr(SpaceRock,
+                                'HPIX_{}'.format(value),
+                                self.radec_to_hpix(value))
+
 
         elif input_coordinates == 'cartesian':
 
@@ -153,22 +188,34 @@ class SpaceRock:
 
             self.xyz_to_kep(mu)
             lp = self.M < np.pi * u.rad
-            self.epoch[lp] = self.tau.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
-            self.epoch[~lp] = self.tau.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
-            self.epoch = Time(self.epoch, format='jd', scale='utc')
+            self.t_peri[lp] = self.obsdate.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
+            self.t_peri[~lp] = self.obsdate.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+            self.t_peri = Time(self.t_peri, format='jd', scale='utc')
 
             # this looks redundant but it allows for broadcasring.
-            self.tau = self.epoch + self.M / np.sqrt(mu / self.a**3)
+            # self.obsdate = self.t_peri + self.M / np.sqrt(mu / self.a**3)
 
-            if self.frame == 'barycentric':
-                self.xyz_to_equa()
+            if SpaceRock.calc_equa == True:
 
-            elif self.frame == 'heliocentric':
-                self.to_bary()
-                self.xyz_to_equa()
-                self.to_helio()
+                if SpaceRock.frame == 'barycentric':
+                    self.xyz_to_equa()
 
-        self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
+                elif SpaceRock.frame == 'heliocentric':
+                    self.to_bary()
+                    self.xyz_to_equa()
+                    self.to_helio()
+
+                self.H = kwargs.get('h')
+                if self.H is not None:
+                    self.mag = self.estimate_mag()
+
+                if NSIDE is not None:
+                    for value in SpaceRock.NSIDE:
+                        setattr(SpaceRock,
+                                'HPIX_{}'.format(value),
+                            self.radec_to_hpix(value))
+
+        self.varpi = Angle((self.arg + self.node).wrap_at(2 * np.pi * u.rad), u.rad)
 
         if kwargs.get('name') is not None:
             self.name = kwargs.get('name')
@@ -176,16 +223,25 @@ class SpaceRock:
             # produces random, non-repeting integers between 0 and 1e10 - 1
             self.name = ['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.a))]
 
-        self.H = kwargs.get('h')
-        if self.H is not None:
-            self.mag = self.estimate_mag()
-        if NSIDE is not None:
-            for value in self.NSIDE:
-                setattr(SpaceRock,
-                        'HPIX_{}'.format(value),
-                        self.radec_to_hpix(value))
+        self.obsdate = Time(self.obsdate, format='jd', scale='utc')
 
-        self.tau = Time(self.tau, format='jd', scale='utc')
+    def __len__(self):
+        '''
+        This method allows you to use the len() function on a SpaceRocks object.
+        '''
+        return len(self.name)
+
+
+    def __getitem__(self, idx):
+        '''
+        This method allows you to index a SpaceRocks object.
+        '''
+        p = copy.copy(self)
+        for attr in SpaceRock.attributes:
+            setattr(p, attr, getattr(self, attr)[idx])
+
+        return p
+
 
     def calc_E(self, e, M):
         '''
@@ -221,14 +277,14 @@ class SpaceRock:
         This results in a significant slowdown to the code.
         '''
 
-        t = ts.tt(jd=self.tau.value)
+        t = ts.tt(jd=self.obsdate.value)
         earth = planets['earth']
 
         # Only used for the topocentric calculation.
-        if self.obscode is not None:
-            earth += Topos(latitude_degrees=self.obslat,
-                           longitude_degrees=self.obslon,
-                           elevation_m=self.obselev) # topocentric calculation
+        if SpaceRock.obscode is not None:
+            earth += Topos(latitude_degrees=SpaceRock.obslat,
+                           longitude_degrees=SpaceRock.obslon,
+                           elevation_m=SpaceRock.obselev) # topocentric calculation
 
         x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
         earth_dis = norm([x_earth, y_earth, z_earth])
@@ -389,8 +445,8 @@ class SpaceRock:
         '''
         Method to convert heliocentric coordinates to barycentric coordinates.
         '''
-        if self.frame == 'heliocentric':
-            t = ts.tt(jd=self.tau.value)
+        if SpaceRock.frame == 'heliocentric':
+            t = ts.tt(jd=self.obsdate.value)
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
             # calculate the barycentric xyz postion
@@ -405,18 +461,20 @@ class SpaceRock:
             self.xyz_to_kep(mu_bary)
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
             lp = self.M < np.pi * u.rad
-            self.epoch.jd[lp] = self.tau.value[lp] - self.M.value[lp] / np.sqrt(mu_bary.value / self.a.value[lp]**3)
-            self.epoch.jd[~lp] = self.tau.value[~lp] + (2*np.pi - self.M.value[~lp]) / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
-            self.epoch = Time(self.epoch, format='jd', scale='utc')
-            self.frame = 'barycentric'
+            self.t_peri.jd[lp] = self.obsdate.value[lp] - self.M.value[lp] / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+            self.t_peri.jd[~lp] = self.obsdate.value[~lp] + (2*np.pi - self.M.value[~lp]) / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
+            self.t_peri = Time(self.t_peri, format='jd', scale='utc')
+            SpaceRock.frame = 'barycentric'
+
+        return self
 
 
     def to_helio(self):
         '''
         Method to convert barycentric coordinates to heliocentric coordinates.
         '''
-        if self.frame == 'barycentric':
-            t = ts.tt(jd=self.tau.value)
+        if SpaceRock.frame == 'barycentric':
+            t = ts.tt(jd=self.obsdate.value)
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
             # calculate the heliocentric xyz postion
@@ -432,10 +490,10 @@ class SpaceRock:
 
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
             lp = self.M < np.pi * u.rad
-            self.epoch.jd[lp] = self.tau.value[lp] - self.M.value[lp] / np.sqrt(mu_bary.value / self.a.value[lp]**3)
-            self.epoch.jd[~lp] = self.tau.value[~lp] + (2*np.pi - self.M.value[~lp]) / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
-            self.epoch = Time(self.epoch, format='jd', scale='utc')
-            self.frame = 'heliocentric'
+            self.t_peri.jd[lp] = self.obsdate.value[lp] - self.M.value[lp] / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+            self.t_peri.jd[~lp] = self.obsdate.value[~lp] + (2*np.pi - self.M.value[~lp]) / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
+            self.t_peri = Time(self.t_peri, format='jd', scale='utc')
+            SpaceRock.frame = 'heliocentric'
 
         return self
 
@@ -445,12 +503,11 @@ class SpaceRock:
         Just compute the xyz position of an object. Used for iterative equatorial
         calculation.
         '''
-
         # compute eccentric anomaly E
         E = self.calc_E(e.value, M.value) * u.rad
 
         # compute true anomaly ν
-        ν = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2.), (1 - e)**0.5*np.cos(E/2.))
+        ν = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2), (1 - e)**0.5*np.cos(E/2))
 
         # compute the distance to the central body r
         r = a * (1 - e * np.cos(E))
@@ -463,8 +520,11 @@ class SpaceRock:
 
         return x, y, z
 
-    def plot_orbits(self):
 
+    def plot_orbits(self):
+        '''
+        Plot the orbits of all your rocks.
+        '''
         x = np.zeros([500, len(self.a)])
         y = np.zeros([500, len(self.a)])
         z = np.zeros([500, len(self.a)])
@@ -484,13 +544,6 @@ class SpaceRock:
         ax.axis('off')
         ax.view_init(90, 0)
 
-        #xpad = (np.max(x) - np.min(x)) * 0.05
-        #ypad = (np.max(x) - np.min(x)) * 0.05
-        #zpad = (np.max(x) - np.min(x)) * 0.05
-        #ax.set_xlim([np.min(x) - xpad, np.max(x) + xpad])
-        #ax.set_ylim([np.min(y) - ypad, np.max(y) + ypad])
-        #ax.set_zlim([np.min(z) - zpad, np.max(z) + zpad])
-
         return fig, ax
 
 
@@ -499,38 +552,9 @@ class SpaceRock:
         Create a dictionary of the object attributes. This method is used
         by the pandas_df and astropy_table methods.
         '''
-        data = {'name':self.name,
-                'a':self.a,
-                'e':self.e,
-                'inc':self.inc,
-                'arg':self.arg,
-                'node':self.node,
-                'varpi':self.varpi,
-                'epoch':self.epoch,
-                'M':self.M,
-                'tau':self.tau,
-                'x':self.x,
-                'y':self.y,
-                'z':self.z,
-                'vx':self.vx,
-                'vy':self.vy,
-                'vz':self.vz,
-                'ra':self.ra,
-                'dec':self.dec,
-                'skycoord':self.skycoord,
-                'delta':self.delta,
-                'ltt':self.ltt,
-                'phase_angle':self.phase_angle,
-                'elong':self.elong,
-                'r':self.r}
-
-        if self.NSIDE is not None:
-            for value in self.NSIDE:
-                data['HPIX_{}'.format(value)] = getattr(SpaceRock, 'HPIX_{}'.format(value))
-
-        if self.H is not None:
-            data['H'] = self.H
-            data['mag'] = self.mag
+        data = {}
+        for attr in SpaceRock.attributes:
+            data[attr] = getattr(self, attr)
 
         return data
 
@@ -561,8 +585,7 @@ class SpaceRock:
         return 'Data written to {}.csv.'.format(path)
 
 
-    def plot_radec(self, color='black', alpha=0.5, zoom=False,
-                   galactic_plane=False, ecliptic_plane=True):
+    def plot_radec(self, color='black', alpha=0.5, zoom=False, galactic_plane=False, ecliptic_plane=True):
         '''
         Plot the right ascension and declination of each object on a Mollweide
         projection. (See https://en.wikipedia.org/wiki/Mollweide_projection)
@@ -596,7 +619,6 @@ class SpaceRock:
                               linewidth=1, color='gray', alpha=0.5, linestyle='-')
             gl.xlocator = mticker.FixedLocator(xticks)
             gl.ylocator = mticker.FixedLocator(yticks)
-
 
             gl.bottom_labels = False
             gl.top_labels = False
@@ -676,228 +698,3 @@ class SpaceRock:
                 ax.plot(-galxdata[order][1:999], galydata[order][1:999], 'g-', zorder=3)
 
         return fig, ax
-
-
-    def set_simulation(self, startdate, model, gr=False, gr_fast=False,
-                       gr_full=False, add_pluto=False):
-
-        mercury = planets['mercury']
-        venus = planets['venus']
-        earth = planets['earth']
-        mars = planets['mars']
-        jupiter = planets['jupiter barycenter']
-        saturn = planets['saturn barycenter']
-        uranus = planets['uranus barycenter']
-        neptune = planets['neptune barycenter']
-
-        M_mercury = 1.6601367952719304e-7
-        M_venus = 2.4478383396645447e-6
-        M_earth = 3.040432648022642e-6 # Earth-Moon Barycenter
-        M_mars = 3.2271560375549977e-7 # Mars Barycenter
-        M_sun = 1
-        M_jupiter = 9.547919384243222e-4
-        M_saturn = 2.858859806661029e-4
-        M_uranus = 4.3662440433515637e-5
-        M_neptune = 5.151389020535497e-5
-        M_pluto = 7.361781606089469e-9
-
-        if model == 0:
-            active_bodies = [sun]
-            names = ['Sun']
-            M_sun += M_mercury + M_venus + M_earth + M_mars \
-                     + M_jupiter + M_saturn + M_uranus + M_neptune
-            masses = [M_sun]
-
-        elif model == 1:
-            active_bodies = [sun, jupiter, saturn, uranus, neptune]
-            names = ['Sun', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            M_sun += M_mercury + M_venus + M_earth + M_mars
-            masses = [M_sun, M_jupiter, M_saturn, M_uranus, M_neptune]
-
-        elif model == 2:
-            active_bodies = [sun, earth, jupiter, saturn, uranus, neptune]
-            names = ['Sun', 'Earth', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            M_sun += M_mercury + M_venus + M_mars
-            masses = [M_sun, M_earth, M_jupiter, M_saturn, M_uranus, M_neptune]
-
-        elif model == 3:
-            active_bodies = [sun, earth, mars, jupiter, saturn, uranus, neptune]
-            names = ['Sun', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            M_sun += M_mercury + M_venus
-            masses = [M_sun, M_earth, M_Mars,
-                      M_jupiter, M_saturn, M_uranus, M_neptune]
-
-        elif model == 4:
-            active_bodies = [sun, venus, earth, mars, jupiter, saturn, uranus, neptune]
-            names = ['Sun', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            M_sun += M_mercury
-            masses = [M_sun, M_venus, M_earth, M_Mars,
-                      M_jupiter, M_saturn, M_uranus, M_neptune]
-
-        elif model == 5:
-            active_bodies = [sun, mercury, venus, earth, mars, jupiter, saturn, uranus, neptune]
-            names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            masses = [M_sun, M_mercury, M_venus, M_earth, M_Mars, M_jupiter, M_saturn, M_uranus, M_neptune]
-
-        if add_pluto == True:
-            pluto = planets['pluto barycenter']
-            active_bodies.append(pluto)
-            names.append('Pluto')
-            masses.append(M_pluto)
-
-        t = ts.tt(jd=startdate)
-
-        x, y, z = np.array([body.at(t).ecliptic_xyz().au for body in active_bodies]).T
-        vx, vy, vz = np.array([body.at(t).ecliptic_velocity().au_per_d for body in active_bodies]).T
-
-        # create a dataframe of the massive bodies in the solar system
-        ss = pd.DataFrame()
-        ss['x'] = x
-        ss['y'] = y
-        ss['z'] = z
-        ss['vx'] = vx
-        ss['vy'] = vy
-        ss['vz'] = vz
-        ss['mass'] = masses
-        ss['a'] = 1 / (2 / norm([ss.x, ss.y, ss.z]) - norm([ss.vx, ss.vy, ss.vz])**2 / mu_bary.value)
-        ss['hill_radius'] = ss.a * pow(ss.mass / (3 * M_sun), 1/3)
-        ss['name'] = names
-
-        sim = rebound.Simulation()
-        sim.units = ('day', 'AU', 'Msun')
-
-        for p in ss.itertuples():
-            sim.add(x=p.x, y=p.y, z=p.z,
-                    vx=p.vx, vy=p.vy, vz=p.vz,
-                    m=p.mass, hash=p.name, r=p.hill_radius)
-
-        sim.move_to_com()
-
-        if gr_fast == True:
-            bodies = sim.particles
-            rebx = reboundx.Extras(sim)
-            gr = rebx.load_force('gr_potential')
-            gr.params['c'] = constants.C
-            rebx.add_force(gr)
-            bodies['Sun'].params['gr_source'] = 1
-
-        elif gr == True:
-            bodies = sim.particles
-            rebx = reboundx.Extras(sim)
-            gr = rebx.load_force('gr')
-            gr.params['c'] = constants.C
-            rebx.add_force(gr)
-            bodies['Sun'].params['gr_source'] = 1
-
-        elif gr_full == True:
-            rebx = reboundx.Extras(sim)
-            gr = rebx.load_force('gr_full')
-            gr.params["c"] = constants.C
-            rebx.add_force(gr)
-
-        sim.N_active = len(ss)
-        sim.testparticle_type = 0
-
-        sim.integrator = 'mercurius'
-        sim.dt = 1 # one day
-
-        sim.ri_ias15.min_dt = sim.dt / 1440 # one minute
-        sim.ri_mercurius.hillfac = 3
-
-        return sim
-
-
-    def propagate(self, enddates, model=0):
-        '''
-        Integrate the bodies to the desired date. The logic could be cleaner
-        but it works.
-        '''
-
-        if np.isscalar(enddates):
-            enddates = np.array([enddates])
-
-        Nx = len(enddates)
-        Ny = len(self.x)
-        x_values = np.zeros([Nx, Ny])
-        y_values = np.zeros([Nx, Ny])
-        z_values = np.zeros([Nx, Ny])
-        vx_values = np.zeros([Nx, Ny])
-        vy_values = np.zeros([Nx, Ny])
-        vz_values = np.zeros([Nx, Ny])
-        tau_values = np.zeros([Nx, Ny])
-        name_values = np.tile(self.name, Nx)
-        if self.H is not None:
-            H_values = np.tile(self.H, Nx)
-
-        in_frame = self.frame
-
-        # We need to (or should) work in barycentric coordinates in rebound
-        if in_frame == 'heliocentric':
-            self.to_bary()
-
-        # Rehash as a dataframe for easy access
-        df = self.pandas_df()
-        df['tau'] = df['tau'].apply(lambda idx: idx.jd)
-
-        # Integrate all particles to the same tau
-        pickup_times = df.tau
-        sim = self.set_simulation(np.min(pickup_times), model)
-        sim.t = np.min(df.tau)
-
-        for time in np.sort(np.unique(pickup_times)):
-            ps = df[df.tau == time]
-            for p in ps.itertuples():
-                sim.add(x=p.x, y=p.y, z=p.z,
-                vx=p.vx, vy=p.vy, vz=p.vz,
-                hash=p.name)
-                sim.integrate(time, exact_finish_time=1)
-
-        for ii, time in enumerate(np.sort(enddates)):
-            sim.integrate(time, exact_finish_time=1)
-            for jj, name in enumerate(self.name):
-                x_values[ii, jj] = sim.particles[name].x
-                y_values[ii, jj] = sim.particles[name].y
-                z_values[ii, jj] = sim.particles[name].z
-                vx_values[ii, jj] = sim.particles[name].vx
-                vy_values[ii, jj] = sim.particles[name].vy
-                vz_values[ii, jj] = sim.particles[name].vz
-                tau_values[ii, jj] = sim.t
-
-        self.x = x_values.flatten() * u.au
-        self.y = y_values.flatten() * u.au
-        self.z = z_values.flatten() * u.au
-        self.vx = vx_values.flatten() * (u.au / u.day)
-        self.vy = vy_values.flatten() * (u.au / u.day)
-        self.vz = vz_values.flatten() * (u.au / u.day)
-        self.name = name_values.flatten()
-        self.tau = Time(tau_values.flatten(), format='jd', scale='utc')
-
-        self.xyz_to_kep(mu_bary)
-
-        self.epoch = np.zeros(Nx * Ny)
-        lp = self.M < np.pi * u.rad
-        self.epoch[lp] = self.tau.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
-        self.epoch[~lp] = self.tau.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
-        self.epoch = Time(self.epoch, format='jd', scale='utc')
-
-        self.xyz_to_equa()
-        self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
-
-        if self.H is not None:
-            self.H = H_values
-            self.mag = self.estimate_mag()
-
-        # calculate new hpix
-        if self.NSIDE is not None:
-            for value in self.NSIDE:
-                setattr(SpaceRock,
-                'HPIX_{}'.format(value),
-                self.radec_to_hpix(value))
-
-        # be polite and return orbital parameters in the input frame.
-        if in_frame == 'heliocentric':
-            self.to_helio()
-
-        out_df = self.pandas_df()
-
-        return df, out_df
