@@ -8,4 +8,3 @@ ephem
 skyfield
 astropy
 matplotlib
-cartopy

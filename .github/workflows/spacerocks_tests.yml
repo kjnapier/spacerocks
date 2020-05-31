@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
          os: [ubuntu-latest]
-         python-version: [3.5, 3.6, 3.7, 3.8]
+         python-version: [3.8]
 
     steps:
     - uses: actions/checkout@v2
@@ -32,6 +32,7 @@ jobs:
         pip3 install --upgrade cython numpy pyshp six
         pip3 install shapely --no-binary shapely
         pip install -r requirements.txt
+        CFLAGS=‘-stdlib=libc++’ pip install cartopy
         pip install -e .
     - name: Lint with flake8
       run: |
