@@ -7,7 +7,6 @@ dependencies:
   - pytest
   - pylint
   - flake8
-  - healpy
   - rebound
   - numpy
   - pandas
