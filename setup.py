@@ -11,6 +11,7 @@ setup(
    # I'm not sure package_data is working.
    package_data={'spacerocks': ['data/observatories.csv']},
    install_requires=['healpy', 'numpy', 'matplotlib', 'skyfield',
-                     'astropy', 'numba', 'pandas', 'rebound'],
+                     'astropy', 'numba', 'pandas', 'rebound',
+                     'reboundx', 'ephem', 'cartopy'],
    include_package_data=True
 )
