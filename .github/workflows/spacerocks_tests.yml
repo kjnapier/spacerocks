@@ -32,7 +32,7 @@ jobs:
         pip3 install --upgrade cython numpy pyshp six
         pip3 install shapely --no-binary shapely
         pip install -r requirements.txt
-        CC=clang CFLAGS=‘-stdlib=libc++’ pip install cartopy
+        CC=clang pip install cartopy
         pip install -e .
     - name: Lint with flake8
       run: |
