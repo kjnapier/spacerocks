@@ -30,7 +30,7 @@ from astropy.coordinates import SkyCoord
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from mpl_toolkits.mplot3d import Axes3D
-rimport cartopy.crs as ccrs
+import cartopy.crs as ccrs
 
 from .linalg3d import *
 from .constants import *
