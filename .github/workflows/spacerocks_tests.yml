@@ -26,4 +26,7 @@ jobs:
         run: conda info
       - name: Conda list
         shell: pwsh
-        run: conda list
+        run: |
+          conda install requirements.txt
+          conda install -c conda-forge
+          conda list
