@@ -18,6 +18,7 @@ from reboundx import constants
 import numpy as np
 import pandas as pd
 from numba import jit
+from scipy.optimize import newton
 import ephem
 from skyfield.api import Topos, Loader
 
