@@ -34,7 +34,6 @@ jobs:
 
       - name: Install Dependencies Absent From Conda
         run: |
-          CXX=clang++ CC=clang pip install reboundx
           pip install healpy
 
       - name: Lint with flake8
