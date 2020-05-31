@@ -17,7 +17,7 @@ BP = SpaceRock(a=4.487673062316562E+02,
 
 class TestSpacerocks(unittest.TestCase):
 
-    def test_BP_ephemerides(self):
+    def test_ephemerides(self):
         self.assertAlmostEqual(BP.ra.rad[0], 1.1921539698)
         self.assertAlmostEqual(BP.dec.rad[0], -0.5464390416)
         self.assertAlmostEqual(BP.mag.value[0], 21.6360133068)
