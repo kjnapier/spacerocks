@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        os: ['ubuntu-latest', 'macos-latest', 'windows-latest']
+        os: ['ubuntu-latest', 'macos-latest']
         python-version: [3.8]
 
     runs-on: ${{ matrix.os }}
@@ -33,7 +33,9 @@ jobs:
           activate-environment: spacerocks
 
       - name: Install Dependencies Absent From Conda
-        run: pip install reboundx
+        run: |
+          pip install reboundx
+          pip install healpy
 
       - name: Lint with flake8
         shell: pwsh
