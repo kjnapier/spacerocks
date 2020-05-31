@@ -9,7 +9,6 @@ dependencies:
   - flake8
   - healpy
   - rebound
-  - reboundx
   - numpy
   - pandas
   - numba
