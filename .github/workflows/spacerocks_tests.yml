@@ -24,6 +24,9 @@ jobs:
           pip install flake8
           pip install pytest
           pip install wheel
+          brew install proj geos
+          pip3 install --upgrade cython numpy pyshp six
+          pip3 install shapely --no-binary shapely
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
