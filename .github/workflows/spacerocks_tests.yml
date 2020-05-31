@@ -47,4 +47,4 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --statistics
 
       - name: Test with pytest
-        run: coverage run --source=. -m py.test
+        run: pytest
