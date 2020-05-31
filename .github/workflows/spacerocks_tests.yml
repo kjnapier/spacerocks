@@ -3,20 +3,25 @@
 # ['ubuntu-latest', 'macos-latest', 'windows-latest']
 
 name: spacerocks
-on:
-  push:
-    branches: [ master ]
+on: [push]
+
 
 jobs:
+
   build:
+
     strategy:
       matrix:
         os: ['ubuntu-latest']
         python-version: [3.8]
+
     runs-on: ${{ matrix.os }}
+
     steps:
+
       - name: Checkout
         uses: actions/checkout@v2
+
       - name: Setup Miniconda
         uses: goanpeca/setup-miniconda@v1
         with:
@@ -26,3 +31,17 @@ jobs:
           python-version: ${{ matrix.python-version }}
           environment-file: environment.yml
           activate-environment: spacerocks
+        run: pip install reboundx
+
+      - name: Lint with flake8
+        shell: pwsh
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # all Python files should follow PEP8 (except some notebooks, see setup.cfg)
+          flake8 jupytext tests
+          # exit-zero treats all errors as warnings.  The GitHub editor is 127 chars wide
+          flake8 . --count --exit-zero --max-complexity=10 --statistics
+
+      - name: Test with pytest
+        run: coverage run --source=. -m py.test
