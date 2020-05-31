@@ -27,7 +27,6 @@ jobs:
           brew install proj geos
           pip3 install --upgrade cython numpy pyshp six
           pip3 install shapely --no-binary shapely
-          brew install python3-dev
 
       - name: Lint with flake8
         run: |
