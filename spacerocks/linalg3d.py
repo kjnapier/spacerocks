@@ -19,7 +19,7 @@ def norm(a):
 
 @jit
 def euler_rotation(a, b, c, x):
-    # Currently assumes z=0
+    # Currently assumes z=0. I'm going to modify this to the genreal case.
     xrot = x[0] * (np.cos(a)*np.cos(c) - np.sin(a)*np.sin(c)*np.cos(b)) - \
            x[1] * (np.sin(a)*np.cos(c) + np.cos(a)*np.sin(c)*np.cos(b))
     yrot = x[0] * (np.cos(a)*np.sin(c) + np.sin(a)*np.cos(c)*np.cos(b)) + \

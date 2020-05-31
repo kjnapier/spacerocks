@@ -38,7 +38,9 @@ from .constants import *
 #from .jacobians import *
 
 # Read in the observatory codes file and rehash as a dataframe.
-observatories = pd.read_csv(os.path.join(os.path.dirname(__file__), 'data', 'observatories.csv'))
+observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
+                            'data',
+                            'observatories.csv'))
 
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
@@ -95,7 +97,8 @@ class SpaceRock:
 
         if SpaceRock.calc_equa == True:
 
-            for attr in ['ra', 'dec', 'skycoord', 'elong', 'delta', 'ltt', 'phase_angle']:
+            for attr in ['ra', 'dec', 'skycoord', 'elong',
+                         'delta', 'ltt', 'phase_angle']:
                 attributes.append(attr)
 
             if self.H is not None:
@@ -143,8 +146,11 @@ class SpaceRock:
                 self.M = Angle(kwargs.get('m'), angle_unit).rad * u.rad
                 lp = self.M < np.pi * u.rad
                 self.t_peri = np.zeros(len(self.obsdate))
-                self.t_peri[lp] = self.obsdate.value[lp] - self.M.value[lp] / np.sqrt(mu_bary.value / self.a.value[lp]**3)
-                self.t_peri[~lp] = self.obsdate.value[~lp] + (2*np.pi - self.M.value[~lp]) / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
+                self.t_peri[lp] = self.obsdate.value[lp] - self.M.value[lp] \
+                                  / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+                self.t_peri[~lp] = self.obsdate.value[~lp] \
+                                   + (2*np.pi - self.M.value[~lp]) \
+                                   / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
                 self.t_peri = Time(self.t_peri, format='jd', scale='utc')
 
             elif (kwargs.get('m') is None) and (kwargs.get('t_peri') is not None):
@@ -188,8 +194,11 @@ class SpaceRock:
 
             self.xyz_to_kep(mu)
             lp = self.M < np.pi * u.rad
-            self.t_peri[lp] = self.obsdate.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
-            self.t_peri[~lp] = self.obsdate.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+            self.t_peri[lp] = self.obsdate.jd[lp] * u.day - self.M[lp] \
+                              / np.sqrt(mu_bary / self.a[lp]**3)
+            self.t_peri[~lp] = self.obsdate.jd[~lp] * u.day \
+                               + (2*np.pi * u.rad - self.M[~lp]) \
+                               / np.sqrt(mu_bary / self.a[~lp]**3)
             self.t_peri = Time(self.t_peri, format='jd', scale='utc')
 
             # this looks redundant but it allows for broadcasring.
@@ -461,8 +470,11 @@ class SpaceRock:
             self.xyz_to_kep(mu_bary)
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
             lp = self.M < np.pi * u.rad
-            self.t_peri.jd[lp] = self.obsdate.value[lp] - self.M.value[lp] / np.sqrt(mu_bary.value / self.a.value[lp]**3)
-            self.t_peri.jd[~lp] = self.obsdate.value[~lp] + (2*np.pi - self.M.value[~lp]) / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
+            self.t_peri.jd[lp] = self.obsdate.value[lp] - self.M.value[lp] \
+                                 / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+            self.t_peri.jd[~lp] = self.obsdate.value[~lp] \
+                                  + (2*np.pi - self.M.value[~lp]) \
+                                  / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
             self.t_peri = Time(self.t_peri, format='jd', scale='utc')
             SpaceRock.frame = 'barycentric'
 
@@ -490,8 +502,11 @@ class SpaceRock:
 
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
             lp = self.M < np.pi * u.rad
-            self.t_peri.jd[lp] = self.obsdate.value[lp] - self.M.value[lp] / np.sqrt(mu_bary.value / self.a.value[lp]**3)
-            self.t_peri.jd[~lp] = self.obsdate.value[~lp] + (2*np.pi - self.M.value[~lp]) / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
+            self.t_peri.jd[lp] = self.obsdate.value[lp] - self.M.value[lp] \
+                                 / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+            self.t_peri.jd[~lp] = self.obsdate.value[~lp] \
+                                  + (2*np.pi - self.M.value[~lp]) \
+                                  / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
             self.t_peri = Time(self.t_peri, format='jd', scale='utc')
             SpaceRock.frame = 'heliocentric'
 
