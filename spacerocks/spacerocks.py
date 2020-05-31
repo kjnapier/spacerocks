@@ -30,7 +30,7 @@ from astropy.coordinates import SkyCoord
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from mpl_toolkits.mplot3d import Axes3D
-#import cartopy.crs as ccrs
+rimport cartopy.crs as ccrs
 
 from .linalg3d import *
 from .constants import *
@@ -624,8 +624,8 @@ class SpaceRock:
 
             ax.set_xticks(xticks)
             ax.set_yticks(yticks)
-            xticklabels = ['${:.2f}\degree$'.format(-value) for value in xticks]
-            yticklabels = ['${:.2f}\degree$'.format(value) for value in yticks]
+            xticklabels = [r'${:.2f}\degree$'.format(-value) for value in xticks]
+            yticklabels = [r'${:.2f}\degree$'.format(value) for value in yticks]
             ax.set_xticklabels(xticklabels)
             ax.set_yticklabels(yticklabels)
 
@@ -675,15 +675,15 @@ class SpaceRock:
         else:
 
             fig = plt.figure(figsize=(12, 8))
-            ax = fig.add_subplot(111, projection="mollweide")
+            ax = fig.add_subplot(111, projection='mollweide')
             ax.grid(True)
 
             xdata = self.ra
             xdata[xdata.value > np.pi] -= 2*np.pi * u.rad
-            ax.set_xticklabels(['$150\degree$', '$120\degree$', '$90\degree$' ,
-                                '$60\degree$' , '$30\degree$' , '$0\degree$'  ,
-                                '$330\degree$', '$300\degree$', '$270\degree$',
-                                '$240\degree$', '$210\degree$'])
+            ax.set_xticklabels([r'$150\degree$', r'$120\degree$', r'$90\degree$' ,
+                                r'$60\degree$' , r'$30\degree$' , r'$0\degree$'  ,
+                                r'$330\degree$', r'$300\degree$', r'$270\degree$',
+                                r'$240\degree$', r'$210\degree$'])
 
             ax.scatter(-xdata, self.dec, color=color, alpha=alpha)
 
