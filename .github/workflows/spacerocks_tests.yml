@@ -31,6 +31,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           environment-file: environment.yml
           activate-environment: spacerocks
+
+      - name: Install Dependencies Absent From Conda
         run: pip install reboundx
 
       - name: Lint with flake8
