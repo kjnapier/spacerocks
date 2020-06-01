@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
    name='spacerocks',
-   version='0.6.10',
+   version='0.7.0',
    description='Calculate solar system ephemerides from orbital elements.',
    author='Kevin Napier',
    author_email='kjnapier@umich.edu',
