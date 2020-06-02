@@ -1,5 +1,7 @@
 ###############################################################################
-# SpaceRocks, version 0.7.0
+# SpaceRocks, version 0.7.1
+#
+# 0.7.1: change obsdate keyword to epoch
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -63,12 +65,12 @@ class SpaceRock:
         kwargs = {key.lower(): data for key, data in kwargs.items()}
         keywords = ['a', 'e', 'inc', 'node', 'arg', 'm',
                     'x', 'y', 'z', 'vx', 'vy', 'vz',
-                    'obsdate', 't_peri', 'h', 'name']
+                    'epoch', 't_peri', 'h', 'name']
 
         if not all(key in keywords for key in [*kwargs]):
             raise ValueError('Keywords are limited to a, e, inc, node,\
-                              arg, m, x, y, z, vx, vy, vz, obsdate, t_peri,\
-                              H, name')
+                              arg, m, x, y, z, vx, vy, vz, epoch, t_peri,\
+                              h, name')
 
         input_coordinates = input_coordinates.lower()
         input_frame = input_frame.lower()
@@ -79,7 +81,7 @@ class SpaceRock:
             if np.isscalar(kwargs.get(key)):
                 kwargs[key] = np.array([kwargs.get(key)])
 
-        self.obsdate = Time(kwargs.get('obsdate'),
+        self.epoch = Time(kwargs.get('epoch'),
                         format=input_time_format,
                         scale=input_time_scale).jd * u.day
 
@@ -96,7 +98,7 @@ class SpaceRock:
 
         # Base attributes. Required by every object.
         attributes = ['a', 'e', 'inc', 'node', 'arg', 'M', 't_peri', 'varpi',
-                      'x', 'y', 'z', 'vx', 'vy', 'vz', 'obsdate', 'name', 'r']
+                      'x', 'y', 'z', 'vx', 'vy', 'vz', 'epoch', 'name', 'r']
 
         if SpaceRock.calc_equa == True:
 
@@ -148,10 +150,10 @@ class SpaceRock:
             if (kwargs.get('t_peri') is None) and (kwargs.get('m') is not None):
                 self.M = Angle(kwargs.get('m'), angle_unit).rad * u.rad
                 lp = self.M < np.pi * u.rad
-                self.t_peri = np.zeros(len(self.obsdate))
-                self.t_peri[lp] = self.obsdate.value[lp] - self.M.value[lp] \
+                self.t_peri = np.zeros(len(self.epoch))
+                self.t_peri[lp] = self.epoch.value[lp] - self.M.value[lp] \
                                   / np.sqrt(mu_bary.value / self.a.value[lp]**3)
-                self.t_peri[~lp] = self.obsdate.value[~lp] \
+                self.t_peri[~lp] = self.epoch.value[~lp] \
                                    + (2*np.pi - self.M.value[~lp]) \
                                    / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
                 self.t_peri = Time(self.t_peri, format='jd', scale='utc')
@@ -160,10 +162,10 @@ class SpaceRock:
                 self.t_peri = Time(kwargs.get('t_peri'),
                                   format=input_time_format,
                                   scale=input_time_scale)
-                self.M = np.sqrt(mu / self.a**3) * (self.obsdate - self.t_peri.jd * u.day)
+                self.M = np.sqrt(mu / self.a**3) * (self.epoch - self.t_peri.jd * u.day)
 
             # this looks redundant but it allows for broadcasring.
-            # self.obsdate = self.t_peri + self.M / np.sqrt(mu / self.a**3)
+            # self.epoch = self.t_peri + self.M / np.sqrt(mu / self.a**3)
             self.kep_to_xyz(mu)
 
             if SpaceRock.calc_equa == True:
@@ -197,15 +199,15 @@ class SpaceRock:
 
             self.xyz_to_kep(mu)
             lp = self.M < np.pi * u.rad
-            self.t_peri[lp] = self.obsdate.jd[lp] * u.day - self.M[lp] \
+            self.t_peri[lp] = self.epoch.jd[lp] * u.day - self.M[lp] \
                               / np.sqrt(mu_bary / self.a[lp]**3)
-            self.t_peri[~lp] = self.obsdate.jd[~lp] * u.day \
+            self.t_peri[~lp] = self.epoch.jd[~lp] * u.day \
                                + (2*np.pi * u.rad - self.M[~lp]) \
                                / np.sqrt(mu_bary / self.a[~lp]**3)
             self.t_peri = Time(self.t_peri, format='jd', scale='utc')
 
             # this looks redundant but it allows for broadcasring.
-            # self.obsdate = self.t_peri + self.M / np.sqrt(mu / self.a**3)
+            # self.epoch = self.t_peri + self.M / np.sqrt(mu / self.a**3)
 
             if SpaceRock.calc_equa == True:
 
@@ -235,7 +237,7 @@ class SpaceRock:
             # produces random, non-repeting integers between 0 and 1e10 - 1
             self.name = ['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.a))]
 
-        self.obsdate = Time(self.obsdate, format='jd', scale='utc')
+        self.epoch = Time(self.epoch, format='jd', scale='utc')
 
     def __len__(self):
         '''
@@ -289,7 +291,7 @@ class SpaceRock:
         This results in a significant slowdown to the code.
         '''
 
-        t = ts.tt(jd=self.obsdate.value)
+        t = ts.tt(jd=self.epoch.value)
         earth = planets['earth']
 
         # Only used for the topocentric calculation.
@@ -458,7 +460,7 @@ class SpaceRock:
         Method to convert heliocentric coordinates to barycentric coordinates.
         '''
         if SpaceRock.frame == 'heliocentric':
-            t = ts.tt(jd=self.obsdate.value)
+            t = ts.tt(jd=self.epoch.value)
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
             # calculate the barycentric xyz postion
@@ -473,9 +475,9 @@ class SpaceRock:
             self.xyz_to_kep(mu_bary)
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
             lp = self.M < np.pi * u.rad
-            self.t_peri.jd[lp] = self.obsdate.value[lp] - self.M.value[lp] \
+            self.t_peri.jd[lp] = self.epoch.value[lp] - self.M.value[lp] \
                                  / np.sqrt(mu_bary.value / self.a.value[lp]**3)
-            self.t_peri.jd[~lp] = self.obsdate.value[~lp] \
+            self.t_peri.jd[~lp] = self.epoch.value[~lp] \
                                   + (2*np.pi - self.M.value[~lp]) \
                                   / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
             self.t_peri = Time(self.t_peri, format='jd', scale='utc')
@@ -489,7 +491,7 @@ class SpaceRock:
         Method to convert barycentric coordinates to heliocentric coordinates.
         '''
         if SpaceRock.frame == 'barycentric':
-            t = ts.tt(jd=self.obsdate.value)
+            t = ts.tt(jd=self.epoch.value)
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
             # calculate the heliocentric xyz postion
@@ -505,9 +507,9 @@ class SpaceRock:
 
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
             lp = self.M < np.pi * u.rad
-            self.t_peri.jd[lp] = self.obsdate.value[lp] - self.M.value[lp] \
+            self.t_peri.jd[lp] = self.epoch.value[lp] - self.M.value[lp] \
                                  / np.sqrt(mu_bary.value / self.a.value[lp]**3)
-            self.t_peri.jd[~lp] = self.obsdate.value[~lp] \
+            self.t_peri.jd[~lp] = self.epoch.value[~lp] \
                                   + (2*np.pi - self.M.value[~lp]) \
                                   / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
             self.t_peri = Time(self.t_peri, format='jd', scale='utc')

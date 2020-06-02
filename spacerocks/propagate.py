@@ -73,15 +73,15 @@ class Propagate(SpaceRock):
 
         # Rehash as a dataframe for easy access
         df = self.pandas_df()
-        df['obsdate'] = df['obsdate'].apply(lambda idx: idx.jd)
+        df['epoch'] = df['epoch'].apply(lambda idx: idx.jd)
 
         # Integrate all particles to the same obsdate
-        pickup_times = df.obsdate
+        pickup_times = df.epoch
         sim = self.set_simulation(np.min(pickup_times))
-        sim.t = np.min(df.obsdate)
+        sim.t = np.min(df.epoch)
 
         for time in np.sort(np.unique(pickup_times)):
-            ps = df[df.obsdate == time]
+            ps = df[df.epoch == time]
             for p in ps.itertuples():
                 sim.add(x=p.x, y=p.y, z=p.z,
                         vx=p.vx, vy=p.vy, vz=p.vz,
@@ -112,8 +112,8 @@ class Propagate(SpaceRock):
 
         self.t_peri = np.zeros(Nx * Ny)
         lp = self.M < np.pi * u.rad
-        self.t_peri[lp] = self.obsdate.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
-        self.t_peri[~lp] = self.obsdate.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
+        self.t_peri[lp] = self.epoch.jd[lp] * u.day - self.M[lp] / np.sqrt(mu_bary / self.a[lp]**3)
+        self.t_peri[~lp] = self.epoch.jd[~lp] * u.day + (2*np.pi * u.rad - self.M[~lp]) / np.sqrt(mu_bary / self.a[~lp]**3)
         self.t_peri = Time(self.t_peri, format='jd', scale='utc')
 
         self.xyz_to_equa()
