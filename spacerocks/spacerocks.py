@@ -1,7 +1,7 @@
 ###############################################################################
 # SpaceRocks, version 0.7.1
 #
-# 0.7.1: change obsdate keyword to epoch
+# 0.7.1: changed the obsdate keyword to epoch
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -164,8 +164,6 @@ class SpaceRock:
                                   scale=input_time_scale)
                 self.M = np.sqrt(mu / self.a**3) * (self.epoch - self.t_peri.jd * u.day)
 
-            # this looks redundant but it allows for broadcasring.
-            # self.epoch = self.t_peri + self.M / np.sqrt(mu / self.a**3)
             self.kep_to_xyz(mu)
 
             if SpaceRock.calc_equa == True:
@@ -205,9 +203,6 @@ class SpaceRock:
                                + (2*np.pi * u.rad - self.M[~lp]) \
                                / np.sqrt(mu_bary / self.a[~lp]**3)
             self.t_peri = Time(self.t_peri, format='jd', scale='utc')
-
-            # this looks redundant but it allows for broadcasring.
-            # self.epoch = self.t_peri + self.M / np.sqrt(mu / self.a**3)
 
             if SpaceRock.calc_equa == True:
 
