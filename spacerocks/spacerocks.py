@@ -10,6 +10,7 @@ import sys
 import os
 import random
 import copy
+import warnings
 
 import healpy as hp
 
@@ -149,7 +150,8 @@ class SpaceRock:
 
             if (kwargs.get('t_peri') is None) and (kwargs.get('m') is not None):
                 self.M = Angle(kwargs.get('m'), angle_unit).rad * u.rad
-                lp = self.M < np.pi * u.rad
+                with np.errstate(invalid='ignore'):
+                    lp = self.M < np.pi * u.rad
                 self.t_peri = np.zeros(len(self.epoch))
                 self.t_peri[lp] = self.epoch.value[lp] - self.M.value[lp] \
                                   / np.sqrt(mu_bary.value / self.a.value[lp]**3)
@@ -196,7 +198,8 @@ class SpaceRock:
             self.vz = kwargs.get('vz') * (u.au / u.day)
 
             self.xyz_to_kep(mu)
-            lp = self.M < np.pi * u.rad
+            with np.errstate(invalid='ignore'):
+                lp = self.M < np.pi * u.rad
             self.t_peri[lp] = self.epoch.jd[lp] * u.day - self.M[lp] \
                               / np.sqrt(mu_bary / self.a[lp]**3)
             self.t_peri[~lp] = self.epoch.jd[~lp] * u.day \
@@ -273,7 +276,8 @@ class SpaceRock:
         δ5 = -f0 / (f1 + δ4*f2/2 + δ4**2*f3/6 - δ4**3*f2/24)
 
         E = E1 + δ5
-        E[E < 0] += 2 * np.pi
+        with np.errstate(invalid='ignore'):
+            E[E < 0] += 2 * np.pi
         return E
 
 
@@ -420,8 +424,10 @@ class SpaceRock:
         n = norm([nx, ny, nz])
 
         # compute true anomaly ν, the angle between e and r
-        ν = np.arccos(dot([ex, ey, ez], [self.x, self.y, self.z]) / (self.e*self.r))
-        ν[rrdot < 0] = 2 * np.pi * u.rad - ν[rrdot < 0]
+        # true anomaly is undefined for circular orbits. Handle this more nicely.
+        with np.errstate(invalid='ignore'):
+            ν = np.arccos(dot([ex, ey, ez], [self.x, self.y, self.z]) / (self.e*self.r))
+            ν[rrdot < 0] = 2 * np.pi * u.rad - ν[rrdot < 0]
 
         # compute inclination
         self.inc = Angle(np.arccos(hz/h), u.rad)
@@ -430,19 +436,22 @@ class SpaceRock:
         E = 2 * np.arctan2(np.sqrt(1-self.e) * np.sin(ν/2), np.sqrt(1+self.e) * np.cos(ν/2))
 
         # compute ascending node
-        node = np.arccos(nx/n)
-        node[ny < 0] = 2 * np.pi - node[ny < 0]
-        self.node = Angle(node, u.rad)
+        with np.errstate(invalid='ignore'):
+            node = np.arccos(nx/n)
+            node[ny < 0] = 2 * np.pi - node[ny < 0]
+            self.node = Angle(node, u.rad)
 
         # compute argument of periapsis, the angle between e and n
-        arg = np.arccos(dot([nx, ny, nz], [ex, ey, ez]) / (n*self.e))
-        arg[ez < 0] = 2 * np.pi * u.rad - arg[ez < 0]
-        self.arg = Angle(arg, u.rad)
+        with np.errstate(invalid='ignore'):
+            arg = np.arccos(dot([nx, ny, nz], [ex, ey, ez]) / (n*self.e))
+            arg[ez < 0] = 2 * np.pi * u.rad - arg[ez < 0]
+            self.arg = Angle(arg, u.rad)
 
         # compute mean anomaly
-        M = E - self.e * np.sin(E) * u.rad
-        M[M < 0] += 2 * np.pi * u.rad
-        self.M = Angle(M, u.rad)
+        with np.errstate(invalid='ignore'):
+            M = E - self.e * np.sin(E) * u.rad
+            M[M < 0] += 2 * np.pi * u.rad
+            self.M = Angle(M, u.rad)
 
         # compute a
         self.a = 1 / (2 / self.r - norm([self.vx, self.vy, self.vz])**2 / mu * u.rad**2)
@@ -469,7 +478,8 @@ class SpaceRock:
             # calculate barycentric keplerian elements
             self.xyz_to_kep(mu_bary)
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
-            lp = self.M < np.pi * u.rad
+            with np.errstate(invalid='ignore'):
+                lp = self.M < np.pi * u.rad
             self.t_peri.jd[lp] = self.epoch.value[lp] - self.M.value[lp] \
                                  / np.sqrt(mu_bary.value / self.a.value[lp]**3)
             self.t_peri.jd[~lp] = self.epoch.value[~lp] \
@@ -501,7 +511,8 @@ class SpaceRock:
             self.xyz_to_kep(mu_helio)
 
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
-            lp = self.M < np.pi * u.rad
+            with np.errstate(invalid='ignore'):
+                lp = self.M < np.pi * u.rad
             self.t_peri.jd[lp] = self.epoch.value[lp] - self.M.value[lp] \
                                  / np.sqrt(mu_bary.value / self.a.value[lp]**3)
             self.t_peri.jd[~lp] = self.epoch.value[~lp] \
