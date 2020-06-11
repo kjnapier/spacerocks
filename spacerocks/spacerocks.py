@@ -53,8 +53,8 @@ observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
-#planets = load('de423.bsp')
-planets = load('de431t.bsp')
+planets = load('de423.bsp')
+#planets = load('de431t.bsp')
 sun = planets['sun']
 
 

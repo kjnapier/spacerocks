@@ -17,8 +17,8 @@ from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
-#planets = load('de423.bsp')
-planets = load('de431t.bsp')
+planets = load('de423.bsp')
+#planets = load('de431t.bsp')
 
 sun = planets['sun']
 
