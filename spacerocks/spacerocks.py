@@ -1,7 +1,9 @@
 ###############################################################################
-# SpaceRocks, version 0.7.1
+# SpaceRocks, version 0.7.2
 #
-# 0.7.1: changed the obsdate keyword to epoch
+# 0.7.2:
+#     - changed the obsdate keyword to epoch
+#     - added J2, J4, large asteroids to propagate
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -51,7 +53,8 @@ observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
-planets = load('de423.bsp')
+#planets = load('de423.bsp')
+planets = load('de431t.bsp')
 sun = planets['sun']
 
 
@@ -66,12 +69,12 @@ class SpaceRock:
         kwargs = {key.lower(): data for key, data in kwargs.items()}
         keywords = ['a', 'e', 'inc', 'node', 'arg', 'm',
                     'x', 'y', 'z', 'vx', 'vy', 'vz',
-                    'epoch', 't_peri', 'h', 'name']
+                    'epoch', 't_peri', 'h', 'name', 'g']
 
         if not all(key in keywords for key in [*kwargs]):
             raise ValueError('Keywords are limited to a, e, inc, node,\
                               arg, m, x, y, z, vx, vy, vz, epoch, t_peri,\
-                              h, name')
+                              h, name, g')
 
         input_coordinates = input_coordinates.lower()
         input_frame = input_frame.lower()
@@ -82,11 +85,18 @@ class SpaceRock:
             if np.isscalar(kwargs.get(key)):
                 kwargs[key] = np.array([kwargs.get(key)])
 
-        self.epoch = Time(kwargs.get('epoch'),
-                        format=input_time_format,
-                        scale=input_time_scale).jd * u.day
+        #self.epoch = Time(kwargs.get('epoch'),
+        #                  format=input_time_format,
+        #                  scale=input_time_scale).jd * u.day
+
+        self.epoch = Time(kwargs.get('epoch'), format=input_time_format,
+                          scale=input_time_scale)
 
         self.H = kwargs.get('h')
+
+        self.G = kwargs.get('g')
+        if self.G is None:
+            self.G = 0.15
 
         if NSIDE is not None:
             if np.isscalar(NSIDE):
@@ -153,18 +163,21 @@ class SpaceRock:
                 with np.errstate(invalid='ignore'):
                     lp = self.M < np.pi * u.rad
                 self.t_peri = np.zeros(len(self.epoch))
-                self.t_peri[lp] = self.epoch.value[lp] - self.M.value[lp] \
+                #self.t_peri[lp] = self.epoch.value[lp] - self.M.value[lp] \
+                #                  / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+                #self.t_peri[~lp] = self.epoch.value[~lp] \
+                #                   + (2*np.pi - self.M.value[~lp]) \
+                #                   / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
+                self.t_peri[lp] = self.epoch.jd[lp] - self.M.value[lp] \
                                   / np.sqrt(mu_bary.value / self.a.value[lp]**3)
-                self.t_peri[~lp] = self.epoch.value[~lp] \
+                self.t_peri[~lp] = self.epoch.jd[~lp] \
                                    + (2*np.pi - self.M.value[~lp]) \
                                    / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
                 self.t_peri = Time(self.t_peri, format='jd', scale='utc')
 
             elif (kwargs.get('m') is None) and (kwargs.get('t_peri') is not None):
-                self.t_peri = Time(kwargs.get('t_peri'),
-                                  format=input_time_format,
-                                  scale=input_time_scale)
-                self.M = np.sqrt(mu / self.a**3) * (self.epoch - self.t_peri.jd * u.day)
+                self.t_peri = Time(kwargs.get('t_peri'), format=input_time_format, scale=input_time_scale)
+                self.M = np.sqrt(mu / self.a**3) * (self.epoch.jd * u.day - self.t_peri.jd * u.day)
 
             self.kep_to_xyz(mu)
 
@@ -290,7 +303,9 @@ class SpaceRock:
         This results in a significant slowdown to the code.
         '''
 
-        t = ts.tt(jd=self.epoch.value)
+        #t = ts.tai(jd=self.epoch.tai.jd)
+        #t = ts.tdb(jd=self.epoch.tdb.jd)
+        t = ts.tt(jd=self.epoch.tt.jd)
         earth = planets['earth']
 
         # Only used for the topocentric calculation.
@@ -364,7 +379,7 @@ class SpaceRock:
         mag = self.H + 5 * np.log10(self.r * self.delta / u.au**2)
 
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
-        mag[not_zero] -= 2.5 * np.log10((1 - G) * Psi_1[not_zero] + G * Psi_2[not_zero])
+        mag[not_zero] -= 2.5 * np.log10((1 - self.G) * Psi_1[not_zero] + self.G * Psi_2[not_zero])
 
         return mag
 
@@ -379,10 +394,10 @@ class SpaceRock:
         E = self.calc_E(self.e.value, self.M.value) * u.rad
 
         # compute true anomaly v
-        ν = 2 * np.arctan2((1 + self.e)**0.5*np.sin(E/2.), (1 - self.e)**0.5*np.cos(E/2.))
+        ν = 2 * np.arctan2((1 + self.e)**0.5 * np.sin(E/2), (1 - self.e)**0.5 * np.cos(E/2))
 
         # compute the distance to the central body r
-        r = self.a * (1 - self.e*np.cos(E))
+        r = self.a * (1 - self.e * np.cos(E))
 
         # obtain the position o and velocity ov vector
         o = [r * np.cos(ν), r * np.sin(ν), np.zeros(len(ν))]
@@ -415,7 +430,7 @@ class SpaceRock:
         # compute eccentricity vector
         ### hacky units
         ex, ey, ez = u.au**3 * u.rad**2/ u.day**2 * np.array(cross([self.vx, self.vy, self.vz], \
-                     [hx, hy, hz])) / mu  - [self.x, self.y, self.z]*u.au/self.r
+                     [hx, hy, hz])) / mu  - [self.x, self.y, self.z] * u.au/self.r
         self.e = norm([ex, ey, ez])
 
         # compute vector n
@@ -464,7 +479,9 @@ class SpaceRock:
         Method to convert heliocentric coordinates to barycentric coordinates.
         '''
         if SpaceRock.frame == 'heliocentric':
-            t = ts.tt(jd=self.epoch.value)
+            #t = ts.tai(jd=self.epoch.value + 37/86400)
+            #t = ts.tdb(jd=self.epoch.tdb.jd)
+            t = ts.tt(jd=self.epoch.tt.jd)
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
             # calculate the barycentric xyz postion
@@ -496,7 +513,9 @@ class SpaceRock:
         Method to convert barycentric coordinates to heliocentric coordinates.
         '''
         if SpaceRock.frame == 'barycentric':
-            t = ts.tt(jd=self.epoch.value)
+            #t = ts.tai(jd=self.epoch.value + 37/86400)
+            #t = ts.tdb(jd=self.epoch.tdb.jd)
+            t = ts.tt(jd=self.epoch.tt.jd)
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
             # calculate the heliocentric xyz postion
@@ -557,7 +576,7 @@ class SpaceRock:
         for idx, M in enumerate(np.linspace(0, 2*np.pi, 500)):
             xx, yy, zz = self.kep_to_xyz_pos(self.a, self.e, self.inc.rad,
                                         self.arg.rad, self.node.rad,
-                                        np.repeat(M, len(self.a)) * u.rad, False)
+                                        np.repeat(M, len(self.a)) * u.rad)
             x[idx] = xx
             y[idx] = yy
             z[idx] = zz
@@ -565,7 +584,7 @@ class SpaceRock:
         fig = plt.figure(figsize=(12, 12))
         ax = fig.add_subplot(111, projection='3d')
         for idx in range(len(self.a)):
-            ax.plot(x.T[idx], y.T[idx], z.T[idx], color=np.random.choice(['#FFCB05', '#00274C']))
+            ax.plot(x.T[idx], y.T[idx], z.T[idx], color=np.random.choice(['#00274C', '#FFCB05']))
 
         ax.axis('off')
         ax.view_init(90, 0)
