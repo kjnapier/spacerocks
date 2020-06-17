@@ -379,10 +379,12 @@ class Propagate(SpaceRock):
 
 
         else:
-            sim.integrator = 'mercurius'
-            sim.dt = 1 # one day
-            sim.ri_ias15.min_dt = sim.dt / 1440 # one minute
-            sim.ri_mercurius.hillfac = 3
+            #sim.integrator = 'mercurius'
+            #sim.dt = 1 # one day
+            #sim.ri_ias15.min_dt = sim.dt / 1440 # one minute
+            #sim.ri_mercurius.hillfac = 3
+            sim.integrator = 'ias15'
+            #sim.ri_ias15.epsilon = 1e-10
 
         sim.move_to_com()
 
