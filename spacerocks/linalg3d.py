@@ -17,7 +17,7 @@ def dot(a, b):
 def norm(a):
     return (a[0]**2 + a[1]**2 + a[2]**2)**0.5
 
-@jit
+# @jit
 def euler_rotation(a, b, c, x):
     # Currently assumes z=0. I'm going to modify this to the genreal case.
     xrot = x[0] * (np.cos(a)*np.cos(c) - np.sin(a)*np.sin(c)*np.cos(b)) - \
