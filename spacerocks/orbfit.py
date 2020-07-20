@@ -1,3 +1,4 @@
+import numpy as np
 class OrbitFit:
 
     def __init__(self, ra, dec, epoch, obscode):
