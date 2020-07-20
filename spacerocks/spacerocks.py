@@ -1,5 +1,5 @@
 ################################################################################
-# SpaceRocks, version 0.7.3
+# SpaceRocks, version 0.7.5
 #
 # 0.7.2:
 #     - changed the obsdate keyword to epoch
@@ -26,9 +26,17 @@ from astropy.coordinates import Angle
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
 
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-from mpl_toolkits.mplot3d import Axes3D
+# Read in the observatory codes file and rehash as a dataframe.
+observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
+                            'data',
+                            'observatories.csv'))
+
+from skyfield.api import Topos, Loader
+# Load in planets for ephemeride calculation.
+load = Loader('./Skyfield-Data', expire=False, verbose=False)
+ts = load.timescale()
+planets = load('de423.bsp')
+earth = planets['earth']
 
 from .linalg3d import *
 from .constants import *
@@ -40,34 +48,54 @@ from .convenience import Convenience
 class SpaceRock(Transformations, Convenience):
 
     def __init__(self, input_coordinates='keplerian', input_frame='barycentric',
-                 input_angles='degrees', input_time_format='jd',
-                 input_time_scale='utc', *args, **kwargs):
+                 input_angles='degrees', input_time_format='jd', calc_abg=False,
+                 input_time_scale='utc', abg_obscode=500, *args, **kwargs):
+
+        if abg_obscode != 500:
+            SpaceRock.obscode = str(abg_obscode).zfill(3)
+            obs = observatories[observatories.obscode == SpaceRock.obscode]
+            SpaceRock.obslat = obs.lat.values
+            SpaceRock.obslon = obs.lon.values
+            SpaceRock.obselev = obs.elevation.values
+        else:
+            SpaceRock.obscode = 500
 
         # Case-insensitive keyword arguments.
         kwargs = {key.lower(): data for key, data in kwargs.items()}
-        keywords = ['a', 'e', 'inc', 'node', 'arg', 'm',
-                    'x', 'y', 'z', 'vx', 'vy', 'vz',
-                    'epoch', 't_peri', 'h', 'name', 'g']
+        # keywords = ['a', 'e', 'inc', 'node', 'arg', 'm',
+        #             'x', 'y', 'z', 'vx', 'vy', 'vz',
+        #             'epoch', 't_peri', 'h', 'name', 'g']
 
-        if not all(key in keywords for key in [*kwargs]):
-            raise ValueError('Keywords are limited to a, e, inc, node,\
-                              arg, m, x, y, z, vx, vy, vz, epoch, t_peri,\
-                              h, name, g')
+        # if not all(key in keywords for key in [*kwargs]):
+        #     raise ValueError('Keywords are limited to a, e, inc, node,\
+        #                       arg, m, x, y, z, vx, vy, vz, epoch, t_peri,\
+        #                       h, name, g')
 
         input_coordinates = input_coordinates.lower()
         input_frame = input_frame.lower()
         input_angles = input_angles.lower()
+        calc_abg = calc_abg
 
         # scalar input -> arrays
         for idx, key in enumerate([*kwargs]):
             if np.isscalar(kwargs.get(key)):
                 kwargs[key] = np.array([kwargs.get(key)])
 
+        if kwargs.get('delta_h') is not None:
+            self.delta_H = kwargs.get('delta_h')
+        if kwargs.get('rotation_period') is not None:
+            self.rotation_period = kwargs.get('rotation_period') * u.day
+        if kwargs.get('phi0') is not None:
+            self.phi_0 = kwargs.get('phi0')
+
+
+        self.t0 = kwargs.get('epoch') * u.day
+
         if kwargs.get('name') is not None:
             self.name = kwargs.get('name')
         else:
             # produces random, non-repeting integers between 0 and 1e10 - 1
-            self.name = np.array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.a))])
+            self.name = np.array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.t0))])
 
         self.epoch = Time(kwargs.get('epoch'), format=input_time_format, scale=input_time_scale)
 
@@ -105,6 +133,14 @@ class SpaceRock(Transformations, Convenience):
 
             self.kep_to_xyz(mu)
 
+            if calc_abg == True:
+                if self.__class__.frame == 'heliocentric':
+                    self.to_bary()
+                    self.xyz_to_abg()
+                    self.to_helio()
+                else:
+                    self.xyz_to_abg()
+
 
         elif input_coordinates == 'cartesian':
 
@@ -116,7 +152,28 @@ class SpaceRock(Transformations, Convenience):
             self.vz = kwargs.get('vz') * (u.au / u.day)
 
             self.xyz_to_kep(mu)
-            self.t_peri = self.calc_t_peri()
+
+            if calc_abg == True:
+                if self.__class__.frame == 'heliocentric':
+                    self.to_bary()
+                    self.xyz_to_abg()
+                    self.to_helio()
+                else:
+                    self.xyz_to_abg()
+
+
+        elif input_coordinates == 'abg':
+
+            self.alpha = kwargs.get('alpha')
+            self.beta = kwargs.get('beta')
+            self.gamma = kwargs.get('gamma') / u.au
+            self.alpha_dot = kwargs.get('alpha_dot') / u.day
+            self.beta_dot = kwargs.get('beta_dot') / u.day
+            self.gamma_dot = kwargs.get('gamma_dot') / u.day
+
+            self.abg_to_xyz()
+            self.xyz_to_kep(mu)
+
 
         self.varpi = Angle((self.arg + self.node).wrap_at(2 * np.pi * u.rad), u.rad)
 
@@ -136,9 +193,9 @@ class SpaceRock(Transformations, Convenience):
         y = np.zeros([500, len(self.a)])
         z = np.zeros([500, len(self.a)])
         for idx, M in enumerate(np.linspace(0, 2*np.pi, 500)):
-            xx, yy, zz = self.kep_to_xyz_pos(self.a, self.e, self.inc.rad,
-                                        self.arg.rad, self.node.rad,
-                                        np.repeat(M, len(self.a)) * u.rad)
+            xx, yy, zz, _, _, _ = self.kep_to_xyz_temp(self.a, self.e, self.inc.rad,
+                                                       self.arg.rad, self.node.rad,
+                                                       np.repeat(M, len(self.a)) * u.rad)
             x[idx] = xx
             y[idx] = yy
             z[idx] = zz

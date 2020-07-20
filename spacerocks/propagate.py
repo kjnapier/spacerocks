@@ -30,7 +30,16 @@ from .convenience import Convenience
 class Propagate(SpaceRock, Transformations, Convenience):
 
     def __init__(self, rocks, obsdates, model=0, gr=False,
-                 gr_full=False, add_pluto=False):
+                 gr_full=False, add_pluto=False, calc_abg=False, abg_obscode=500):
+
+        if abg_obscode != 500:
+            Propagate.obscode = str(abg_obscode).zfill(3)
+            obs = observatories[observatories.obscode == Propagate.obscode]
+            Propagate.obslat = obs.lat.values
+            Propagate.obslon = obs.lon.values
+            Propagate.obselev = obs.elevation.values
+        else:
+            SpaceRock.obscode = 500
 
 
         for key in list(rocks.__dict__.keys()):
@@ -39,6 +48,9 @@ class Propagate(SpaceRock, Transformations, Convenience):
         Propagate.gr = gr
         Propagate.gr_full = gr_full
         Propagate.add_pluto = add_pluto
+        Propagate.calc_abg = calc_abg
+        Propagate.obscode = abg_obscode
+
 
         if np.isscalar(obsdates):
             obsdates = np.array([obsdates])
@@ -50,10 +62,9 @@ class Propagate(SpaceRock, Transformations, Convenience):
 
     def propagate(self):
         '''
-        Integrate the bodies to the desired date. The logic could be cleaner
+        Integrate all bodies to the desired date. The logic could be cleaner
         but it works.
         '''
-
         Nx = len(Propagate.obsdates)
         Ny = len(self)
         x_values = np.zeros([Nx, Ny])
@@ -64,11 +75,6 @@ class Propagate(SpaceRock, Transformations, Convenience):
         vz_values = np.zeros([Nx, Ny])
         obsdate_values = np.zeros([Nx, Ny])
         name_values = np.tile(self.name, Nx)
-        try:
-            H_values = np.tile(self.H, Nx)
-        except:
-            pass
-
         in_frame = Propagate.frame
 
         # We need to (or should) work in barycentric coordinates in rebound
@@ -110,12 +116,25 @@ class Propagate(SpaceRock, Transformations, Convenience):
 
         self.xyz_to_kep(mu_bary)
 
+        if self.__class__.calc_abg == True:
+            self.xyz_to_abg()
+
         self.t_peri = self.calc_t_peri()
         self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
 
         # be polite and return orbital parameters in the input frame.
         if in_frame == 'heliocentric':
             self.to_helio()
+
+        try:
+            self.H = np.tile(self.H, Nx)
+            self.G = np.tile(self.G, Nx)
+            self.delta_H = np.tile(self.delta_H, Nx)
+            self.rotation_period = np.tile(self.rotation_period, Nx)
+            self.phi0 = np.tile(self.phi_0, Nx)
+            self.t0 = np.tile(self.t0, Nx)
+        except:
+            pass
 
         return self
 
@@ -204,7 +223,7 @@ class Propagate(SpaceRock, Transformations, Convenience):
 
 
         startdate = Time(startdate, scale='utc', format='jd')
-        t = ts.ut1(jd=startdate.ut1.jd)
+        t = ts.tt(jd=startdate.tt.jd)
 
         x, y, z = np.array([body.at(t).ecliptic_xyz().au for body in active_bodies]).T
         vx, vy, vz = np.array([body.at(t).ecliptic_velocity().au_per_d for body in active_bodies]).T
