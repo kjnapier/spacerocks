@@ -4,6 +4,7 @@ import pandas as pd
 import rebound
 import reboundx
 from reboundx import constants
+import os
 
 import warnings
 
@@ -12,6 +13,11 @@ from astropy.table import Table
 from astropy.coordinates import Angle
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
+
+# Read in the observatory codes file and rehash as a dataframe.
+observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
+                            'data',
+                            'observatories.csv'))
 
 from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
@@ -56,7 +62,7 @@ class Propagate(SpaceRock, Transformations, Convenience):
             obsdates = np.array([obsdates])
 
         Propagate.model = model
-        Propagate.obsdates = obsdates
+        Propagate.obsdates = self.detect_timescale(obsdates, 'utc').jd
         self.propagate()
 
 
@@ -92,6 +98,7 @@ class Propagate(SpaceRock, Transformations, Convenience):
                 sim.add(x=p.x.value, y=p.y.value, z=p.z.value,
                         vx=p.vx.value, vy=p.vy.value, vz=p.vz.value,
                         hash=p.name)
+
                 sim.integrate(time, exact_finish_time=1)
 
         for ii, time in enumerate(np.sort(Propagate.obsdates)):
@@ -127,12 +134,13 @@ class Propagate(SpaceRock, Transformations, Convenience):
             self.to_helio()
 
         try:
+            self.t0 = np.tile(self.t0, Nx)
             self.H = np.tile(self.H, Nx)
             self.G = np.tile(self.G, Nx)
             self.delta_H = np.tile(self.delta_H, Nx)
             self.rotation_period = np.tile(self.rotation_period, Nx)
             self.phi0 = np.tile(self.phi_0, Nx)
-            self.t0 = np.tile(self.t0, Nx)
+            #self.t0 = np.tile(self.t0, Nx)
         except:
             pass
 
@@ -227,6 +235,7 @@ class Propagate(SpaceRock, Transformations, Convenience):
 
         x, y, z = np.array([body.at(t).ecliptic_xyz().au for body in active_bodies]).T
         vx, vy, vz = np.array([body.at(t).ecliptic_velocity().au_per_d for body in active_bodies]).T
+
 
         # create a dataframe of the massive bodies in the solar system
         ss = pd.DataFrame()

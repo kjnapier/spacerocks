@@ -9,7 +9,7 @@ mu_bary = 0.00029630927492415936 * u.radian**2 * u.au**3 / u.day**2
 mu_helio = 0.00029591220828559093 * u.radian**2 * u.au**3 / u.day**2
 
 # obliquity of the Earth. From Horizons.
-epsilon = Angle(84381.448, u.arcsec).radian
+epsilon = Angle(84381.448, u.arcsec).rad
 
 # speed of light
 c = c.to(u.au / u.day)

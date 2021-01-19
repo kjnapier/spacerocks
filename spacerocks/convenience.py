@@ -1,6 +1,10 @@
 from astropy.table import Table
 import pandas as pd
+import numpy as np
+from astropy.time import Time
 import copy
+
+import dateutil
 
 class Convenience:
 
@@ -20,6 +24,40 @@ class Convenience:
             setattr(p, attr, getattr(self, attr)[idx])
 
         return p
+
+
+    def detect_timescale(self, timevalue, timescale):
+        if isinstance(timevalue[0], str):
+            dates = [dateutil.parser.parse(d, fuzzy_with_tokens=True)[0] for d in timevalue]
+            return Time(dates, format='datetime', scale=timescale)
+        elif np.all(timevalue > 100000):
+            return Time(timevalue, format='jd', scale=timescale)
+        else:
+            return Time(timevalue, format='mjd', scale=timescale)
+
+    def detect_coords(self, kwargs):
+
+        kep = ['a', 'e', 'inc', 'node', 'arg', 'm', 'f', 'varpi', 't_peri']
+        xyz = ['x', 'y', 'z', 'vx', 'vy', 'vz']
+        abg = ['alpha', 'beta', 'gamma', 'dalpha', 'dbeta', 'dgamma']
+
+        input_coords = list(kwargs.keys())
+
+        if np.in1d(input_coords, kep).sum() == 6:
+            coords = 'kep'
+
+        elif np.in1d(input_coords, xyz).sum() == 6:
+            coords = 'xyz'
+
+        elif np.in1d(input_coords, abg).sum() == 6:
+            coords = 'abg'
+
+        else:
+            raise ValueError('Invalid input coordinates. Please see the documentation for accepted input.')
+
+        return coords
+
+
 
     def astropy_table(self):
         '''

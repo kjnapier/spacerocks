@@ -2,11 +2,12 @@ import os
 import warnings
 
 import healpy as hp
-import numpy as np
 import pandas as pd
 from skyfield.api import Topos, Loader
 from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord
+
+from numpy import sin, cos, arctan2, arcsin, array, isscalar
 
 from .constants import epsilon, mu_bary, c
 from .transformations import Transformations
@@ -28,20 +29,20 @@ class Observe(Transformations, Convenience):
     def __init__(self, rocks, obscode=None, NSIDE=None):
 
         if obscode is not None:
-            Observe.obscode = str(obscode).zfill(3)
-            obs = observatories[observatories.obscode == Observe.obscode]
-            Observe.obslat = obs.lat.values
-            Observe.obslon = obs.lon.values
-            Observe.obselev = obs.elevation.values
+            self.__class__.obscode = str(obscode).zfill(3)
+            obs = observatories[observatories.obscode == self.__class__.obscode]
+            self.__class__.obslat = obs.lat.values
+            self.__class__.obslon = obs.lon.values
+            self.__class__.obselev = obs.elevation.values
         else:
-            Observe.obscode = 500
+            self.__class__.obscode = 500
 
         if NSIDE is not None:
-            if np.isscalar(NSIDE):
-                NSIDE = np.array([NSIDE])
-            Observe.NSIDE = NSIDE
+            if isscalar(NSIDE):
+                NSIDE = array([NSIDE])
+            self.__class__.NSIDE = NSIDE
         else:
-            Observe.NSIDE = None
+            self.__class__.NSIDE = None
 
         self.xyz_to_equa(rocks)
 
@@ -53,12 +54,8 @@ class Observe(Transformations, Convenience):
             self.xyz_to_equa(rocks)
             rocks.to_helio()
 
-        try:
-            self.mag = self.estimate_mag(rocks)
-        except:
-            pass
 
-        if Observe.NSIDE is not None:
+        if self.__class__.NSIDE is not None:
             for value in Observe.NSIDE:
                 setattr(self, 'HPIX_{}'.format(value), self.radec_to_hpix(value))
 
@@ -69,3 +66,11 @@ class Observe(Transformations, Convenience):
             self.mag = self.estimate_mag(rocks)
         except:
             pass
+
+    @property
+    def ecliptic_longitude(self):
+        return arctan2((cos(epsilon)*cos(self.dec.rad)*sin(self.ra.rad) + sin(epsilon)*sin(self.dec.rad)), cos(self.dec.rad) * cos(self.ra.rad))
+
+    @property
+    def ecliptic_latitude(self):
+        return arcsin(cos(epsilon)*sin(self.dec.rad) - sin(epsilon)*cos(self.dec.rad)*sin(self.ra.rad))

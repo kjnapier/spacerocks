@@ -1,13 +1,15 @@
 import warnings
+from healpy.pixelfunc import ang2pix
 
 import numpy as np
 from astropy import units as u
-
+import pandas as pd
 
 from .linalg3d import *
 from .constants import *
 
 from astropy.time import Time
+from astropy.coordinates import SkyCoord
 from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
@@ -18,75 +20,85 @@ earth = planets['earth']
 
 class Transformations:
 
-    def equa_to_ecl(self, x, y, z):
+    #def equa_to_ecl(self, x, y, z):
 
-        R = np.array([[1, 0, 0],
-                      [0, np.cos(epsilon), np.sin(epsilon)],
-                      [0, -np.sin(epsilon), np.cos(epsilon)]])
+    #    R = np.array([[1, 0, 0],
+    #                  [0, np.cos(epsilon), np.sin(epsilon)],
+    #                  [0, -np.sin(epsilon), np.cos(epsilon)]])
 
-        return R @ np.array([x, y, z])
+    #    return R @ np.array([x, y, z])
 
-    def xyz_to_abg(self):
+    #def ecl_to_tel(self, x, y, z):
 
-        earth = planets['earth']
+    #    #l =
+    #    #b =
 
-        if self.__class__.obscode != 500:
-            earth += Topos(latitude_degrees=self.__class__.obslat,
-                            longitude_degrees=self.__class__.obslon,
-                            elevation_m=self.__class__.obselev) # topocentric calculation
+    #    R = np.array([[-np.sin(l), -np.cos(l) * np.sin(b), np.cos(l) * np.cos(b)],
+    #                  [np.cos(l), -np.sin(l) * np.sin(b), np.sin(l) * np.cos(b)],
+    #                  [0, np.cos(b), np.sin(b)]])
 
-        t = ts.tt(jd=self.epoch.tt.jd)
-        x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
-        vx_earth, vy_earth, vz_earth = earth.at(t).velocity.au_per_d * u.au / u.day # earth ICRS position
+    #    return R @ np.array([x, y, z])
 
-        x, y, z = self.equa_to_ecl(self.x.value, self.y.value, self.z.value) * u.au
-        vx, vy, vz = self.equa_to_ecl(self.vx.value, self.vy.value, self.vz.value) * u.au / u.day
+    #def xyz_to_abg(self):
 
-        #x0 = self.x - x_earth
-        #y0 = self.y - y_earth
-        #z0 = self.z - z_earth
-        #vx0 = self.vx - vx_earth
-        #vy0 = self.vy - vy_earth
-        #vz0 = self.vz - vz_earth
+    #    earth = planets['earth']
 
-        x0 = x - x_earth
-        y0 = y - y_earth
-        z0 = z - z_earth
-        vx0 = vx - vx_earth
-        vy0 = vy - vy_earth
-        vz0 = vz - vz_earth
+    #    if self.__class__.obscode != 500:
+    #        earth += Topos(latitude_degrees=self.__class__.obslat,
+    #                        longitude_degrees=self.__class__.obslon,
+    #                        elevation_m=self.__class__.obselev) # topocentric calculation
 
-        self.alpha = x0 / z0
-        self.beta = y0 / z0
-        self.gamma = 1 / z0
-        self.alpha_dot = vx0 / z0
-        self.beta_dot = vy0 / z0
-        self.gamma_dot = vz0 / z0
+    #    t = ts.tt(jd=self.epoch.tt.jd)
+    #    x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
+    #    vx_earth, vy_earth, vz_earth = earth.at(t).velocity.au_per_d * u.au / u.day # earth ICRS position
 
-        return self
+    #    x, y, z = self.equa_to_ecl(self.x.value, self.y.value, self.z.value) * u.au
+    #    vx, vy, vz = self.equa_to_ecl(self.vx.value, self.vy.value, self.vz.value) * u.au / u.day
 
-    def abg_to_xyz(self):
+    #    #x0 = self.x - x_earth
+    #    #y0 = self.y - y_earth
+    #    #z0 = self.z - z_earth
+    #    #vx0 = self.vx - vx_earth
+    #    #vy0 = self.vy - vy_earth
+    #    #vz0 = self.vz - vz_earth
 
-        earth = planets['earth']
+    #    x0 = x - x_earth
+    #    y0 = y - y_earth
+    #    z0 = z - z_earth
+    #    vx0 = vx - vx_earth
+    #    vy0 = vy - vy_earth
+    #    vz0 = vz - vz_earth
 
-        if self.__class__.obscode != 500:
-            earth += Topos(latitude_degrees=self.__class__.obslat,
-                            longitude_degrees=self.__class__.obslon,
-                            elevation_m=self.__class__.obselev) # topocentric calculation
+    #    self.alpha = x0 / z0
+    #    self.beta = y0 / z0
+    #    self.gamma = 1 / z0
+    #    self.dalpha = vx0 / z0
+    #    self.dbeta = vy0 / z0
+    #    self.dgamma = vz0 / z0
 
-        t = ts.tt(jd=self.epoch.tt.jd)
-        x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
-        vx_earth, vy_earth, vz_earth = earth.at(t).velocity.au_per_d * u.au / u.day # earth ICRS position
+    #    return self
 
-        self.x = self.alpha / self.gamma + x_earth
-        self.y = self.beta / self.gamma + y_earth
-        self.z = 1 / self.gamma + z_earth
-        self.vx = self.alpha_dot / self.gamma
-        self.vy = self.beta_dot / self.gamma
-        self.vz = self.gamma_dot / self.gamma
+    #def abg_to_xyz(self):
 
-        return self
+    #    earth = planets['earth']
 
+    #    if self.__class__.obscode != 500:
+    #        earth += Topos(latitude_degrees=self.__class__.obslat,
+    #                        longitude_degrees=self.__class__.obslon,
+    #                        elevation_m=self.__class__.obselev) # topocentric calculation
+
+    #    t = ts.tt(jd=self.epoch.tt.jd)
+    #    x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
+    #    vx_earth, vy_earth, vz_earth = earth.at(t).velocity.au_per_d * u.au / u.day # earth ICRS position
+
+    #    self.x = self.alpha / self.gamma + x_earth
+    #    self.y = self.beta / self.gamma + y_earth
+    #    self.z = 1 / self.gamma + z_earth
+    #    self.vx = self.alpha_dot / self.gamma
+    #    self.vy = self.beta_dot / self.gamma
+    #    self.vz = self.gamma_dot / self.gamma
+
+    #    return self
 
     def xyz_to_equa(self, rocks):
         '''
@@ -104,16 +116,19 @@ class Transformations:
 
             # Only used for the topocentric calculation.
             if self.__class__.obscode != 500:
-                earth += Topos(latitude_degrees=Observe.obslat,
-                                longitude_degrees=Observe.obslon,
-                                elevation_m=Observe.obselev) # topocentric calculation
+                earth += Topos(latitude_degrees=self.__class__.obslat,
+                               longitude_degrees=self.__class__.obslon,
+                               elevation_m=self.__class__.obselev) # topocentric calculation
 
-            x_earth, y_earth, z_earth = earth.at(t).position.au * u.au # earth ICRS position
-            vx_earth, vy_earth, vz_earth = earth.at(t).velocity.au_per_d * u.au / u.day # earth ICRS position
+            ee = earth.at(t)
+            x_earth, y_earth, z_earth = ee.position.au * u.au # earth ICRS position
+            vx_earth, vy_earth, vz_earth = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
+
             earth_dis = norm([x_earth, y_earth, z_earth])
+
             x0, y0, z0 = rocks.x, rocks.y, rocks.z
             vx0, vy0, vz0 = rocks.vx, rocks.vy, rocks.vz
-            for idx in range(10):
+            for idx in range(5):
                 # transfer ecliptic to ICRS and shift to Geocentric (topocentric)
                 x = x0 - x_earth
                 y = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
@@ -124,23 +139,21 @@ class Transformations:
                 delta = norm([x, y, z])
                 ltt = delta / c
                 M = rocks.M - ltt * (mu_bary / rocks.a**3)**0.5
-                if idx < 9:
+                if idx < 4:
                     x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(rocks.a, rocks.e, rocks.inc,
                                                                      rocks.arg, rocks.node, M)
 
             # Cartesian to spherical coordinate
             self.delta = norm([x, y, z])
             self.ltt = self.delta / c
-            self.dec = Angle(np.arcsin(z / norm([x, y, z])), u.rad)
+            self.dec = Angle(np.arcsin(z / self.delta), u.rad)
             self.ra = Angle(np.arctan2(y, x), u.rad).wrap_at(2 * np.pi * u.rad)
-            self.phase_angle = Angle(np.arccos(-(earth_dis**2 - rocks.r**2 - self.delta**2)/(2 * rocks.r* self.delta)), u.rad)
+            #self.phase_angle = Angle(np.arccos(-(earth_dis**2 - rocks.r**2 - self.delta**2)/(2 * rocks.r * self.delta)), u.rad)
             self.elong = Angle(np.arccos(-(rocks.r**2 - self.delta**2 - earth_dis**2)/(2 * self.delta * earth_dis)), u.rad)
             self.skycoord = SkyCoord(self.ra, self.dec, frame='icrs')
-            self.dec_rate = (-z * (x * vx + y * vy) + (norm([x, y, np.zeros(len(rocks))])**2) * vz) \
-                    / (norm([x, y, np.zeros(len(rocks))]) * norm([x, y, z])**2) * u.rad
-            self.ra_rate = (y * vx - x * vy) / norm([x, y, np.zeros(len(rocks))])**2 * np.cos(self.dec) * u.rad
-            #ra_rate[rocks.inc.rad >= np.pi/2] *= -1
-            #self.ra_rate = ra_rate
+            self.dec_rate = (-z * (x * vx + y * vy) + (norm([x, y, np.zeros_like(x)])**2) * vz) \
+                    / (norm([x, y, np.zeros_like(x)]) * self.delta**2) * u.rad
+            self.ra_rate = - (y * vx - x * vy) / norm([x, y, np.zeros_like(z)])**2 * np.cos(self.dec) * u.rad
 
         return self
 
@@ -153,15 +166,22 @@ class Transformations:
 
         ## pyephem
         beta = np.zeros(len(q))
-        beta[np.where(q <= 1)[0]] = np.pi * u.rad
+
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            beta = np.arccos(q)
+
+        beta[np.where(q <= -1)[0]] = np.pi * u.rad
         beta[np.where(q >= 1)[0]] = 0 * u.rad
 
         Psi_1 = np.exp(-3.33 * np.tan(beta/2)**0.63)
         Psi_2 = np.exp(-1.87 * np.tan(beta/2)**1.22)
         mag = rocks.H + 5 * np.log10(rocks.r * self.delta / u.au**2)
 
+
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
         mag[not_zero] -= 2.5 * np.log10((1 - rocks.G[not_zero]) * Psi_1[not_zero] + rocks.G[not_zero] * Psi_2[not_zero])
+
 
         try:
             mag += rocks.delta_H * np.sin((rocks.epoch.jd - rocks.t0.value - self.ltt.value) * 2 * np.pi / rocks.rotation_period.value + rocks.phi0)
@@ -181,7 +201,7 @@ class Transformations:
     def kep_to_xyz(self, mu):
         '''
         Transform from Keplerian to cartesian coordinates. There is no analytic
-        solution to solve Kepler's Equation M = E - eSin[e] for the eccentric
+        solution to Kepler's Equation M = E - eSin[e] for the eccentric
         anomaly (E), but I use a close approximation.
         '''
         # compute eccentric anomaly E
@@ -189,6 +209,7 @@ class Transformations:
 
         # compute true anomaly v
         ν = 2 * np.arctan2((1 + self.e)**0.5 * np.sin(E/2), (1 - self.e)**0.5 * np.cos(E/2))
+        self.true = ν
 
         # compute the distance to the central body r
         r = self.a * (1 - self.e * np.cos(E))
@@ -239,6 +260,8 @@ class Transformations:
             ν = np.arccos(dot([ex, ey, ez], [self.x, self.y, self.z]) / (self.e*self.r))
             ν[rrdot < 0] = 2 * np.pi * u.rad - ν[rrdot < 0]
 
+        self.true = ν
+
         # compute inclination
         self.inc = Angle(np.arccos(hz/h), u.rad)
 
@@ -246,22 +269,19 @@ class Transformations:
         E = 2 * np.arctan2(np.sqrt(1-self.e) * np.sin(ν/2), np.sqrt(1+self.e) * np.cos(ν/2))
 
         # compute ascending node
-        with np.errstate(invalid='ignore'):
-            node = np.arccos(nx/n)
-            node[ny < 0] = 2 * np.pi - node[ny < 0]
-            self.node = Angle(node, u.rad)
+        node = np.arccos(nx/n) * u.rad
+        node[ny < 0] = 2 * np.pi * u.rad - node[ny < 0]
+        self.node = Angle(node, u.rad)
 
         # compute argument of periapsis, the angle between e and n
-        with np.errstate(invalid='ignore'):
-            arg = np.arccos(dot([nx, ny, nz], [ex, ey, ez]) / (n*self.e))
-            arg[ez < 0] = 2 * np.pi * u.rad - arg[ez < 0]
-            self.arg = Angle(arg, u.rad)
+        arg = np.arccos(dot([nx, ny, nz], [ex, ey, ez]) / (n * self.e))
+        arg[ez < 0] = 2 * np.pi * u.rad - arg[ez < 0]
+        self.arg = Angle(arg, u.rad)
 
         # compute mean anomaly
-        with np.errstate(invalid='ignore'):
-            M = E - self.e * np.sin(E) * u.rad
-            M[M < 0] += 2 * np.pi * u.rad
-            self.M = Angle(M, u.rad)
+        M = E - self.e * np.sin(E) * u.rad
+        M[M < 0] += 2 * np.pi * u.rad
+        self.M = Angle(M, u.rad)
 
         # compute a
         self.a = 1 / (2 / self.r - norm([self.vx, self.vy, self.vz])**2 / mu * u.rad**2)
@@ -292,11 +312,17 @@ class Transformations:
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
             with np.errstate(invalid='ignore'):
                 lp = self.M < np.pi * u.rad
-            self.t_peri.jd[lp] = self.epoch.value[lp] - self.M.value[lp] \
+            self.t_peri.jd[lp] = self.epoch.jd[lp] - self.M.value[lp] \
                                  / np.sqrt(mu_bary.value / self.a.value[lp]**3)
-            self.t_peri.jd[~lp] = self.epoch.value[~lp] \
+            self.t_peri.jd[~lp] = self.epoch.jd[~lp] \
                                   + (2*np.pi - self.M.value[~lp]) \
                                   / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
+
+            #self.t_peri.jd[lp] = self.epoch.value[lp] - self.M.value[lp] \
+            #                     / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+            #self.t_peri.jd[~lp] = self.epoch.value[~lp] \
+            #                      + (2*np.pi - self.M.value[~lp]) \
+            #                      / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
             self.t_peri = Time(self.t_peri, format='jd', scale='utc')
             self.__class__.frame = 'barycentric'
 
@@ -327,11 +353,16 @@ class Transformations:
             self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
             with np.errstate(invalid='ignore'):
                 lp = self.M < np.pi * u.rad
-            self.t_peri.jd[lp] = self.epoch.value[lp] - self.M.value[lp] \
+            self.t_peri.jd[lp] = self.epoch.jd[lp] - self.M.value[lp] \
                                  / np.sqrt(mu_bary.value / self.a.value[lp]**3)
-            self.t_peri.jd[~lp] = self.epoch.value[~lp] \
+            self.t_peri.jd[~lp] = self.epoch.jd[~lp] \
                                   + (2*np.pi - self.M.value[~lp]) \
                                   / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
+            #self.t_peri.jd[lp] = self.epoch.value[lp] - self.M.value[lp] \
+            #                     / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+            #self.t_peri.jd[~lp] = self.epoch.value[~lp] \
+            #                      + (2*np.pi - self.M.value[~lp]) \
+            #                      / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
             self.t_peri = Time(self.t_peri, format='jd', scale='utc')
             self.__class__.frame = 'heliocentric'
 
@@ -396,13 +427,13 @@ class Transformations:
     def calc_t_peri(self):
 
         with np.errstate(invalid='ignore'):
-            lp = self.M < np.pi * u.rad
+            lp = self.M.rad < np.pi# * u.rad
 
-        t_peri = np.zeros(len(self))
-        t_peri[lp] = self.epoch.jd[lp] - self.M.value[lp] \
+        t_peri = np.zeros_like(self.M.rad)
+        t_peri[lp] = self.epoch.jd[lp] - self.M.rad[lp] \
                           / np.sqrt(mu_bary.value / self.a.value[lp]**3)
         t_peri[~lp] = self.epoch.jd[~lp] \
-                           + (2*np.pi - self.M.value[~lp]) \
+                           + (2*np.pi - self.M.rad[~lp]) \
                            / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
 
         t_peri = Time(t_peri, format='jd', scale='utc')
