@@ -3,6 +3,7 @@ import warnings
 
 import healpy as hp
 import pandas as pd
+import numpy as np
 from skyfield.api import Topos, Loader
 from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord
@@ -66,6 +67,12 @@ class Observe(Transformations, Convenience):
             self.mag = self.estimate_mag(rocks)
         except:
             pass
+
+    def radec_to_hpix(self, NSIDE):
+        '''
+        Convert (ra, dec) into healpix.
+        '''
+        return hp.pixelfunc.ang2pix(NSIDE, np.pi/2 - self.dec.radian, self.ra.radian, nest=True)
 
     @property
     def ecliptic_longitude(self):

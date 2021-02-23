@@ -84,7 +84,7 @@ class Propagate(SpaceRock, Transformations, Convenience):
         in_frame = Propagate.frame
 
         # We need to (or should) work in barycentric coordinates in rebound
-        if in_frame == 'heliocentric':
+        if in_frame == 'helio':
             self.to_bary()
 
         # Integrate all particles to the same obsdate
@@ -130,7 +130,7 @@ class Propagate(SpaceRock, Transformations, Convenience):
         self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
 
         # be polite and return orbital parameters in the input frame.
-        if in_frame == 'heliocentric':
+        if in_frame == 'helio':
             self.to_helio()
 
         try:

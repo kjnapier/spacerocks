@@ -209,7 +209,7 @@ class Transformations:
 
         # compute true anomaly v
         ν = 2 * np.arctan2((1 + self.e)**0.5 * np.sin(E/2), (1 - self.e)**0.5 * np.cos(E/2))
-        self.true = ν
+        self.true_anomaly = Angle(ν, u.rad)
 
         # compute the distance to the central body r
         r = self.a * (1 - self.e * np.cos(E))
@@ -260,7 +260,7 @@ class Transformations:
             ν = np.arccos(dot([ex, ey, ez], [self.x, self.y, self.z]) / (self.e*self.r))
             ν[rrdot < 0] = 2 * np.pi * u.rad - ν[rrdot < 0]
 
-        self.true = ν
+        self.true_anomaly = Angle(ν, u.rad)
 
         # compute inclination
         self.inc = Angle(np.arccos(hz/h), u.rad)
@@ -270,12 +270,17 @@ class Transformations:
 
         # compute ascending node
         node = np.arccos(nx/n) * u.rad
+        node[self.inc == 0] = 0 * u.rad
         node[ny < 0] = 2 * np.pi * u.rad - node[ny < 0]
+
         self.node = Angle(node, u.rad)
 
         # compute argument of periapsis, the angle between e and n
         arg = np.arccos(dot([nx, ny, nz], [ex, ey, ez]) / (n * self.e))
+        #arg[self.node.rad == 0] = np.arctan2(ey, ex)
         arg[ez < 0] = 2 * np.pi * u.rad - arg[ez < 0]
+
+        arg[self.e == 0] = 0 * u.rad
         self.arg = Angle(arg, u.rad)
 
         # compute mean anomaly

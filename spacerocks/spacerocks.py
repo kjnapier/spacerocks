@@ -128,6 +128,7 @@ class SpaceRock(Transformations, Convenience):
 
 
         self.varpi = Angle((self.arg + self.node).wrap_at(2 * np.pi * u.rad), u.rad)
+        self.true_longitude = Angle((self.true_anomaly + self.varpi).wrap_at(2 * np.pi * u.rad), u.rad)
 
         if kwargs.get('h') is not None:
             self.H = kwargs.get('h')
