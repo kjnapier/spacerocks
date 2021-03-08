@@ -278,7 +278,7 @@ class Propagate(SpaceRock, Transformations, Convenience):
 
         sim.testparticle_type = 0
         sim.integrator = 'ias15'
-        sim.ri_ias15.epsilon = 1e-10
+        #sim.ri_ias15.epsilon = 1e-10
 
         sim.move_to_com()
 

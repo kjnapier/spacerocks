@@ -22,9 +22,8 @@ import pandas as pd
 
 from astropy import units as u
 from astropy.table import Table
-from astropy.coordinates import Angle
+from astropy.coordinates import Angle, Distance, SkyCoord
 from astropy.time import Time
-from astropy.coordinates import SkyCoord
 
 import dateutil
 import matplotlib.pyplot as plt
@@ -95,7 +94,7 @@ class SpaceRock(Transformations, Convenience):
 
         if coords == 'kep':
 
-            self.a = kwargs.get('a') * units.distance
+            self.a = Distance(kwargs.get('a'), units.distance).to(u.au)
             self.e = kwargs.get('e') * u.dimensionless_unscaled
             self.inc = Angle(kwargs.get('inc'), units.angle).to(u.rad)
             self.node = Angle(kwargs.get('node'), units.angle).to(u.rad)
@@ -117,12 +116,12 @@ class SpaceRock(Transformations, Convenience):
 
         elif coords == 'xyz':
 
-            self.x = kwargs.get('x') * units.distance
-            self.y = kwargs.get('y') * units.distance
-            self.z = kwargs.get('z') * units.distance
-            self.vx = kwargs.get('vx') * units.speed
-            self.vy = kwargs.get('vy') * units.speed
-            self.vz = kwargs.get('vz') * units.speed
+            self.x = Distance(kwargs.get('x'), units.distance, allow_negative=True).to(u.au)
+            self.y = Distance(kwargs.get('y'), units.distance, allow_negative=True).to(u.au)
+            self.z = Distance(kwargs.get('z'), units.distance, allow_negative=True).to(u.au)
+            self.vx = (kwargs.get('vx') * units.speed).to(u.au / u.day)
+            self.vy = (kwargs.get('vy') * units.speed).to(u.au / u.day)
+            self.vz = (kwargs.get('vz') * units.speed).to(u.au / u.day)
 
             self.xyz_to_kep(mu)
 
@@ -138,73 +137,73 @@ class SpaceRock(Transformations, Convenience):
                 self.G = np.repeat(0.15, len(self))
 
 
-    def ecl_to_tel(self, x_ec, y_ec, z_ec, l0, b0):
-        '''
-        This is right
-        '''
-        sl = np.sin(l0)
-        cl = np.cos(l0)
-        sb = np.sin(b0)
-        cb = np.cos(b0)
-
-        xT = -sl*x_ec + cl*y_ec
-        yT = -cl*sb*x_ec -sl*sb*y_ec + cb*z_ec
-        zT = cl*cb*x_ec + sl*cb*y_ec + sb*z_ec
-
-        return xT, yT, zT
-
-
-    def calc_abg(self, obscode=500):
-        '''
-        [x] Transform equatorial {xyz, vxyz} (barycentric) to ecliptic {xyz, vxyz}.
-        [x] Compute the (ra, dec) of the rock.
-        [x] Get {xyz, vxyz} of earth in the ecliptic frame.
-        [x] Transform {xyz, vxyz} from ecliptic to telescope-centric coordinates.
-        [x] Use xyzT, vxyzT to compute abg coordinates.
-        '''
-
-        x_ec, y_ec, z_ec = self.x, self.y, self.z
-        vx_ec, vy_ec, vz_ec = self.vx, self.vy, self.vz
-
-        o = Observe(self, obscode=obscode)
-        l = o.ecliptic_longitude
-        b = o.ecliptic_latitude
-
-        #t = ts.tt(jd=self.epoch.tt.jd)
-        t = ts.ut1(jd=self.epoch.ut1.jd)
-        earth = planets['earth']
-
-        # Only used for the topocentric calculation.
-        if obscode != 500:
-            obscode = str(obscode).zfill(3)
-            obs = observatories[observatories.obscode == obscode]
-            earth += Topos(latitude_degrees=obs.lat.values, longitude_degrees=obs.lon.values, elevation_m=obs.elevation.values)
-
-        ee = earth.at(t)
-
-        x0, y0, z0 = ee.ecliptic_xyz().au * u.au
-        vx0, vy0, vz0 = ee.ecliptic_velocity().au_per_d * u.au / u.d
-
-        xT, yT, zT = self.ecl_to_tel(x_ec - x0, y_ec - y0, z_ec - z0, l, b)
-        vxT, vyT, vzT = self.ecl_to_tel(vx_ec - vx0, vy_ec - vy0, vz_ec - vz0, l, b)
-
-
-        self.gamma = 1/zT
-        self.alpha = self.gamma * xT
-        self.beta = self.gamma * yT
-        self.dalpha = self.gamma * vxT
-        self.dbeta = self.gamma * vyT
-        self.dgamma = self.gamma * vzT
-
-    def equ_to_ecl(self, x, y, z):
-        '''
-        This is right
-        '''
-        x_ec = x
-        y_ec = np.cos(epsilon)*y + np.sin(epsilon)*z
-        z_ec = -np.sin(epsilon)*y + np.cos(epsilon)*z
-        return x_ec, y_ec, z_ec
-
+#    def ecl_to_tel(self, x_ec, y_ec, z_ec, l0, b0):
+#        '''
+#        This is right
+#        '''
+#        sl = np.sin(l0)
+#        cl = np.cos(l0)
+#        sb = np.sin(b0)
+#        cb = np.cos(b0)
+#
+#        xT = -sl*x_ec + cl*y_ec
+#        yT = -cl*sb*x_ec -sl*sb*y_ec + cb*z_ec
+#        zT = cl*cb*x_ec + sl*cb*y_ec + sb*z_ec
+#
+#        return xT, yT, zT
+#
+#
+#    def calc_abg(self, obscode=500):
+#        '''
+#        [x] Transform equatorial {xyz, vxyz} (barycentric) to ecliptic {xyz, vxyz}.
+#        [x] Compute the (ra, dec) of the rock.
+#        [x] Get {xyz, vxyz} of earth in the ecliptic frame.
+#        [x] Transform {xyz, vxyz} from ecliptic to telescope-centric coordinates.
+#        [x] Use xyzT, vxyzT to compute abg coordinates.
+#        '''
+#
+#        x_ec, y_ec, z_ec = self.x, self.y, self.z
+#        vx_ec, vy_ec, vz_ec = self.vx, self.vy, self.vz
+#
+#        o = Observe(self, obscode=obscode)
+#        l = o.ecliptic_longitude
+#        b = o.ecliptic_latitude
+#
+#        #t = ts.tt(jd=self.epoch.tt.jd)
+#        t = ts.ut1(jd=self.epoch.ut1.jd)
+#        earth = planets['earth']
+#
+#        # Only used for the topocentric calculation.
+#        if obscode != 500:
+#            obscode = str(obscode).zfill(3)
+#            obs = observatories[observatories.obscode == obscode]
+#            earth += Topos(latitude_degrees=obs.lat.values, longitude_degrees=obs.lon.values, elevation_m=obs.elevation.values)
+#
+#        ee = earth.at(t)
+#
+#        x0, y0, z0 = ee.ecliptic_xyz().au * u.au
+#        vx0, vy0, vz0 = ee.ecliptic_velocity().au_per_d * u.au / u.d
+#
+#        xT, yT, zT = self.ecl_to_tel(x_ec - x0, y_ec - y0, z_ec - z0, l, b)
+#        vxT, vyT, vzT = self.ecl_to_tel(vx_ec - vx0, vy_ec - vy0, vz_ec - vz0, l, b)
+#
+#
+#        self.gamma = 1/zT
+#        self.alpha = self.gamma * xT
+#        self.beta = self.gamma * yT
+#        self.dalpha = self.gamma * vxT
+#        self.dbeta = self.gamma * vyT
+#        self.dgamma = self.gamma * vzT
+#
+#    def equ_to_ecl(self, x, y, z):
+#        '''
+#        This is right
+#        '''
+#        x_ec = x
+#        y_ec = np.cos(epsilon)*y + np.sin(epsilon)*z
+#        z_ec = -np.sin(epsilon)*y + np.cos(epsilon)*z
+#        return x_ec, y_ec, z_ec
+#
 
 #class SpaceRock(Transformations, Convenience):
 #
