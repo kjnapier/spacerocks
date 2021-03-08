@@ -13,6 +13,7 @@ SpaceRocks is an open-source software written in pure Python. It is a suite of t
 
 - Positional uncertainty calculations.
 - Orbit fitting.
+- Minor Planet Center Queries.
 
 
 
@@ -27,7 +28,7 @@ pip install spacerocks
 If you don't use pip, or if you want to be sure that you have the most up-to-date version, you can clone the repository and install from the source.
 
 ```zsh
-git clone https://github.com/kjnapes/spacerocks.git
+git clone https://github.com/kjnapier/spacerocks.git
 python setup.py install
 ```
 
