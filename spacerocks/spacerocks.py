@@ -129,6 +129,7 @@ class SpaceRock(Transformations, Convenience):
 
         self.varpi = Angle((self.arg + self.node).wrap_at(2 * np.pi * u.rad), u.rad)
         self.true_longitude = Angle((self.true_anomaly + self.varpi).wrap_at(2 * np.pi * u.rad), u.rad)
+        self.mean_longitude = Angle((self.M + self.varpi).wrap_at(2 * np.pi * u.rad), u.rad)
 
         if kwargs.get('h') is not None:
             self.H = kwargs.get('h')
@@ -136,6 +137,10 @@ class SpaceRock(Transformations, Convenience):
                 self.G = kwargs.get('g')
             else:
                 self.G = np.repeat(0.15, len(self))
+
+    @property
+    def q(self):
+        return self.a * (1 - self.e)
 
 
     def ecl_to_tel(self, x_ec, y_ec, z_ec, l0, b0):
@@ -187,7 +192,6 @@ class SpaceRock(Transformations, Convenience):
 
         xT, yT, zT = self.ecl_to_tel(x_ec - x0, y_ec - y0, z_ec - z0, l, b)
         vxT, vyT, vzT = self.ecl_to_tel(vx_ec - vx0, vy_ec - vy0, vz_ec - vz0, l, b)
-
 
         self.gamma = 1/zT
         self.alpha = self.gamma * xT
@@ -322,27 +326,20 @@ class SpaceRock(Transformations, Convenience):
 #
 #        # self.epoch = Time(self.epoch, format='jd', scale='utc')
 #
-#    #def plot_orbits(self):
-    #    '''
-    #    Plot the orbits of all your rocks.
-    #    '''
-    #    x = np.zeros([500, len(self.a)])
-    #    y = np.zeros([500, len(self.a)])
-    #    z = np.zeros([500, len(self.a)])
-    #    for idx, M in enumerate(np.linspace(0, 2*np.pi, 500)):
-    #        xx, yy, zz, _, _, _ = self.kep_to_xyz_temp(self.a, self.e, self.inc.rad,
-    #                                                   self.arg.rad, self.node.rad,
-    #                                                   np.repeat(M, len(self.a)) * u.rad)
-    #        x[idx] = xx
-    #        y[idx] = yy
-    #        z[idx] = zz
+    def plot_orbits(self, N, colors, alphas, ax, linewidths):
+        '''
+        Plot the orbits of all your rocks.
+        '''
+        x = np.zeros([N, len(self.a)])
+        y = np.zeros([N, len(self.a)])
+        z = np.zeros([N, len(self.a)])
+        for idx, M in enumerate(np.linspace(0, 2*np.pi, N)):
+            xx, yy, zz, _, _, _ = self.kep_to_xyz_temp(self.a, self.e, self.inc.rad,
+                                                       self.arg.rad, self.node.rad,
+                                                       np.repeat(M, len(self.a)) * u.rad)
+            x[idx] = xx
+            y[idx] = yy
+            z[idx] = zz
 
-    #    fig = plt.figure(figsize=(12, 12))
-    #    ax = fig.add_subplot(111, projection='3d')
-    #    for idx in range(len(self.a)):
-    #        ax.plot(x.T[idx], y.T[idx], z.T[idx], color=np.random.choice(['#00274C', '#FFCB05']))
-
-    #    ax.axis('off')
-    #    ax.view_init(90, 0)
-
-    #    return fig, ax
+        for idx in range(len(self.a)):
+            ax.plot(x.T[idx], y.T[idx], color=colors[idx], alpha=alphas[idx], linewidth=linewidths[idx])

@@ -444,3 +444,44 @@ class Transformations:
         t_peri = Time(t_peri, format='jd', scale='utc')
 
         return t_peri
+
+
+    #def calc_t_peri(self):
+
+    #    with np.errstate(invalid='ignore'):
+    #        lp = self.M.rad < np.pi# * u.rad
+
+    #    t_peri = np.zeros_like(self.M.rad)
+    #    t_peri[lp] = self.epoch.jd[lp] - self.M.rad[lp] \
+    #                      / np.sqrt(mu_bary.value / self.a.value[lp]**3)
+    #    t_peri[~lp] = self.epoch.jd[~lp] \
+    #                       + (2*np.pi - self.M.rad[~lp]) \
+    #                       / np.sqrt(mu_bary.value / self.a.value[~lp]**3)
+
+    #    t_peri = Time(t_peri, format='jd', scale='utc')
+
+    #    return t_peri
+
+    @property
+    def t_peri(self):
+        return
+
+    @property
+    def a(self):
+        return Distance(1 / (2 / self.r - norm([self.vx, self.vy, self.vz])**2 / mu * u.rad**2))
+
+    @property
+    def n(self):
+        return np.sqrt(mu_bary.value / self.a.value**3)
+
+    @property
+    def q(self):
+        return self.a * (1 - self.e)
+
+    @property
+    def r(self):
+        return norm([self.x, self.y, self.z])
+
+    @property
+        def Q(self):
+            return self.a * (1 + self.e)

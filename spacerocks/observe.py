@@ -45,7 +45,7 @@ class Observe(Transformations, Convenience):
         else:
             self.__class__.NSIDE = None
 
-        self.xyz_to_equa(rocks)
+        #self.xyz_to_equa(rocks)
 
         if rocks.frame == 'barycentric':
             self.xyz_to_equa(rocks)
