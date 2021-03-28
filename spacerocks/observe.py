@@ -11,7 +11,7 @@ from astropy.coordinates import Angle, SkyCoord
 from numpy import sin, cos, arctan2, arcsin, array, isscalar
 
 from .constants import epsilon, mu_bary, c
-from .transformations import Transformations
+#from .skyfuncs import Transformations
 from .linalg3d import norm
 from .convenience import Convenience
 
@@ -25,10 +25,11 @@ load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
 planets = load('de423.bsp')
 
-class Observe(Transformations, Convenience):
+class Observe(Convenience):
 
     def __init__(self, rocks, obscode=None, NSIDE=None):
 
+        self.mu = mu_bary
         if obscode is not None:
             self.__class__.obscode = str(obscode).zfill(3)
             obs = observatories[observatories.obscode == self.__class__.obscode]
@@ -38,46 +39,67 @@ class Observe(Transformations, Convenience):
         else:
             self.__class__.obscode = 500
 
-        if NSIDE is not None:
-            if isscalar(NSIDE):
-                NSIDE = array([NSIDE])
-            self.__class__.NSIDE = NSIDE
-        else:
-            self.__class__.NSIDE = None
 
-        #self.xyz_to_equa(rocks)
+        self.xT, self.yT, self.zT, self.vxT, self.vyT, self.vzT = self.xyz_to_tel(rocks)
 
-        if rocks.frame == 'barycentric':
-            self.xyz_to_equa(rocks)
-
-        elif rocks.frame == 'heliocentric':
-            rocks.to_bary()
-            self.xyz_to_equa(rocks)
-            rocks.to_helio()
-
-
-        if self.__class__.NSIDE is not None:
-            for value in Observe.NSIDE:
-                setattr(self, 'HPIX_{}'.format(value), self.radec_to_hpix(value))
 
         self.name = rocks.name
         self.epoch = rocks.epoch
 
-        try:
-            self.mag = self.estimate_mag(rocks)
-        except:
-            pass
-
-    def radec_to_hpix(self, NSIDE):
-        '''
-        Convert (ra, dec) into healpix.
-        '''
-        return hp.pixelfunc.ang2pix(NSIDE, np.pi/2 - self.dec.radian, self.ra.radian, nest=True)
 
     @property
-    def ecliptic_longitude(self):
-        return arctan2((cos(epsilon)*cos(self.dec.rad)*sin(self.ra.rad) + sin(epsilon)*sin(self.dec.rad)), cos(self.dec.rad) * cos(self.ra.rad))
+    def mag(self):
+        return self._mag
 
-    @property
-    def ecliptic_latitude(self):
-        return arcsin(cos(epsilon)*sin(self.dec.rad) - sin(epsilon)*cos(self.dec.rad)*sin(self.ra.rad))
+    @mag.setter
+    def mag(self, rocks):
+        self._mag = self.__estimate_mag(rocks)
+
+
+    def xyz_to_tel(self, rocks):
+        '''
+        Transform from barycentric ecliptic Cartesian coordinates to
+        telescope-centric coordinates.
+
+        Routine corrects iteratively for light travel time.
+        '''
+
+        if rocks.frame == 'heliocentric':
+            rocks.to_bary()
+
+        t = ts.tt(jd=rocks.epoch.tt.jd)
+        earth = planets['earth']
+
+        # Only used for the topocentric calculation.
+        if self.__class__.obscode != 500:
+            earth += Topos(latitude_degrees=self.__class__.obslat,
+                           longitude_degrees=self.__class__.obslon,
+                           elevation_m=self.__class__.obselev) # topocentric calculation
+
+        ee = earth.at(t)
+        x_earth, y_earth, z_earth = ee.position.au * u.au # earth ICRS position
+        vx_earth, vy_earth, vz_earth = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
+
+        for idx in range(5):
+
+            # transfer ecliptic to ICRS and shift to Geocentric (topocentric)
+            xT = rocks.x - x_earth
+            yT = rocks.y * cos(epsilon) - rocks.z * sin(epsilon) - y_earth
+            zT = rocks.y * sin(epsilon) + rocks.z * cos(epsilon) - z_earth
+            vxT = rocks.vx - vx_earth
+            vyT = rocks.vy * cos(epsilon) - rocks.vz * sin(epsilon) - vy_earth
+            vzT = rocks.vy * sin(epsilon) + rocks.vz * cos(epsilon) - vz_earth
+
+            if idx < 4:
+
+                delta = norm([xT, yT, zT])
+                ltt = delta / c
+                M = rocks.M - ltt * rocks.n
+                x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(rocks.a,
+                                                                 rocks.e,
+                                                                 rocks.inc,
+                                                                 rocks.arg,
+                                                                 rocks.node,
+                                                                 M)
+
+        return xT, yT, zT, vxT, vyT, vzT
