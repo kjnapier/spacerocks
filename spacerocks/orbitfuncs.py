@@ -203,19 +203,19 @@ class OrbitFuncs:
 
         '''Transform from Keplerian to Cartesian coordinates.'''
 
-        self.E = self._calc_E(self.e, self.M.rad)
+        self.E = self._calc_E_from_M(self.e, self.M.rad)
 
         self.true_anomaly = self._calc_true_anomaly_from_kep(self.e, self.E)
 
         self.r = self._calc_r_from_kep(self.a, self.e, self.E)
 
-        self.ovec = self._calc_ovec(self.r, self.true_anomaly)
+        ovec = self._calc_ovec(self.r, self.true_anomaly)
 
-        self.vovec = self._calc_vovec(self.a, self.e, self.E, self.r, self.mu)
+        vovec = self._calc_vovec(self.a, self.e, self.E, self.r, self.mu)
 
-        self.x, self.y, self.z = self._calc_xyz(self.arg, self.inc, self.node, self.ovec)
+        self.x, self.y, self.z = self._calc_xyz(self.arg, self.inc, self.node, ovec)
 
-        self.vx, self.vy, self.vz = self._calc_vxyz(self.arg, self.inc, self.node, self.vovec)
+        self.vx, self.vy, self.vz = self._calc_vxyz(self.arg, self.inc, self.node, vovec)
 
 
     def xyz_to_kep(self):

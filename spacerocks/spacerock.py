@@ -105,7 +105,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
             if kwargs.get('M') is not None:
                 self.M = Angle(kwargs.get('M'), units.angle).to(u.rad)
-                self.E = self._calc_E(self.e, self.M.rad)
+                self.E = self._calc_E_from_M(self.e, self.M.rad)
 
             if kwargs.get('E') is not None:
                 self.E = Angle(kwargs.get('E'), units.angle).to(u.rad)

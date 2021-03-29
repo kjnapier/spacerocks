@@ -1,6 +1,7 @@
 from spacerocks import SpaceRock
 import numpy as np
 import pandas as pd
+
 import rebound
 import reboundx
 from reboundx import constants
@@ -30,10 +31,10 @@ sun = planets['sun']
 
 from .linalg3d import *
 from .constants import *
-from .orbitfuncs import OrbitFuncs
+from .transformations import Transformations
 from .convenience import Convenience
 
-class Propagate(SpaceRock, OrbitFuncs, Convenience):
+class Propagate(SpaceRock, Transformations, Convenience):
 
     def __init__(self, rocks, obsdates, model=0, gr=False,
                  gr_full=False, add_pluto=False, calc_abg=False, abg_obscode=500):
@@ -126,7 +127,7 @@ class Propagate(SpaceRock, OrbitFuncs, Convenience):
         if self.__class__.calc_abg == True:
             self.xyz_to_abg()
 
-        #self.t_peri = self.calc_t_peri()
+        self.t_peri = self.calc_t_peri()
         self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
 
         # be polite and return orbital parameters in the input frame.
