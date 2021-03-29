@@ -11,7 +11,7 @@ class OrbitFuncs:
 
     '''Private Methods'''
 
-    def __calc_E(self, e, M):
+    def _calc_E_from_M(self, e, M):
         '''
         Calculate eccentric anomaly from eccentricity and mean anomaly
 
@@ -38,105 +38,113 @@ class OrbitFuncs:
 
         return E
 
+    def _calc_E_from_true_anomaly(self, e, true_anomaly):
+        pass
 
-    def __calc_rrdot(self, x, y, z, vx, vy, vz):
+
+    def _calc_rrdot(self, x, y, z, vx, vy, vz):
         '''Calculate the dot product of the position and velocity vectors'''
         return dot([x, y, z], [vx, vy, vz])
 
 
-    def __calc_true_anomaly_from_kep(self, e, E):
+    def _calc_true_anomaly_from_kep(self, e, E):
         '''Calculate true anomaly from keplerian elements'''
         return 2 * arctan2(sqrt(1 + e) * sin(E/2), sqrt(1 - e) * cos(E/2))
 
 
-    def __calc_true_anomaly_from_xyz(self, x, y, z, evec, rrdot):
+    def _calc_true_anomaly_from_xyz(self, x, y, z, evec, rrdot):
         '''Calculate true anomaly'''
-        true_anomaly = arccos(dot(evec, [x, y, z]) / (norm(evec) * norm([x, y, z])))
-        true_anomaly[rrdot < 0] = 2 * pi - true_anomaly[rrdot < 0]
+        e = norm(evec)
+        true_anomaly = zeros_like(e)
+        true_anomaly[e == 0] = arccos(x[e == 0] / norm([x[e == 0], y[e == 0], z[e == 0]]))
+        true_anomaly[e != 0] = arccos(dot(evec[..., e != 0], [x[e != 0], y[e != 0], z[e != 0]]) / (norm(evec[..., e != 0]) * norm([x[e != 0], y[e != 0], z[e != 0]])))
+        true_anomaly[rrdot < 0] = 2 * pi * u.rad - true_anomaly[rrdot < 0]
         return true_anomaly
 
 
-    def __calc_r_from_kep(self, a, e, E):
+    def _calc_r_from_kep(self, a, e, E):
         '''Compure the distance of the rock from the center of the coordinate system'''
         return a * (1 - e * cos(E))
 
-    def __calc_r_from_xyz(self, x, y, z):
+    def _calc_r_from_xyz(self, x, y, z):
         '''Compure the distance of the rock from the center of the coordinate system'''
         return norm([x, y, z])
 
 
-    def __calc_ovec(self, r, true_anomaly):
+    def _calc_ovec(self, r, true_anomaly):
         '''Compute the position of the object in its orbital plane.'''
         return r * array([cos(true_anomaly), sin(true_anomaly), zeros_like(true_anomaly)])
 
 
-    def __calc_vovec(self, a, e, E, r, mu):
+    def _calc_vovec(self, a, e, E, r, mu):
         '''Compute the velocity of the object in its orbital plane.'''
-        return (mu * a**2 / r) * array([-sin(E), sqrt(1 - e**2) * cos(E), zeros_like(E)])
+        return sqrt(mu * a) / r * array([-sin(E), sqrt(1 - e**2) * cos(E), zeros_like(E)]) / u.rad
 
 
-    def __calc_xyz(self, arg, inc, node, ovec):
+    def _calc_xyz(self, arg, inc, node, ovec):
         '''Compute state vector position from Keplerian elements.'''
         return euler_rotation(arg, inc, node, ovec)
 
 
-    def __calc_vxyz(self, arg, inc, node, vovec):
+    def _calc_vxyz(self, arg, inc, node, vovec):
         '''Compute state vector velocity from Keplerian elements.'''
         return euler_rotation(arg, inc, node, vovec)
 
 
-    def __calc_hvec(self, x, y, z, vx, vy, vz):
+    def _calc_hvec(self, x, y, z, vx, vy, vz):
         '''Compute an object's angular momentum vector from its state vector.'''
         return cross([x, y, z], [vx, vy, vz])
 
 
-    def __calc_evec(self, x, y, z, vx, vy, vz, hvec, mu):
+    def _calc_evec(self, x, y, z, vx, vy, vz, hvec, mu):
         '''Compute an object's eccentricity vector from its state and angular momentum vectors.'''
-        return array(cross([vx, vy, vz], hvec)) / mu  - array([x, y, z]) / norm([x, y, z])
+        return array(cross([vx, vy, vz], hvec)) / mu.value  - array([x.au, y.au, z.au]) / norm([x.au, y.au, z.au])
 
 
-    def __calc_nvec(self, hvec):
+    def _calc_nvec(self, hvec):
         '''Compute an object's node vector from its angular momentum vector.'''
         return array([-hvec[1], hvec[0], zeros_like(hvec[2])])
 
 
-    def __calc_inc(self, hvec):
+    def _calc_inc(self, hvec):
         '''Compute orbital inclination'''
         return arccos(hvec[2] / norm(hvec))
 
 
-    def __calc_arg(self, nvec, evec):
+    def _calc_arg(self, nvec, evec):
         '''Compute argument of pericenter'''
         e = norm(evec)
         n = norm(nvec)
+        arg = zeros_like(e)
+        arg[(e == 0) | (n == 0)] = 0
+        arg[(e != 0) & (n != 0)] = arccos(dot(nvec[..., (e != 0) & (n != 0)], evec[..., (e != 0) & (n != 0)]) / (n[(e != 0) & (n != 0)] * e[(e != 0) & (n != 0)]))
+        arg[evec[2] < 0] = 2 * pi * u.rad - arg[evec[2] < 0]
 
-        arg = arccos(dot(nvec, evec) / (n * e))
-        arg[evec[2] < 0] = 2 * pi - arg[evec[2] < 0]
-        arg[e == 0] = 0
         return arg
 
 
-    def __calc_node(self, nvec, inc):
+    def _calc_node(self, nvec, inc):
         '''Compute longitude of ascending node'''
         # compute ascending node
-        node = arccos(nvec[0] / norm(nvec))
+        node = zeros_like(inc)
         node[inc == 0] = 0
-        node[nvec[1] < 0] = 2 * pi - node[nvec[1] < 0]
+        node[inc != 0] = arccos(nvec[0][inc != 0] / norm(nvec[..., inc != 0]))
+        node[nvec[1] < 0] = 2 * pi * u.rad - node[nvec[1] < 0]
         return node
 
 
-    def __calc_M(self, e, E):
+    def _calc_M(self, e, E):
         '''Calculate mean anomaly from eccentric anomaly'''
         M = E - e * sin(E)
         return M % (2 * pi)
 
 
-    def __calc_e(self, evec):
+    def _calc_e(self, evec):
         return norm(evec)
 
 
-    def __calc_a(self, x, y, z, vx, vy, vz, mu):
-        return 1 / (2 / norm([x, y, z]) - norm([vx, vy, vz])**2 / mu)
+    def _calc_a(self, x, y, z, vx, vy, vz, mu):
+        return 1 / (2 / norm([x.value, y.value, z.value]) - norm([vx.value, vy.value, vz.value])**2 / mu.value)
 
 
     def to_bary(self):
@@ -195,46 +203,46 @@ class OrbitFuncs:
 
         '''Transform from Keplerian to Cartesian coordinates.'''
 
-        self.E = self.__calc_E(self.e, self.M.rad)
+        self.E = self._calc_E(self.e, self.M.rad)
 
-        self.true_anomaly = self.__calc_true_anomaly_from_kep(self.e, self.E)
+        self.true_anomaly = self._calc_true_anomaly_from_kep(self.e, self.E)
 
-        self.r = self.__calc_r_from_kep(self.a, self.e, self.E)
+        self.r = self._calc_r_from_kep(self.a, self.e, self.E)
 
-        self.ovec = self.__calc_ovec(self.r, self.true_anomaly)
+        self.ovec = self._calc_ovec(self.r, self.true_anomaly)
 
-        self.vovec = self.__calc_vovec(self.a, self.e, self.E, self.r, self.mu)
+        self.vovec = self._calc_vovec(self.a, self.e, self.E, self.r, self.mu)
 
-        self.x, self.y, self.z = self.__calc_xyz(self.arg, self.inc, self.node, self.ovec)
+        self.x, self.y, self.z = self._calc_xyz(self.arg, self.inc, self.node, self.ovec)
 
-        self.vx, self.vy, self.vz = self.__calc_vxyz(self.arg, self.inc, self.node, self.vovec)
+        self.vx, self.vy, self.vz = self._calc_vxyz(self.arg, self.inc, self.node, self.vovec)
 
 
     def xyz_to_kep(self):
 
         '''Transform from Cartesian to Keplerian coordinates.'''
 
-        self.r = self.__calc_r_from_xyz(self.x, self.y, self.z)
+        self.r = self._calc_r_from_xyz(self.x, self.y, self.z)
 
-        rrdot = self.__calc_rrdot(self.x, self.y, self.z, self.vx, self.vy, self.vz)
+        rrdot = self._calc_rrdot(self.x, self.y, self.z, self.vx, self.vy, self.vz)
 
-        self.hvec = self.__calc_hvec(self.x, self.y, self.z, self.vx, self.vy, self.vz)
+        self.hvec = self._calc_hvec(self.x, self.y, self.z, self.vx, self.vy, self.vz)
 
-        self.evec = self.__calc_evec(self.x, self.y, self.z, self.vx, self.vy, self.vz, self.hvec, self.mu)
+        self.evec = self._calc_evec(self.x, self.y, self.z, self.vx, self.vy, self.vz, self.hvec, self.mu)
 
-        self.nvec = self.__calc_nvec(self.hvec)
+        self.nvec = self._calc_nvec(self.hvec)
 
-        self.true_anomaly = self.__calc_true_anomaly_from_xyz(self.x, self.y, self.z, self.evec, self.rrdot)
+        self.true_anomaly = self._calc_true_anomaly_from_xyz(self.x, self.y, self.z, self.evec, rrdot)
 
-        self.inc = self.__calc_inc(self.hvec)
+        self.inc = self._calc_inc(self.hvec)
 
-        self.arg = self.__calc_arg(self.nvec, self.evec)
+        self.arg = self._calc_arg(self.nvec, self.evec)
 
-        self.node = self.__calc_node(self.nvec, self.inc)
+        self.node = self._calc_node(self.nvec, self.inc)
 
-        self.e = self.__calc_e(self.evec)
+        self.e = self._calc_e(self.evec)
 
-        self.a = self.__calc_a(self.x, self.y, self.z, self.vx, self.vy, self.vz, self.mu)
+        self.a = self._calc_a(self.x, self.y, self.z, self.vx, self.vy, self.vz, self.mu)
 
 
     '''Keplerian Elements'''

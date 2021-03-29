@@ -1,7 +1,7 @@
 __version__ = '0.8.0'
 __author__ = 'Kevin Napier'
 
-from .spacerocks import SpaceRock
+from .spacerock import SpaceRock
 from .propagate import Propagate
 from .observe import Observe
 from .units import Units

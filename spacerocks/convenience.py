@@ -37,7 +37,7 @@ class Convenience:
 
     def detect_coords(self, kwargs):
 
-        kep = ['a', 'e', 'inc', 'node', 'arg', 'm', 'f', 'varpi', 't_peri']
+        kep = ['a', 'e', 'inc', 'node', 'arg', 'M', 'true_anomaly', 'varpi', 't_peri', 'mean_longitude', 'true_logitude']
         xyz = ['x', 'y', 'z', 'vx', 'vy', 'vz']
         abg = ['alpha', 'beta', 'gamma', 'dalpha', 'dbeta', 'dgamma']
 
