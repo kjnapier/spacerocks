@@ -10,35 +10,32 @@
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
 
-import healpy as hp
 import sys
 import os
 import random
 import copy
-import warnings
 
 import numpy as np
 import pandas as pd
 
 from astropy import units as u
-from astropy.table import Table
-from astropy.coordinates import Angle, Distance, SkyCoord
+from astropy.coordinates import Angle, Distance
 from astropy.time import Time
 
 import dateutil
 import matplotlib.pyplot as plt
 
-# Read in the observatory codes file and rehash as a dataframe.
-observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
-                            'data',
-                            'observatories.csv'))
-
-from skyfield.api import Topos, Loader
-# Load in planets for ephemeride calculation.
-load = Loader('./Skyfield-Data', expire=False, verbose=False)
-ts = load.timescale()
-planets = load('de423.bsp')
-earth = planets['earth']
+## Read in the observatory codes file and rehash as a dataframe.
+#observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
+#                            'data',
+#                            'observatories.csv'))
+#
+#from skyfield.api import Topos, Loader
+## Load in planets for ephemeride calculation.
+#load = Loader('./Skyfield-Data', expire=False, verbose=False)
+#ts = load.timescale()
+#planets = load('de423.bsp')
+#earth = planets['earth']
 
 from .linalg3d import *
 from .constants import *

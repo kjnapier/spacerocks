@@ -1,28 +1,10 @@
-import warnings
-from healpy.pixelfunc import ang2pix
-
-import numpy as np
-
-from numpy import pi, sqrt, sin, cos, tan, exp, log10, zeros_like, arccos, arctan2, array
-
-from astropy import units as u
+from numpy import pi, sqrt, cbrt, sin, cos, tan, exp, log10, zeros_like, arccos, arctan2, array
 import pandas as pd
 
+from astropy import units as u
+
 from .linalg3d import norm, dot, cross, euler_rotation
-#from .constants import *
-
 from astropy.time import Time
-#from astropy.coordinates import SkyCoord
-#from skyfield.api import Topos, Loader
-
-# Load in planets for ephemeride calculation.
-# load = Loader('./Skyfield-Data', expire=False, verbose=False)
-# ts = load.timescale()
-# planets = load('de423.bsp')
-# sun = planets['sun']
-# earth = planets['earth']
-
-
 
 class OrbitFuncs:
 
@@ -154,7 +136,7 @@ class OrbitFuncs:
 
 
     def __calc_a(self, x, y, z, vx, vy, vz, mu):
-        1 / (2 / norm([x, y, z]) - norm([vx, vy, vz])**2 / mu)
+        return 1 / (2 / norm([x, y, z]) - norm([vx, vy, vz])**2 / mu)
 
 
     def to_bary(self):
@@ -201,9 +183,9 @@ class OrbitFuncs:
             self.vy -= vy_sun
             self.vz -= vz_sun
 
+
             # calculate heliocentric keplerian elements
             self.xyz_to_kep()
-
             self.__class__.frame = 'heliocentric'
 
         return self
@@ -340,73 +322,71 @@ class OrbitFuncs:
     def varpi(self):
         del self._varpi
 
-    #@property
-    #def M(self):
-    #    if not hasattr(self, '_M'):
-    #        self.M = self.a * (1 - self.e)
-    #    return self._q
+    @property
+    def M(self):
+        if not hasattr(self, '_M'):
+            self.M = self.E * self.e * sin(self.E)
+        return self._M
 
-    #@M.setter
-    #def M(self, value):
-    #    self._M = value
+    @M.setter
+    def M(self, value):
+        self._M = value
 
-    #@M.deleter
-    #def M(self):
-    #    del self._M
+    @M.deleter
+    def M(self):
+        del self._M
 
-    #@property
-    #def E(self):
-    #    if not hasattr(self, '_q'):
-    #        self.q = self.a * (1 - self.e)
-    #    return self._q
+    @property
+    def E(self):
+        return self._E
 
-    #@E.setter
-    #def E(self, value):
-    #    self._E = value
+    @E.setter
+    def E(self, value):
+        self._E = value
 
-    #@E.deleter
-    #def E(self):
-    #    del self._E
+    @E.deleter
+    def E(self):
+        del self._E
 
-    #@property
-    #def true_anomaly(self):
-    #    if not hasattr(self, '_q'):
-    #        self.q = self.a * (1 - self.e)
-    #    return self._q
+    @property
+    def true_anomaly(self):
+        return self._true_anomaly
 
-    #@true_anomaly.setter
-    #def true_anomaly(self, value):
-    #    self._true_anomaly = value
+    @true_anomaly.setter
+    def true_anomaly(self, value):
+        self._true_anomaly = value
 
-    #@true_anomaly.deleter
-    #def true_anomaly(self):
-    #    del self._true_anomaly
+    @true_anomaly.deleter
+    def true_anomaly(self):
+        del self._true_anomaly
 
-    #@property
-    #def true_longitude(self):
-    #    return self._true_longitude
+    @property
+    def true_longitude(self):
+        if not hasattr(self, '_true_longitude'):
+            self.true_longitude = (self.true_anomaly + self.varpi) % (2 * pi * u.rad)
+        return self._true_longitude
 
-    #@true_longitude.setter
-    #def true_longitude(self, value):
-    #    if not hasattr(self, '_q'):
-    #        self.q = self.a * (1 - self.e)
-    #    return self._q
+    @true_longitude.setter
+    def true_longitude(self, value):
+        self._true_longitude = value
 
-    #@true_longitude.deleter
-    #def true_longitude(self):
-    #    del self._true_longitude
+    @true_longitude.deleter
+    def true_longitude(self):
+        del self._true_longitude
 
-    #@property
-    #def mean_longitude(self):
-    #    return self._mean_longitude
+    @property
+    def mean_longitude(self):
+        if not hasattr(self, '_true_longitude'):
+            self.mean_longitude = (self.M + self.varpi) % (2 * pi * u.rad)
+        return self._mean_longitude
 
-    #@mean_longitude.setter
-    #def mean_longitude(self, value):
-    #    self._mean_longitude = value
+    @mean_longitude.setter
+    def mean_longitude(self, value):
+        self._mean_longitude = value
 
-    #@mean_longitude.deleter
-    #def mean_longitude(self):
-    #    del self._mean_longitude
+    @mean_longitude.deleter
+    def mean_longitude(self):
+        del self._mean_longitude
 
 
     @property
@@ -497,6 +477,54 @@ class OrbitFuncs:
     @n.deleter
     def n(self):
         del self._n
+
+
+    @property
+    def mass(self):
+        if not hasattr(self, '_mass'):
+            self.mass = 0
+        return self._mass
+
+    @mass.setter
+    def mass(self, value):
+        self._mass = value
+
+
+    @property
+    def radius(self):
+        if not hasattr(self, '_radius'):
+            self.radius = 1e-16
+        return self._radius
+
+    @radius.setter
+    def radius(self, value):
+        self._radius = value
+
+
+    @property
+    def density(self):
+        if not hasattr(self, '_density'):
+            self.density = 1e-16
+        return self._density
+
+    @density.setter
+    def density(self, value):
+        self._density = value
+
+
+    @property
+    def hill_radius(self):
+        if not hasattr(self, '_hill_radius'):
+            self.hill_radius = self.a * (1 - self.e) * cbrt(self.m / 3)
+        return self._hill_radius
+
+    @hill_radius.setter
+    def hill_radius(self, value):
+        self._hill_radius = value
+
+    @hill_radius.deleter
+    def hill_radius(self):
+        del self._hill_radius
 
 
     @property
