@@ -25,6 +25,8 @@ from astropy.time import Time
 import dateutil
 import matplotlib.pyplot as plt
 
+from numpy import sin, cos, arctan2, sqrt
+
 ## Read in the observatory codes file and rehash as a dataframe.
 #observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
 #                            'data',
@@ -112,7 +114,8 @@ class SpaceRock(OrbitFuncs, Convenience):
                 self.M = self.E * self.e * sin(self.E)
 
             if kwargs.get('true_anomaly') is not None:
-                self.true_anomaly = Angle(kwargs.get('true_anomaly'), units.angle).to(u.rad)
+                self.true_anomaly = Angle(kwargs.get('true_anomaly'), units.angle)
+                self.E = Angle(2 * arctan2(sqrt(1-self.e) * sin(self.true_anomaly/2), sqrt(1+self.e) * cos(self.true_anomaly/2)), u.rad)
 
             if kwargs.get('true_longitude') is not None:
                 self.true_longitude = Angle(kwargs.get('true_longitude'), units.angle).to(u.rad)

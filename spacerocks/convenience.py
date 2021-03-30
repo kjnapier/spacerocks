@@ -37,7 +37,7 @@ class Convenience:
 
     def detect_coords(self, kwargs):
 
-        kep = ['a', 'e', 'inc', 'node', 'arg', 'M', 'true_anomaly', 'varpi', 't_peri', 'mean_longitude', 'true_logitude']
+        kep = ['a', 'e', 'inc', 'node', 'arg', 'M', 'true_anomaly', 'E', 'varpi', 't_peri']
         xyz = ['x', 'y', 'z', 'vx', 'vy', 'vz']
         abg = ['alpha', 'beta', 'gamma', 'dalpha', 'dbeta', 'dgamma']
 
@@ -61,8 +61,7 @@ class Convenience:
 
     def astropy_table(self):
         '''
-        Write the rocks to an astropy table. This can handle units, though
-        it is generally less elegant than pandas.
+        Write the rocks to an astropy table. This can handle units.
         '''
         return Table(self.__dict__)
 
@@ -70,7 +69,7 @@ class Convenience:
     def pandas_df(self):
         '''
         Write the rocks to a pandas dataframe. Pandas can't handle astropy
-        units (yet), so if you want to keep units intact you'll have to use
-        an Astropy Table. to_pandas()
+        units, so if you want to keep units intact you'll have to use
+        an Astropy Table.
         '''
         return self.astropy_table().to_pandas()

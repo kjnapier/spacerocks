@@ -2,14 +2,15 @@ from numpy import pi, sqrt, cbrt, sin, cos, tan, exp, log10, zeros_like, arccos,
 import pandas as pd
 
 from astropy import units as u
-
+from astropy.coordinates import Angle
 from .linalg3d import norm, dot, cross, euler_rotation
+from .vector import Vector
 from astropy.time import Time
 
 class OrbitFuncs:
 
 
-    '''Private Methods'''
+    '''Private Methods
 
     def _calc_E_from_M(self, e, M):
         '''
@@ -39,7 +40,7 @@ class OrbitFuncs:
         return E
 
     def _calc_E_from_true_anomaly(self, e, true_anomaly):
-        pass
+        return 2 * arctan2(sqrt(1 - e) * sin(true_anomaly/2), sqrt(1 + e) * cos(true_anomaly/2))
 
 
     def _calc_rrdot(self, x, y, z, vx, vy, vz):
@@ -58,7 +59,7 @@ class OrbitFuncs:
         true_anomaly = zeros_like(e)
         true_anomaly[e == 0] = arccos(x[e == 0] / norm([x[e == 0], y[e == 0], z[e == 0]]))
         true_anomaly[e != 0] = arccos(dot(evec[..., e != 0], [x[e != 0], y[e != 0], z[e != 0]]) / (norm(evec[..., e != 0]) * norm([x[e != 0], y[e != 0], z[e != 0]])))
-        true_anomaly[rrdot < 0] = 2 * pi * u.rad - true_anomaly[rrdot < 0]
+        true_anomaly[rrdot < 0] = 2 * pi - true_anomaly[rrdot < 0]
         return true_anomaly
 
 
@@ -118,7 +119,7 @@ class OrbitFuncs:
         arg = zeros_like(e)
         arg[(e == 0) | (n == 0)] = 0
         arg[(e != 0) & (n != 0)] = arccos(dot(nvec[..., (e != 0) & (n != 0)], evec[..., (e != 0) & (n != 0)]) / (n[(e != 0) & (n != 0)] * e[(e != 0) & (n != 0)]))
-        arg[evec[2] < 0] = 2 * pi * u.rad - arg[evec[2] < 0]
+        arg[evec[2] < 0] = 2 * pi - arg[evec[2] < 0]
 
         return arg
 
@@ -128,8 +129,8 @@ class OrbitFuncs:
         # compute ascending node
         node = zeros_like(inc)
         node[inc == 0] = 0
-        node[inc != 0] = arccos(nvec[0][inc != 0] / norm(nvec[..., inc != 0]))
-        node[nvec[1] < 0] = 2 * pi * u.rad - node[nvec[1] < 0]
+        node[inc != 0] = arccos(nvec[:, inc != 0][0] / array(norm(nvec[..., inc != 0])))
+        node[nvec[1] < 0] = 2 * pi - node[nvec[1] < 0]
         return node
 
 
@@ -203,9 +204,9 @@ class OrbitFuncs:
 
         '''Transform from Keplerian to Cartesian coordinates.'''
 
-        self.E = self._calc_E_from_M(self.e, self.M.rad)
+        #self.E = self._calc_E_from_M(self.e, self.M.rad)
 
-        self.true_anomaly = self._calc_true_anomaly_from_kep(self.e, self.E)
+        #self.true_anomaly = self._calc_true_anomaly_from_kep(self.e, self.E)
 
         self.r = self._calc_r_from_kep(self.a, self.e, self.E)
 
@@ -232,13 +233,13 @@ class OrbitFuncs:
 
         self.nvec = self._calc_nvec(self.hvec)
 
-        self.true_anomaly = self._calc_true_anomaly_from_xyz(self.x, self.y, self.z, self.evec, rrdot)
+        self.true_anomaly = Angle(self._calc_true_anomaly_from_xyz(self.x, self.y, self.z, self.evec, rrdot), u.rad)
 
-        self.inc = self._calc_inc(self.hvec)
+        self.inc = Angle(self._calc_inc(self.hvec), u.rad)
 
-        self.arg = self._calc_arg(self.nvec, self.evec)
+        self.arg = Angle(self._calc_arg(self.nvec, self.evec), u.rad)
 
-        self.node = self._calc_node(self.nvec, self.inc)
+        self.node = Angle(self._calc_node(self.nvec, self.inc.rad), u.rad)
 
         self.e = self._calc_e(self.evec)
 
@@ -289,7 +290,7 @@ class OrbitFuncs:
     @property
     def node(self):
         if not hasattr(self, '_node'):
-            self.node = (self.varpi - self.arg) % (2 * pi * u.rad)
+            self.node = Angle((self.varpi.rad - self.arg.rad) % (2 * pi), u.rad)
         return self._node
 
     @node.setter
@@ -304,7 +305,7 @@ class OrbitFuncs:
     @property
     def arg(self):
         if not hasattr(self, '_arg'):
-            self.arg = (self.varpi - self.node) % (2 * pi * u.rad)
+            self.arg = Angle((self.varpi.rad - self.node.rad) % (2 * pi), u.rad)
         return self._arg
 
     @arg.setter
@@ -319,7 +320,7 @@ class OrbitFuncs:
     @property
     def varpi(self):
         if not hasattr(self, '_varpi'):
-            self.varpi = (self.node + self.arg) % (2 * pi * u.rad)
+            self.varpi = Angle((self.node.rad + self.arg.rad) % (2 * pi), u.rad)
         return self._varpi
 
     @varpi.setter
@@ -333,7 +334,7 @@ class OrbitFuncs:
     @property
     def M(self):
         if not hasattr(self, '_M'):
-            self.M = self.E * self.e * sin(self.E)
+            self.M = Angle(self.E.rad + self.e * sin(self.E.rad), u.rad)
         return self._M
 
     @M.setter
@@ -346,6 +347,8 @@ class OrbitFuncs:
 
     @property
     def E(self):
+        if not hasattr(self, '_E'):
+            self.E = Angle(self._calc_E_from_true_anomaly(self.e, self.true_anomaly.rad), u.rad)
         return self._E
 
     @E.setter
@@ -371,7 +374,7 @@ class OrbitFuncs:
     @property
     def true_longitude(self):
         if not hasattr(self, '_true_longitude'):
-            self.true_longitude = (self.true_anomaly + self.varpi) % (2 * pi * u.rad)
+            self.true_longitude = Angle((self.true_anomaly.rad + self.varpi.rad) % (2 * pi), u.rad)
         return self._true_longitude
 
     @true_longitude.setter
@@ -385,7 +388,7 @@ class OrbitFuncs:
     @property
     def mean_longitude(self):
         if not hasattr(self, '_true_longitude'):
-            self.mean_longitude = (self.M + self.varpi) % (2 * pi * u.rad)
+            self.mean_longitude = Angle((self.M.rad + self.varpi.rad) % (2 * pi), u.rad)
         return self._mean_longitude
 
     @mean_longitude.setter
@@ -539,7 +542,7 @@ class OrbitFuncs:
     def TisserandJ(self):
         if not hasattr(self, '_TisserandJ'):
             aJ = 5.2 * u.au
-            self.TisserandJ = aJ / self.a * 2 * cos(self.inc) * sqrt(self.p / aJ)
+            self.TisserandJ = aJ.value / self.a + 2 * cos(self.inc) * sqrt(self.p / aJ.value)
         return self._TisserandJ
 
     @TisserandJ.setter
