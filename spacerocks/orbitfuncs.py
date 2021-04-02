@@ -10,7 +10,7 @@ from astropy.time import Time
 class OrbitFuncs:
 
 
-    '''Private Methods
+    '''Private Methods'''
 
     def _calc_E_from_M(self, e, M):
         '''
@@ -204,9 +204,11 @@ class OrbitFuncs:
 
         '''Transform from Keplerian to Cartesian coordinates.'''
 
-        #self.E = self._calc_E_from_M(self.e, self.M.rad)
+        #self.M = (self.mean_longitude - self.varpi) % (2 * pi)
 
-        #self.true_anomaly = self._calc_true_anomaly_from_kep(self.e, self.E)
+        self.E = self._calc_E_from_M(self.e, self.M.rad)
+
+        self.true_anomaly = self._calc_true_anomaly_from_kep(self.e, self.E)
 
         self.r = self._calc_r_from_kep(self.a, self.e, self.E)
 
@@ -387,7 +389,7 @@ class OrbitFuncs:
 
     @property
     def mean_longitude(self):
-        if not hasattr(self, '_true_longitude'):
+        if not hasattr(self, '_mean_longitude'):
             self.mean_longitude = Angle((self.M.rad + self.varpi.rad) % (2 * pi), u.rad)
         return self._mean_longitude
 

@@ -1,6 +1,12 @@
 from astropy import units as u
 from astropy.table import Table
 
+# Units manager for spacerocks.
+# Usage:
+# from astropy import units as u
+# units = Units()
+# units.angle = u.rad
+
 class Units:
 
     def __init__(self):

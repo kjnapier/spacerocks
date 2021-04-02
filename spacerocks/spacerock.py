@@ -15,6 +15,8 @@ import os
 import random
 import copy
 
+from math import pi
+
 import numpy as np
 import pandas as pd
 
@@ -122,8 +124,8 @@ class SpaceRock(OrbitFuncs, Convenience):
                 self.true_anomaly = self.true_longitude - self.varpi
 
             if kwargs.get('mean_longitude') is not None:
-                self.mean_longitude = Angle(kwargs.get('mean_longitude'), units.angle).to(u.rad)
-                self.M = self.mean_longitude - self.varpi
+                self.mean_longitude = Angle(kwargs.get('mean_longitude'), units.angle)
+                self.M = Angle((self.mean_longitude.rad - self.varpi.rad) % (2 * pi), u.rad)
 
 
             self.kep_to_xyz()
