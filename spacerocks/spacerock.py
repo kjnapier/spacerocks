@@ -1,54 +1,23 @@
 ################################################################################
-# SpaceRocks, version 0.7.5
-#
-# 0.7.2:
-#     - changed the obsdate keyword to epoch
-#
-# 0.7.4:
-#     - Major restructuring. Transformations, Convenience, Observe classes
+# SpaceRocks, version 1.0.0
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
 
-import sys
-import os
-import random
-import copy
-
 from math import pi
-
-import numpy as np
 import pandas as pd
 
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
 
-import dateutil
-import matplotlib.pyplot as plt
+from numpy import sin, cos, arctan2, sqrt, array
 
-from numpy import sin, cos, arctan2, sqrt
-
-## Read in the observatory codes file and rehash as a dataframe.
-#observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
-#                            'data',
-#                            'observatories.csv'))
-#
-#from skyfield.api import Topos, Loader
-## Load in planets for ephemeride calculation.
-#load = Loader('./Skyfield-Data', expire=False, verbose=False)
-#ts = load.timescale()
-#planets = load('de423.bsp')
-#earth = planets['earth']
-
-from .linalg3d import *
 from .constants import *
 from .orbitfuncs import OrbitFuncs
 from .convenience import Convenience
 from .observe import Observe
 from .units import Units
-#from .jacobians import *
-
 
 class SpaceRock(OrbitFuncs, Convenience):
 
@@ -61,9 +30,9 @@ class SpaceRock(OrbitFuncs, Convenience):
         # input -> arrays
         for idx, key in enumerate([*kwargs]):
             if not hasattr(kwargs.get(key), '__len__'):
-                kwargs[key] = np.array([kwargs.get(key)])
+                kwargs[key] = array([kwargs.get(key)])
             else:
-                kwargs[key] = np.array(kwargs.get(key))
+                kwargs[key] = array(kwargs.get(key))
 
         SpaceRock.frame = input_frame
         if SpaceRock.frame == 'barycentric':
@@ -78,11 +47,11 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
 
-        if kwargs.get('name') is not None:
-            self.name = kwargs.get('name').astype(str)
-        else:
-            # produces random, non-repeting integers between 0 and 1e10 - 1
-            self.name = np.array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.epoch))])
+        #if kwargs.get('name') is not None:
+        #    self.name = kwargs.get('name').astype(str)
+        #else:
+        #    # produces random, non-repeting integers between 0 and 1e10 - 1
+        #    self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.epoch))])
 
 
 
@@ -139,5 +108,15 @@ class SpaceRock(OrbitFuncs, Convenience):
             self.vx = (kwargs.get('vx') * units.speed).to(u.au / u.day)
             self.vy = (kwargs.get('vy') * units.speed).to(u.au / u.day)
             self.vz = (kwargs.get('vz') * units.speed).to(u.au / u.day)
+
+            x = Distance(kwargs.get('x'), units.distance, allow_negative=True).to(u.au)
+            y = Distance(kwargs.get('y'), units.distance, allow_negative=True).to(u.au)
+            z = Distance(kwargs.get('z'), units.distance, allow_negative=True).to(u.au)
+            vx = (kwargs.get('vx') * units.speed).to(u.au / u.day)
+            vy = (kwargs.get('vy') * units.speed).to(u.au / u.day)
+            vz = (kwargs.get('vz') * units.speed).to(u.au / u.day)
+
+            self.position = Vector(x, y, z)
+            self.velocity = Vector(vx, vy, vz)
 
             self.xyz_to_kep()

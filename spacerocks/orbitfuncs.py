@@ -43,9 +43,9 @@ class OrbitFuncs:
         return 2 * arctan2(sqrt(1 - e) * sin(true_anomaly/2), sqrt(1 + e) * cos(true_anomaly/2))
 
 
-    def _calc_rrdot(self, x, y, z, vx, vy, vz):
+    def _calc_rrdot(self, position, velocity):
         '''Calculate the dot product of the position and velocity vectors'''
-        return dot([x, y, z], [vx, vy, vz])
+        return position.dot(velocity)
 
 
     def _calc_true_anomaly_from_kep(self, e, E):
@@ -53,12 +53,12 @@ class OrbitFuncs:
         return 2 * arctan2(sqrt(1 + e) * sin(E/2), sqrt(1 - e) * cos(E/2))
 
 
-    def _calc_true_anomaly_from_xyz(self, x, y, z, evec, rrdot):
+    def _calc_true_anomaly_from_xyz(self, position, evec, rrdot):
         '''Calculate true anomaly'''
         e = norm(evec)
         true_anomaly = zeros_like(e)
         true_anomaly[e == 0] = arccos(x[e == 0] / norm([x[e == 0], y[e == 0], z[e == 0]]))
-        true_anomaly[e != 0] = arccos(dot(evec[..., e != 0], [x[e != 0], y[e != 0], z[e != 0]]) / (norm(evec[..., e != 0]) * norm([x[e != 0], y[e != 0], z[e != 0]])))
+        true_anomaly[e != 0] = arccos(dot(evec[..., e != 0], position[e != 0]) / (norm(evec[..., e != 0]) * norm([x[e != 0], y[e != 0], z[e != 0]])))
         true_anomaly[rrdot < 0] = 2 * pi - true_anomaly[rrdot < 0]
         return true_anomaly
 
@@ -67,9 +67,9 @@ class OrbitFuncs:
         '''Compure the distance of the rock from the center of the coordinate system'''
         return a * (1 - e * cos(E))
 
-    def _calc_r_from_xyz(self, x, y, z):
+    def _calc_r_from_xyz(self, position):
         '''Compure the distance of the rock from the center of the coordinate system'''
-        return norm([x, y, z])
+        return position.norm
 
 
     def _calc_ovec(self, r, true_anomaly):
@@ -92,19 +92,19 @@ class OrbitFuncs:
         return euler_rotation(arg, inc, node, vovec)
 
 
-    def _calc_hvec(self, x, y, z, vx, vy, vz):
+    def _calc_hvec(self, position, velocity):
         '''Compute an object's angular momentum vector from its state vector.'''
-        return cross([x, y, z], [vx, vy, vz])
+        return position.cross(velocity)
 
 
-    def _calc_evec(self, x, y, z, vx, vy, vz, hvec, mu):
+    def _calc_evec(self, position, velocity, hvec, mu):
         '''Compute an object's eccentricity vector from its state and angular momentum vectors.'''
-        return array(cross([vx, vy, vz], hvec)) / mu.value  - array([x.au, y.au, z.au]) / norm([x.au, y.au, z.au])
+        return velocity.cross(hvec) / mu.value  - position / position.norm
 
 
     def _calc_nvec(self, hvec):
         '''Compute an object's node vector from its angular momentum vector.'''
-        return array([-hvec[1], hvec[0], zeros_like(hvec[2])])
+        return Vector(-hvec[1], hvec[0], zeros_like(hvec[2]))
 
 
     def _calc_inc(self, hvec):
@@ -144,8 +144,8 @@ class OrbitFuncs:
         return norm(evec)
 
 
-    def _calc_a(self, x, y, z, vx, vy, vz, mu):
-        return 1 / (2 / norm([x.value, y.value, z.value]) - norm([vx.value, vy.value, vz.value])**2 / mu.value)
+    def _calc_a(self, position, velocity, mu):
+        return 1 / (2 / position.norm - velocity.dot(velocity) / mu.value)
 
 
     def to_bary(self):
