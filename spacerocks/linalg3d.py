@@ -1,4 +1,3 @@
-from numba import jit
 import numpy as np
 # pure-Python vector algebra in three dimensions.
 

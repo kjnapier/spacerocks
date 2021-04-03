@@ -1,3 +1,13 @@
+<<<<<<< HEAD
+from numpy import pi, sqrt, cbrt, sin, cos, tan, exp, log10, zeros_like, arccos, arctan2, array
+import pandas as pd
+
+from astropy import units as u
+from astropy.coordinates import Angle
+from .linalg3d import norm, dot, cross, euler_rotation
+from .vector import Vector
+from astropy.time import Time
+=======
 import warnings
 from healpy.pixelfunc import ang2pix
 
@@ -23,13 +33,18 @@ from astropy.time import Time
 # earth = planets['earth']
 
 
+>>>>>>> master
 
 class OrbitFuncs:
 
 
     '''Private Methods'''
 
+<<<<<<< HEAD
+    def _calc_E_from_M(self, e, M):
+=======
     def __calc_E(self, e, M):
+>>>>>>> master
         '''
         Calculate eccentric anomaly from eccentricity and mean anomaly
 
@@ -56,6 +71,18 @@ class OrbitFuncs:
 
         return E
 
+<<<<<<< HEAD
+    def _calc_E_from_true_anomaly(self, e, true_anomaly):
+        return 2 * arctan2(sqrt(1 - e) * sin(true_anomaly/2), sqrt(1 + e) * cos(true_anomaly/2))
+
+
+    def _calc_rrdot(self, position, velocity):
+        '''Calculate the dot product of the position and velocity vectors'''
+        return position.dot(velocity)
+
+
+    def _calc_true_anomaly_from_kep(self, e, E):
+=======
 
     def __calc_rrdot(self, x, y, z, vx, vy, vz):
         '''Calculate the dot product of the position and velocity vectors'''
@@ -63,17 +90,39 @@ class OrbitFuncs:
 
 
     def __calc_true_anomaly_from_kep(self, e, E):
+>>>>>>> master
         '''Calculate true anomaly from keplerian elements'''
         return 2 * arctan2(sqrt(1 + e) * sin(E/2), sqrt(1 - e) * cos(E/2))
 
 
+<<<<<<< HEAD
+    def _calc_true_anomaly_from_xyz(self, position, evec, rrdot):
+        '''Calculate true anomaly'''
+        e = norm(evec)
+        true_anomaly = zeros_like(e)
+        true_anomaly[e == 0] = arccos(x[e == 0] / norm([x[e == 0], y[e == 0], z[e == 0]]))
+        true_anomaly[e != 0] = arccos(dot(evec[..., e != 0], position[e != 0]) / (norm(evec[..., e != 0]) * norm([x[e != 0], y[e != 0], z[e != 0]])))
+=======
     def __calc_true_anomaly_from_xyz(self, x, y, z, evec, rrdot):
         '''Calculate true anomaly'''
         true_anomaly = arccos(dot(evec, [x, y, z]) / (norm(evec) * norm([x, y, z])))
+>>>>>>> master
         true_anomaly[rrdot < 0] = 2 * pi - true_anomaly[rrdot < 0]
         return true_anomaly
 
 
+<<<<<<< HEAD
+    def _calc_r_from_kep(self, a, e, E):
+        '''Compure the distance of the rock from the center of the coordinate system'''
+        return a * (1 - e * cos(E))
+
+    def _calc_r_from_xyz(self, position):
+        '''Compure the distance of the rock from the center of the coordinate system'''
+        return position.norm
+
+
+    def _calc_ovec(self, r, true_anomaly):
+=======
     def __calc_r_from_kep(self, a, e, E):
         '''Compure the distance of the rock from the center of the coordinate system'''
         return a * (1 - e * cos(E))
@@ -84,25 +133,57 @@ class OrbitFuncs:
 
 
     def __calc_ovec(self, r, true_anomaly):
+>>>>>>> master
         '''Compute the position of the object in its orbital plane.'''
         return r * array([cos(true_anomaly), sin(true_anomaly), zeros_like(true_anomaly)])
 
 
+<<<<<<< HEAD
+    def _calc_vovec(self, a, e, E, r, mu):
+        '''Compute the velocity of the object in its orbital plane.'''
+        return sqrt(mu * a) / r * array([-sin(E), sqrt(1 - e**2) * cos(E), zeros_like(E)]) / u.rad
+
+
+    def _calc_xyz(self, arg, inc, node, ovec):
+=======
     def __calc_vovec(self, a, e, E, r, mu):
         '''Compute the velocity of the object in its orbital plane.'''
         return (mu * a**2 / r) * array([-sin(E), sqrt(1 - e**2) * cos(E), zeros_like(E)])
 
 
     def __calc_xyz(self, arg, inc, node, ovec):
+>>>>>>> master
         '''Compute state vector position from Keplerian elements.'''
         return euler_rotation(arg, inc, node, ovec)
 
 
+<<<<<<< HEAD
+    def _calc_vxyz(self, arg, inc, node, vovec):
+=======
     def __calc_vxyz(self, arg, inc, node, vovec):
+>>>>>>> master
         '''Compute state vector velocity from Keplerian elements.'''
         return euler_rotation(arg, inc, node, vovec)
 
 
+<<<<<<< HEAD
+    def _calc_hvec(self, position, velocity):
+        '''Compute an object's angular momentum vector from its state vector.'''
+        return position.cross(velocity)
+
+
+    def _calc_evec(self, position, velocity, hvec, mu):
+        '''Compute an object's eccentricity vector from its state and angular momentum vectors.'''
+        return velocity.cross(hvec) / mu.value  - position / position.norm
+
+
+    def _calc_nvec(self, hvec):
+        '''Compute an object's node vector from its angular momentum vector.'''
+        return Vector(-hvec[1], hvec[0], zeros_like(hvec[2]))
+
+
+    def _calc_inc(self, hvec):
+=======
     def __calc_hvec(self, x, y, z, vx, vy, vz):
         '''Compute an object's angular momentum vector from its state vector.'''
         return cross([x, y, z], [vx, vy, vz])
@@ -119,10 +200,31 @@ class OrbitFuncs:
 
 
     def __calc_inc(self, hvec):
+>>>>>>> master
         '''Compute orbital inclination'''
         return arccos(hvec[2] / norm(hvec))
 
 
+<<<<<<< HEAD
+    def _calc_arg(self, nvec, evec):
+        '''Compute argument of pericenter'''
+        e = norm(evec)
+        n = norm(nvec)
+        arg = zeros_like(e)
+        arg[(e == 0) | (n == 0)] = 0
+        arg[(e != 0) & (n != 0)] = arccos(dot(nvec[..., (e != 0) & (n != 0)], evec[..., (e != 0) & (n != 0)]) / (n[(e != 0) & (n != 0)] * e[(e != 0) & (n != 0)]))
+        arg[evec[2] < 0] = 2 * pi - arg[evec[2] < 0]
+
+        return arg
+
+
+    def _calc_node(self, nvec, inc):
+        '''Compute longitude of ascending node'''
+        # compute ascending node
+        node = zeros_like(inc)
+        node[inc == 0] = 0
+        node[inc != 0] = arccos(nvec[:, inc != 0][0] / array(norm(nvec[..., inc != 0])))
+=======
     def __calc_arg(self, nvec, evec):
         '''Compute argument of pericenter'''
         e = norm(evec)
@@ -139,22 +241,36 @@ class OrbitFuncs:
         # compute ascending node
         node = arccos(nvec[0] / norm(nvec))
         node[inc == 0] = 0
+>>>>>>> master
         node[nvec[1] < 0] = 2 * pi - node[nvec[1] < 0]
         return node
 
 
+<<<<<<< HEAD
+    def _calc_M(self, e, E):
+=======
     def __calc_M(self, e, E):
+>>>>>>> master
         '''Calculate mean anomaly from eccentric anomaly'''
         M = E - e * sin(E)
         return M % (2 * pi)
 
 
+<<<<<<< HEAD
+    def _calc_e(self, evec):
+        return norm(evec)
+
+
+    def _calc_a(self, position, velocity, mu):
+        return 1 / (2 / position.norm - velocity.dot(velocity) / mu.value)
+=======
     def __calc_e(self, evec):
         return norm(evec)
 
 
     def __calc_a(self, x, y, z, vx, vy, vz, mu):
         1 / (2 / norm([x, y, z]) - norm([vx, vy, vz])**2 / mu)
+>>>>>>> master
 
 
     def to_bary(self):
@@ -201,9 +317,15 @@ class OrbitFuncs:
             self.vy -= vy_sun
             self.vz -= vz_sun
 
+<<<<<<< HEAD
+
+            # calculate heliocentric keplerian elements
+            self.xyz_to_kep()
+=======
             # calculate heliocentric keplerian elements
             self.xyz_to_kep()
 
+>>>>>>> master
             self.__class__.frame = 'heliocentric'
 
         return self
@@ -213,6 +335,23 @@ class OrbitFuncs:
 
         '''Transform from Keplerian to Cartesian coordinates.'''
 
+<<<<<<< HEAD
+        #self.M = (self.mean_longitude - self.varpi) % (2 * pi)
+
+        self.E = self._calc_E_from_M(self.e, self.M.rad)
+
+        self.true_anomaly = self._calc_true_anomaly_from_kep(self.e, self.E)
+
+        self.r = self._calc_r_from_kep(self.a, self.e, self.E)
+
+        ovec = self._calc_ovec(self.r, self.true_anomaly)
+
+        vovec = self._calc_vovec(self.a, self.e, self.E, self.r, self.mu)
+
+        self.x, self.y, self.z = self._calc_xyz(self.arg, self.inc, self.node, ovec)
+
+        self.vx, self.vy, self.vz = self._calc_vxyz(self.arg, self.inc, self.node, vovec)
+=======
         self.E = self.__calc_E(self.e, self.M.rad)
 
         self.true_anomaly = self.__calc_true_anomaly_from_kep(self.e, self.E)
@@ -226,12 +365,36 @@ class OrbitFuncs:
         self.x, self.y, self.z = self.__calc_xyz(self.arg, self.inc, self.node, self.ovec)
 
         self.vx, self.vy, self.vz = self.__calc_vxyz(self.arg, self.inc, self.node, self.vovec)
+>>>>>>> master
 
 
     def xyz_to_kep(self):
 
         '''Transform from Cartesian to Keplerian coordinates.'''
 
+<<<<<<< HEAD
+        self.r = self._calc_r_from_xyz(self.x, self.y, self.z)
+
+        rrdot = self._calc_rrdot(self.x, self.y, self.z, self.vx, self.vy, self.vz)
+
+        self.hvec = self._calc_hvec(self.x, self.y, self.z, self.vx, self.vy, self.vz)
+
+        self.evec = self._calc_evec(self.x, self.y, self.z, self.vx, self.vy, self.vz, self.hvec, self.mu)
+
+        self.nvec = self._calc_nvec(self.hvec)
+
+        self.true_anomaly = Angle(self._calc_true_anomaly_from_xyz(self.x, self.y, self.z, self.evec, rrdot), u.rad)
+
+        self.inc = Angle(self._calc_inc(self.hvec), u.rad)
+
+        self.arg = Angle(self._calc_arg(self.nvec, self.evec), u.rad)
+
+        self.node = Angle(self._calc_node(self.nvec, self.inc.rad), u.rad)
+
+        self.e = self._calc_e(self.evec)
+
+        self.a = self._calc_a(self.x, self.y, self.z, self.vx, self.vy, self.vz, self.mu)
+=======
         self.r = self.__calc_r_from_xyz(self.x, self.y, self.z)
 
         rrdot = self.__calc_rrdot(self.x, self.y, self.z, self.vx, self.vy, self.vz)
@@ -253,6 +416,7 @@ class OrbitFuncs:
         self.e = self.__calc_e(self.evec)
 
         self.a = self.__calc_a(self.x, self.y, self.z, self.vx, self.vy, self.vz, self.mu)
+>>>>>>> master
 
 
     '''Keplerian Elements'''
@@ -299,7 +463,11 @@ class OrbitFuncs:
     @property
     def node(self):
         if not hasattr(self, '_node'):
+<<<<<<< HEAD
+            self.node = Angle((self.varpi.rad - self.arg.rad) % (2 * pi), u.rad)
+=======
             self.node = (self.varpi - self.arg) % (2 * pi * u.rad)
+>>>>>>> master
         return self._node
 
     @node.setter
@@ -314,7 +482,11 @@ class OrbitFuncs:
     @property
     def arg(self):
         if not hasattr(self, '_arg'):
+<<<<<<< HEAD
+            self.arg = Angle((self.varpi.rad - self.node.rad) % (2 * pi), u.rad)
+=======
             self.arg = (self.varpi - self.node) % (2 * pi * u.rad)
+>>>>>>> master
         return self._arg
 
     @arg.setter
@@ -329,7 +501,11 @@ class OrbitFuncs:
     @property
     def varpi(self):
         if not hasattr(self, '_varpi'):
+<<<<<<< HEAD
+            self.varpi = Angle((self.node.rad + self.arg.rad) % (2 * pi), u.rad)
+=======
             self.varpi = (self.node + self.arg) % (2 * pi * u.rad)
+>>>>>>> master
         return self._varpi
 
     @varpi.setter
@@ -340,6 +516,75 @@ class OrbitFuncs:
     def varpi(self):
         del self._varpi
 
+<<<<<<< HEAD
+    @property
+    def M(self):
+        if not hasattr(self, '_M'):
+            self.M = Angle(self.E.rad + self.e * sin(self.E.rad), u.rad)
+        return self._M
+
+    @M.setter
+    def M(self, value):
+        self._M = value
+
+    @M.deleter
+    def M(self):
+        del self._M
+
+    @property
+    def E(self):
+        if not hasattr(self, '_E'):
+            self.E = Angle(self._calc_E_from_true_anomaly(self.e, self.true_anomaly.rad), u.rad)
+        return self._E
+
+    @E.setter
+    def E(self, value):
+        self._E = value
+
+    @E.deleter
+    def E(self):
+        del self._E
+
+    @property
+    def true_anomaly(self):
+        return self._true_anomaly
+
+    @true_anomaly.setter
+    def true_anomaly(self, value):
+        self._true_anomaly = value
+
+    @true_anomaly.deleter
+    def true_anomaly(self):
+        del self._true_anomaly
+
+    @property
+    def true_longitude(self):
+        if not hasattr(self, '_true_longitude'):
+            self.true_longitude = Angle((self.true_anomaly.rad + self.varpi.rad) % (2 * pi), u.rad)
+        return self._true_longitude
+
+    @true_longitude.setter
+    def true_longitude(self, value):
+        self._true_longitude = value
+
+    @true_longitude.deleter
+    def true_longitude(self):
+        del self._true_longitude
+
+    @property
+    def mean_longitude(self):
+        if not hasattr(self, '_mean_longitude'):
+            self.mean_longitude = Angle((self.M.rad + self.varpi.rad) % (2 * pi), u.rad)
+        return self._mean_longitude
+
+    @mean_longitude.setter
+    def mean_longitude(self, value):
+        self._mean_longitude = value
+
+    @mean_longitude.deleter
+    def mean_longitude(self):
+        del self._mean_longitude
+=======
     #@property
     #def M(self):
     #    if not hasattr(self, '_M'):
@@ -407,6 +652,7 @@ class OrbitFuncs:
     #@mean_longitude.deleter
     #def mean_longitude(self):
     #    del self._mean_longitude
+>>>>>>> master
 
 
     @property
@@ -500,10 +746,65 @@ class OrbitFuncs:
 
 
     @property
+<<<<<<< HEAD
+    def mass(self):
+        if not hasattr(self, '_mass'):
+            self.mass = 0
+        return self._mass
+
+    @mass.setter
+    def mass(self, value):
+        self._mass = value
+
+
+    @property
+    def radius(self):
+        if not hasattr(self, '_radius'):
+            self.radius = 1e-16
+        return self._radius
+
+    @radius.setter
+    def radius(self, value):
+        self._radius = value
+
+
+    @property
+    def density(self):
+        if not hasattr(self, '_density'):
+            self.density = 1e-16
+        return self._density
+
+    @density.setter
+    def density(self, value):
+        self._density = value
+
+
+    @property
+    def hill_radius(self):
+        if not hasattr(self, '_hill_radius'):
+            self.hill_radius = self.a * (1 - self.e) * cbrt(self.m / 3)
+        return self._hill_radius
+
+    @hill_radius.setter
+    def hill_radius(self, value):
+        self._hill_radius = value
+
+    @hill_radius.deleter
+    def hill_radius(self):
+        del self._hill_radius
+
+
+    @property
+    def TisserandJ(self):
+        if not hasattr(self, '_TisserandJ'):
+            aJ = 5.2 * u.au
+            self.TisserandJ = aJ.value / self.a + 2 * cos(self.inc) * sqrt(self.p / aJ.value)
+=======
     def TisserandJ(self):
         if not hasattr(self, '_TisserandJ'):
             aJ = 5.2 * u.au
             self.TisserandJ = aJ / self.a * 2 * cos(self.inc) * sqrt(self.p / aJ)
+>>>>>>> master
         return self._TisserandJ
 
     @TisserandJ.setter

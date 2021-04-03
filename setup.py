@@ -6,7 +6,7 @@ setup(
    description='Calculate solar system ephemerides from orbital elements.',
    author='Kevin Napier',
    author_email='kjnapier@umich.edu',
-   url="https://github.com/kjnapes/spacerocks",
+   url="https://github.com/kjnapier/spacerocks",
    packages=['spacerocks'],
    # I'm not sure package_data is working.
    package_data={'spacerocks': ['data/observatories.csv']},
