@@ -209,7 +209,7 @@ class OrbitFuncs:
     @property
     def vx(self):
         if not hasattr(self, '_vx'):
-            self.vx = self.velocity.vx
+            self.vx = self.velocity.x
         return self._vx
 
     @vx.setter
@@ -223,7 +223,7 @@ class OrbitFuncs:
     @property
     def vy(self):
         if not hasattr(self, '_vy'):
-            self.vy = self.velocity.vy
+            self.vy = self.velocity.y
         return self._vy
 
     @vy.setter
@@ -237,7 +237,7 @@ class OrbitFuncs:
     @property
     def vz(self):
         if not hasattr(self, '_vz'):
-            self.vz = self.velocity.vz
+            self.vz = self.velocity.z
         return self._vz
 
     @vz.setter
@@ -309,7 +309,7 @@ class OrbitFuncs:
                 node = zeros_like(self.inc.rad * u.rad)
                 node[self.inc == 0] = 0
                 node[self.inc != 0] = arccos(self.nvec[self.inc != 0].x / self.nvec[self.inc != 0].norm)
-                node[self.nvec.y < 0] = 2 * pi - node[self.nvec.y < 0]
+                node[self.nvec.y < 0] = 2 * pi * u.rad - node[self.nvec.y < 0]
                 self.node = Angle(node, u.rad)
         return self._node
 
@@ -334,7 +334,7 @@ class OrbitFuncs:
                 arg = zeros_like(self.e * u.rad)
                 arg[(self.e == 0) | (n == 0)] = 0
                 arg[(self.e != 0) & (n != 0)] = arccos(self.nvec[(self.e != 0) & (n != 0)].dot(self.evec[(self.e != 0) & (n != 0)]) / (n[(self.e != 0) & (n != 0)] * self.e[(self.e != 0) & (n != 0)]))
-                arg[self.evec.z < 0] = 2 * pi - arg[self.evec.z < 0]
+                arg[self.evec.z < 0] = 2 * pi * u.rad - arg[self.evec.z < 0]
                 self.arg = Angle(arg, u.rad)
 
         return self._arg
@@ -388,10 +388,12 @@ class OrbitFuncs:
                 self.M = Angle(self._mean_longitude.rad - self.varpi.rad, u.rad)
 
             elif hasattr(self, '_true_anomaly') or hasattr(self, '_true_longitude') or hasattr(self, '_E') or (hasattr(self, '_position') and hasattr(self, '_velocity')):
-                self.M = Angle(self.E.rad + self.e * sin(self.E.rad), u.rad)
+                self.M = Angle(self.E.rad + self.e.value * sin(self.E.rad), u.rad)
 
             elif hasattr(self, '_t_peri'):
-                self.M = Angle(self.n * (self.t_peri - self.epoch), u.rad)
+                M = self.n * (self.epoch - self.t_peri)
+                M = M % (2 * pi * u.rad)
+                self.M = Angle(M, u.rad)
 
         return self._M
 

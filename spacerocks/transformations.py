@@ -104,7 +104,7 @@ class Transformations:
         '''
         Convert (ra, dec) into healpix.
         '''
-        return hp.pixelfunc.ang2pix(NSIDE, np.pi/2 - self.dec.radian, self.ra.radian, nest=True)
+        return hp.pixelfunc.ang2pix(NSIDE, np.pi/2 - self.dec.rad, self.ra.rad, nest=True)
 
 
     def kep_to_xyz_temp(self, a, e, inc, arg, node, M):

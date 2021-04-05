@@ -1,5 +1,6 @@
 from numpy import sqrt, sin, cos
 import copy
+
 class Vector:
 
     def __init__(self, x, y, z):
