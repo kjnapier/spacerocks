@@ -5,7 +5,6 @@ import numpy as np
 from astropy import units as u
 import pandas as pd
 
-from .linalg3d import *
 from .constants import *
 
 from astropy.time import Time

@@ -12,7 +12,6 @@ from numpy import sin, cos, arctan2, arcsin, array, isscalar
 
 from .constants import epsilon, mu_bary, c
 #from .skyfuncs import Transformations
-from .linalg3d import norm
 from .convenience import Convenience
 
 # Read in the observatory codes file and rehash as a dataframe.

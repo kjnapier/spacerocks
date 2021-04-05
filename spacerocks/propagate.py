@@ -29,7 +29,6 @@ planets = load('de423.bsp')
 
 sun = planets['sun']
 
-from .linalg3d import *
 from .constants import *
 from .orbitfuncs import OrbitFuncs
 from .convenience import Convenience

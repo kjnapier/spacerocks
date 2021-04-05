@@ -81,7 +81,8 @@ class OrbitFuncs:
     @property
     def vovec(self):
         if not hasattr(self, '_vovec'):
-            self.vovec = Vector(-(self.mu * self.a**2 / self.r) * sin(self.E.rad), (self.mu * self.a**2 / self.r) * sqrt(1 - self.e**2) * cos(self.E.rad), (self.mu * self.a**2 / self.r) * zeros_like(self.E.rad))
+            a = sqrt(self.mu / u.rad**2 * self.a) / self.r
+            self.vovec = Vector(- a * sin(self.E.rad), a * sqrt(1 - self.e**2) * cos(self.E.rad), a * zeros_like(self.E.rad))
         return self._vovec
 
     @vovec.setter
