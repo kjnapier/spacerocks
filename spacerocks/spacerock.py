@@ -18,6 +18,7 @@ from .orbitfuncs import OrbitFuncs
 from .convenience import Convenience
 from .observe import Observe
 from .units import Units
+from .vector import Vector
 
 class SpaceRock(OrbitFuncs, Convenience):
 
@@ -77,41 +78,37 @@ class SpaceRock(OrbitFuncs, Convenience):
                     self.t_peri = Time(kwargs.get('t_peri'), format=units.timeformat, scale=units.timescale)
 
             if kwargs.get('M') is not None:
-                self.M = Angle(kwargs.get('M'), units.angle).to(u.rad)
-                self.E = self._calc_E_from_M(self.e, self.M.rad)
+                self.M = Angle(kwargs.get('M'), units.angle)
 
             if kwargs.get('E') is not None:
-                self.E = Angle(kwargs.get('E'), units.angle).to(u.rad)
-                self.M = self.E * self.e * sin(self.E)
+                self.E = Angle(kwargs.get('E'), units.angle)
 
             if kwargs.get('true_anomaly') is not None:
                 self.true_anomaly = Angle(kwargs.get('true_anomaly'), units.angle)
                 self.E = Angle(2 * arctan2(sqrt(1-self.e) * sin(self.true_anomaly/2), sqrt(1+self.e) * cos(self.true_anomaly/2)), u.rad)
 
             if kwargs.get('true_longitude') is not None:
-                self.true_longitude = Angle(kwargs.get('true_longitude'), units.angle).to(u.rad)
-                self.true_anomaly = self.true_longitude - self.varpi
+                self.true_longitude = Angle(kwargs.get('true_longitude'), units.angle)
 
             if kwargs.get('mean_longitude') is not None:
                 self.mean_longitude = Angle(kwargs.get('mean_longitude'), units.angle)
-                self.M = Angle((self.mean_longitude.rad - self.varpi.rad) % (2 * pi), u.rad)
 
 
-            self.kep_to_xyz()
+            #self.kep_to_xyz()
 
 
         elif coords == 'xyz':
 
-            self.x = Distance(kwargs.get('x'), units.distance, allow_negative=True).to(u.au)
-            self.y = Distance(kwargs.get('y'), units.distance, allow_negative=True).to(u.au)
-            self.z = Distance(kwargs.get('z'), units.distance, allow_negative=True).to(u.au)
-            self.vx = (kwargs.get('vx') * units.speed).to(u.au / u.day)
-            self.vy = (kwargs.get('vy') * units.speed).to(u.au / u.day)
-            self.vz = (kwargs.get('vz') * units.speed).to(u.au / u.day)
+            #self.x = Distance(kwargs.get('x'), units.distance, allow_negative=True)
+            #self.y = Distance(kwargs.get('y'), units.distance, allow_negative=True)
+            #self.z = Distance(kwargs.get('z'), units.distance, allow_negative=True)
+            #self.vx = (kwargs.get('vx') * units.speed).to(u.au / u.day)
+            #self.vy = (kwargs.get('vy') * units.speed).to(u.au / u.day)
+            #self.vz = (kwargs.get('vz') * units.speed).to(u.au / u.day)
 
-            x = Distance(kwargs.get('x'), units.distance, allow_negative=True).to(u.au)
-            y = Distance(kwargs.get('y'), units.distance, allow_negative=True).to(u.au)
-            z = Distance(kwargs.get('z'), units.distance, allow_negative=True).to(u.au)
+            x = Distance(kwargs.get('x'), units.distance, allow_negative=True)
+            y = Distance(kwargs.get('y'), units.distance, allow_negative=True)
+            z = Distance(kwargs.get('z'), units.distance, allow_negative=True)
             vx = (kwargs.get('vx') * units.speed).to(u.au / u.day)
             vy = (kwargs.get('vy') * units.speed).to(u.au / u.day)
             vz = (kwargs.get('vz') * units.speed).to(u.au / u.day)
@@ -119,4 +116,4 @@ class SpaceRock(OrbitFuncs, Convenience):
             self.position = Vector(x, y, z)
             self.velocity = Vector(vx, vy, vz)
 
-            self.xyz_to_kep()
+            #self.xyz_to_kep()
