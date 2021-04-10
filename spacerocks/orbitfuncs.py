@@ -256,7 +256,7 @@ class OrbitFuncs:
     @property
     def a(self):
         if not hasattr(self, '_a'):
-            self.a = Distance(1 / (2 / self.position.norm - self.velocity.dot(self.velocity) / self.mu * u.rad**2), u.au, allow_negative=False)
+            self.a = Distance(1 / (2 / self.position.norm - self.velocity.dot(self.velocity) / self.mu * u.rad**2), u.au, allow_negative=True)
         return self._a
 
     @a.setter
@@ -386,9 +386,11 @@ class OrbitFuncs:
         if not hasattr(self, '_M'):
 
             if hasattr(self, '_mean_longitude'):
-                self.M = Angle(self._mean_longitude.rad - self.varpi.rad, u.rad)
+                M = (self.mean_longitude.rad - self.varpi.rad) % (2 * pi)
+                self.M = Angle(M, u.rad)
 
             elif hasattr(self, '_true_anomaly') or hasattr(self, '_true_longitude') or hasattr(self, '_E') or (hasattr(self, '_position') and hasattr(self, '_velocity')):
+                M = (self.E.rad + self.e.value * sin(self.E.rad)) % (2 * pi)
                 self.M = Angle(self.E.rad + self.e.value * sin(self.E.rad), u.rad)
 
             elif hasattr(self, '_t_peri'):
@@ -417,7 +419,7 @@ class OrbitFuncs:
                 self.E = Angle(E, u.rad)
 
             elif hasattr(self, '_M') or hasattr(self, '_mean_longitude') or hasattr(self, '_t_peri'):
-                M = self.M.rad
+                M = array(self.M.rad)
                 e = self.e
                 M[M > pi] -= 2 * pi
                 alpha = (3 * pi**2 + 1.6 * (pi**2 - pi * abs(M))/(1 + e))/(pi**2 - 6)
@@ -462,6 +464,8 @@ class OrbitFuncs:
                 true_anomaly = zeros_like(self.e * u.rad)
                 true_anomaly[self.e == 0] = arccos(self.position[self.e == 0].x / self.position[self.e == 0].norm)
                 true_anomaly[self.e != 0] = arccos(self.evec[self.e != 0].dot(self.position[self.e != 0]) / (self.evec[self.e != 0].norm * self.position[self.e != 0].norm))
+
+                true_anomaly[self.position.dot(self.velocity).value < 0] = 2 * pi * u.rad - true_anomaly[self.position.dot(self.velocity).value < 0]
                 self.true_anomaly = Angle(true_anomaly.value, u.rad) # compute true anomaly from cartesian vectors. Other properties can be computed lazily.
 
         return self._true_anomaly
@@ -522,37 +526,37 @@ class OrbitFuncs:
 
     ''' Physical Properties '''
 
-    #@property
-    #def mass(self):
-    #    if not hasattr(self, '_mass'):
-    #        self.mass = 0
-    #    return self._mass
+    @property
+    def mass(self):
+        if not hasattr(self, '_mass'):
+            self.mass = 0
+        return self._mass
 
-    #@mass.setter
-    #def mass(self, value):
-    #    self._mass = value
-
-
-    #@property
-    #def radius(self):
-    #    if not hasattr(self, '_radius'):
-    #        self.radius = 1e-16
-    #    return self._radius
-
-    #@radius.setter
-    #def radius(self, value):
-    #    self._radius = value
+    @mass.setter
+    def mass(self, value):
+        self._mass = value
 
 
-    #@property
-    #def density(self):
-    #    if not hasattr(self, '_density'):
-    #        self.density = 1e-16
-    #    return self._density
+    @property
+    def radius(self):
+        if not hasattr(self, '_radius'):
+            self.radius = 1e-16
+        return self._radius
 
-    #@density.setter
-    #def density(self, value):
-    #    self._density = value
+    @radius.setter
+    def radius(self, value):
+        self._radius = value
+
+
+    @property
+    def density(self):
+        if not hasattr(self, '_density'):
+            self.density = 1e-16
+        return self._density
+
+    @density.setter
+    def density(self, value):
+        self._density = value
 
 
     ''' Derived Quantities '''
@@ -656,20 +660,21 @@ class OrbitFuncs:
 
 
 
-    #@property
-    #def hill_radius(self):
-    #    if not hasattr(self, '_hill_radius'):
-    #        self.hill_radius = self.a * (1 - self.e) * cbrt(self.m / 3)
-    #    return self._hill_radius
+    @property
+    def hill_radius(self):
+        if not hasattr(self, '_hill_radius'):
+            self.hill_radius = self.a * (1 - self.e) * cbrt(self.m / 3)
+        return self._hill_radius
 
-    #@hill_radius.setter
-    #def hill_radius(self, value):
-    #    self._hill_radius = value
+    @hill_radius.setter
+    def hill_radius(self, value):
+        self._hill_radius = value
 
-    #@hill_radius.deleter
-    #def hill_radius(self):
-    #    del self._hill_radius
+    @hill_radius.deleter
+    def hill_radius(self):
+        del self._hill_radius
 
-    #def TisserandJ(self):
-    #    aJ = 5.2 * u.au
-    #    return aJ / self.a * 2 * cos(self.inc) * sqrt(self.p / aJ)
+    @property
+    def TisserandJ(self):
+        aJ = 5.2 * u.au
+        return aJ / self.a * 2 * cos(self.inc) * sqrt(self.p / aJ)

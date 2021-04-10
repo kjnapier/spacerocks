@@ -3,20 +3,17 @@
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
-
-from math import pi
-import pandas as pd
+import random
 
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
 
-from numpy import sin, cos, arctan2, sqrt, array
+from numpy import sin, cos, arctan2, sqrt, array, pi
 
 from .constants import *
 from .orbitfuncs import OrbitFuncs
 from .convenience import Convenience
-from .observe import Observe
 from .units import Units
 from .vector import Vector
 
@@ -24,7 +21,6 @@ class SpaceRock(OrbitFuncs, Convenience):
 
     def __init__(self, input_frame='barycentric', units=Units(), *args, **kwargs):
 
-        # Case-insensitive keyword arguments.
         coords = self.detect_coords(kwargs)
         input_frame = input_frame.lower()
 
@@ -48,28 +44,28 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
 
-        #if kwargs.get('name') is not None:
-        #    self.name = kwargs.get('name').astype(str)
-        #else:
-        #    # produces random, non-repeting integers between 0 and 1e10 - 1
-        #    self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.epoch))])
+        if kwargs.get('name') is not None:
+            self.name = kwargs.get('name').astype(str)
+        else:
+            # produces random, non-repeting integers between 0 and 1e10 - 1
+            self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.epoch))])
 
 
 
         if coords == 'kep':
 
-            self.a = Distance(kwargs.get('a'), units.distance).to(u.au)
+            self.a = Distance(kwargs.get('a'), units.distance)
             self.e = kwargs.get('e') #* u.dimensionless_unscaled
-            self.inc = Angle(kwargs.get('inc'), units.angle).to(u.rad)
+            self.inc = Angle(kwargs.get('inc'), units.angle)
 
             if kwargs.get('node') is not None:
-                self.node = Angle(kwargs.get('node'), units.angle).to(u.rad)
+                self.node = Angle(kwargs.get('node'), units.angle)
 
             if kwargs.get('arg') is not None:
-                self.arg = Angle(kwargs.get('arg'), units.angle).to(u.rad)
+                self.arg = Angle(kwargs.get('arg'), units.angle)
 
             if kwargs.get('varpi') is not None:
-                self.varpi = Angle(kwargs.get('varpi'), units.angle).to(u.rad)
+                self.varpi = Angle(kwargs.get('varpi'), units.angle)
 
             if kwargs.get('t_peri') is not None:
                 if units.timeformat is None:
@@ -85,7 +81,6 @@ class SpaceRock(OrbitFuncs, Convenience):
 
             if kwargs.get('true_anomaly') is not None:
                 self.true_anomaly = Angle(kwargs.get('true_anomaly'), units.angle)
-                self.E = Angle(2 * arctan2(sqrt(1-self.e) * sin(self.true_anomaly/2), sqrt(1+self.e) * cos(self.true_anomaly/2)), u.rad)
 
             if kwargs.get('true_longitude') is not None:
                 self.true_longitude = Angle(kwargs.get('true_longitude'), units.angle)
@@ -94,17 +89,7 @@ class SpaceRock(OrbitFuncs, Convenience):
                 self.mean_longitude = Angle(kwargs.get('mean_longitude'), units.angle)
 
 
-            #self.kep_to_xyz()
-
-
         elif coords == 'xyz':
-
-            #self.x = Distance(kwargs.get('x'), units.distance, allow_negative=True)
-            #self.y = Distance(kwargs.get('y'), units.distance, allow_negative=True)
-            #self.z = Distance(kwargs.get('z'), units.distance, allow_negative=True)
-            #self.vx = (kwargs.get('vx') * units.speed).to(u.au / u.day)
-            #self.vy = (kwargs.get('vy') * units.speed).to(u.au / u.day)
-            #self.vz = (kwargs.get('vz') * units.speed).to(u.au / u.day)
 
             x = Distance(kwargs.get('x'), units.distance, allow_negative=True)
             y = Distance(kwargs.get('y'), units.distance, allow_negative=True)
@@ -115,5 +100,3 @@ class SpaceRock(OrbitFuncs, Convenience):
 
             self.position = Vector(x, y, z)
             self.velocity = Vector(vx, vy, vz)
-
-            #self.xyz_to_kep()
