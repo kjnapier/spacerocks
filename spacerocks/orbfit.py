@@ -4,6 +4,11 @@ class OrbitFit:
 
     def __init__(self, detections):
         pass
+        #if mpc_format == True:
+        #    self.file = file
+
+        #elif spacerocks_format = True:
+
 
     #def equatorial_to_tangent(self):
     #    '''
@@ -14,10 +19,6 @@ class OrbitFit:
     #    λ = np.arctan((np.cos(ε) * np.cos(self.dec) * np.sin(self.ra) + \
     #        np.sin(ε) * np.sin(self.dec)) / (np.cos(self.dec) * np.cos(self.ra)))
 
-    #    θx = (np.cos(β) * np.sin(λ - λ[0])) / (np.sin(b[0]) * np.sin(β) - \
-    #            np.cos(β[0]) * np.cos(β) * np.cos(λ - λ[0]))
-    #    θy = (np.cos(β[0]) * np.cos(β) - np.sin(β[0]) * np.sin(β) * np.cos(λ - λ[0]))/ \
-    #         (np.sin(β[0]) * np.sin(β) + np.cos(β[0]) * np.cos(β) * np.cos(λ - λ[0]))
 
     #    #dβ_ddec = (np.cos(self.dec)*np.cos(ε) + np.sin(self.ra)*np.sin(self.dec)*np.sin(ε))**2 / \
     #    #          (1 - (np.cos(ε)*np.sin(self.dec) - np.cos(self.dec)*np.sin(self.ra)*np.sin(ε))**2)
@@ -34,3 +35,19 @@ class OrbitFit:
     #    #         + np.sin(ε)**2 * np.tan(self.dec)))**2
 
     #    return θx, θy#, σθx, σθy
+
+    @property
+    def beta(self):
+        return arcsin(cos(obliquity) * sin(dec) - sin(obliquity) * cos(dec) * sin(ra))
+
+    @property
+    def theta_x(self):
+        #b =
+        #l =
+        return cos(b) * sin(l - l[0])) / (sin(b[0]) * sin(b) - cos(b[0]) * cos(b) * cos(l - l[0]))
+
+    @property
+    def theta_y(self):
+        #b =
+        #l =
+        return cos(b[0]) * cos(b) - sin(b[0]) * np.sin(b) * cos(l - l[0]))/ (sin(b[0]) * sin(b) + cos(b[0]) * cos(b) * np.cos(l - l[0]))
