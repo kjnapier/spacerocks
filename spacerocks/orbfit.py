@@ -9,36 +9,27 @@ class OrbitFit:
 
         #elif spacerocks_format = True:
 
+    '''
+    We'll have 4-5 well-measured quantities:
+    alpha, beta, gamma, alpha_dot, and beta_dot.
+    gamma_dot is unknown, but there is an energy constraint.
 
-    #def equatorial_to_tangent(self):
-    #    '''
-    #    Project the equatorial position to the tangent plane
-    #    '''
-    #    β = np.arcsin(np.cos(ε) * np.sin(self.dec) -  \
-    #        np.sin(ε) * np.cos(self.dec) * np.sin(self.ra))
-    #    λ = np.arctan((np.cos(ε) * np.cos(self.dec) * np.sin(self.ra) + \
-    #        np.sin(ε) * np.sin(self.dec)) / (np.cos(self.dec) * np.cos(self.ra)))
+    We have well-defined uncertainties for ra, dec, ra rate, and dec rate.
+    
+    How do we get uncertainties on distance?
+    I think those come from ra rate and dec rate. Maybe we can write down the
+    distance equation, and then propagate the uncertainties.
 
 
-    #    #dβ_ddec = (np.cos(self.dec)*np.cos(ε) + np.sin(self.ra)*np.sin(self.dec)*np.sin(ε))**2 / \
-    #    #          (1 - (np.cos(ε)*np.sin(self.dec) - np.cos(self.dec)*np.sin(self.ra)*np.sin(ε))**2)
-
-    #    #dβ_dra = (np.cos(self.ra) * np.cos(self.dec) * np.sin(ε))**2 / \
-    #    #         (1 - (np.cos(ε)*np.sin(self.dec) - np.cos(self.dec)*np.sin(self.ra)*np.sin(ε))**2)
-
-    #    #dλ_ddec = (np.cos(self.ra)**2 * np.sec(self.dec)**4 * np.sin(ε)**2) \
-    #    #          / (np.cos(self.ra)**2 + (np.cos(ε)*np.sin(self.ra) + np.sin(ε)*np.tan(self.dec))**2)**2
-
-    #    #dλ_dra = (np.cos(ε) + np.sin(self.ra) * np.sin(ε) * np.tan(self.dec))**2 \
-    #    #         / (np.cos(self.ra)**2 + np.cos(ε)**2 * np.sin(self.ra)**2) \
-    #    #         + np.tan(self.dec) * (np.sin(self.ra) * np.sin(2*ε) \
-    #    #         + np.sin(ε)**2 * np.tan(self.dec)))**2
-
-    #    return θx, θy#, σθx, σθy
+    '''
 
     @property
     def beta(self):
         return arcsin(cos(obliquity) * sin(dec) - sin(obliquity) * cos(dec) * sin(ra))
+
+    @property
+    def lambda(self):
+        return arctan((cos(obliquity) * cos(dec) * sin(ra) + sin(obliquity) * sin(dec)) / (cos(dec) * cos(ra)))
 
     @property
     def theta_x(self):
