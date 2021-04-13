@@ -15,7 +15,7 @@ class OrbitFit:
     gamma_dot is unknown, but there is an energy constraint.
 
     We have well-defined uncertainties for ra, dec, ra rate, and dec rate.
-    
+
     How do we get uncertainties on distance?
     I think those come from ra rate and dec rate. Maybe we can write down the
     distance equation, and then propagate the uncertainties.

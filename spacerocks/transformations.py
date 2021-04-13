@@ -104,30 +104,3 @@ class Transformations:
         Convert (ra, dec) into healpix.
         '''
         return hp.pixelfunc.ang2pix(NSIDE, np.pi/2 - self.dec.rad, self.ra.rad, nest=True)
-
-
-    def kep_to_xyz_temp(self, a, e, inc, arg, node, M):
-        '''
-        Just compute the xyz position of an object. Used for iterative equatorial
-        calculation.
-        '''
-        # compute eccentric anomaly E
-        E = self.calc_E(e.value, M.value) * u.rad
-
-        # compute true anomaly ν
-        ν = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2), (1 - e)**0.5*np.cos(E/2))
-
-        # compute the distance to the central body r
-        r = a * (1 - e * np.cos(E))
-
-        # obtain the position vector o
-        o = [r * np.cos(ν), r * np.sin(ν), np.zeros(len(ν))]
-        ov = [(mu_bary * a)**0.5 / r * (-np.sin(E))/ u.rad,
-              (mu_bary * a)**0.5 / r * ((1 - e**2)**0.5 * np.cos(E))/ u.rad,
-              np.zeros(len(ν))/ u.rad]
-
-        # Rotate o to the inertial frame
-        x, y, z = euler_rotation(arg, inc, node, o) #* u.au
-        vx, vy, vz = euler_rotation(arg, inc, node, ov) #* u.au / u.day
-
-        return x, y, z, vx, vy, vz
