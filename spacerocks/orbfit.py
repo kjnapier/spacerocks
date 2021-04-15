@@ -4,33 +4,41 @@ class OrbitFit:
 
     def __init__(self, detections):
         pass
+        #if mpc_format == True:
+        #    self.file = file
 
-    #def equatorial_to_tangent(self):
-    #    '''
-    #    Project the equatorial position to the tangent plane
-    #    '''
-    #    β = np.arcsin(np.cos(ε) * np.sin(self.dec) -  \
-    #        np.sin(ε) * np.cos(self.dec) * np.sin(self.ra))
-    #    λ = np.arctan((np.cos(ε) * np.cos(self.dec) * np.sin(self.ra) + \
-    #        np.sin(ε) * np.sin(self.dec)) / (np.cos(self.dec) * np.cos(self.ra)))
+        #elif spacerocks_format = True:
 
-    #    θx = (np.cos(β) * np.sin(λ - λ[0])) / (np.sin(b[0]) * np.sin(β) - \
-    #            np.cos(β[0]) * np.cos(β) * np.cos(λ - λ[0]))
-    #    θy = (np.cos(β[0]) * np.cos(β) - np.sin(β[0]) * np.sin(β) * np.cos(λ - λ[0]))/ \
-    #         (np.sin(β[0]) * np.sin(β) + np.cos(β[0]) * np.cos(β) * np.cos(λ - λ[0]))
+    '''
+    We'll have 4-5 well-measured quantities:
+    alpha, beta, gamma, alpha_dot, and beta_dot.
+    gamma_dot is unknown, but there is an energy constraint.
 
-    #    #dβ_ddec = (np.cos(self.dec)*np.cos(ε) + np.sin(self.ra)*np.sin(self.dec)*np.sin(ε))**2 / \
-    #    #          (1 - (np.cos(ε)*np.sin(self.dec) - np.cos(self.dec)*np.sin(self.ra)*np.sin(ε))**2)
+    We have well-defined uncertainties for ra, dec, ra rate, and dec rate.
 
-    #    #dβ_dra = (np.cos(self.ra) * np.cos(self.dec) * np.sin(ε))**2 / \
-    #    #         (1 - (np.cos(ε)*np.sin(self.dec) - np.cos(self.dec)*np.sin(self.ra)*np.sin(ε))**2)
+    How do we get uncertainties on distance?
+    I think those come from ra rate and dec rate. Maybe we can write down the
+    distance equation, and then propagate the uncertainties.
 
-    #    #dλ_ddec = (np.cos(self.ra)**2 * np.sec(self.dec)**4 * np.sin(ε)**2) \
-    #    #          / (np.cos(self.ra)**2 + (np.cos(ε)*np.sin(self.ra) + np.sin(ε)*np.tan(self.dec))**2)**2
 
-    #    #dλ_dra = (np.cos(ε) + np.sin(self.ra) * np.sin(ε) * np.tan(self.dec))**2 \
-    #    #         / (np.cos(self.ra)**2 + np.cos(ε)**2 * np.sin(self.ra)**2) \
-    #    #         + np.tan(self.dec) * (np.sin(self.ra) * np.sin(2*ε) \
-    #    #         + np.sin(ε)**2 * np.tan(self.dec)))**2
+    '''
 
-    #    return θx, θy#, σθx, σθy
+    @property
+    def beta(self):
+        return arcsin(cos(obliquity) * sin(dec) - sin(obliquity) * cos(dec) * sin(ra))
+
+    @property
+    def lambda(self):
+        return arctan((cos(obliquity) * cos(dec) * sin(ra) + sin(obliquity) * sin(dec)) / (cos(dec) * cos(ra)))
+
+    @property
+    def theta_x(self):
+        #b =
+        #l =
+        return cos(b) * sin(l - l[0])) / (sin(b[0]) * sin(b) - cos(b[0]) * cos(b) * cos(l - l[0]))
+
+    @property
+    def theta_y(self):
+        #b =
+        #l =
+        return cos(b[0]) * cos(b) - sin(b[0]) * np.sin(b) * cos(l - l[0]))/ (sin(b[0]) * sin(b) + cos(b[0]) * cos(b) * np.cos(l - l[0]))
