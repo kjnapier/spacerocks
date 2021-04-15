@@ -40,7 +40,7 @@ class Observe(Convenience):
             self.__class__.obscode = 500
 
 
-        # self.tel_position, self.tel_velocity = self.xyz_to_tel(rocks)
+        self.tel_position, self.tel_velocity = self.xyz_to_tel(rocks)
         self.xT, self.yT, self.zT, self.vxT, self.vyT, self.vzT = self.xyz_to_tel(rocks)
 
 
@@ -112,7 +112,7 @@ class Observe(Convenience):
                                                                  rocks.node,
                                                                  M)
 
-        return xT, yT, zT, vxT, vyT, vzT
+        return Vector(xT, yT, zT), Vector(vxT, vyT, vzT)
 
     def kep_to_xyz_temp(self, a, e, inc, arg, node, M):
         '''
