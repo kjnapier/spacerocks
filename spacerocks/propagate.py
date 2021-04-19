@@ -7,6 +7,8 @@ import reboundx
 from reboundx import constants
 import os
 
+from numpy import sqrt
+
 import warnings
 
 from astropy import units as u
@@ -48,8 +50,8 @@ class Propagate(SpaceRock, OrbitFuncs, Convenience):
             SpaceRock.obscode = 500
 
 
-        for key in list(rocks.__dict__.keys()):
-            setattr(self, key, rocks.__dict__[key])
+        #for key in list(rocks.__dict__.keys()):
+    #        setattr(self, key, rocks.__dict__[key])
 
         Propagate.gr = gr
         Propagate.gr_full = gr_full
@@ -63,16 +65,16 @@ class Propagate(SpaceRock, OrbitFuncs, Convenience):
 
         Propagate.model = model
         Propagate.obsdates = self.detect_timescale(obsdates, 'utc').jd
-        self.propagate()
+        self.propagate(rocks)
 
 
-    def propagate(self):
+    def propagate(self, rocks):
         '''
         Integrate all bodies to the desired date. The logic could be cleaner
         but it works.
         '''
         Nx = len(Propagate.obsdates)
-        Ny = len(self)
+        Ny = len(rocks)
         x_values = np.zeros([Nx, Ny])
         y_values = np.zeros([Nx, Ny])
         z_values = np.zeros([Nx, Ny])
@@ -80,20 +82,20 @@ class Propagate(SpaceRock, OrbitFuncs, Convenience):
         vy_values = np.zeros([Nx, Ny])
         vz_values = np.zeros([Nx, Ny])
         obsdate_values = np.zeros([Nx, Ny])
-        name_values = np.tile(self.name, Nx)
+        name_values = np.tile(rocks.name, Nx)
         in_frame = Propagate.frame
 
         # We need to (or should) work in barycentric coordinates in rebound
         if in_frame == 'helio':
-            self.to_bary()
+            rocks.to_bary()
 
         # Integrate all particles to the same obsdate
-        pickup_times = self.epoch.jd #df.epoch
+        pickup_times = rocks.epoch.jd #df.epoch
         sim = self.set_simulation(np.min(pickup_times))
         sim.t = np.min(pickup_times) #np.min(df.epoch)
 
         for time in np.sort(np.unique(pickup_times)):
-            ps = self[self.epoch.jd == time] #df[df.epoch == time]
+            ps = rocks[rocks.epoch.jd == time] #df[df.epoch == time]
             for p in ps:
                 sim.add(x=p.x.value, y=p.y.value, z=p.z.value,
                         vx=p.vx.value, vy=p.vy.value, vz=p.vz.value,
@@ -102,8 +104,9 @@ class Propagate(SpaceRock, OrbitFuncs, Convenience):
                 sim.integrate(time, exact_finish_time=1)
 
         for ii, time in enumerate(np.sort(Propagate.obsdates)):
+            print(time)
             sim.integrate(time, exact_finish_time=1)
-            for jj, name in enumerate(self.name):
+            for jj, name in enumerate(rocks.name):
                 x_values[ii, jj] = sim.particles[name].x
                 y_values[ii, jj] = sim.particles[name].y
                 z_values[ii, jj] = sim.particles[name].z
@@ -112,39 +115,36 @@ class Propagate(SpaceRock, OrbitFuncs, Convenience):
                 vz_values[ii, jj] = sim.particles[name].vz
                 obsdate_values[ii, jj] = sim.t
 
-        self.x = x_values.flatten() * u.au
-        self.y = y_values.flatten() * u.au
-        self.z = z_values.flatten() * u.au
-        self.vx = vx_values.flatten() * (u.au / u.day)
-        self.vy = vy_values.flatten() * (u.au / u.day)
-        self.vz = vz_values.flatten() * (u.au / u.day)
-        self.name = name_values.flatten()
-        self.epoch = Time(obsdate_values.flatten(), format='jd', scale='utc')
+        x = x_values.flatten()
+        y = y_values.flatten()
+        z = z_values.flatten()
+        vx = vx_values.flatten()
+        vy = vy_values.flatten()
+        vz = vz_values.flatten()
+        name = name_values.flatten()
+        epoch = obsdate_values.flatten()
 
-        self.xyz_to_kep(mu_bary)
+        print(x, y, z, vx, vy, vz, name, epoch)
 
-        if self.__class__.calc_abg == True:
-            self.xyz_to_abg()
-
-        #self.t_peri = self.calc_t_peri()
-        self.varpi = (self.arg + self.node).wrap_at(2 * np.pi * u.rad)
 
         # be polite and return orbital parameters in the input frame.
         if in_frame == 'helio':
             self.to_helio()
 
-        try:
-            self.t0 = np.tile(self.t0, Nx)
-            self.H = np.tile(self.H, Nx)
-            self.G = np.tile(self.G, Nx)
-            self.delta_H = np.tile(self.delta_H, Nx)
-            self.rotation_period = np.tile(self.rotation_period, Nx)
-            self.phi0 = np.tile(self.phi_0, Nx)
-            #self.t0 = np.tile(self.t0, Nx)
-        except:
-            pass
+        #try:
+        #    self.t0 = np.tile(self.t0, Nx)
+        #    self.H = np.tile(self.H, Nx)
+        #    self.G = np.tile(self.G, Nx)
+        #    self.delta_H = np.tile(self.delta_H, Nx)
+        #    self.rotation_period = np.tile(self.rotation_period, Nx)
+        #    self.phi0 = np.tile(self.phi_0, Nx)
+        #    #self.t0 = np.tile(self.t0, Nx)
+        #except:
+        #    pass
 
-        return self
+        rocks = SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch)
+
+        return rocks
 
 
     def set_simulation(self, startdate):
@@ -246,7 +246,7 @@ class Propagate(SpaceRock, OrbitFuncs, Convenience):
         ss['vy'] = vy
         ss['vz'] = vz
         ss['mass'] = masses
-        ss['a'] = 1 / (2 / norm([ss.x, ss.y, ss.z]) - norm([ss.vx, ss.vy, ss.vz])**2 / mu_bary.value)
+        ss['a'] = 1 / (2 / sqrt(ss.x**2 + ss.y**2 + ss.z**2) - (ss.vx**2 + ss.vy**2 + ss.vz**2) / mu_bary.value)
         ss['hill_radius'] = ss.a * pow(ss.mass / (3 * M_sun), 1/3)
         ss['name'] = names
 
