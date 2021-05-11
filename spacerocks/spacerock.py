@@ -327,3 +327,60 @@ class SpaceRock(OrbitFuncs, Convenience):
         sim.move_to_com()
 
         return sim
+
+    def orbits(self):
+
+        M = np.linspace(0, 2*np.pi, 1000)
+
+        xs = []
+        ys = []
+        zs = []
+
+        for r in self:
+            x, y, z, _, _, _ = self.kep_to_xyz_temp(r.a, r.e, r.inc, r.arg, r.node, M)
+            xs.append(x)
+            ys.append(y)
+            zs.append(z)
+
+        return xs, ys, zs
+
+
+    def kep_to_xyz_temp(self, a, e, inc, arg, node, M):
+        '''
+        Just compute the xyz position of an object. Used for iterative equatorial
+        calculation.
+        '''
+        # compute eccentric anomaly E
+        M = array(M)
+        M[M > pi] -= 2 * pi
+        alpha = (3 * pi**2 + 1.6 * (pi**2 - pi * abs(M))/(1 + e))/(pi**2 - 6)
+        d = 3 * (1 - e) + alpha * e
+        q = 2 * alpha * d * (1 - e) - M**2
+        r = 3 * alpha * d * (d - 1 + e) * M + M**3
+        w = (abs(r) + sqrt(q**3 + r**2))**(2/3)
+        E1 = (2 * r * w / (w**2 + w*q + q**2) + M)/d
+        f2 = e * sin(E1)
+        f3 = e * cos(E1)
+        f0 = E1 - f2 - M
+        f1 = 1 - f3
+        d3 = -f0 / (f1 - f0 * f2 / (2 * f1))
+        d4 = -f0 / (f1 + f2 * d3 / 2 + d3**2 * f3/6)
+        d5 = -f0 / (f1 + d4*f2/2 + d4**2*f3/6 - d4**3*f2/24)
+        E = E1 + d5
+        E = E % (2 * pi)
+
+        # compute true anomaly ν
+        true_anomaly = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2), (1 - e)**0.5*np.cos(E/2))
+
+        # compute the distance to the central body r
+        r = a * (1 - e * np.cos(E))
+
+        # obtain the position vector o
+        o = Vector(r * cos(true_anomaly), r * sin(true_anomaly), np.zeros_like(true_anomaly))
+        ov = Vector((mu_bary * a)**0.5 / r * (-np.sin(E))/ u.rad, (mu_bary * a)**0.5 / r * ((1 - e**2)**0.5 * np.cos(E))/ u.rad, np.zeros(len(true_anomaly))/ u.rad)
+
+        # Rotate o to the inertial frame
+        position = o.euler_rotation(arg, inc, node) #* u.au
+        velocity = ov.euler_rotation(arg, inc, node) #* u.au / u.day
+
+        return position.x, position.y, position.z, velocity.x, velocity.y, velocity.z
