@@ -4,62 +4,116 @@ from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
 
+from .constants import *
+
 from .vector import Vector
 
+from skyfield.api import Topos, Loader
+# Load in planets for ephemeride calculation.
+load = Loader('./Skyfield-Data', expire=False, verbose=False)
+ts = load.timescale()
+planets = load('de423.bsp')
+sun = planets['sun']
 
 class OrbitFuncs:
 
 
-    #def to_bary(self):
-    #    '''
-    #    Method to convert heliocentric coordinates to barycentric coordinates.
-    #    '''
-    #    if self.__class__.frame == 'heliocentric':
-    #        #t = ts.tai(jd=self.epoch.value + 37/86400)
-    #        #t = ts.tdb(jd=self.epoch.tdb.jd)
-    #        t = ts.tt(jd=self.epoch.tt.jd)
-    #        x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
-    #        vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
-    #        # calculate the barycentric xyz postion
-    #        self.x += x_sun
-    #        self.y += y_sun
-    #        self.z += z_sun
-    #        self.vx += vx_sun
-    #        self.vy += vy_sun
-    #        self.vz += vz_sun
+    def to_bary(self):
+        '''
+        Method to convert heliocentric coordinates to barycentric coordinates.
+        '''
+        if self.__class__.frame == 'heliocentric':
+            #t = ts.tai(jd=self.epoch.value + 37/86400)
+            #t = ts.tdb(jd=self.epoch.tdb.jd)
+            t = ts.tt(jd=self.epoch.tt.jd)
+            x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
+            vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
+            # calculate the barycentric xyz postion
+            self.x += x_sun
+            self.y += y_sun
+            self.z += z_sun
+            self.vx += vx_sun
+            self.vy += vy_sun
+            self.vz += vz_sun
 
 
-    #        # calculate barycentric keplerian elements
-    #        self.xyz_to_kep()
-    #        self.__class__.frame = 'barycentric'
+            # clear the keplerian variables because they need to be recomputed
+            self.clear_kep()
 
-    #    return self
+            self.position = Vector(self.x, self.y, self.z)
+            self.velocity = Vector(self.vx, self.vy, self.vz)
+
+            self.__class__.frame = 'barycentric'
+            self.__class__.mu = mu_bary
+
+        return self
 
 
-    #def to_helio(self):
-    #    '''
-    #    Method to convert barycentric coordinates to heliocentric coordinates.
-    #    '''
-    #    if self.__class__.frame == 'barycentric':
-    #        #t = ts.tai(jd=self.epoch.value + 37/86400)
-    #        #t = ts.tdb(jd=self.epoch.tdb.jd)
-    #        t = ts.tt(jd=self.epoch.tt.jd)
-    #        x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
-    #        vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
-    #        # calculate the heliocentric xyz postion
-    #        self.x -= x_sun
-    #        self.y -= y_sun
-    #        self.z -= z_sun
-    #        self.vx -= vx_sun
-    #        self.vy -= vy_sun
-    #        self.vz -= vz_sun
+    def to_helio(self):
+        '''
+        Method to convert barycentric coordinates to heliocentric coordinates.
+        '''
+        if self.__class__.frame == 'barycentric':
+            #t = ts.tai(jd=self.epoch.value + 37/86400)
+            #t = ts.tdb(jd=self.epoch.tdb.jd)
+            t = ts.tt(jd=self.epoch.tt.jd)
+            x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
+            vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
+            # calculate the heliocentric xyz postion
+            self.x -= x_sun
+            self.y -= y_sun
+            self.z -= z_sun
+            self.vx -= vx_sun
+            self.vy -= vy_sun
+            self.vz -= vz_sun
 
-    #        # calculate heliocentric keplerian elements
-    #        self.xyz_to_kep()
+            # clear the keplerian variables because they need to be recomputed
+            self.clear_kep()
 
-    #        self.__class__.frame = 'heliocentric'
+            self.position = Vector(self.x, self.y, self.z)
+            self.velocity = Vector(self.vx, self.vy, self.vz)
 
-    #    return self
+            self.__class__.frame = 'heliocentric'
+            self.__class__.mu = mu_helio
+
+        return self
+
+    def clear_kep(self):
+
+        to_delete = ['_a', '_e', '_inc', '_arg', '_node', '_varpi', '_M', '_E',
+                     '_true_anomaly', '_true_longitude', '_mean_longitude',
+                     '_q', '_t_peri', '_b', '_p', '_n', '_Q', '_hill_radius', '_r',
+                     '_ovec', '_vovec', '_nvec', '_hvec', '_evec', '_position', '_velocity', '_rrdot']
+
+        for attr in to_delete:
+            self.__dict__.pop(attr, None)
+
+        #del self.a
+        #del self.e
+        #del self.inc
+        #del self.arg
+        #del self.node
+        #del self.M
+        #del self.E
+        #del self.varpi
+        #del self.true_anomaly
+        #del self.true_longitude
+        #del self.mean_longitude
+        #del self.q
+        #del self.t_peri
+        #del self.b
+        #del self.p
+        #del self.n
+        #del self.Q
+        #del self.hill_radius
+        #del self.r
+        #del self.ovec
+        #del self.vovec
+        #del self.nvec
+        #del self.hvec
+        #del self.evec
+        #del self.position
+        #del self.velocity
 
 
     ''' Vector Quantities '''
@@ -138,7 +192,10 @@ class OrbitFuncs:
     @property
     def position(self):
         if not hasattr(self, '_position'):
-            self.position = self.ovec.euler_rotation(self.arg, self.inc, self.node)
+            if hasattr(self, '_x') and hasattr(self, '_y') and hasattr(self, '_z'):
+                self.position = Vector(self.x, self.y, self.z)
+            else:
+                self.position = self.ovec.euler_rotation(self.arg, self.inc, self.node)
         return self._position
 
     @position.setter
@@ -152,7 +209,10 @@ class OrbitFuncs:
     @property
     def velocity(self):
         if not hasattr(self, '_velocity'):
-            self.velocity = self.vovec.euler_rotation(self.arg, self.inc, self.node)
+            if hasattr(self, '_vx') and hasattr(self, '_vy') and hasattr(self, '_vz'):
+                self.velocity = Vector(self.vx, self.vy, self.vz)
+            else:
+                self.velocity = self.vovec.euler_rotation(self.arg, self.inc, self.node)
         return self._velocity
 
     @velocity.setter

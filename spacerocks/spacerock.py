@@ -130,7 +130,7 @@ class SpaceRock(OrbitFuncs, Convenience):
         in_frame = self.frame
 
         # We need to (or should) work in barycentric coordinates in rebound
-        if in_frame == 'helio':
+        if in_frame == 'heliocentric':
             self.to_bary()
 
         # Integrate all particles to the same obsdate
@@ -167,9 +167,11 @@ class SpaceRock(OrbitFuncs, Convenience):
         name = name_values.flatten()
         epoch = obsdate_values.flatten()
 
+        rocks = SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, input_frame='barycentric')
+
         # be polite and return orbital parameters in the input frame.
-        if in_frame == 'helio':
-            self.to_helio()
+        if in_frame == 'heliocentric':
+            rocks = rocks.to_helio()
 
         #try:
         #    self.t0 = np.tile(self.t0, Nx)
@@ -187,7 +189,7 @@ class SpaceRock(OrbitFuncs, Convenience):
         Maybe a sortby argument?
         '''
 
-        return SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch)
+        return rocks
 
     def set_simulation(self, startdate, model):
 

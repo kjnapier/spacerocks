@@ -40,7 +40,7 @@ class Observe(Convenience):
             self.__class__.obscode = 500
 
 
-        self.tel_position, self.tel_velocity = self.xyz_to_tel(rocks)
+        #self.tel_position, self.tel_velocity = self.xyz_to_tel(rocks)
         self.xT, self.yT, self.zT, self.vxT, self.vyT, self.vzT = self.xyz_to_tel(rocks)
 
 
@@ -51,10 +51,10 @@ class Observe(Convenience):
         self.ra = Angle(np.arctan2(self.yT, self.xT), u.rad).wrap_at(2 * np.pi * u.rad)
         self.dec_rate = (-self.zT * (self.xT * self.vxT + self.yT * self.vyT) + ((self.xT**2 + self.yT**2) * self.vzT)) \
                 / (sqrt(self.xT**2 + self.yT**2) * (self.xT**2 + self.yT**2 + self.zT**2)) * u.rad
-        self.ra_rate = (self.yT * self.vxT - self.xT * self.vyT) / (self.xT**2 + self.yT**2) * u.rad
+        self.ra_rate = -(self.yT * self.vxT - self.xT * self.vyT) / (self.xT**2 + self.yT**2) * u.rad
         self.delta = sqrt(self.xT**2 + self.yT**2 + self.zT**2)
         earth_dis = 1 * u.au
-        self.phase_angle = Angle(np.arccos(-(earth_dis**2 - rocks.r**2 - self.delta**2)/(2 * rocks.r* self.delta)), u.rad)
+        self.phase_angle = Angle(np.arccos(-(earth_dis**2 - rocks.r**2 - self.delta**2)/(2 * rocks.r * self.delta)), u.rad)
         self.elong = Angle(np.arccos(-(rocks.r**2 - self.delta**2 - earth_dis**2)/(2 * self.delta * earth_dis)), u.rad)
 
     @property
@@ -74,10 +74,9 @@ class Observe(Convenience):
         Routine corrects iteratively for light travel time.
         '''
 
-        if rocks.frame == 'heliocentric':
-            rocks.to_bary()
+        rocks.to_bary()
 
-        t = ts.tdb(jd=rocks.epoch.tdb.jd)
+        t = ts.tt(jd=rocks.epoch.tt.jd)
         earth = planets['earth']
 
         # Only used for the topocentric calculation.
@@ -87,32 +86,63 @@ class Observe(Convenience):
         #                   elevation_m=self.__class__.obselev) # topocentric calculation
 
         ee = earth.at(t)
-        x_earth, y_earth, z_earth = ee.ecliptic_xyz().au * u.au # earth ICRS position
-        vx_earth, vy_earth, vz_earth = ee.ecliptic_velocity().au_per_d * u.au / u.day # earth ICRS position
+        #x_earth, y_earth, z_earth = ee.ecliptic_xyz().au * u.au # earth ICRS position
+        #vx_earth, vy_earth, vz_earth = ee.ecliptic_velocity().au_per_d * u.au / u.day # earth ICRS position
 
-        for idx in range(5):
+        x_earth, y_earth, z_earth = ee.position.au * u.au # earth ICRS position
+        vx_earth, vy_earth, vz_earth = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
 
+        x0, y0, z0 = rocks.x, rocks.y, rocks.z
+        vx0, vy0, vz0 = rocks.vx, rocks.vy, rocks.vz
+
+        for idx in range(10):
             # transfer ecliptic to ICRS and shift to Geocentric (topocentric)
-            xT = rocks.x - x_earth
-            yT = rocks.y * cos(epsilon) - rocks.z * sin(epsilon) - y_earth
-            zT = rocks.y * sin(epsilon) + rocks.z * cos(epsilon) - z_earth
-            vxT = rocks.vx - vx_earth
-            vyT = rocks.vy * cos(epsilon) - rocks.vz * sin(epsilon) - vy_earth
-            vzT = rocks.vy * sin(epsilon) + rocks.vz * cos(epsilon) - vz_earth
+            x = x0 - x_earth
+            y = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
+            z = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_earth
+            vx = vx0 - vx_earth
+            vy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_earth
+            vz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_earth
+            delta = sqrt(x**2 + y**2 + z**2)
+            ltt = delta / c
+            M = rocks.M - ltt * (mu_bary / rocks.a**3)**0.5
+            if idx < 9:
+                x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(rocks.a, rocks.e, rocks.inc,
+                                                                 rocks.arg, rocks.node, M)
 
-            if idx < 4:
+        #for idx in range(5):
 
-                delta = sqrt(xT**2 + yT**2 + zT**2)
-                ltt = delta / c
-                M = rocks.M - ltt * rocks.n
-                x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(rocks.a,
-                                                                 rocks.e,
-                                                                 rocks.inc,
-                                                                 rocks.arg,
-                                                                 rocks.node,
-                                                                 M)
+        #    # transfer ecliptic to ICRS and shift to Geocentric (topocentric)
+        #    #xT = x0 - x_earth
+        #    #yT = y0 * cos(epsilon) - z0 * sin(epsilon) - y_earth
+        #    #zT = y0 * sin(epsilon) + z0 * cos(epsilon) - z_earth
+        #    #vxT = vx0 - vx_earth
+        #    #vyT = vy0 * cos(epsilon) - vz0 * sin(epsilon) - vy_earth
+        #    #vzT = vy0 * sin(epsilon) + vz0 * cos(epsilon) - vz_earth
 
-        return Vector(xT, yT, zT), Vector(vxT, vyT, vzT)
+        #    xT = x0 - x_earth
+        #    yT = y0 - y_earth * cos(-epsilon) - z_earth * sin(epsilon)
+        #    zT = z0 - y_earth * sin(-epsilon) - z_earth * cos(epsilon)
+        #    vxT = vx0 - vx_earth
+        #    vyT = vy0 - vy_earth * cos(-epsilon) - vz_earth * sin(epsilon)
+        #    vzT = vz0 - vy_earth * sin(-epsilon) - vz_earth * cos(epsilon)
+
+
+        #    if idx < 4:
+
+        #        delta = sqrt(xT**2 + yT**2 + zT**2)
+        #        ltt = delta / c
+        #        M = rocks.M - (ltt * rocks.n)
+        #        x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(rocks.a,
+        #                                                         rocks.e,
+        #                                                         rocks.inc,
+        #                                                         rocks.arg,
+        #                                                         rocks.node,
+        #                                                         M)
+
+        #return Vector(xT, yT, zT), Vector(vxT, vyT, vzT)
+        #return xT, yT, zT, vxT, vyT, vzT
+        return x, y, z, vx, vy, vz
 
     def kep_to_xyz_temp(self, a, e, inc, arg, node, M):
         '''
@@ -120,6 +150,7 @@ class Observe(Convenience):
         calculation.
         '''
         # compute eccentric anomaly E
+        e = e.value
         M = array(M.rad)
         M[M > pi] -= 2 * pi
         alpha = (3 * pi**2 + 1.6 * (pi**2 - pi * abs(M))/(1 + e))/(pi**2 - 6)
@@ -136,7 +167,8 @@ class Observe(Convenience):
         d4 = -f0 / (f1 + f2 * d3 / 2 + d3**2 * f3/6)
         d5 = -f0 / (f1 + d4*f2/2 + d4**2*f3/6 - d4**3*f2/24)
         E = E1 + d5
-        E = E % (2 * pi)
+        E[E < 0] += 2 * pi
+        #E = E % (2 * pi)
 
         # compute true anomaly ν
         true_anomaly = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2), (1 - e)**0.5*np.cos(E/2))
