@@ -14,6 +14,8 @@ import numpy as np
 import pandas as pd
 
 import rebound
+import reboundx
+from reboundx import constants
 
 from .constants import *
 from .orbitfuncs import OrbitFuncs
@@ -112,7 +114,7 @@ class SpaceRock(OrbitFuncs, Convenience):
             self.velocity = Vector(vx, vy, vz)
 
 
-    def propagate(self, obsdates, model):
+    def propagate(self, obsdates, model, add_pluto=False, gr=False):
         '''
         Integrate all bodies to the desired date. The logic could be cleaner
         but it works.
@@ -135,7 +137,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         # Integrate all particles to the same obsdate
         pickup_times = self.epoch.jd #df.epoch
-        sim = self.set_simulation(np.min(pickup_times), model=model)
+        sim = self.set_simulation(np.min(pickup_times), model=model, add_pluto=add_pluto, gr=gr)
         sim.t = np.min(pickup_times) #np.min(df.epoch)
 
         for time in np.sort(np.unique(pickup_times)):
@@ -171,7 +173,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         # be polite and return orbital parameters in the input frame.
         if in_frame == 'heliocentric':
-            rocks = rocks.to_helio()
+            rocks.to_helio()
 
         #try:
         #    self.t0 = np.tile(self.t0, Nx)
@@ -191,7 +193,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         return rocks
 
-    def set_simulation(self, startdate, model):
+    def set_simulation(self, startdate, model, add_pluto=False, gr=False):
 
         sun = planets['sun']
         mercury = planets['mercury barycenter']
@@ -268,11 +270,11 @@ class SpaceRock(OrbitFuncs, Convenience):
         else:
             raise ValueError('Model not recognized. Check the documentation.')
 
-        #if Propagate.add_pluto == True:
-        #    pluto = planets['pluto barycenter']
-        #    active_bodies.append(pluto)
-        #    names.append('Pluto')
-        #    masses.append(M_pluto)
+        if add_pluto == True:
+            pluto = planets['pluto barycenter']
+            active_bodies.append(pluto)
+            names.append('Pluto')
+            masses.append(M_pluto)
 
 
         startdate = Time(startdate, scale='utc', format='jd')
@@ -315,15 +317,15 @@ class SpaceRock(OrbitFuncs, Convenience):
         #    rebx.add_force(gr)
         #    bodies['Sun'].params['gr_source'] = 1
 
-        #elif Propagate.gr_full == True:
-        #    rebx = reboundx.Extras(sim)
-        #    gr = rebx.load_force('gr_full')
-        #    gr.params["c"] = constants.C
-        #    rebx.add_force(gr)
+        if gr == True:
+            rebx = reboundx.Extras(sim)
+            gr = rebx.load_force('gr_full')
+            gr.params["c"] = constants.C
+            rebx.add_force(gr)
 
         sim.testparticle_type = 0
         sim.integrator = 'ias15'
-        #sim.ri_ias15.epsilon = 1e-10
+        #sim.ri_ias15.epsilon = 1e-12
 
         sim.move_to_com()
 

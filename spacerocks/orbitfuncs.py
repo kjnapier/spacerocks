@@ -331,7 +331,7 @@ class OrbitFuncs:
     @property
     def e(self):
         if not hasattr(self, '_e'):
-            self.e = self.evec.norm
+            self.e = self.evec.norm.value
         return self._e
 
     @e.setter
@@ -450,8 +450,8 @@ class OrbitFuncs:
                 self.M = Angle(M, u.rad)
 
             elif hasattr(self, '_true_anomaly') or hasattr(self, '_true_longitude') or hasattr(self, '_E') or (hasattr(self, '_position') and hasattr(self, '_velocity')):
-                M = (self.E.rad + self.e.value * sin(self.E.rad)) % (2 * pi)
-                self.M = Angle(self.E.rad + self.e.value * sin(self.E.rad), u.rad)
+                M = (self.E.rad - self.e * sin(self.E.rad)) % (2 * pi)
+                self.M = Angle(M, u.rad)
 
             elif hasattr(self, '_t_peri'):
                 M = self.n * (self.epoch - self.t_peri)

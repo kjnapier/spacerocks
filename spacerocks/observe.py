@@ -76,14 +76,14 @@ class Observe(Convenience):
 
         rocks.to_bary()
 
-        t = ts.tt(jd=rocks.epoch.tt.jd)
+        t = ts.tdb(jd=rocks.epoch.tdb.jd)
         earth = planets['earth']
 
         # Only used for the topocentric calculation.
-        #if self.__class__.obscode != 500:
-        #    earth += Topos(latitude_degrees=self.__class__.obslat,
-        #                   longitude_degrees=self.__class__.obslon,
-        #                   elevation_m=self.__class__.obselev) # topocentric calculation
+        if (self.__class__.obscode != 500) and (self.__class__.obscode != '500'):
+            earth += Topos(latitude_degrees=self.__class__.obslat,
+                           longitude_degrees=self.__class__.obslon,
+                           elevation_m=self.__class__.obselev) # topocentric calculation
 
         ee = earth.at(t)
         #x_earth, y_earth, z_earth = ee.ecliptic_xyz().au * u.au # earth ICRS position
@@ -95,50 +95,50 @@ class Observe(Convenience):
         x0, y0, z0 = rocks.x, rocks.y, rocks.z
         vx0, vy0, vz0 = rocks.vx, rocks.vy, rocks.vz
 
+        #for idx in range(10):
+        #    # transfer ecliptic to ICRS and shift to Geocentric (topocentric)
+        #    x = x0 - x_earth
+        #    y = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
+        #    z = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_earth
+        #    vx = vx0 - vx_earth
+        #    vy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_earth
+        #    vz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_earth
+        #    delta = sqrt(x**2 + y**2 + z**2)
+        #    ltt = delta / c
+        #    M = rocks.M - ltt * (mu_bary / rocks.a**3)**0.5
+        #    if idx < 9:
+        #        x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(rocks.a, rocks.e, rocks.inc,
+        #                                                         rocks.arg, rocks.node, M)
+
+
         for idx in range(10):
+
             # transfer ecliptic to ICRS and shift to Geocentric (topocentric)
+            #xT = x0 - x_earth
+            #yT = y0 * cos(epsilon) - z0 * sin(epsilon) - y_earth
+            #zT = y0 * sin(epsilon) + z0 * cos(epsilon) - z_earth
+            #vxT = vx0 - vx_earth
+            #vyT = vy0 * cos(epsilon) - vz0 * sin(epsilon) - vy_earth
+            #vzT = vy0 * sin(epsilon) + vz0 * cos(epsilon) - vz_earth
+
             x = x0 - x_earth
             y = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
             z = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_earth
             vx = vx0 - vx_earth
             vy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_earth
             vz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_earth
-            delta = sqrt(x**2 + y**2 + z**2)
-            ltt = delta / c
-            M = rocks.M - ltt * (mu_bary / rocks.a**3)**0.5
+
             if idx < 9:
-                x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(rocks.a, rocks.e, rocks.inc,
-                                                                 rocks.arg, rocks.node, M)
 
-        #for idx in range(5):
-
-        #    # transfer ecliptic to ICRS and shift to Geocentric (topocentric)
-        #    #xT = x0 - x_earth
-        #    #yT = y0 * cos(epsilon) - z0 * sin(epsilon) - y_earth
-        #    #zT = y0 * sin(epsilon) + z0 * cos(epsilon) - z_earth
-        #    #vxT = vx0 - vx_earth
-        #    #vyT = vy0 * cos(epsilon) - vz0 * sin(epsilon) - vy_earth
-        #    #vzT = vy0 * sin(epsilon) + vz0 * cos(epsilon) - vz_earth
-
-        #    xT = x0 - x_earth
-        #    yT = y0 - y_earth * cos(-epsilon) - z_earth * sin(epsilon)
-        #    zT = z0 - y_earth * sin(-epsilon) - z_earth * cos(epsilon)
-        #    vxT = vx0 - vx_earth
-        #    vyT = vy0 - vy_earth * cos(-epsilon) - vz_earth * sin(epsilon)
-        #    vzT = vz0 - vy_earth * sin(-epsilon) - vz_earth * cos(epsilon)
-
-
-        #    if idx < 4:
-
-        #        delta = sqrt(xT**2 + yT**2 + zT**2)
-        #        ltt = delta / c
-        #        M = rocks.M - (ltt * rocks.n)
-        #        x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(rocks.a,
-        #                                                         rocks.e,
-        #                                                         rocks.inc,
-        #                                                         rocks.arg,
-        #                                                         rocks.node,
-        #                                                         M)
+                delta = sqrt(x**2 + y**2 + z**2)
+                ltt = delta / c
+                M = rocks.M - (ltt * rocks.n)
+                x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(rocks.a,
+                                                                 rocks.e,
+                                                                 rocks.inc,
+                                                                 rocks.arg,
+                                                                 rocks.node,
+                                                                 M)
 
         #return Vector(xT, yT, zT), Vector(vxT, vyT, vzT)
         #return xT, yT, zT, vxT, vyT, vzT
@@ -150,7 +150,7 @@ class Observe(Convenience):
         calculation.
         '''
         # compute eccentric anomaly E
-        e = e.value
+        e = e
         M = array(M.rad)
         M[M > pi] -= 2 * pi
         alpha = (3 * pi**2 + 1.6 * (pi**2 - pi * abs(M))/(1 + e))/(pi**2 - 6)
