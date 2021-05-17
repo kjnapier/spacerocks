@@ -141,6 +141,7 @@ class Propagate(SpaceRock, OrbitFuncs, Convenience):
             self.rotation_period = np.tile(self.rotation_period, Nx)
             self.phi0 = np.tile(self.phi_0, Nx)
             #self.t0 = np.tile(self.t0, Nx)
+
         except:
             pass
 
@@ -279,6 +280,11 @@ class Propagate(SpaceRock, OrbitFuncs, Convenience):
         sim.testparticle_type = 0
         sim.integrator = 'ias15'
         #sim.ri_ias15.epsilon = 1e-10
+
+        sim.add('Ceres')
+        sim.add('Pluto')
+        sim.add('Pallas')
+        sim.add('Vesta')
 
         sim.move_to_com()
 

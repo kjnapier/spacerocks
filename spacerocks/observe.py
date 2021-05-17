@@ -22,8 +22,19 @@ observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
 
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
-ts = load.timescale()
+#ts = load.timescale()
 planets = load('de423.bsp')
+
+from skyfield.api import wgs84
+
+from skyfield.data import iers
+
+url = load.build_url('finals2000A.all')
+with load.open(url) as f:
+    finals_data = iers.parse_x_y_dut1_from_finals_all(f)
+
+ts = load.timescale()
+iers.install_polar_motion_table(ts, finals_data)
 
 class Observe(Convenience):
 
@@ -80,10 +91,13 @@ class Observe(Convenience):
         earth = planets['earth']
 
         # Only used for the topocentric calculation.
-        if (self.__class__.obscode != 500) and (self.__class__.obscode != '500'):
-            earth += Topos(latitude_degrees=self.__class__.obslat,
-                           longitude_degrees=self.__class__.obslon,
-                           elevation_m=self.__class__.obselev) # topocentric calculation
+        #if (self.__class__.obscode != 500) and (self.__class__.obscode != '500'):
+        #    earth += Topos(latitude_degrees=self.__class__.obslat,
+        #                   longitude_degrees=self.__class__.obslon,
+        #                   elevation_m=self.__class__.obselev) # topocentric calculation
+
+
+        earth += wgs84.latlon(self.__class__.obslat, self.__class__.obslon, elevation_m=self.__class__.obselev)
 
         ee = earth.at(t)
         #x_earth, y_earth, z_earth = ee.ecliptic_xyz().au * u.au # earth ICRS position
@@ -95,42 +109,18 @@ class Observe(Convenience):
         x0, y0, z0 = rocks.x, rocks.y, rocks.z
         vx0, vy0, vz0 = rocks.vx, rocks.vy, rocks.vz
 
-        #for idx in range(10):
-        #    # transfer ecliptic to ICRS and shift to Geocentric (topocentric)
-        #    x = x0 - x_earth
-        #    y = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
-        #    z = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_earth
-        #    vx = vx0 - vx_earth
-        #    vy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_earth
-        #    vz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_earth
-        #    delta = sqrt(x**2 + y**2 + z**2)
-        #    ltt = delta / c
-        #    M = rocks.M - ltt * (mu_bary / rocks.a**3)**0.5
-        #    if idx < 9:
-        #        x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(rocks.a, rocks.e, rocks.inc,
-        #                                                         rocks.arg, rocks.node, M)
-
-
         for idx in range(10):
 
-            # transfer ecliptic to ICRS and shift to Geocentric (topocentric)
-            #xT = x0 - x_earth
-            #yT = y0 * cos(epsilon) - z0 * sin(epsilon) - y_earth
-            #zT = y0 * sin(epsilon) + z0 * cos(epsilon) - z_earth
-            #vxT = vx0 - vx_earth
-            #vyT = vy0 * cos(epsilon) - vz0 * sin(epsilon) - vy_earth
-            #vzT = vy0 * sin(epsilon) + vz0 * cos(epsilon) - vz_earth
-
-            x = x0 - x_earth
-            y = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
-            z = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_earth
-            vx = vx0 - vx_earth
-            vy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_earth
-            vz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_earth
+            dx = x0 - x_earth
+            dy = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
+            dz = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_earth
+            dvx = vx0 - vx_earth
+            dvy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_earth
+            dvz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_earth
 
             if idx < 9:
 
-                delta = sqrt(x**2 + y**2 + z**2)
+                delta = sqrt(dx**2 + dy**2 + dz**2)
                 ltt = delta / c
                 M = rocks.M - (ltt * rocks.n)
                 x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(rocks.a,
@@ -142,7 +132,7 @@ class Observe(Convenience):
 
         #return Vector(xT, yT, zT), Vector(vxT, vyT, vzT)
         #return xT, yT, zT, vxT, vyT, vzT
-        return x, y, z, vx, vy, vz
+        return dx, dy, dz, dvx, dvy, dvz
 
     def kep_to_xyz_temp(self, a, e, inc, arg, node, M):
         '''

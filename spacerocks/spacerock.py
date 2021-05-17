@@ -193,6 +193,9 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         return rocks
 
+    def observe(self, rocks, obscode):
+        pass
+
     def set_simulation(self, startdate, model, add_pluto=False, gr=False):
 
         sun = planets['sun']
