@@ -4,6 +4,7 @@
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
 import random
+import copy
 
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
@@ -193,8 +194,72 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         return rocks
 
-    def observe(self, rocks, obscode):
-        pass
+    def observe(self, obscode):
+        x, y, z, vx, vy, vz = xyz_to_tel(self, obscode)
+        return Ephemerides(x, y, z, vx, vy, vz)
+
+
+    def xyz_to_tel(self, obscode):
+        '''
+        Transform from barycentric ecliptic Cartesian coordinates to
+        telescope-centric coordinates.
+
+        Routine corrects iteratively for light travel time.
+        '''
+
+        if obscode is not None:
+            obscode = str(obscode).zfill(3)
+            obs = observatories[observatories.obscode == self.__class__.obscode]
+            obslat = obs.lat.values
+            obslon = obs.lon.values
+            obselev = obs.elevation.values
+        else:
+            obscode = 500
+
+        rocks = copy.copy(self)
+
+        rocks.to_bary()
+
+        t = ts.tdb(jd=rocks.epoch.tdb.jd)
+        earth = planets['earth']
+
+        # Only used for the topocentric calculation.
+        if (obscode != 500) and (obscode != '500'):
+            earth += wgs84.latlon(obslat, obslon, obselev)
+
+
+        ee = earth.at(t)
+
+        x_earth, y_earth, z_earth = ee.position.au * u.au # earth ICRS position
+        vx_earth, vy_earth, vz_earth = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
+
+        x0, y0, z0 = rocks.x, rocks.y, rocks.z
+        vx0, vy0, vz0 = rocks.vx, rocks.vy, rocks.vz
+
+        for idx in range(10):
+
+            dx = x0 - x_earth
+            dy = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
+            dz = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_earth
+            dvx = vx0 - vx_earth
+            dvy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_earth
+            dvz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_earth
+
+            if idx < 9:
+
+                delta = sqrt(dx**2 + dy**2 + dz**2)
+                ltt = delta / c
+                M = rocks.M - (ltt * rocks.n)
+                x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(rocks.a,
+                                                                 rocks.e,
+                                                                 rocks.inc,
+                                                                 rocks.arg,
+                                                                 rocks.node,
+                                                                 M)
+
+        #return Vector(xT, yT, zT), Vector(vxT, vyT, vzT)
+        #return xT, yT, zT, vxT, vyT, vzT
+        return dx, dy, dz, dvx, dvy, dvz
 
     def set_simulation(self, startdate, model, add_pluto=False, gr=False):
 
@@ -237,31 +302,31 @@ class SpaceRock(OrbitFuncs, Convenience):
             masses = [M_sun, M_jupiter, M_saturn, M_uranus, M_neptune]
 
 
-        elif model == 2:
-            active_bodies = [sun, earth, jupiter, saturn, uranus, neptune]
-            names = ['Sun', 'Earth', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            M_sun += M_mercury + M_venus + M_mars
-            masses = [M_sun, M_earth, M_jupiter, M_saturn, M_uranus, M_neptune]
+        #elif model == 2:
+        #    active_bodies = [sun, earth, jupiter, saturn, uranus, neptune]
+        #    names = ['Sun', 'Earth', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+        #    M_sun += M_mercury + M_venus + M_mars
+        #    masses = [M_sun, M_earth, M_jupiter, M_saturn, M_uranus, M_neptune]
 
 
-        elif model == 3:
-            active_bodies = [sun, earth, mars, jupiter, saturn, uranus, neptune]
-            names = ['Sun', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            M_sun += M_mercury + M_venus
-            masses = [M_sun, M_earth, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune]
+        #elif model == 3:
+        #    active_bodies = [sun, earth, mars, jupiter, saturn, uranus, neptune]
+        #    names = ['Sun', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+        #    M_sun += M_mercury + M_venus
+        #    masses = [M_sun, M_earth, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune]
 
 
-        elif model == 4:
-            active_bodies = [sun, venus, earth, mars, jupiter, saturn, uranus, neptune]
-            names = ['Sun', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            M_sun += M_mercury
-            masses = [M_sun, M_venus, M_earth, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune]
+        #elif model == 4:
+        #    active_bodies = [sun, venus, earth, mars, jupiter, saturn, uranus, neptune]
+        #    names = ['Sun', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+        #    M_sun += M_mercury
+        #    masses = [M_sun, M_venus, M_earth, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune]
 
 
-        elif model == 5:
-            active_bodies = [sun, mercury, venus, earth, mars, jupiter, saturn, uranus, neptune]
-            names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            masses = [M_sun, M_mercury, M_venus, M_earth, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune]
+        #elif model == 5:
+        #    active_bodies = [sun, mercury, venus, earth, mars, jupiter, saturn, uranus, neptune]
+        #    names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+        #    masses = [M_sun, M_mercury, M_venus, M_earth, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune]
 
 
         elif model == 6:
@@ -328,11 +393,12 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         sim.testparticle_type = 0
         sim.integrator = 'ias15'
-        #sim.ri_ias15.epsilon = 1e-12
 
         sim.move_to_com()
 
         return sim
+
+
 
     def orbits(self):
 
@@ -353,8 +419,8 @@ class SpaceRock(OrbitFuncs, Convenience):
 
     def kep_to_xyz_temp(self, a, e, inc, arg, node, M):
         '''
-        Just compute the xyz position of an object. Used for iterative equatorial
-        calculation.
+        Just compute the xyz position of an object. Used for iterative
+        equatorial calculation.
         '''
         # compute eccentric anomaly E
         M = array(M)
