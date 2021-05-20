@@ -62,7 +62,7 @@ class Observe(Convenience):
         self.ra = Angle(np.arctan2(self.yT, self.xT), u.rad).wrap_at(2 * np.pi * u.rad)
         self.dec_rate = (-self.zT * (self.xT * self.vxT + self.yT * self.vyT) + ((self.xT**2 + self.yT**2) * self.vzT)) \
                 / (sqrt(self.xT**2 + self.yT**2) * (self.xT**2 + self.yT**2 + self.zT**2)) * u.rad
-        self.ra_rate = -(self.yT * self.vxT - self.xT * self.vyT) / (self.xT**2 + self.yT**2) * u.rad
+        self.ra_rate = - cos(self.dec) * (self.yT * self.vxT - self.xT * self.vyT) / (self.xT**2 + self.yT**2) * u.rad
         self.delta = sqrt(self.xT**2 + self.yT**2 + self.zT**2)
         earth_dis = 1 * u.au
         self.phase_angle = Angle(np.arccos(-(earth_dis**2 - rocks.r**2 - self.delta**2)/(2 * rocks.r * self.delta)), u.rad)
