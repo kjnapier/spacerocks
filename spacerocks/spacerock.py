@@ -23,6 +23,7 @@ from .orbitfuncs import OrbitFuncs
 from .convenience import Convenience
 from .units import Units
 from .vector import Vector
+from .ephemerides import Ephemerides
 
 from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
@@ -186,11 +187,6 @@ class SpaceRock(OrbitFuncs, Convenience):
         #    #self.t0 = np.tile(self.t0, Nx)
         #except:
         #    pass
-
-        '''
-        Should make this return a dictionary?
-        Maybe a sortby argument?
-        '''
 
         return rocks
 
