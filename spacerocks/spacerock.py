@@ -5,6 +5,7 @@
 ################################################################################
 import random
 import copy
+import os
 
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
@@ -31,12 +32,27 @@ load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
 planets = load('de423.bsp')
 
+observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
+                            'data',
+                            'observatories.csv'))
+
+from skyfield.api import wgs84
+from skyfield.data import iers
+
+url = load.build_url('finals2000A.all')
+with load.open(url) as f:
+    finals_data = iers.parse_x_y_dut1_from_finals_all(f)
+
+ts = load.timescale()
+iers.install_polar_motion_table(ts, finals_data)
+
+
 class SpaceRock(OrbitFuncs, Convenience):
 
-    def __init__(self, input_frame='barycentric', units=Units(), *args, **kwargs):
+    def __init__(self, frame='barycentric', units=Units(), *args, **kwargs):
 
         coords = self.detect_coords(kwargs)
-        input_frame = input_frame.lower()
+        input_frame = frame.lower()
 
         # input -> arrays
         for idx, key in enumerate([*kwargs]):
@@ -56,10 +72,17 @@ class SpaceRock(OrbitFuncs, Convenience):
         else:
             self.epoch = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
 
-        self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
+        if kwargs.get('H') is not None:
+            self.H = kwargs.get('H')
+
+        if (kwargs.get('rotation_period') is not None) and (kwargs.get('delta_H') is not None) and (kwargs.get('phi0') is not None):
+            self.rotation_period = kwargs.get('rotation_period')
+            self.delta_H = kwargs.get('delta_H')
+            self.phi0 = kwargs.get('phi0')
+            self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
 
         if kwargs.get('name') is not None:
-            self.name = kwargs.get('name').astype(str)
+            self.name = array([kwargs.get('name')])
         else:
             # produces random, non-repeting integers between 0 and 1e10 - 1
             self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.epoch))])
@@ -116,12 +139,12 @@ class SpaceRock(OrbitFuncs, Convenience):
             self.velocity = Vector(vx, vy, vz)
 
 
-    def propagate(self, obsdates, model, add_pluto=False, gr=False):
+    def propagate(self, epochs, model, add_pluto=False, gr=False):
         '''
         Integrate all bodies to the desired date. The logic could be cleaner
         but it works.
         '''
-        Nx = len(obsdates)
+        Nx = len(epochs)
         Ny = len(self)
         x_values = zeros([Nx, Ny])
         y_values = zeros([Nx, Ny])
@@ -151,7 +174,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
                 sim.integrate(time, exact_finish_time=1)
 
-        for ii, time in enumerate(np.sort(obsdates)):
+        for ii, time in enumerate(np.sort(epochs)):
             sim.integrate(time, exact_finish_time=1)
             for jj, name in enumerate(self.name):
                 x_values[ii, jj] = sim.particles[name].x
@@ -171,29 +194,42 @@ class SpaceRock(OrbitFuncs, Convenience):
         name = name_values.flatten()
         epoch = obsdate_values.flatten()
 
-        rocks = SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, input_frame='barycentric')
+        rocks = SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, frame='barycentric')
 
         # be polite and return orbital parameters in the input frame.
         if in_frame == 'heliocentric':
             rocks.to_helio()
 
-        #try:
-        #    self.t0 = np.tile(self.t0, Nx)
-        #    self.H = np.tile(self.H, Nx)
-        #    self.G = np.tile(self.G, Nx)
-        #    self.delta_H = np.tile(self.delta_H, Nx)
-        #    self.rotation_period = np.tile(self.rotation_period, Nx)
-        #    self.phi0 = np.tile(self.phi_0, Nx)
-        #    #self.t0 = np.tile(self.t0, Nx)
-        #except:
-        #    pass
+        if hasattr(self, 'G'):
+            rocks.G = np.tile(self.G, Nx)
+
+        if hasattr(self, 'delta_H'):
+            rocks.delta_H = np.tile(self.delta_H, Nx)
+            rocks.rotation_period = np.tile(self.rotation_period, Nx)
+            rocks.phi0 = np.tile(self.phi0, Nx)
+            rocks.t0 = Time(np.tile(self.t0.jd, Nx),  format='jd')
+
+            rocks.H = np.tile(self.H, Nx) + rocks.delta_H * np.sin(2 * np.pi * (rocks.epoch.jd - rocks.t0.jd) / rocks.rotation_period  - rocks.phi0)
+
+        elif hasattr(self, 'H'):
+            rocks.H = np.tile(self.H, Nx)
+
 
         return rocks
 
     def observe(self, obscode):
-        x, y, z, vx, vy, vz = xyz_to_tel(self, obscode)
-        return Ephemerides(x, y, z, vx, vy, vz)
+        x, y, z, vx, vy, vz = self.xyz_to_tel(obscode)
+        if self.frame == 'barycentric':
+            self.to_helio()
+            r_helio = self.r
+            self.to_bary()
+        else:
+            r_helio = self.r
 
+        if not hasattr(self, 'H'):
+            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz)
+        else:
+            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, r_helio=r_helio, H=self.H)
 
     def xyz_to_tel(self, obscode):
         '''
@@ -205,7 +241,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         if obscode is not None:
             obscode = str(obscode).zfill(3)
-            obs = observatories[observatories.obscode == self.__class__.obscode]
+            obs = observatories[observatories.obscode == obscode]
             obslat = obs.lat.values
             obslon = obs.lon.values
             obselev = obs.elevation.values
@@ -253,8 +289,6 @@ class SpaceRock(OrbitFuncs, Convenience):
                                                                  rocks.node,
                                                                  M)
 
-        #return Vector(xT, yT, zT), Vector(vxT, vyT, vzT)
-        #return xT, yT, zT, vxT, vyT, vzT
         return dx, dy, dz, dvx, dvy, dvz
 
     def set_simulation(self, startdate, model, add_pluto=False, gr=False):
@@ -269,13 +303,15 @@ class SpaceRock(OrbitFuncs, Convenience):
         saturn = planets['saturn barycenter']
         uranus = planets['uranus barycenter']
         neptune = planets['neptune barycenter']
+        pluto = planets['pluto barycenter']
 
+        M_sun = 1
         M_mercury = 1.6601367952719304e-7 # Mercury Barycenter
         M_venus = 2.4478383396645447e-6 # Venus Barycenter
         M_earth = 3.0034896161241036e-06
         M_moon = M_earth / 81.3005690769
         M_mars = 3.2271560375549977e-7 # Mars Barycenter
-        M_sun = 1
+
         M_jupiter = 9.547919384243222e-4
         M_saturn = 2.858859806661029e-4
         M_uranus = 4.3662440433515637e-5
@@ -298,47 +334,14 @@ class SpaceRock(OrbitFuncs, Convenience):
             masses = [M_sun, M_jupiter, M_saturn, M_uranus, M_neptune]
 
 
-        #elif model == 2:
-        #    active_bodies = [sun, earth, jupiter, saturn, uranus, neptune]
-        #    names = ['Sun', 'Earth', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-        #    M_sun += M_mercury + M_venus + M_mars
-        #    masses = [M_sun, M_earth, M_jupiter, M_saturn, M_uranus, M_neptune]
-
-
-        #elif model == 3:
-        #    active_bodies = [sun, earth, mars, jupiter, saturn, uranus, neptune]
-        #    names = ['Sun', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-        #    M_sun += M_mercury + M_venus
-        #    masses = [M_sun, M_earth, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune]
-
-
-        #elif model == 4:
-        #    active_bodies = [sun, venus, earth, mars, jupiter, saturn, uranus, neptune]
-        #    names = ['Sun', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-        #    M_sun += M_mercury
-        #    masses = [M_sun, M_venus, M_earth, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune]
-
-
-        #elif model == 5:
-        #    active_bodies = [sun, mercury, venus, earth, mars, jupiter, saturn, uranus, neptune]
-        #    names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-        #    masses = [M_sun, M_mercury, M_venus, M_earth, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune]
-
-
-        elif model == 6:
-            active_bodies = [sun, mercury, venus, earth, moon, mars, jupiter, saturn, uranus, neptune]
-            names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Moon', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            masses = [M_sun, M_mercury, M_venus, M_earth, M_moon, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune]
+        elif model == 2:
+            active_bodies = [sun, mercury, venus, earth, moon, mars, jupiter, saturn, uranus, neptune, pluto]
+            names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Moon', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
+            masses = [M_sun, M_mercury, M_venus, M_earth, M_moon, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune, M_pluto]
 
 
         else:
             raise ValueError('Model not recognized. Check the documentation.')
-
-        if add_pluto == True:
-            pluto = planets['pluto barycenter']
-            active_bodies.append(pluto)
-            names.append('Pluto')
-            masses.append(M_pluto)
 
 
         startdate = Time(startdate, scale='utc', format='jd')
@@ -371,15 +374,6 @@ class SpaceRock(OrbitFuncs, Convenience):
                     m=p.mass, hash=p.name, r=p.hill_radius)
 
         sim.N_active = len(ss)
-
-
-        #if Propagate.gr == True:
-        #    bodies = sim.particles
-        #    rebx = reboundx.Extras(sim)
-        #    gr = rebx.load_force('gr')
-        #    gr.params['c'] = constants.C
-        #    rebx.add_force(gr)
-        #    bodies['Sun'].params['gr_source'] = 1
 
         if gr == True:
             rebx = reboundx.Extras(sim)
