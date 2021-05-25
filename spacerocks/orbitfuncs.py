@@ -705,7 +705,7 @@ class OrbitFuncs:
         '''Compute the distance of the rock from the center of the coordinate system'''
         if not hasattr(self, '_r'):
             if hasattr(self, '_position'):
-                self.r = self.position.norm
+                self.r = Distance(self.position.norm)
             else:
                 self.r = self.a * (1 - self.e * cos(self.E.rad))
         return self._r
