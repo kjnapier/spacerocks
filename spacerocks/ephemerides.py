@@ -30,7 +30,10 @@ class Ephemerides:
             self.H = kwargs.get('H')
 
         if kwargs.get('r_helio') is not None:
-            self.helio_r = kwargs.get('helio_r')
+            self.helio_r = kwargs.get('r_helio')
+
+        self.delta = np.sqrt(self.x**2 + self.y**2 + self.z**2)
+        self.G = np.array([0.15])
 
 
     @property
@@ -53,7 +56,7 @@ class Ephemerides:
     def mag(self):
         pass
 
-    def estimate_mag(self, rocks):
+    def estimate_mag(self):
         '''
         Estimate the apparent magnitude of a TNO
         https://iopscience.iop.org/article/10.3847/1538-3881/ab18a9/pdf for light curves
@@ -61,16 +64,16 @@ class Ephemerides:
         q = (self.helio_r**2 + self.delta**2 - 1 * u.au**2)/(2 * self.helio_r * self.delta)
 
         ## pyephem
-        beta = np.zeros(len(q))
-        beta[np.where(q <= 1)[0]] = np.pi * u.rad
+        beta = np.arccos(q)
+        beta[np.where(q <= -1)[0]] = np.pi * u.rad
         beta[np.where(q >= 1)[0]] = 0 * u.rad
 
         Psi_1 = np.exp(-3.33 * np.tan(beta/2)**0.63)
         Psi_2 = np.exp(-1.87 * np.tan(beta/2)**1.22)
-        mag = rocks.H + 5 * np.log10(self.helio_r * self.delta / u.au**2)
+        mag = self.H + 5 * np.log10(self.helio_r * self.delta / u.au**2)
 
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
-        mag[not_zero] -= 2.5 * np.log10((1 - rocks.G[not_zero]) * Psi_1[not_zero] + rocks.G[not_zero] * Psi_2[not_zero])
+        mag[not_zero] -= 2.5 * np.log10((1 - self.G[not_zero]) * Psi_1[not_zero] + self.G[not_zero] * Psi_2[not_zero])
 
         #try:
     #        mag += rocks.delta_H * np.sin((rocks.epoch.jd - rocks.t0.value - self.ltt.value) * 2 * np.pi / rocks.rotation_period.value + rocks.phi0)
