@@ -159,7 +159,7 @@ class SpaceRock(OrbitFuncs, Convenience):
                           M=M,
                           name=self.name,
                           epoch=epoch,
-                          frame='propagate_frame')
+                          frame=propagate_frame)
 
         # be polite and return orbital parameters in the input frame.
         if in_frame == 'heliocentric':
@@ -172,7 +172,7 @@ class SpaceRock(OrbitFuncs, Convenience):
             rocks.delta_H = self.delta_H
             rocks.rotation_period = self.rotation_period
             rocks.phi0 = self.phi0
-            rocks.t0 = Time(self.t0.jd,  format='jd')
+            rocks.t0 = Time(self.t0.jd, format='jd')
 
             rocks.H = self.H + rocks.delta_H * np.sin(2 * np.pi * (rocks.epoch.jd - rocks.t0.jd) / rocks.rotation_period  - rocks.phi0)
 
