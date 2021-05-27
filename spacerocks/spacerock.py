@@ -138,6 +138,48 @@ class SpaceRock(OrbitFuncs, Convenience):
             self.position = Vector(x, y, z)
             self.velocity = Vector(vx, vy, vz)
 
+def analytic_propagate(self, epoch, propagate_frame = 'heliocentric'):
+        '''
+        propagate all bodies to the desired date using Kieprian orbit.
+        '''       
+        in_frame = self.frame
+        if propagate_frame == 'heliocentric' and propagate_frame != in_frame:
+            self.to_helio()
+        
+        if propagate_frame == 'barycentric' and propagate_frame != in_frame:
+            self.to_bary()
+        
+        M = ((self.n.value * (epoch - self.epoch.jd) + self.M.rad)*180/np.pi)%360
+
+        rocks = SpaceRock(a=self.a,
+                          e=self.e, 
+                          inc=self.inc,
+                          node=self.node, 
+                          arg=self.arg, 
+                          M=M, 
+                          name=self.name, 
+                          epoch=epoch, 
+                          frame='propagate_frame')
+
+        # be polite and return orbital parameters in the input frame.
+        if in_frame == 'heliocentric':
+            self.to_bary()
+
+        if hasattr(self, 'G'):
+            rocks.G = self.G
+
+        if hasattr(self, 'delta_H'):
+            rocks.delta_H = self.delta_H
+            rocks.rotation_period = self.rotation_period
+            rocks.phi0 = self.phi0
+            rocks.t0 = Time(self.t0.jd,  format='jd')
+
+            rocks.H = self.H + rocks.delta_H * np.sin(2 * np.pi * (rocks.epoch.jd - rocks.t0.jd) / rocks.rotation_period  - rocks.phi0)
+
+        elif hasattr(self, 'H'):
+            rocks.H = self.H
+    
+        return rocks
 
     def propagate(self, epochs, model, add_pluto=False, gr=False):
         '''
