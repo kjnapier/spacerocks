@@ -88,8 +88,9 @@ class Observe(Convenience):
         rocks.to_bary()
 
         #t = ts.tdb(jd=rocks.epoch.tdb.jd)
-
-        t = ts.tdb(jd=np.unique(rocks.epoch.tdb.jd))
+        alltimes = rocks.epoch.tdb.jd
+        unique_times = np.unique(alltimes)
+        t = ts.tdb(jd=unique_times)
         earth = planets['earth']
         earth += wgs84.latlon(self.__class__.obslat, self.__class__.obslon, elevation_m=self.__class__.obselev)
         ee = earth.at(t)
@@ -99,20 +100,20 @@ class Observe(Convenience):
         xx, yy, zz = ee.position.au * u.au # earth ICRS position
         vxx, vyy, vzz = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
 
-        exs = {t:x for t, x in zip(np.unique(rocks.epoch.tdb.jd), xx)}
-        eys = {t:y for t, y in zip(np.unique(rocks.epoch.tdb.jd), yy)}
-        ezs = {t:z for t, z in zip(np.unique(rocks.epoch.tdb.jd), zz)}
-        evxs = {t:vx for t, vx in zip(np.unique(rocks.epoch.tdb.jd), vxx)}
-        evys = {t:vy for t, vy in zip(np.unique(rocks.epoch.tdb.jd), vyy)}
-        evzs = {t:vz for t, vz in zip(np.unique(rocks.epoch.tdb.jd), vzz)}
+        exs = {t:x for t, x in zip(unique_times, xx)}
+        eys = {t:y for t, y in zip(unique_times, yy)}
+        ezs = {t:z for t, z in zip(unique_times, zz)}
+        evxs = {t:vx for t, vx in zip(unique_times, vxx)}
+        evys = {t:vy for t, vy in zip(unique_times, vyy)}
+        evzs = {t:vz for t, vz in zip(unique_times, vzz)}
 
-        x_earth = np.array([exs[t] for t in rocks.epoch.tdb.jd])
-        y_earth = np.array([eys[t] for t in rocks.epoch.tdb.jd])
-        z_earth = np.array([ezs[t] for t in rocks.epoch.tdb.jd])
+        x_earth = np.array([exs[t] for t in alltimes])
+        y_earth = np.array([eys[t] for t in alltimes])
+        z_earth = np.array([ezs[t] for t in alltimes])
 
-        vx_earth = np.array([evxs[t] for t in rocks.epoch.tdb.jd])
-        vy_earth = np.array([evys[t] for t in rocks.epoch.tdb.jd])
-        vz_earth = np.array([evzs[t] for t in rocks.epoch.tdb.jd])
+        vx_earth = np.array([evxs[t] for t in alltimes])
+        vy_earth = np.array([evys[t] for t in alltimes])
+        vz_earth = np.array([evzs[t] for t in alltimes])
 
         x0, y0, z0 = rocks.x, rocks.y, rocks.z
         vx0, vy0, vz0 = rocks.vx, rocks.vy, rocks.vz
