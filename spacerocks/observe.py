@@ -87,24 +87,32 @@ class Observe(Convenience):
 
         rocks.to_bary()
 
-        t = ts.tdb(jd=rocks.epoch.tdb.jd)
+        #t = ts.tdb(jd=rocks.epoch.tdb.jd)
+
+        t = ts.tdb(jd=np.unique(rocks.epoch.tdb.jd))
         earth = planets['earth']
-
-        # Only used for the topocentric calculation.
-        #if (self.__class__.obscode != 500) and (self.__class__.obscode != '500'):
-        #    earth += Topos(latitude_degrees=self.__class__.obslat,
-        #                   longitude_degrees=self.__class__.obslon,
-        #                   elevation_m=self.__class__.obselev) # topocentric calculation
-
-
         earth += wgs84.latlon(self.__class__.obslat, self.__class__.obslon, elevation_m=self.__class__.obselev)
-
         ee = earth.at(t)
         #x_earth, y_earth, z_earth = ee.ecliptic_xyz().au * u.au # earth ICRS position
         #vx_earth, vy_earth, vz_earth = ee.ecliptic_velocity().au_per_d * u.au / u.day # earth ICRS position
 
-        x_earth, y_earth, z_earth = ee.position.au * u.au # earth ICRS position
-        vx_earth, vy_earth, vz_earth = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
+        xx, yy, zz = ee.position.au * u.au # earth ICRS position
+        vxx, vyy, vzz = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
+
+        exs = {t:x for t, x in zip(np.unique(rocks.epoch.tdb.jd), xx)}
+        eys = {t:y for t, y in zip(np.unique(rocks.epoch.tdb.jd), yy)}
+        ezs = {t:z for t, z in zip(np.unique(rocks.epoch.tdb.jd), zz)}
+        evxs = {t:vx for t, vx in zip(np.unique(rocks.epoch.tdb.jd), vxx)}
+        evys = {t:vy for t, vy in zip(np.unique(rocks.epoch.tdb.jd), vyy)}
+        evzs = {t:vz for t, vz in zip(np.unique(rocks.epoch.tdb.jd), vzz)}
+
+        x_earth = np.array([exs[t] for t in rocks.epoch.tdb.jd])
+        y_earth = np.array([eys[t] for t in rocks.epoch.tdb.jd])
+        z_earth = np.array([ezs[t] for t in rocks.epoch.tdb.jd])
+
+        vx_earth = np.array([evxs[t] for t in rocks.epoch.tdb.jd])
+        vy_earth = np.array([evys[t] for t in rocks.epoch.tdb.jd])
+        vz_earth = np.array([evzs[t] for t in rocks.epoch.tdb.jd])
 
         x0, y0, z0 = rocks.x, rocks.y, rocks.z
         vx0, vy0, vz0 = rocks.vx, rocks.vy, rocks.vz
