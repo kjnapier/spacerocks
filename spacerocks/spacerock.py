@@ -143,13 +143,13 @@ class SpaceRock(OrbitFuncs, Convenience):
         propagate all bodies to the desired date using Kieprian orbit.
         '''
         in_frame = self.frame
-        if propagate_frame == 'heliocentric' and propagate_frame != in_frame:
-            self.to_helio()
+        if propagate_frame != in_frame:
+            if propagate_frame == 'heliocentric':
+                self.to_helio()
+            else:
+                self.to_bary()
 
-        if propagate_frame == 'barycentric' and propagate_frame != in_frame:
-            self.to_bary()
-
-        M = ((self.n.value * (epoch - self.epoch.jd) + self.M.rad)*180/np.pi)%360
+        M = (self.n.value * (epoch - self.epoch.jd) + self.M.rad*180/np.pi)%360
 
         rocks = SpaceRock(a=self.a,
                           e=self.e,
@@ -162,8 +162,11 @@ class SpaceRock(OrbitFuncs, Convenience):
                           frame=propagate_frame)
 
         # be polite and return orbital parameters in the input frame.
-        if in_frame == 'heliocentric':
-            self.to_bary()
+        if in_frame != self.frame:
+            if in_frame == 'heliocentric':
+                self.to_helio()
+            else:
+                self.to_bary()
 
         if hasattr(self, 'G'):
             rocks.G = self.G
