@@ -22,7 +22,7 @@ class OrbitFuncs:
         '''
         Method to convert heliocentric coordinates to barycentric coordinates.
         '''
-        if self.__class__.frame == 'heliocentric':
+        if self.frame == 'heliocentric':
             #t = ts.tai(jd=self.epoch.value + 37/86400)
             #t = ts.tdb(jd=self.epoch.tdb.jd)
             t = ts.tt(jd=self.epoch.tt.jd)
@@ -43,8 +43,8 @@ class OrbitFuncs:
             self.position = Vector(self.x, self.y, self.z)
             self.velocity = Vector(self.vx, self.vy, self.vz)
 
-            self.__class__.frame = 'barycentric'
-            self.__class__.mu = mu_bary
+            self.frame = 'barycentric'
+            self.mu = mu_bary
 
         return self
 
@@ -53,7 +53,7 @@ class OrbitFuncs:
         '''
         Method to convert barycentric coordinates to heliocentric coordinates.
         '''
-        if self.__class__.frame == 'barycentric':
+        if self.frame == 'barycentric':
             #t = ts.tai(jd=self.epoch.value + 37/86400)
             #t = ts.tdb(jd=self.epoch.tdb.jd)
             t = ts.tt(jd=self.epoch.tt.jd)
@@ -73,8 +73,8 @@ class OrbitFuncs:
             self.position = Vector(self.x, self.y, self.z)
             self.velocity = Vector(self.vx, self.vy, self.vz)
 
-            self.__class__.frame = 'heliocentric'
-            self.__class__.mu = mu_helio
+            self.frame = 'heliocentric'
+            self.mu = mu_helio
 
         return self
 

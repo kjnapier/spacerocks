@@ -52,7 +52,7 @@ class SpaceRock(OrbitFuncs, Convenience):
     def __init__(self, frame='barycentric', units=Units(), *args, **kwargs):
 
         coords = self.detect_coords(kwargs)
-        input_frame = frame.lower()
+        frame = frame.lower()
 
         # input -> arrays
         for idx, key in enumerate([*kwargs]):
@@ -61,7 +61,7 @@ class SpaceRock(OrbitFuncs, Convenience):
             else:
                 kwargs[key] = array(kwargs.get(key))
 
-        SpaceRock.frame = input_frame
+        SpaceRock.frame = frame
         if SpaceRock.frame == 'barycentric':
             SpaceRock.mu = mu_bary
         elif SpaceRock.frame == 'heliocentric':
@@ -154,10 +154,10 @@ class SpaceRock(OrbitFuncs, Convenience):
         vz_values = zeros([Nx, Ny])
         obsdate_values = np.zeros([Nx, Ny])
         name_values = np.tile(self.name, Nx)
-        in_frame = self.frame
+        frame = self.frame
 
         # We need to (or should) work in barycentric coordinates in rebound
-        if in_frame == 'heliocentric':
+        if frame == 'heliocentric':
             self.to_bary()
 
         # Integrate all particles to the same obsdate
@@ -197,7 +197,7 @@ class SpaceRock(OrbitFuncs, Convenience):
         rocks = SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, frame='barycentric')
 
         # be polite and return orbital parameters in the input frame.
-        if in_frame == 'heliocentric':
+        if frame == 'heliocentric':
             rocks.to_helio()
 
         if hasattr(self, 'G'):
@@ -218,13 +218,15 @@ class SpaceRock(OrbitFuncs, Convenience):
         return rocks
 
     def observe(self, obscode):
-        x, y, z, vx, vy, vz = self.xyz_to_tel(obscode)
+
         if self.frame == 'barycentric':
             self.to_helio()
             r_helio = self.r
             self.to_bary()
         else:
             r_helio = self.r
+
+        x, y, z, vx, vy, vz = self.xyz_to_tel(obscode)
 
         if not hasattr(self, 'H'):
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz)
@@ -248,9 +250,11 @@ class SpaceRock(OrbitFuncs, Convenience):
         else:
             obscode = 500
 
+
         rocks = copy.copy(self)
 
-        rocks.to_bary()
+        if rocks.frame == 'heliocentric':
+            rocks.to_bary()
 
         t = ts.tdb(jd=rocks.epoch.tdb.jd)
         earth = planets['earth']
