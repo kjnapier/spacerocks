@@ -82,7 +82,7 @@ class SpaceRock(OrbitFuncs, Convenience):
             self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
 
         if kwargs.get('name') is not None:
-            self.name = array([kwargs.get('name')])
+            self.name = kwargs.get('name')
         else:
             # produces random, non-repeting integers between 0 and 1e10 - 1
             self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.epoch))])
