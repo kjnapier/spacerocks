@@ -28,6 +28,8 @@ class OrbitFuncs:
             t = ts.tt(jd=self.epoch.tt.jd)
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
+
+
             # calculate the barycentric xyz postion
             self.x += x_sun
             self.y += y_sun
@@ -59,6 +61,8 @@ class OrbitFuncs:
             t = ts.tt(jd=self.epoch.tt.jd)
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
+
+
             # calculate the heliocentric xyz postion
             self.x -= x_sun
             self.y -= y_sun
