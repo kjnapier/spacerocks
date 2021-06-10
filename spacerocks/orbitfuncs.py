@@ -1,9 +1,9 @@
-from numpy import pi, sqrt, cbrt, sin, cos, tan, exp, log10, zeros_like, arccos, arctan2, array, any
-
+from numpy import pi, sqrt, cbrt, sin, cos, tan, sinh, tanh, exp, log10, zeros_like, arccos, arctan2, array, any
+import numpy as np
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
-
+from scipy.optimize import newton
 from .constants import *
 
 from .vector import Vector
@@ -454,7 +454,9 @@ class OrbitFuncs:
                 self.M = Angle(M, u.rad)
 
             elif hasattr(self, '_true_anomaly') or hasattr(self, '_true_longitude') or hasattr(self, '_E') or (hasattr(self, '_position') and hasattr(self, '_velocity')):
-                M = (self.E.rad - self.e * sin(self.E.rad)) % (2 * pi)
+                M = np.zeros(len(self))
+                M[self.e < 1] = (self.E.rad[self.e < 1] - self.e[self.e < 1] * sin(self.E.rad[self.e < 1])) % (2 * pi)
+                M[self.e >= 1] = (self.e[self.e >= 1] * sinh(self.E.rad[self.e >= 1]) - self.E.rad[self.e >= 1]) % (2 * pi)
                 self.M = Angle(M, u.rad)
 
             elif hasattr(self, '_t_peri'):
@@ -483,8 +485,11 @@ class OrbitFuncs:
                 self.E = Angle(E, u.rad)
 
             elif hasattr(self, '_M') or hasattr(self, '_mean_longitude') or hasattr(self, '_t_peri'):
-                M = array(self.M.rad)
-                e = self.e
+                E = np.zeros(len(self))
+
+
+                M = array(self.M.rad)[self.e < 1]
+                e = self.e[self.e < 1]
                 M[M > pi] -= 2 * pi
                 alpha = (3 * pi**2 + 1.6 * (pi**2 - pi * abs(M))/(1 + e))/(pi**2 - 6)
                 d = 3 * (1 - e) + alpha * e
@@ -499,8 +504,15 @@ class OrbitFuncs:
                 d3 = -f0 / (f1 - f0 * f2 / (2 * f1))
                 d4 = -f0 / (f1 + f2 * d3 / 2 + d3**2 * f3 / 6)
                 d5 = -f0 / (f1 + d4 * f2 / 2 + d4**2 * f3 / 6 - d4**3 * f2 / 24)
-                E = E1 + d5
-                E = E % (2 * pi)
+                E[self.e < 1] = (E1 + d5) % (2 * pi)
+
+                if np.any(self.e >= 1):
+                    M = array(self.M.rad)[self.e >= 1]
+                    e = self.e[self.e >= 1]
+                    f = lambda E, M, e: e * sinh(E) - E - M
+                    E0 = M
+                    E[self.e >= 1] = np.array([newton(f, E0[idx], args=(M[idx], e[idx]), maxiter=10000) for idx in range(len(M))])
+
                 self.E = Angle(E, u.rad)
 
         return self._E
@@ -522,7 +534,11 @@ class OrbitFuncs:
                 self.true_anomaly = Angle(self.true_longitude.rad - self.varpi.rad, u.rad)
 
             elif hasattr(self, '_E') or hasattr(self, '_M') or hasattr(self, '_mean_longitude') or hasattr(self, '_t_peri'):
-                self.true_anomaly = Angle(2 * arctan2(sqrt(1 + self.e) * sin(self.E.rad / 2), sqrt(1 - self.e) * cos(self.E.rad / 2)), u.rad)
+                true_anomaly = np.zeros(len(self))
+                true_anomaly[self.e < 1] = 2 * arctan2(sqrt(1 + self.e[self.e < 1]) * sin(self.E.rad[self.e < 1] / 2), sqrt(1 - self.e[self.e < 1]) * cos(self.E.rad[self.e < 1] / 2))
+                true_anomaly[self.e >= 1] = 2 * arctan2(sqrt(self.e[self.e >= 1] + 1) * tanh(self.E[self.e >= 1] / 2), sqrt(self.e[self.e >= 1] - 1))
+                #self.true_anomaly = Angle(2 * arctan2(sqrt(1 + self.e) * sin(self.E.rad / 2), sqrt(1 - self.e) * cos(self.E.rad / 2)), u.rad)
+                self.true_anomaly = Angle(true_anomaly, u.rad)
 
             elif hasattr(self, '_position') and hasattr(self, '_velocity'):
                 true_anomaly = zeros_like(self.e * u.rad)
@@ -688,7 +704,7 @@ class OrbitFuncs:
     @property
     def n(self):
         if not hasattr(self, '_n'):
-            self.n = sqrt(self.mu / self.a**3)
+            self.n = sqrt(self.mu / abs(self.a)**3)
         return self._n
 
     @n.setter

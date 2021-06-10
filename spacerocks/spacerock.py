@@ -244,9 +244,8 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         # be polite and return orbital parameters in the input frame.
         if frame == 'heliocentric':
-            self.to_helio()
             rocks.to_helio()
-            
+
         if hasattr(self, 'G'):
             rocks.G = np.tile(self.G, Nx)
 
