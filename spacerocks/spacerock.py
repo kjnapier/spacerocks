@@ -30,7 +30,7 @@ from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
-planets = load('de423.bsp')
+planets = load('de430t.bsp')
 
 observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
                             'data',
@@ -301,23 +301,47 @@ class SpaceRock(OrbitFuncs, Convenience):
         if rocks.frame == 'heliocentric':
             rocks.to_bary()
 
-        t = ts.tdb(jd=rocks.epoch.tdb.jd)
+        t = ts.tt(jd=rocks.epoch.tt.jd)
+        earth = planets['earth']
+
+
+        alltimes = rocks.epoch.tdb.jd
+        unique_times = np.unique(alltimes)
+        t = ts.tdb(jd=unique_times)
         earth = planets['earth']
 
         # Only used for the topocentric calculation.
         if (obscode != 500) and (obscode != '500'):
             earth += wgs84.latlon(obslat, obslon, obselev)
 
-
         ee = earth.at(t)
 
-        x_earth, y_earth, z_earth = ee.position.au * u.au # earth ICRS position
-        vx_earth, vy_earth, vz_earth = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
+        xx, yy, zz = ee.position.au * u.au # earth ICRS position
+        vxx, vyy, vzz = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
+
+        exs = {t:x.value for t, x in zip(unique_times, xx)}
+        eys = {t:y.value for t, y in zip(unique_times, yy)}
+        ezs = {t:z.value for t, z in zip(unique_times, zz)}
+        evxs = {t:vx.value for t, vx in zip(unique_times, vxx)}
+        evys = {t:vy.value for t, vy in zip(unique_times, vyy)}
+        evzs = {t:vz.value for t, vz in zip(unique_times, vzz)}
+
+        x_earth = np.array([exs[t] for t in alltimes]) * u.au
+        y_earth = np.array([eys[t] for t in alltimes]) * u.au
+        z_earth = np.array([ezs[t] for t in alltimes]) * u.au
+
+        vx_earth = np.array([evxs[t] for t in alltimes]) * u.au / u.day
+        vy_earth = np.array([evys[t] for t in alltimes]) * u.au / u.day
+        vz_earth = np.array([evzs[t] for t in alltimes]) * u.au / u.day
+
+        #x_earth, y_earth, z_earth = ee.position.au * u.au # earth ICRS position
+        #vx_earth, vy_earth, vz_earth = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
+
 
         x0, y0, z0 = rocks.x, rocks.y, rocks.z
         vx0, vy0, vz0 = rocks.vx, rocks.vy, rocks.vz
 
-        for idx in range(10):
+        for idx in range(5):
 
             dx = x0 - x_earth
             dy = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
@@ -326,7 +350,7 @@ class SpaceRock(OrbitFuncs, Convenience):
             dvy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_earth
             dvz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_earth
 
-            if idx < 9:
+            if idx < 4:
 
                 delta = sqrt(dx**2 + dy**2 + dz**2)
                 ltt = delta / c

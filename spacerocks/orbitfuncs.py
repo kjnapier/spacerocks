@@ -493,8 +493,8 @@ class OrbitFuncs:
                 f0 = E1 - f2 - M
                 f1 = 1 - f3
                 d3 = -f0 / (f1 - f0 * f2 / (2 * f1))
-                d4 = -f0 / (f1 + f2 * d3 / 2 + d3**2 * f3/6)
-                d5 = -f0 / (f1 + d4*f2/2 + d4**2*f3/6 - d4**3*f2/24)
+                d4 = -f0 / (f1 + f2 * d3 / 2 + d3**2 * f3 / 6)
+                d5 = -f0 / (f1 + d4 * f2 / 2 + d4**2 * f3 / 6 - d4**3 * f2 / 24)
                 E = E1 + d5
                 E = E % (2 * pi)
                 self.E = Angle(E, u.rad)
