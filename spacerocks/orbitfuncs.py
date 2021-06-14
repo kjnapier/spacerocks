@@ -536,8 +536,8 @@ class OrbitFuncs:
             elif hasattr(self, '_E') or hasattr(self, '_M') or hasattr(self, '_mean_longitude') or hasattr(self, '_t_peri'):
                 true_anomaly = np.zeros(len(self))
                 true_anomaly[self.e < 1] = 2 * arctan2(sqrt(1 + self.e[self.e < 1]) * sin(self.E.rad[self.e < 1] / 2), sqrt(1 - self.e[self.e < 1]) * cos(self.E.rad[self.e < 1] / 2))
-                if np.any(self.e >= 1):
-                    true_anomaly[self.e >= 1] = 2 * arctan2(sqrt(self.e[self.e >= 1] + 1) * tanh(self.E[self.e >= 1] / 2), sqrt(self.e[self.e >= 1] - 1))
+                #if np.any(self.e >= 1):
+                true_anomaly[self.e >= 1] = 2 * arctan2(sqrt(self.e[self.e >= 1] + 1) * tanh(self.E[self.e >= 1] / 2), sqrt(self.e[self.e >= 1] - 1))
                 #self.true_anomaly = Angle(2 * arctan2(sqrt(1 + self.e) * sin(self.E.rad / 2), sqrt(1 - self.e) * cos(self.E.rad / 2)), u.rad)
                 self.true_anomaly = Angle(true_anomaly, u.rad)
 
