@@ -10,6 +10,8 @@ from numpy import sin, cos, arctan2, sqrt, array, pi, zeros
 import numpy as np
 import pandas as pd
 
+from .constants import c
+
 class Ephemerides:
 
     '''
@@ -24,16 +26,23 @@ class Ephemerides:
         self.vx = kwargs.get('vx')
         self.vy = kwargs.get('vy')
         self.vz = kwargs.get('vz')
+        self.epoch = kwargs.get('epoch')
+        self.name = kwargs.get('name')
 
-
-        if kwargs.get('H') is not None:
-            self.H = kwargs.get('H')
+        if kwargs.get('H0') is not None:
+            self.H0 = kwargs.get('H0')
 
         if kwargs.get('r_helio') is not None:
             self.helio_r = kwargs.get('r_helio')
 
+        if kwargs.get('delta_H') is not None:
+            self.delta_H = kwargs.get('delta_H')
+            self.rotation_period = kwargs.get('rotation_period')
+            self.phi0 = kwargs.get('phi0')
+            self.t0 = kwargs.get('t0')
+
         self.delta = np.sqrt(self.x**2 + self.y**2 + self.z**2)
-        self.G = np.array([0.15])
+        self.G = kwargs.get('G')
 
 
     @property
@@ -53,8 +62,9 @@ class Ephemerides:
         return (-self.z * (self.x * self.vx + self.y * self.vy) + ((self.x**2 + self.y**2) * self.vz)) \
                 / (sqrt(self.x**2 + self.y**2) * (self.x**2 + self.y**2 + self.z**2)) * u.rad
 
+    @property
     def mag(self):
-        pass
+        return self.estimate_mag()
 
     def estimate_mag(self):
         '''
@@ -70,15 +80,17 @@ class Ephemerides:
 
         Psi_1 = np.exp(-3.33 * np.tan(beta/2)**0.63)
         Psi_2 = np.exp(-1.87 * np.tan(beta/2)**1.22)
-        mag = self.H + 5 * np.log10(self.helio_r * self.delta / u.au**2)
+        mag = self.H0 + 5 * np.log10(self.helio_r * self.delta / u.au**2)
 
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
         mag[not_zero] -= 2.5 * np.log10((1 - self.G[not_zero]) * Psi_1[not_zero] + self.G[not_zero] * Psi_2[not_zero])
 
-        #try:
-    #        mag += rocks.delta_H * np.sin((rocks.epoch.jd - rocks.t0.value - self.ltt.value) * 2 * np.pi / rocks.rotation_period.value + rocks.phi0)
-    #    except:
-    #        pass
+        if hasattr(self, 'delta_H'):
+            ltt = self.delta / c
+            dH = self.delta_H * np.sin((self.epoch.jd - self.t0.jd - ltt.value) * 2 * np.pi / self.rotation_period + self.phi0.rad)
+            mag += dH
+
+            self.H = self.H0 + dH
 
         return mag
 

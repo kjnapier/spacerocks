@@ -61,31 +61,36 @@ class SpaceRock(OrbitFuncs, Convenience):
             else:
                 kwargs[key] = array(kwargs.get(key))
 
-        SpaceRock.frame = frame
-        if SpaceRock.frame == 'barycentric':
-            SpaceRock.mu = mu_bary
-        elif SpaceRock.frame == 'heliocentric':
-            SpaceRock.mu = mu_helio
-
         if units.timeformat is None:
             self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
         else:
             self.epoch = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
-
-        if kwargs.get('H') is not None:
-            self.H = kwargs.get('H')
-
-        if (kwargs.get('rotation_period') is not None) and (kwargs.get('delta_H') is not None) and (kwargs.get('phi0') is not None):
-            self.rotation_period = kwargs.get('rotation_period')
-            self.delta_H = kwargs.get('delta_H')
-            self.phi0 = kwargs.get('phi0')
-            self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
 
         if kwargs.get('name') is not None:
             self.name = np.atleast_1d(kwargs.get('name'))
         else:
             # produces random, non-repeting integers between 0 and 1e10 - 1
             self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.epoch))])
+
+        SpaceRock.frame = frame
+        if SpaceRock.frame == 'barycentric':
+            SpaceRock.mu = mu_bary
+        elif SpaceRock.frame == 'heliocentric':
+            SpaceRock.mu = mu_helio
+
+
+
+        if kwargs.get('H0') is not None:
+            self.H0 = kwargs.get('H0')
+            self.G = np.repeat(0.15, len(self))
+
+        if (kwargs.get('rotation_period') is not None) and (kwargs.get('delta_H') is not None) and (kwargs.get('phi0') is not None):
+            self.rotation_period = kwargs.get('rotation_period')
+            self.delta_H = kwargs.get('delta_H')
+            self.phi0 = Angle(kwargs.get('phi0'), units.angle)
+            self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
+
+
 
 
 
@@ -206,18 +211,24 @@ class SpaceRock(OrbitFuncs, Convenience):
             self.to_bary()
 
         # Integrate all particles to the same obsdate
-        pickup_times = self.epoch.tt.jd #df.epoch
+        pickup_times = self.epoch.tt.jd
         sim = self.set_simulation(np.min(pickup_times), model=model, gr=gr)
         sim.t = np.min(pickup_times) #np.min(df.epoch)
 
+        self.x
+        self.y
+        self.z
+        self.vx
+        self.vy
+        self.vz
+
         for time in np.sort(np.unique(pickup_times)):
-            ps = self[self.epoch.tt.jd == time] #df[df.epoch == time]
+            ps = self[self.epoch.tt.jd == time]
             for p in ps:
                 sim.add(x=p.x.value, y=p.y.value, z=p.z.value,
                         vx=p.vx.value, vy=p.vy.value, vz=p.vz.value,
                         hash=p.name)
 
-                #sim.move_to_com()
                 sim.integrate(time, exact_finish_time=1)
 
         for ii, time in enumerate(np.sort(epochs)):
@@ -255,10 +266,11 @@ class SpaceRock(OrbitFuncs, Convenience):
             rocks.phi0 = np.tile(self.phi0, Nx)
             rocks.t0 = Time(np.tile(self.t0.jd, Nx),  format='jd')
 
-            rocks.H = np.tile(self.H, Nx) + rocks.delta_H * np.sin(2 * np.pi * (rocks.epoch.jd - rocks.t0.jd) / rocks.rotation_period  - rocks.phi0)
+            #rocks.H = np.tile(self.H, Nx) + rocks.delta_H * np.sin(2 * np.pi * (rocks.epoch.jd - rocks.t0.jd) / rocks.rotation_period  - rocks.phi0)
+            rocks.H0 = np.tile(self.H0, Nx)
 
         elif hasattr(self, 'H'):
-            rocks.H = np.tile(self.H, Nx)
+            rocks.H0 = np.tile(self.H0, Nx)
 
 
         return rocks
@@ -274,10 +286,12 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         x, y, z, vx, vy, vz = self.xyz_to_tel(obscode)
 
-        if not hasattr(self, 'H'):
-            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz)
+        if not hasattr(self, 'H0'):
+            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name)
+        elif not hasattr(self, 'delta_H'):
+            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio, H0=self.H0, G=self.G)
         else:
-            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, r_helio=r_helio, H=self.H)
+            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio, H0=self.H0, G=self.G, delta_H=self.delta_H, t0=self.t0, rotation_period=self.rotation_period, phi0=self.phi0)
 
     def xyz_to_tel(self, obscode):
         '''
