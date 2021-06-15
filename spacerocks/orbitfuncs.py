@@ -607,37 +607,37 @@ class OrbitFuncs:
 
     ''' Physical Properties '''
 
-    @property
-    def mass(self):
-        if not hasattr(self, '_mass'):
-            self.mass = 0
-        return self._mass
+    #@property
+    #def mass(self):
+    #    if not hasattr(self, '_mass'):
+    #        self.mass = 0
+    #    return self._mass
 
-    @mass.setter
-    def mass(self, value):
-        self._mass = value
-
-
-    @property
-    def radius(self):
-        if not hasattr(self, '_radius'):
-            self.radius = 1e-16
-        return self._radius
-
-    @radius.setter
-    def radius(self, value):
-        self._radius = value
+    #@mass.setter
+    #def mass(self, value):
+    #    self._mass = value
 
 
-    @property
-    def density(self):
-        if not hasattr(self, '_density'):
-            self.density = 1e-16
-        return self._density
+    #@property
+    #def radius(self):
+    #    if not hasattr(self, '_radius'):
+    #        self.radius = 1e-16
+    #    return self._radius
 
-    @density.setter
-    def density(self, value):
-        self._density = value
+    #@radius.setter
+    #def radius(self, value):
+    #    self._radius = value
+
+
+    #@property
+    #def density(self):
+    #    if not hasattr(self, '_density'):
+    #        self.density = 1e-16
+    #    return self._density
+
+    #@density.setter
+    #def density(self, value):
+    #    self._density = value
 
 
     ''' Derived Quantities '''
@@ -741,19 +741,19 @@ class OrbitFuncs:
 
 
 
-    @property
-    def hill_radius(self):
-        if not hasattr(self, '_hill_radius'):
-            self.hill_radius = self.a * (1 - self.e) * cbrt(self.m / 3)
-        return self._hill_radius
+    #@property
+    #def hill_radius(self):
+    #    if not hasattr(self, '_hill_radius'):
+    #        self.hill_radius = self.a * (1 - self.e) * cbrt(self.m / 3)
+    #    return self._hill_radius
 
-    @hill_radius.setter
-    def hill_radius(self, value):
-        self._hill_radius = value
+    #@hill_radius.setter
+    #def hill_radius(self, value):
+    #    self._hill_radius = value
 
-    @hill_radius.deleter
-    def hill_radius(self):
-        del self._hill_radius
+    #@hill_radius.deleter
+    #def hill_radius(self):
+    #    del self._hill_radius
 
     @property
     def TisserandJ(self):

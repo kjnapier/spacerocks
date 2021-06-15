@@ -225,6 +225,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         for time in np.sort(np.unique(pickup_times)):
             ps = self[self.epoch.tt.jd == time]
+            print(ps.__dict__)
             for p in ps:
                 sim.add(x=p.x.value, y=p.y.value, z=p.z.value,
                         vx=p.vx.value, vy=p.vy.value, vz=p.vz.value,
