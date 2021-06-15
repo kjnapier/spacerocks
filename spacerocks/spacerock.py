@@ -1,5 +1,5 @@
 ################################################################################
-# SpaceRocks, version 1.0.2
+# SpaceRocks, version 1.0.4
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -56,10 +56,12 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         # input -> arrays
         for idx, key in enumerate([*kwargs]):
-            if not hasattr(kwargs.get(key), '__len__'):
-                kwargs[key] = array([kwargs.get(key)])
-            else:
-                kwargs[key] = array(kwargs.get(key))
+            kwargs[key] = np.atleast_1d(kwargs.get(key))
+            #if not hasattr(kwargs.get(key), '__len__'):
+        #        kwargs[key] = array([kwargs.get(key)])
+        #    else:
+        #        kwargs[key] = array(kwargs.get(key))
+
 
         if units.timeformat is None:
             self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
@@ -225,7 +227,6 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         for time in np.sort(np.unique(pickup_times)):
             ps = self[self.epoch.tt.jd == time]
-            print(ps.__dict__)
             for p in ps:
                 sim.add(x=p.x.value, y=p.y.value, z=p.z.value,
                         vx=p.vx.value, vy=p.vy.value, vz=p.vz.value,
