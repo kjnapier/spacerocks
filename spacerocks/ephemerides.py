@@ -33,7 +33,7 @@ class Ephemerides:
             self.H0 = kwargs.get('H0')
 
         if kwargs.get('r_helio') is not None:
-            self.helio_r = kwargs.get('r_helio')
+            self.r_helio = kwargs.get('r_helio')
 
         if kwargs.get('delta_H') is not None:
             self.delta_H = kwargs.get('delta_H')
@@ -71,7 +71,7 @@ class Ephemerides:
         Estimate the apparent magnitude of a TNO
         https://iopscience.iop.org/article/10.3847/1538-3881/ab18a9/pdf for light curves
         '''
-        q = (self.helio_r**2 + self.delta**2 - 1 * u.au**2)/(2 * self.helio_r * self.delta)
+        q = (self.r_helio**2 + self.delta**2 - 1 * u.au**2)/(2 * self.r_helio * self.delta)
 
         ## pyephem
         beta = np.arccos(q)
@@ -80,7 +80,7 @@ class Ephemerides:
 
         Psi_1 = np.exp(-3.33 * np.tan(beta/2)**0.63)
         Psi_2 = np.exp(-1.87 * np.tan(beta/2)**1.22)
-        mag = self.H0 + 5 * np.log10(self.helio_r * self.delta / u.au**2)
+        mag = self.H0 + 5 * np.log10(self.r_helio * self.delta / u.au**2)
 
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
         mag[not_zero] -= 2.5 * np.log10((1 - self.G[not_zero]) * Psi_1[not_zero] + self.G[not_zero] * Psi_2[not_zero])
@@ -91,6 +91,9 @@ class Ephemerides:
             mag += dH
 
             self.H = self.H0 + dH
+
+        else:
+            self.H = self.H0
 
         return mag
 

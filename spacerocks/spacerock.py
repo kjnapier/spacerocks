@@ -1,5 +1,5 @@
 ################################################################################
-# SpaceRocks, version 1.0.4
+# SpaceRocks, version 1.0.5
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -91,9 +91,6 @@ class SpaceRock(OrbitFuncs, Convenience):
             self.delta_H = kwargs.get('delta_H')
             self.phi0 = Angle(kwargs.get('phi0'), units.angle)
             self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
-
-
-
 
 
         if coords == 'kep':
@@ -272,7 +269,7 @@ class SpaceRock(OrbitFuncs, Convenience):
             #rocks.H = np.tile(self.H, Nx) + rocks.delta_H * np.sin(2 * np.pi * (rocks.epoch.jd - rocks.t0.jd) / rocks.rotation_period  - rocks.phi0)
             rocks.H0 = np.tile(self.H0, Nx)
 
-        elif hasattr(self, 'H'):
+        elif hasattr(self, 'H0'):
             rocks.H0 = np.tile(self.H0, Nx)
 
 
@@ -290,8 +287,9 @@ class SpaceRock(OrbitFuncs, Convenience):
         x, y, z, vx, vy, vz = self.xyz_to_tel(obscode)
 
         if not hasattr(self, 'H0'):
-            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name)
-        elif not hasattr(self, 'delta_H'):
+            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio)
+        elif (not hasattr(self, 'delta_H')) and hasattr(self, 'H0'):
+            print('two')
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio, H0=self.H0, G=self.G)
         else:
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio, H0=self.H0, G=self.G, delta_H=self.delta_H, t0=self.t0, rotation_period=self.rotation_period, phi0=self.phi0)
