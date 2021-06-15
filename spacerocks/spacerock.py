@@ -232,7 +232,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
                 sim.integrate(time, exact_finish_time=1)
 
-        for ii, time in enumerate(np.sort(epochs)):
+        for ii, time in enumerate(np.sort(np.atleast_1d(epochs))):
             sim.integrate(time, exact_finish_time=1)
             for jj, name in enumerate(self.name):
                 x_values[ii, jj] = sim.particles[name].x
