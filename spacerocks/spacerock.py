@@ -194,7 +194,8 @@ class SpaceRock(OrbitFuncs, Convenience):
         Integrate all bodies to the desired date. The logic could be cleaner
         but it works.
         '''
-        Nx = len(epochs)
+
+        Nx = len(np.atleast_1d(epochs))
         Ny = len(self)
         x_values = zeros([Nx, Ny])
         y_values = zeros([Nx, Ny])
@@ -443,10 +444,6 @@ class SpaceRock(OrbitFuncs, Convenience):
         x, y, z = np.array([body.at(t).ecliptic_xyz().au for body in active_bodies]).T
         vx, vy, vz = np.array([body.at(t).ecliptic_velocity().au_per_d for body in active_bodies]).T
 
-        #x, y, z = np.array([body.at(t).position.au for body in active_bodies]).T
-        #vx, vy, vz = np.array([body.at(t).velocity.au_per_d for body in active_bodies]).T
-
-
         # create a dataframe of the massive bodies in the solar system
         ss = pd.DataFrame()
         ss['x'] = x
@@ -483,8 +480,6 @@ class SpaceRock(OrbitFuncs, Convenience):
         sim.move_to_com()
 
         return sim
-
-
 
     def orbits(self):
 
