@@ -12,7 +12,7 @@ from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
-planets = load('de423.bsp')
+planets = load('de440.bsp')
 sun = planets['sun']
 
 class OrbitFuncs:
@@ -23,12 +23,11 @@ class OrbitFuncs:
         Method to convert heliocentric coordinates to barycentric coordinates.
         '''
         if self.__class__.frame == 'heliocentric':
-            #t = ts.tai(jd=self.epoch.value + 37/86400)
-            #t = ts.tdb(jd=self.epoch.tdb.jd)
+
             t = ts.tt(jd=self.epoch.tt.jd)
+
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
-
 
             # calculate the barycentric xyz postion
             self.x += x_sun
@@ -56,11 +55,14 @@ class OrbitFuncs:
         Method to convert barycentric coordinates to heliocentric coordinates.
         '''
         if self.__class__.frame == 'barycentric':
-            #t = ts.tai(jd=self.epoch.value + 37/86400)
-            #t = ts.tdb(jd=self.epoch.tdb.jd)
+
             t = ts.tt(jd=self.epoch.tt.jd)
+
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
+
+            #x_sun, y_sun, z_sun = sun.at(t).position.au * u.au
+            #vx_sun, vy_sun, vz_sun = sun.at(t).velocity.au_per_d * u.au / u.day
 
 
             # calculate the heliocentric xyz postion

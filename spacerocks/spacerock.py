@@ -1,5 +1,5 @@
 ################################################################################
-# SpaceRocks, version 1.0.5
+# SpaceRocks, version 1.0.6
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -30,7 +30,7 @@ from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
-planets = load('de423.bsp')
+planets = load('de440.bsp')
 
 observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
                             'data',
@@ -41,7 +41,7 @@ from skyfield.data import iers
 
 #url = load.build_url('finals2000A.all')
 #with load.open(url) as f:
-#    finals_data = iers.parse_x_y_dut1_from_finals_all(f)
+    #finals_data = iers.parse_x_y_dut1_from_finals_all(f)
 
 ts = load.timescale()
 #iers.install_polar_motion_table(ts, finals_data)
@@ -289,12 +289,10 @@ class SpaceRock(OrbitFuncs, Convenience):
         if not hasattr(self, 'H0'):
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio)
         elif (not hasattr(self, 'delta_H')) and hasattr(self, 'H0'):
-            print('two')
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio, H0=self.H0, G=self.G)
         else:
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio, H0=self.H0, G=self.G, delta_H=self.delta_H, t0=self.t0, rotation_period=self.rotation_period, phi0=self.phi0)
-
-    def xyz_to_tel(self, obscode):
+    def xyz_to_tel(self, obscode=500):
         '''
         Transform from barycentric ecliptic Cartesian coordinates to
         telescope-centric coordinates.
@@ -302,19 +300,17 @@ class SpaceRock(OrbitFuncs, Convenience):
         Routine corrects iteratively for light travel time.
         '''
 
-        if obscode is not None:
+        if obscode != 500:
             obscode = str(obscode).zfill(3)
             obs = observatories[observatories.obscode == obscode]
             obslat = obs.lat.values
             obslon = obs.lon.values
             obselev = obs.elevation.values
-        else:
-            obscode = 500
 
 
         in_frame = self.frame
-        if in_frame == 'heliocentric':
-            self.to_bary()
+        #if in_frame == 'heliocentric':
+        self.to_bary()
 
 
         alltimes = self.epoch.tt.jd
@@ -331,6 +327,7 @@ class SpaceRock(OrbitFuncs, Convenience):
         xx, yy, zz = ee.position.au * u.au # earth ICRS position
         vxx, vyy, vzz = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
 
+
         exs = {t:x.value for t, x in zip(unique_times, xx)}
         eys = {t:y.value for t, y in zip(unique_times, yy)}
         ezs = {t:z.value for t, z in zip(unique_times, zz)}
@@ -345,9 +342,6 @@ class SpaceRock(OrbitFuncs, Convenience):
         vx_earth = np.array([evxs[t] for t in alltimes]) * u.au / u.day
         vy_earth = np.array([evys[t] for t in alltimes]) * u.au / u.day
         vz_earth = np.array([evzs[t] for t in alltimes]) * u.au / u.day
-
-        #x_earth, y_earth, z_earth = ee.position.au * u.au # earth ICRS position
-        #vx_earth, vy_earth, vz_earth = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
 
 
         x0, y0, z0 = self.x, self.y, self.z
@@ -366,6 +360,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
                 delta = sqrt(dx**2 + dy**2 + dz**2)
                 ltt = delta / c
+
                 M = self.M - (ltt * self.n)
                 x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(self.a,
                                                                  self.e,
@@ -374,6 +369,7 @@ class SpaceRock(OrbitFuncs, Convenience):
                                                                  self.node,
                                                                  M)
 
+        # Be poplite
         if in_frame == 'heliocentric':
             self.to_helio()
 
