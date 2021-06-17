@@ -30,7 +30,7 @@ from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
-planets = load('de440.bsp')
+planets = load('de441.bsp')
 
 observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
                             'data',
@@ -57,11 +57,6 @@ class SpaceRock(OrbitFuncs, Convenience):
         # input -> arrays
         for idx, key in enumerate([*kwargs]):
             kwargs[key] = np.atleast_1d(kwargs.get(key))
-            #if not hasattr(kwargs.get(key), '__len__'):
-        #        kwargs[key] = array([kwargs.get(key)])
-        #    else:
-        #        kwargs[key] = array(kwargs.get(key))
-
 
         if units.timeformat is None:
             self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
@@ -74,11 +69,11 @@ class SpaceRock(OrbitFuncs, Convenience):
             # produces random, non-repeting integers between 0 and 1e10 - 1
             self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.epoch))])
 
-        SpaceRock.frame = frame
-        if SpaceRock.frame == 'barycentric':
-            SpaceRock.mu = mu_bary
-        elif SpaceRock.frame == 'heliocentric':
-            SpaceRock.mu = mu_helio
+        self.frame = frame
+        if self.frame == 'barycentric':
+            self.mu = mu_bary
+        elif self.frame == 'heliocentric':
+            self.mu = mu_helio
 
 
 
@@ -188,13 +183,15 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         return rocks
 
-    def propagate(self, epochs, model, gr=False):
+    def propagate(self, epochs, model, units=Units(), gr=False):
         '''
         Integrate all bodies to the desired date. The logic could be cleaner
         but it works.
         '''
 
-        Nx = len(np.atleast_1d(epochs))
+        epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
+
+        Nx = len(epochs)
         Ny = len(self)
         x_values = zeros([Nx, Ny])
         y_values = zeros([Nx, Ny])
@@ -206,15 +203,15 @@ class SpaceRock(OrbitFuncs, Convenience):
         name_values = np.tile(self.name, Nx)
         frame = self.frame
 
-        # We need to (or should) work in barycentric coordinates in rebound
-        if frame == 'heliocentric':
-            self.to_bary()
+        # We need to integrate in barycentric coordinates
+        self.to_bary()
 
         # Integrate all particles to the same obsdate
-        pickup_times = self.epoch.tt.jd
-        sim = self.set_simulation(np.min(pickup_times), model=model, gr=gr)
+        pickup_times = self.epoch.tdb.jd
+        sim = self.set_simulation(np.min(pickup_times), units=units, model=model, gr=gr)
         sim.t = np.min(pickup_times) #np.min(df.epoch)
 
+        # need to ensure these are computed
         self.x
         self.y
         self.z
@@ -223,7 +220,7 @@ class SpaceRock(OrbitFuncs, Convenience):
         self.vz
 
         for time in np.sort(np.unique(pickup_times)):
-            ps = self[self.epoch.tt.jd == time]
+            ps = self[self.epoch.tdb.jd == time]
             for p in ps:
                 sim.add(x=p.x.value, y=p.y.value, z=p.z.value,
                         vx=p.vx.value, vy=p.vy.value, vz=p.vz.value,
@@ -231,7 +228,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
                 sim.integrate(time, exact_finish_time=1)
 
-        for ii, time in enumerate(np.sort(np.atleast_1d(epochs))):
+        for ii, time in enumerate(np.sort(epochs.tdb.jd)):
             sim.integrate(time, exact_finish_time=1)
             for jj, name in enumerate(self.name):
                 x_values[ii, jj] = sim.particles[name].x
@@ -251,11 +248,14 @@ class SpaceRock(OrbitFuncs, Convenience):
         name = name_values.flatten()
         epoch = obsdate_values.flatten()
 
-        rocks = SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, frame='barycentric')
+        units = Units()
+        units.timescale = 'tdb'
+        rocks = self.__class__(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, frame='barycentric', units=units)
 
         # be polite and return orbital parameters in the input frame.
         if frame == 'heliocentric':
             rocks.to_helio()
+            self.to_helio()
 
         if hasattr(self, 'G'):
             rocks.G = np.tile(self.G, Nx)
@@ -264,7 +264,7 @@ class SpaceRock(OrbitFuncs, Convenience):
             rocks.delta_H = np.tile(self.delta_H, Nx)
             rocks.rotation_period = np.tile(self.rotation_period, Nx)
             rocks.phi0 = np.tile(self.phi0, Nx)
-            rocks.t0 = Time(np.tile(self.t0.jd, Nx),  format='jd')
+            rocks.t0 = Time(np.tile(self.t0.jd, Nx), format='jd')
 
             #rocks.H = np.tile(self.H, Nx) + rocks.delta_H * np.sin(2 * np.pi * (rocks.epoch.jd - rocks.t0.jd) / rocks.rotation_period  - rocks.phi0)
             rocks.H0 = np.tile(self.H0, Nx)
@@ -292,6 +292,7 @@ class SpaceRock(OrbitFuncs, Convenience):
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio, H0=self.H0, G=self.G)
         else:
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio, H0=self.H0, G=self.G, delta_H=self.delta_H, t0=self.t0, rotation_period=self.rotation_period, phi0=self.phi0)
+
     def xyz_to_tel(self, obscode=500):
         '''
         Transform from barycentric ecliptic Cartesian coordinates to
@@ -313,10 +314,12 @@ class SpaceRock(OrbitFuncs, Convenience):
         self.to_bary()
 
 
-        alltimes = self.epoch.tt.jd
+        alltimes = self.epoch.tdb.jd
         unique_times = np.unique(alltimes)
-        t = ts.tt(jd=unique_times)
+        t = ts.tdb(jd=unique_times)
         earth = planets['earth']
+
+
 
         # Only used for the topocentric calculation.
         if (obscode != 500) and (obscode != '500'):
@@ -347,7 +350,9 @@ class SpaceRock(OrbitFuncs, Convenience):
         x0, y0, z0 = self.x, self.y, self.z
         vx0, vy0, vz0 = self.vx, self.vy, self.vz
 
-        for idx in range(5):
+        ltt0 = 0
+
+        for idx in range(10):
 
             dx = x0 - x_earth
             dy = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
@@ -356,18 +361,23 @@ class SpaceRock(OrbitFuncs, Convenience):
             dvy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_earth
             dvz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_earth
 
-            if idx < 4:
+            delta = sqrt(dx**2 + dy**2 + dz**2)
 
-                delta = sqrt(dx**2 + dy**2 + dz**2)
-                ltt = delta / c
+            ltt = delta / c
+            dltt = (ltt - ltt0)
 
-                M = self.M - (ltt * self.n)
-                x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(self.a,
-                                                                 self.e,
-                                                                 self.inc,
-                                                                 self.arg,
-                                                                 self.node,
-                                                                 M)
+            if np.all(abs(max(dltt.value)) < 1e-12):
+                break
+
+            M = self.M - (ltt * self.n)
+            x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(self.a,
+                                                             self.e,
+                                                             self.inc,
+                                                             self.arg,
+                                                             self.node,
+                                                             M)
+
+            ltt0 = ltt
 
         # Be poplite
         if in_frame == 'heliocentric':
@@ -375,7 +385,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         return dx, dy, dz, dvx, dvy, dvz
 
-    def set_simulation(self, startdate, model, gr=False):
+    def set_simulation(self, startdate, units, model, gr=False):
 
         sun = planets['sun']
         mercury = planets['mercury barycenter']
@@ -434,8 +444,8 @@ class SpaceRock(OrbitFuncs, Convenience):
             raise ValueError('Model not recognized. Check the documentation.')
 
 
-        startdate = Time(startdate, scale='tt', format='jd')
-        t = ts.tt(jd=startdate.tt.jd)
+        startdate = Time(startdate, scale=units.timescale, format='jd')
+        t = ts.tdb(jd=startdate.tdb.jd)
 
         x, y, z = np.array([body.at(t).ecliptic_xyz().au for body in active_bodies]).T
         vx, vy, vz = np.array([body.at(t).ecliptic_velocity().au_per_d for body in active_bodies]).T

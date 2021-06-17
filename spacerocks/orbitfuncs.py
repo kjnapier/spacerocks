@@ -12,7 +12,7 @@ from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
-planets = load('de440.bsp')
+planets = load('de441.bsp')
 sun = planets['sun']
 
 class OrbitFuncs:
@@ -22,30 +22,37 @@ class OrbitFuncs:
         '''
         Method to convert heliocentric coordinates to barycentric coordinates.
         '''
-        if self.__class__.frame == 'heliocentric':
+        if self.frame == 'heliocentric':
 
-            t = ts.tt(jd=self.epoch.tt.jd)
+            t = ts.tdb(jd=self.epoch.tdb.jd)
 
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
 
             # calculate the barycentric xyz postion
-            self.x += x_sun
-            self.y += y_sun
-            self.z += z_sun
-            self.vx += vx_sun
-            self.vy += vy_sun
-            self.vz += vz_sun
+            #self.x += x_sun
+            #self.y += y_sun
+            #self.z += z_sun
+            #self.vx += vx_sun
+            #self.vy += vy_sun
+            #self.vz += vz_sun
 
+            x = self.x + x_sun
+            y = self.y + y_sun
+            z = self.z + z_sun
+            vx = self.vx + vx_sun
+            vy = self.vy + vy_sun
+            vz = self.vz + vz_sun
+
+
+            self.frame = 'barycentric'
+            self.mu = mu_bary
 
             # clear the keplerian variables because they need to be recomputed
             self.clear_kep()
 
-            self.position = Vector(self.x, self.y, self.z)
-            self.velocity = Vector(self.vx, self.vy, self.vz)
-
-            self.__class__.frame = 'barycentric'
-            self.__class__.mu = mu_bary
+            self.position = Vector(x, y, z)
+            self.velocity = Vector(vx, vy, vz)
 
         return self
 
@@ -54,9 +61,9 @@ class OrbitFuncs:
         '''
         Method to convert barycentric coordinates to heliocentric coordinates.
         '''
-        if self.__class__.frame == 'barycentric':
+        if self.frame == 'barycentric':
 
-            t = ts.tt(jd=self.epoch.tt.jd)
+            t = ts.tdb(jd=self.epoch.tdb.jd)
 
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
@@ -66,21 +73,28 @@ class OrbitFuncs:
 
 
             # calculate the heliocentric xyz postion
-            self.x -= x_sun
-            self.y -= y_sun
-            self.z -= z_sun
-            self.vx -= vx_sun
-            self.vy -= vy_sun
-            self.vz -= vz_sun
+            #self.x -= x_sun
+            #self.y -= y_sun
+            #self.z -= z_sun
+            #self.vx -= vx_sun
+            #self.vy -= vy_sun
+            #self.vz -= vz_sun
+
+            x = self.x - x_sun
+            y = self.y - y_sun
+            z = self.z - z_sun
+            vx = self.vx - vx_sun
+            vy = self.vy - vy_sun
+            vz = self.vz - vz_sun
+
+            self.frame = 'heliocentric'
+            self.mu = mu_helio
 
             # clear the keplerian variables because they need to be recomputed
             self.clear_kep()
 
-            self.position = Vector(self.x, self.y, self.z)
-            self.velocity = Vector(self.vx, self.vy, self.vz)
-
-            self.__class__.frame = 'heliocentric'
-            self.__class__.mu = mu_helio
+            self.position = Vector(x, y, z)
+            self.velocity = Vector(vx, vy, vz)
 
         return self
 
@@ -89,38 +103,11 @@ class OrbitFuncs:
         to_delete = ['_a', '_e', '_inc', '_arg', '_node', '_varpi', '_M', '_E',
                      '_true_anomaly', '_true_longitude', '_mean_longitude',
                      '_q', '_t_peri', '_b', '_p', '_n', '_Q', '_hill_radius', '_r',
-                     '_ovec', '_vovec', '_nvec', '_hvec', '_evec', '_position', '_velocity', '_rrdot']
+                     '_ovec', '_vovec', '_nvec', '_hvec', '_evec', '_position', '_velocity', '_rrdot',
+                     '_x', '_y', '_z', '_vx', '_vy', '_vz']
 
         for attr in to_delete:
             self.__dict__.pop(attr, None)
-
-        #del self.a
-        #del self.e
-        #del self.inc
-        #del self.arg
-        #del self.node
-        #del self.M
-        #del self.E
-        #del self.varpi
-        #del self.true_anomaly
-        #del self.true_longitude
-        #del self.mean_longitude
-        #del self.q
-        #del self.t_peri
-        #del self.b
-        #del self.p
-        #del self.n
-        #del self.Q
-        #del self.hill_radius
-        #del self.r
-        #del self.ovec
-        #del self.vovec
-        #del self.nvec
-        #del self.hvec
-        #del self.evec
-        #del self.position
-        #del self.velocity
-
 
     ''' Vector Quantities '''
 

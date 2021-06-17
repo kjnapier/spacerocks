@@ -21,7 +21,8 @@ class Convenience:
         '''
         p = copy.copy(self)
         for attr in self.__dict__.keys():
-            setattr(p, attr, getattr(self, attr)[idx])
+            if (attr != 'mu') and (attr != 'frame'):
+                setattr(p, attr, getattr(self, attr)[idx])
 
         return p
 
