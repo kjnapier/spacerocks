@@ -30,7 +30,7 @@ from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
-planets = load('de441.bsp')
+planets = load('de440.bsp')
 
 observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
                             'data',
@@ -58,16 +58,7 @@ class SpaceRock(OrbitFuncs, Convenience):
         for idx, key in enumerate([*kwargs]):
             kwargs[key] = np.atleast_1d(kwargs.get(key))
 
-        if units.timeformat is None:
-            self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
-        else:
-            self.epoch = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
 
-        if kwargs.get('name') is not None:
-            self.name = np.atleast_1d(kwargs.get('name'))
-        else:
-            # produces random, non-repeting integers between 0 and 1e10 - 1
-            self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.epoch))])
 
         self.frame = frame
         if self.frame == 'barycentric':
@@ -76,23 +67,18 @@ class SpaceRock(OrbitFuncs, Convenience):
             self.mu = mu_helio
 
 
-
-        if kwargs.get('H0') is not None:
-            self.H0 = kwargs.get('H0')
-            self.G = np.repeat(0.15, len(self))
-
-        if (kwargs.get('rotation_period') is not None) and (kwargs.get('delta_H') is not None) and (kwargs.get('phi0') is not None):
-            self.rotation_period = kwargs.get('rotation_period')
-            self.delta_H = kwargs.get('delta_H')
-            self.phi0 = Angle(kwargs.get('phi0'), units.angle)
-            self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
-
-
         if coords == 'kep':
 
-            self.a = Distance(kwargs.get('a'), units.distance)
-            self.e = kwargs.get('e') #* u.dimensionless_unscaled
+            if kwargs.get('a') is not None:
+                self.a = Distance(kwargs.get('a'), units.distance)
+
+            if kwargs.get('e') is not None:
+                self.e = kwargs.get('e') #* u.dimensionless_unscaled
+
             self.inc = Angle(kwargs.get('inc'), units.angle)
+
+            if kwargs.get('q') is not None:
+                self.q = Distance(kwargs.get('q'), units.distance)
 
             if kwargs.get('node') is not None:
                 self.node = Angle(kwargs.get('node'), units.angle)
@@ -125,6 +111,23 @@ class SpaceRock(OrbitFuncs, Convenience):
                 self.mean_longitude = Angle(kwargs.get('mean_longitude'), units.angle)
 
 
+            if kwargs.get('epoch') is not None:
+
+                if units.timeformat is None:
+                    self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
+                else:
+                    self.epoch = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
+            else:
+
+                self.epoch = Time(np.zeros(len(self.inc)), format='jd', scale='utc')
+
+            if kwargs.get('name') is not None:
+                self.name = np.atleast_1d(kwargs.get('name'))
+            else:
+                # produces random, non-repeting integers between 0 and 1e10 - 1
+                self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.inc))])
+
+
         elif coords == 'xyz':
 
             x = Distance(kwargs.get('x'), units.distance, allow_negative=True)
@@ -136,6 +139,32 @@ class SpaceRock(OrbitFuncs, Convenience):
 
             self.position = Vector(x, y, z)
             self.velocity = Vector(vx, vy, vz)
+
+            if kwargs.get('epoch') is not None:
+
+                if units.timeformat is None:
+                    self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
+                else:
+                    self.epoch = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
+            else:
+                self.epoch = Time(np.zeros(len(self.x)), format='jd', scale='utc')
+
+
+            if kwargs.get('name') is not None:
+                self.name = np.atleast_1d(kwargs.get('name'))
+            else:
+                # produces random, non-repeting integers between 0 and 1e10 - 1
+                self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.x))])
+
+        if kwargs.get('H0') is not None:
+            self.H0 = kwargs.get('H0')
+            self.G = np.repeat(0.15, len(self))
+
+        if (kwargs.get('rotation_period') is not None) and (kwargs.get('delta_H') is not None) and (kwargs.get('phi0') is not None):
+            self.rotation_period = kwargs.get('rotation_period')
+            self.delta_H = kwargs.get('delta_H')
+            self.phi0 = Angle(kwargs.get('phi0'), units.angle)
+            self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
 
     def analytic_propagate(self, epoch, propagate_frame = 'heliocentric'):
         '''

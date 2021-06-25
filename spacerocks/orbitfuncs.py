@@ -12,7 +12,7 @@ from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
-planets = load('de441.bsp')
+planets = load('de440.bsp')
 sun = planets['sun']
 
 class OrbitFuncs:
@@ -309,7 +309,10 @@ class OrbitFuncs:
     @property
     def a(self):
         if not hasattr(self, '_a'):
-            self.a = Distance(1 / (2 / self.position.norm - self.velocity.dot(self.velocity) / self.mu * u.rad**2), u.au, allow_negative=True)
+            if hasattr(self, '_position') and hasattr(self, '_velocity'):
+                self.a = Distance(1 / (2 / self.position.norm - self.velocity.dot(self.velocity) / self.mu * u.rad**2), u.au, allow_negative=True)
+            elif hasattr(self, '_e') and hasattr(self, '_q'):
+                self.a = self.q / (1 - self.e)
         return self._a
 
     @a.setter
@@ -324,7 +327,13 @@ class OrbitFuncs:
     @property
     def e(self):
         if not hasattr(self, '_e'):
-            self.e = self.evec.norm.value
+
+            if hasattr(self, '_position') and hasattr(self, '_velocity'):
+                self.e = self.evec.norm.value
+
+            elif hasattr(self, '_a') and hasattr(self, '_q'):
+                self.e = 1 - self.q.au / self.a.au
+
         return self._e
 
     @e.setter
@@ -526,7 +535,7 @@ class OrbitFuncs:
                 true_anomaly = np.zeros(len(self))
                 true_anomaly[self.e < 1] = 2 * arctan2(sqrt(1 + self.e[self.e < 1]) * sin(self.E.rad[self.e < 1] / 2), sqrt(1 - self.e[self.e < 1]) * cos(self.E.rad[self.e < 1] / 2))
                 #if np.any(self.e >= 1):
-                true_anomaly[self.e >= 1] = 2 * arctan2(sqrt(self.e[self.e >= 1] + 1) * tanh(self.E[self.e >= 1] / 2), sqrt(self.e[self.e >= 1] - 1))
+                true_anomaly[self.e >= 1] = 2 * arctan2(sqrt(self.e[self.e >= 1] + 1) * tanh(self.E.rad[self.e >= 1] / 2), sqrt(self.e[self.e >= 1] - 1))
                 #self.true_anomaly = Angle(2 * arctan2(sqrt(1 + self.e) * sin(self.E.rad / 2), sqrt(1 - self.e) * cos(self.E.rad / 2)), u.rad)
                 self.true_anomaly = Angle(true_anomaly, u.rad)
 
