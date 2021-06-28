@@ -39,12 +39,7 @@ observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
 from skyfield.api import wgs84
 from skyfield.data import iers
 
-#url = load.build_url('finals2000A.all')
-#with load.open(url) as f:
-    #finals_data = iers.parse_x_y_dut1_from_finals_all(f)
-
 ts = load.timescale()
-#iers.install_polar_motion_table(ts, finals_data)
 
 
 class SpaceRock(OrbitFuncs, Convenience):
