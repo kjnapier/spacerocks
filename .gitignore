@@ -7,7 +7,7 @@
 # Skyfield data
 /Skyfield-Data/
 /spacerocks/Skyfield-Data/
-
+/spacerocks/tests/Skyfield-Data/
 # Ipython checkpoints
 /.ipynb_checkpoints/
 /spacerocks/.ipynb_checkpoints/
