@@ -11,13 +11,14 @@ from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
 
-from numpy import sin, cos, arctan2, sqrt, array, pi, zeros
+from numpy import sin, cos, arctan2, sqrt, array, pi, zeros, sinh, arctanh, arccosh, cosh, tanh, zeros_like
 import numpy as np
 import pandas as pd
 
 import rebound
 import reboundx
 from reboundx import constants
+from scipy.optimize import newton
 
 from .constants import *
 from .orbitfuncs import OrbitFuncs
@@ -65,7 +66,13 @@ class SpaceRock(OrbitFuncs, Convenience):
         if coords == 'kep':
 
             if kwargs.get('a') is not None:
-                self.a = Distance(kwargs.get('a'), units.distance)
+                self.a = Distance(kwargs.get('a'), units.distance, allow_negative=True)
+
+            if kwargs.get('b') is not None:
+                self.b = Distance(kwargs.get('b'), units.distance, allow_negative=True)
+
+            if kwargs.get('v_inf') is not None:
+                self.v_inf = (kwargs.get('v_inf') * units.speed).to(u.au / u.day)
 
             if kwargs.get('e') is not None:
                 self.e = kwargs.get('e') #* u.dimensionless_unscaled
@@ -74,6 +81,9 @@ class SpaceRock(OrbitFuncs, Convenience):
 
             if kwargs.get('q') is not None:
                 self.q = Distance(kwargs.get('q'), units.distance)
+
+            if kwargs.get('Q') is not None:
+                self.Q = Distance(kwargs.get('Q'), units.distance)
 
             if kwargs.get('node') is not None:
                 self.node = Angle(kwargs.get('node'), units.angle)
@@ -92,12 +102,15 @@ class SpaceRock(OrbitFuncs, Convenience):
 
             if kwargs.get('M') is not None:
                 self.M = Angle(kwargs.get('M'), units.angle)
+                #self.M[(self.e > 1) & (self.M.rad > np.pi)] -= 2 * np.pi * u.rad
 
             if kwargs.get('E') is not None:
                 self.E = Angle(kwargs.get('E'), units.angle)
 
             if kwargs.get('true_anomaly') is not None:
                 self.true_anomaly = Angle(kwargs.get('true_anomaly'), units.angle)
+                #self.true_anomaly[(self.e > 1) & (self.true_anomaly.rad > np.pi)] -= 2 * np.pi * u.rad
+                #self.true_anomaly[(self.e > 1) & (self.rrdot < 0)] *= -1
 
             if kwargs.get('true_longitude') is not None:
                 self.true_longitude = Angle(kwargs.get('true_longitude'), units.angle)
@@ -513,14 +526,19 @@ class SpaceRock(OrbitFuncs, Convenience):
 
     def orbits(self):
 
-        M = np.linspace(0, 2*np.pi, 1000)
+        M = Angle(np.linspace(0, 2*np.pi, 1000), u.rad)
 
         xs = []
         ys = []
         zs = []
 
         for r in self:
-            x, y, z, _, _, _ = self.kep_to_xyz_temp(r.a, r.e, r.inc, r.arg, r.node, M)
+            x, y, z, _, _, _ = self.kep_to_xyz_temp(np.repeat(r.a, 1000),
+                                                    np.repeat(r.e, 1000),
+                                                    np.repeat(r.inc, 1000),
+                                                    np.repeat(r.arg, 1000),
+                                                    np.repeat(r.node, 1000),
+                                                    M)
             xs.append(x)
             ys.append(y)
             zs.append(z)
@@ -534,36 +552,91 @@ class SpaceRock(OrbitFuncs, Convenience):
         equatorial calculation.
         '''
         # compute eccentric anomaly E
-        M = array(M)
-        M[M > pi] -= 2 * pi
-        alpha = (3 * pi**2 + 1.6 * (pi**2 - pi * abs(M))/(1 + e))/(pi**2 - 6)
-        d = 3 * (1 - e) + alpha * e
-        q = 2 * alpha * d * (1 - e) - M**2
-        r = 3 * alpha * d * (d - 1 + e) * M + M**3
+        #M = array(M)
+        #M[M > pi] -= 2 * pi
+        #alpha = (3 * pi**2 + 1.6 * (pi**2 - pi * abs(M))/(1 + e))/(pi**2 - 6)
+        #d = 3 * (1 - e) + alpha * e
+        #q = 2 * alpha * d * (1 - e) - M**2
+        #r = 3 * alpha * d * (d - 1 + e) * M + M**3
+        #w = (abs(r) + sqrt(q**3 + r**2))**(2/3)
+        #E1 = (2 * r * w / (w**2 + w*q + q**2) + M)/d
+        #f2 = e * sin(E1)
+        #f3 = e * cos(E1)
+        #f0 = E1 - f2 - M
+        #f1 = 1 - f3
+        #d3 = -f0 / (f1 - f0 * f2 / (2 * f1))
+        #d4 = -f0 / (f1 + f2 * d3 / 2 + d3**2 * f3/6)
+        #d5 = -f0 / (f1 + d4*f2/2 + d4**2*f3/6 - d4**3*f2/24)
+        #E = E1 + d5
+        #E = E % (2 * pi)
+
+        E = np.zeros(len(M))
+
+        MM = M[e < 1].rad
+        ee = e[e < 1]
+
+        MM[MM > pi] -= 2 * pi
+        alpha = (3 * pi**2 + 1.6 * (pi**2 - pi * abs(MM))/(1 + ee))/(pi**2 - 6)
+        d = 3 * (1 - ee) + alpha * ee
+        q = 2 * alpha * d * (1 - ee) - MM**2
+        r = 3 * alpha * d * (d - 1 + ee) * MM + MM**3
         w = (abs(r) + sqrt(q**3 + r**2))**(2/3)
-        E1 = (2 * r * w / (w**2 + w*q + q**2) + M)/d
-        f2 = e * sin(E1)
-        f3 = e * cos(E1)
-        f0 = E1 - f2 - M
+        E1 = (2 * r * w / (w**2 + w*q + q**2) + MM)/d
+        f2 = ee * sin(E1)
+        f3 = ee * cos(E1)
+        f0 = E1 - f2 - MM
         f1 = 1 - f3
         d3 = -f0 / (f1 - f0 * f2 / (2 * f1))
-        d4 = -f0 / (f1 + f2 * d3 / 2 + d3**2 * f3/6)
-        d5 = -f0 / (f1 + d4*f2/2 + d4**2*f3/6 - d4**3*f2/24)
-        E = E1 + d5
-        E = E % (2 * pi)
+        d4 = -f0 / (f1 + f2 * d3 / 2 + d3**2 * f3 / 6)
+        d5 = -f0 / (f1 + d4 * f2 / 2 + d4**2 * f3 / 6 - d4**3 * f2 / 24)
+        E[e < 1] = (E1 + d5) % (2 * pi)
+
+        if np.any(e >= 1):
+            MMM = M[e >= 1].rad
+            eee = e[e >= 1]
+            f = lambda E, MMM, eee: eee * sinh(E) - E - MMM
+            E0 = MMM
+            E[e >= 1] = np.array([newton(f, E0[idx], args=(MMM[idx], eee[idx]), maxiter=10000) for idx in range(len(MMM))])
 
         # compute true anomaly ν
-        true_anomaly = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2), (1 - e)**0.5*np.cos(E/2))
+        #true_anomaly = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2), (1 - e)**0.5*np.cos(E/2))
+
+        true_anomaly = np.zeros(len(M))
+        true_anomaly[e < 1] = 2 * arctan2(sqrt(1 + e[e < 1]) * sin(E[e < 1] / 2), sqrt(1 - e[e < 1]) * cos(E[e < 1] / 2))
+        true_anomaly[e >= 1] = 2 * arctan2(sqrt(e[e >= 1] + 1) * tanh(E[e >= 1] / 2), sqrt(e[e >= 1] - 1))
+
+
+        r = np.zeros(len(M))
+        r[e < 1] = a[e < 1] * (1 - e[e < 1] * cos(E[e < 1]))
+        r[e >= 1] = abs(a[e >= 1]) * abs(1 - e[e >= 1]**2) / (1 + e[e >= 1] * cos(true_anomaly[e >= 1]))
 
         # compute the distance to the central body r
-        r = a * (1 - e * np.cos(E))
+        #r = a * (1 - e * np.cos(E))
 
         # obtain the position vector o
         o = Vector(r * cos(true_anomaly), r * sin(true_anomaly), np.zeros_like(true_anomaly))
-        ov = Vector((mu_bary * a)**0.5 / r * (-np.sin(E))/ u.rad, (mu_bary * a)**0.5 / r * ((1 - e**2)**0.5 * np.cos(E))/ u.rad, np.zeros(len(true_anomaly))/ u.rad)
+
+        vx = np.zeros(len(M))
+        vy = np.zeros(len(M))
+        vz = np.zeros(len(M))
+        xi_bound = sqrt(mu_bary / u.rad**2 * abs(a[e < 1])) / r[e < 1]
+        xi_unbound = sqrt(mu_bary / u.rad**2 * abs(a[e >= 1])) / r[e >= 1]
+
+        vx[e < 1] = - xi_bound * sin(E[e < 1])
+        vx[e >= 1] = - xi_unbound * sinh(E[e >= 1])
+
+        vy[e < 1] = xi_bound * sqrt(abs(1 - e[e < 1]**2)) * cos(E[e < 1])
+        vy[e >= 1] = xi_unbound * sqrt(abs(1 - e[e >= 1]**2)) * np.cosh(E[e >= 1])
+
+        vz[e < 1] = xi_bound * zeros_like(E[e < 1])
+        vz[e >= 1] = xi_unbound * zeros_like(E[e >= 1])
+
+        ov = Vector(vx, vy, vz)
+
+        #ov = Vector((mu_bary * a)**0.5 / r * (-np.sin(E))/ u.rad, (mu_bary * a)**0.5 / r * ((1 - e**2)**0.5 * np.cos(E))/ u.rad, np.zeros(len(true_anomaly))/ u.rad)
 
         # Rotate o to the inertial frame
         position = o.euler_rotation(arg, inc, node) #* u.au
         velocity = ov.euler_rotation(arg, inc, node) #* u.au / u.day
 
-        return position.x, position.y, position.z, velocity.x, velocity.y, velocity.z
+        return position.x * u.au, position.y * u.au, position.z * u.au, velocity.x * u.au/u.d, velocity.y * u.au/u.d, velocity.z * u.au/u.d

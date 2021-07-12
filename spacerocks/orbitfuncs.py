@@ -1,4 +1,4 @@
-from numpy import pi, sqrt, cbrt, sin, cos, tan, sinh, tanh, exp, log10, zeros_like, arccos, arctan2, array, any
+from numpy import pi, sqrt, cbrt, sin, cos, tan, sinh, tanh, exp, log10, zeros_like, arccos, arctan2, array, any, arctanh
 import numpy as np
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
@@ -128,8 +128,22 @@ class OrbitFuncs:
     @property
     def vovec(self):
         if not hasattr(self, '_vovec'):
-            a = sqrt(self.mu / u.rad**2 * self.a) / self.r
-            self.vovec = Vector(- a * sin(self.E.rad), a * sqrt(1 - self.e**2) * cos(self.E.rad), a * zeros_like(self.E.rad))
+            vx = np.zeros(len(self))
+            vy = np.zeros(len(self))
+            vz = np.zeros(len(self))
+            xi_bound = sqrt(self.mu / u.rad**2 * abs(self.a[self.e < 1])) / self.r[self.e < 1]
+            xi_unbound = sqrt(self.mu / u.rad**2 * abs(self.a[self.e >= 1])) / self.r[self.e >= 1]
+
+            vx[self.e < 1] = - xi_bound * sin(self.E[self.e < 1].rad)
+            vx[self.e >= 1] = - xi_unbound * sinh(self.E[self.e >= 1].rad)
+
+            vy[self.e < 1] = xi_bound * sqrt(abs(1 - self.e[self.e < 1]**2)) * cos(self.E[self.e < 1].rad)
+            vy[self.e >= 1] = xi_unbound * sqrt(abs(1 - self.e[self.e > 1]**2)) * np.cosh(self.E[self.e > 1].rad)
+
+            vz[self.e < 1] = xi_bound * zeros_like(self.E[self.e < 1].rad)
+            vz[self.e >= 1] = xi_unbound * zeros_like(self.E[self.e >= 1].rad)
+
+            self.vovec = Vector(vx * u.au / u.d, vy * u.au / u.d, vz * u.au / u.d)
         return self._vovec
 
     @vovec.setter
@@ -313,6 +327,12 @@ class OrbitFuncs:
                 self.a = Distance(1 / (2 / self.position.norm - self.velocity.dot(self.velocity) / self.mu * u.rad**2), u.au, allow_negative=True)
             elif hasattr(self, '_e') and hasattr(self, '_q'):
                 self.a = self.q / (1 - self.e)
+            elif hasattr(self, '_e') and hasattr(self, '_b'):
+                self.a = self.b / np.sqrt(abs(1 - self.e**2)) * (-1 * (self.e > 1))
+            elif hasattr(self, '_Q') and hasattr(self, '_q'):
+                self.a = self.q / (1 - self.e)
+            elif hasattr(self, '_v_inf'):
+                self.a = Distance(-self.mu / self.v_inf**2 / u.rad**2, u.au, allow_negative=True)
         return self._a
 
     @a.setter
@@ -333,6 +353,12 @@ class OrbitFuncs:
 
             elif hasattr(self, '_a') and hasattr(self, '_q'):
                 self.e = 1 - self.q.au / self.a.au
+
+            elif hasattr(self, '_Q') and hasattr(self, '_q'):
+                self.e = (1 - self.q.au/self.Q.au) / (1 + self.q.au/self.Q.au)
+
+            elif hasattr(self, '_b') and hasattr(self, '_v_inf'):
+                self.e = np.sqrt(1 + self.b.au**2 / self.a.au**2)
 
         return self._e
 
@@ -479,7 +505,10 @@ class OrbitFuncs:
         if not hasattr(self, '_E'):
 
             if hasattr(self, '_true_anomaly') or hasattr(self, '_true_longitude') or (hasattr(self, '_position') and hasattr(self, '_velocity')):
-                E = 2 * arctan2(sqrt(1 - self.e) * sin(self.true_anomaly.rad/2), sqrt(1 + self.e) * cos(self.true_anomaly.rad/2))
+                E = np.zeros(len(self))
+                E[self.e < 1] = 2 * arctan2(sqrt(1 - self.e[self.e < 1]) * sin(self.true_anomaly[self.e < 1].rad/2), sqrt(1 + self.e[self.e < 1]) * cos(self.true_anomaly[self.e < 1].rad/2))
+                #E[self.e > 1] = 2 * arctanh(sqrt((self.e[self.e > 1] - 1) / (1 + self.e[self.e > 1])) * tan(self.true_anomaly[self.e > 1].rad/2))
+                E[self.e > 1] = np.arccosh((np.cos(self.true_anomaly[self.e > 1]) + self.e[self.e > 1]) / (1 + self.e[self.e > 1] * np.cos(self.true_anomaly[self.e > 1])))
                 self.E = Angle(E, u.rad)
 
             elif hasattr(self, '_M') or hasattr(self, '_mean_longitude') or hasattr(self, '_t_peri'):
@@ -534,10 +563,9 @@ class OrbitFuncs:
             elif hasattr(self, '_E') or hasattr(self, '_M') or hasattr(self, '_mean_longitude') or hasattr(self, '_t_peri'):
                 true_anomaly = np.zeros(len(self))
                 true_anomaly[self.e < 1] = 2 * arctan2(sqrt(1 + self.e[self.e < 1]) * sin(self.E.rad[self.e < 1] / 2), sqrt(1 - self.e[self.e < 1]) * cos(self.E.rad[self.e < 1] / 2))
-                #if np.any(self.e >= 1):
-                true_anomaly[self.e >= 1] = 2 * arctan2(sqrt(self.e[self.e >= 1] + 1) * tanh(self.E.rad[self.e >= 1] / 2), sqrt(self.e[self.e >= 1] - 1))
-                #self.true_anomaly = Angle(2 * arctan2(sqrt(1 + self.e) * sin(self.E.rad / 2), sqrt(1 - self.e) * cos(self.E.rad / 2)), u.rad)
+                true_anomaly[self.e > 1] = 2 * arctan2(sqrt(self.e[self.e >= 1] + 1) * tanh(self.E.rad[self.e >= 1] / 2), sqrt(self.e[self.e >= 1] - 1))
                 self.true_anomaly = Angle(true_anomaly, u.rad)
+                #self.true_anomaly[(self.e > 1) & (self.rrdot < 0)] *= -1
 
             elif hasattr(self, '_position') and hasattr(self, '_velocity'):
                 true_anomaly = zeros_like(self.e * u.rad)
@@ -643,7 +671,7 @@ class OrbitFuncs:
     @property
     def b(self):
         if not hasattr(self, '_b'):
-            self.b = self.a * sqrt(1 - self.e**2)
+            self.b = abs(self.a) * sqrt(abs(1 - self.e**2))
         return self._b
 
     @b.setter
@@ -658,7 +686,7 @@ class OrbitFuncs:
     @property
     def p(self):
         if not hasattr(self, '_p'):
-            self.p = self.a * (1 - self.e**2)
+            self.p = abs(self.a) * abs(1 - self.e**2)
         return self._p
 
     @p.setter
@@ -701,6 +729,21 @@ class OrbitFuncs:
 
 
     @property
+    def v_inf(self):
+        if not hasattr(self, '_v_inf'):
+            self.v_inf = sqrt(- self.mu / self.a) / u.rad
+        return self._v_inf
+
+    @v_inf.setter
+    def v_inf(self, value):
+        self._v_inf = value
+
+    @v_inf.deleter
+    def v_inf(self):
+        del self._v_inf
+
+
+    @property
     def n(self):
         if not hasattr(self, '_n'):
             self.n = sqrt(self.mu / abs(self.a)**3)
@@ -726,7 +769,10 @@ class OrbitFuncs:
             if hasattr(self, '_position'):
                 self.r = Distance(self.position.norm)
             else:
-                self.r = self.a * (1 - self.e * cos(self.E.rad))
+                rs = np.zeros(len(self))
+                rs[self.e < 1] = self.a[self.e < 1] * (1 - self.e[self.e < 1] * cos(self.E[self.e < 1].rad))
+                rs[self.e > 1] = self.p[self.e > 1] / (1 + self.e[self.e > 1] * cos(self.true_anomaly[self.e > 1]))
+                self.r = Distance(rs, u.au)
         return self._r
 
     @r.setter
