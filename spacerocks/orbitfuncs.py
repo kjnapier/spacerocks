@@ -784,6 +784,38 @@ class OrbitFuncs:
         del self._r
 
 
+    #@property
+    #def mag(self):
+    #    if not hasattr(self, '_mag'):
+    #        self.mag = 0
+    #    return self._mag
+
+    #@mag.setter
+    #def mag(self, value):
+    #    self._mag = value
+
+    #@mag.deleter
+    #def mag(self):
+    #    del self._mag
+
+
+    #@property
+    #def H(self):
+    #    if not hasattr(self, '_H'):
+    #        if hasattr(self, '_mag'):
+    #            obs = self.observe()
+    #            self.H = 0
+    #    return self._H
+
+    #@H.setter
+    #def H(self, value):
+    #    self._H = value
+
+    #@H.deleter
+    #def H(self):
+    #    del self._mag
+
+
 
     #@property
     #def hill_radius(self):

@@ -40,7 +40,6 @@ class Convenience:
 
         kep = ['a', 'e', 'q', 'inc', 'node', 'arg', 'M', 'true_anomaly', 'E', 'varpi', 't_peri', 'mean_longitude', 'true_longitude', 'v_inf', 'b', 'Q']
         xyz = ['x', 'y', 'z', 'vx', 'vy', 'vz']
-        abg = ['alpha', 'beta', 'gamma', 'dalpha', 'dbeta', 'dgamma']
 
         input_coords = list(kwargs.keys())
 
@@ -49,9 +48,6 @@ class Convenience:
 
         elif np.in1d(input_coords, xyz).sum() == 6:
             coords = 'xyz'
-
-        elif np.in1d(input_coords, abg).sum() == 6:
-            coords = 'abg'
 
         else:
             raise ValueError('Invalid input coordinates. Please see the documentation for accepted input.')

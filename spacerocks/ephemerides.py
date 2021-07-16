@@ -12,6 +12,14 @@ import pandas as pd
 
 from .constants import c
 
+from skyfield.api import Topos, Loader
+# Load in planets for ephemeride calculation.
+load = Loader('./Skyfield-Data', expire=False, verbose=False)
+ts = load.timescale()
+planets = load('de440.bsp')
+earth = planets['earth']
+sun = planets['sun']
+
 class Ephemerides:
 
     '''
@@ -41,7 +49,7 @@ class Ephemerides:
             self.phi0 = kwargs.get('phi0')
             self.t0 = kwargs.get('t0')
 
-        self.delta = np.sqrt(self.x**2 + self.y**2 + self.z**2)
+        self.delta = Distance(np.sqrt(self.x**2 + self.y**2 + self.z**2), u.au)
         self.G = kwargs.get('G')
 
 
@@ -71,16 +79,24 @@ class Ephemerides:
         Estimate the apparent magnitude of a TNO
         https://iopscience.iop.org/article/10.3847/1538-3881/ab18a9/pdf for light curves
         '''
-        q = (self.r_helio**2 + self.delta**2 - 1 * u.au**2)/(2 * self.r_helio * self.delta)
+        t = ts.tdb(jd=self.epoch.tdb.jd)
+        e = earth.at(t)
+        s = sun.at(t)
+        sx, sy, sz = s.ecliptic_xyz().au
+        ex, ey, ez = e.ecliptic_xyz().au
+        earth_dist = ((ex-sx)**2 + (ey-sy)**2 + (ez-sz)**2)**0.5
+
+        q = (self.r_helio.au**2 + self.delta.au**2 - earth_dist)/(2 * self.r_helio.au * self.delta.au)
 
         ## pyephem
         beta = np.arccos(q)
         beta[np.where(q <= -1)[0]] = np.pi * u.rad
         beta[np.where(q >= 1)[0]] = 0 * u.rad
 
-        Psi_1 = np.exp(-3.33 * np.tan(beta/2)**0.63)
-        Psi_2 = np.exp(-1.87 * np.tan(beta/2)**1.22)
-        mag = self.H0 + 5 * np.log10(self.r_helio * self.delta / u.au**2)
+        Psi_1 = np.exp(-3.332 * np.tan(beta/2)**0.631)
+        Psi_2 = np.exp(-1.862 * np.tan(beta/2)**1.218)
+        mag = self.H0 + 5 * np.log10(self.r_helio.au * self.delta.au)# / earth_dist**2)
+
 
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
         mag[not_zero] -= 2.5 * np.log10((1 - self.G[not_zero]) * Psi_1[not_zero] + self.G[not_zero] * Psi_2[not_zero])

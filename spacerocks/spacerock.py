@@ -32,6 +32,8 @@ from skyfield.api import Topos, Loader
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
 planets = load('de440.bsp')
+earth = planets['earth']
+sun = planets['sun']
 
 observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
                             'data',
@@ -166,7 +168,15 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         if kwargs.get('H0') is not None:
             self.H0 = kwargs.get('H0')
+
+        if kwargs.get('G') is not None:
+            self.G = kwargs.get('G')
+        else:
             self.G = np.repeat(0.15, len(self))
+
+
+        if kwargs.get('mag') is not None:
+            self.mag = kwargs.get('mag')
 
         if (kwargs.get('rotation_period') is not None) and (kwargs.get('delta_H') is not None) and (kwargs.get('phi0') is not None):
             self.rotation_period = kwargs.get('rotation_period')
@@ -206,6 +216,9 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         if hasattr(self, 'G'):
             rocks.G = self.G
+
+        if hasattr(self, 'mag'):
+            rocks.mag = self.mag
 
         if hasattr(self, 'delta_H'):
             rocks.delta_H = self.delta_H
@@ -312,6 +325,35 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         return rocks
 
+    def calc_H(self, obscode):
+        obs = self.observe(obscode=obscode)
+
+        t = ts.tdb(jd=self.epoch.tdb.jd)
+        e = earth.at(t)
+        s = sun.at(t)
+
+        sx, sy, sz = s.ecliptic_xyz().au
+        ex, ey, ez = e.ecliptic_xyz().au
+        earth_dist = ((ex-sx)**2 + (ey-sy)**2 + (ez-sz)**2)**0.5
+
+        q = (obs.r_helio.au**2 + obs.delta.au**2 - earth_dist**2)/(2 * obs.r_helio.au * obs.delta.au)
+
+        beta = np.arccos(q)
+        beta[np.where(q <= -1)[0]] = np.pi * u.rad
+        beta[np.where(q >= 1)[0]] = 0 * u.rad
+
+        Psi_1 = np.exp(-3.332 * np.tan(beta/2)**0.631)
+        Psi_2 = np.exp(-1.862 * np.tan(beta/2)**1.218)
+
+
+        H = self.mag - 5 * np.log10(obs.r_helio.au * obs.delta.au)# / earth_dist**2)
+
+        not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
+        H[not_zero] += 2.5 * np.log10((1 - self.G[not_zero]) * Psi_1[not_zero] + self.G[not_zero] * Psi_2[not_zero])
+
+        return H
+
+
     def observe(self, obscode):
 
         if self.frame == 'barycentric':
@@ -416,7 +458,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
             ltt0 = ltt
 
-        # Be poplite
+        # Be polite
         if in_frame == 'heliocentric':
             self.to_helio()
 
@@ -466,9 +508,9 @@ class SpaceRock(OrbitFuncs, Convenience):
 
 
         elif model == 2:
-            active_bodies = [sun, mercury, venus, earth, moon, mars, jupiter, saturn, uranus, neptune]
-            names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Moon', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
-            masses = [M_sun, M_mercury, M_venus, M_earth, M_moon, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune]
+            active_bodies = [sun, mercury, venus, earth, moon, mars, jupiter, saturn, uranus, neptune, pluto]
+            names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Moon', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
+            masses = [M_sun, M_mercury, M_venus, M_earth, M_moon, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune, M_pluto]
 
 
         #elif model == 2:
