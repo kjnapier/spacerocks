@@ -55,24 +55,99 @@ class Ephemerides:
 
     @property
     def ra(self):
-        return Angle(np.arctan2(self.y, self.x), u.rad).wrap_at(2 * np.pi * u.rad)
+        if not hasattr(self, '_ra'):
+            self.ra = Angle(np.arctan2(self.y, self.x), u.rad).wrap_at(2 * np.pi * u.rad)
+        return self._ra
+
+    @ra.setter
+    def ra(self, value):
+        self._ra = value
+
+    @ra.deleter
+    def ra(self):
+        del self._ra
 
     @property
     def dec(self):
-        return Angle(np.arcsin(self.z / sqrt(self.x**2 + self.y**2 + self.z**2)), u.rad)
+        if not hasattr(self, '_dec'):
+            self.dec = Angle(np.arcsin(self.z / sqrt(self.x**2 + self.y**2 + self.z**2)), u.rad)
+        return self._dec
+
+    @dec.setter
+    def dec(self, value):
+        self._dec = value
+
+    @dec.deleter
+    def dec(self):
+        del self._dec
 
     @property
     def ra_rate(self):
-        return -cos(self.dec) * (self.y * self.vx - self.x * self.vy) / (self.x**2 + self.y**2) * u.rad
+        if not hasattr(self, '_ra_rate'):
+            self.ra_rate = -cos(self.dec) * (self.y * self.vx - self.x * self.vy) / (self.x**2 + self.y**2) * u.rad
+        return self._ra_rate
+
+    @ra_rate.setter
+    def ra_rate(self, value):
+        self._ra_rate = value
+
+    @ra_rate.deleter
+    def ra_rate(self):
+        del self._ra_rate
 
     @property
     def dec_rate(self):
-        return (-self.z * (self.x * self.vx + self.y * self.vy) + ((self.x**2 + self.y**2) * self.vz)) \
-                / (sqrt(self.x**2 + self.y**2) * (self.x**2 + self.y**2 + self.z**2)) * u.rad
+        if not hasattr(self, '_dec_rate'):
+            self.dec_rate = (-self.z * (self.x * self.vx + self.y * self.vy) + ((self.x**2 + self.y**2) * self.vz)) \
+                            / (sqrt(self.x**2 + self.y**2) * (self.x**2 + self.y**2 + self.z**2)) * u.rad
+        return self._dec_rate
+
+    @dec_rate.setter
+    def dec_rate(self, value):
+        self._dec_rate = value
+
+    @dec_rate.deleter
+    def dec_rate(self):
+        del self._dec_rate
 
     @property
     def mag(self):
-        return self.estimate_mag()
+        if not hasattr(self, '_mag'):
+            self.mag = self.estimate_mag()
+        return self._mag
+
+    @mag.setter
+    def mag(self, value):
+        self._mag = value
+
+    @mag.deleter
+    def mag(self):
+        del self._mag
+
+
+    @property
+    def H(self):
+        if not hasattr(self, '_H'):
+            if hasattr(self, 'delta_H'):
+                ltt = self.delta / c
+                dH = self.delta_H * np.sin((self.epoch.jd - self.t0.jd - ltt.value) * 2 * np.pi / self.rotation_period + self.phi0.rad)
+                mag += dH
+
+                self.H = self.H0 + dH
+
+            else:
+                self.H = self.H0
+        return self._H
+
+    @H.setter
+    def H(self, value):
+        self._H = value
+
+    @H.deleter
+    def H(self):
+        del self._H
+
+
 
     def estimate_mag(self):
         '''
@@ -95,21 +170,11 @@ class Ephemerides:
 
         Psi_1 = np.exp(-3.332 * np.tan(beta/2)**0.631)
         Psi_2 = np.exp(-1.862 * np.tan(beta/2)**1.218)
-        mag = self.H0 + 5 * np.log10(self.r_helio.au * self.delta.au)# / earth_dist**2)
+        mag = self.H + 5 * np.log10(self.r_helio.au * self.delta.au)# / earth_dist**2)
 
 
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
         mag[not_zero] -= 2.5 * np.log10((1 - self.G[not_zero]) * Psi_1[not_zero] + self.G[not_zero] * Psi_2[not_zero])
-
-        if hasattr(self, 'delta_H'):
-            ltt = self.delta / c
-            dH = self.delta_H * np.sin((self.epoch.jd - self.t0.jd - ltt.value) * 2 * np.pi / self.rotation_period + self.phi0.rad)
-            mag += dH
-
-            self.H = self.H0 + dH
-
-        else:
-            self.H = self.H0
 
         return mag
 

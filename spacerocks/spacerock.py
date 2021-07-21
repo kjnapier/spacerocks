@@ -1,5 +1,5 @@
 ################################################################################
-# SpaceRocks, version 1.0.6
+# SpaceRocks, version 1.0.7
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -44,7 +44,6 @@ from skyfield.data import iers
 
 ts = load.timescale()
 
-
 class SpaceRock(OrbitFuncs, Convenience):
 
     def __init__(self, frame='barycentric', units=Units(), *args, **kwargs):
@@ -55,7 +54,6 @@ class SpaceRock(OrbitFuncs, Convenience):
         # input -> arrays
         for idx, key in enumerate([*kwargs]):
             kwargs[key] = np.atleast_1d(kwargs.get(key))
-
 
 
         self.frame = frame
@@ -111,8 +109,6 @@ class SpaceRock(OrbitFuncs, Convenience):
 
             if kwargs.get('true_anomaly') is not None:
                 self.true_anomaly = Angle(kwargs.get('true_anomaly'), units.angle)
-                #self.true_anomaly[(self.e > 1) & (self.true_anomaly.rad > np.pi)] -= 2 * np.pi * u.rad
-                #self.true_anomaly[(self.e > 1) & (self.rrdot < 0)] *= -1
 
             if kwargs.get('true_longitude') is not None:
                 self.true_longitude = Angle(kwargs.get('true_longitude'), units.angle)
@@ -166,8 +162,10 @@ class SpaceRock(OrbitFuncs, Convenience):
                 # produces random, non-repeting integers between 0 and 1e10 - 1
                 self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.x))])
 
+
         if kwargs.get('H0') is not None:
             self.H0 = kwargs.get('H0')
+
 
         if kwargs.get('G') is not None:
             self.G = kwargs.get('G')
@@ -178,11 +176,13 @@ class SpaceRock(OrbitFuncs, Convenience):
         if kwargs.get('mag') is not None:
             self.mag = kwargs.get('mag')
 
+
         if (kwargs.get('rotation_period') is not None) and (kwargs.get('delta_H') is not None) and (kwargs.get('phi0') is not None):
             self.rotation_period = kwargs.get('rotation_period')
             self.delta_H = kwargs.get('delta_H')
             self.phi0 = Angle(kwargs.get('phi0'), units.angle)
             self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
+
 
     def analytic_propagate(self, epoch, propagate_frame = 'heliocentric'):
         '''
@@ -302,26 +302,27 @@ class SpaceRock(OrbitFuncs, Convenience):
         units.timescale = 'tdb'
         rocks = self.__class__(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, frame='barycentric', units=units)
 
+
         # be polite and return orbital parameters in the input frame.
         if frame == 'heliocentric':
             rocks.to_helio()
             self.to_helio()
 
+
         if hasattr(self, 'G'):
             rocks.G = np.tile(self.G, Nx)
+
 
         if hasattr(self, 'delta_H'):
             rocks.delta_H = np.tile(self.delta_H, Nx)
             rocks.rotation_period = np.tile(self.rotation_period, Nx)
             rocks.phi0 = np.tile(self.phi0, Nx)
             rocks.t0 = Time(np.tile(self.t0.jd, Nx), format='jd')
-
-            #rocks.H = np.tile(self.H, Nx) + rocks.delta_H * np.sin(2 * np.pi * (rocks.epoch.jd - rocks.t0.jd) / rocks.rotation_period  - rocks.phi0)
             rocks.H0 = np.tile(self.H0, Nx)
+
 
         elif hasattr(self, 'H0'):
             rocks.H0 = np.tile(self.H0, Nx)
-
 
         return rocks
 
@@ -464,6 +465,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         return dx, dy, dz, dvx, dvy, dvz
 
+
     def set_simulation(self, startdate, units, model, gr=False):
 
         sun = planets['sun']
@@ -512,13 +514,6 @@ class SpaceRock(OrbitFuncs, Convenience):
             names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Moon', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
             masses = [M_sun, M_mercury, M_venus, M_earth, M_moon, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune, M_pluto]
 
-
-        #elif model == 2:
-        #    active_bodies = [sun, mercury, venus, earth, moon, mars, jupiter, saturn, uranus, neptune, pluto]
-        #    names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Moon', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
-        #    masses = [M_sun, M_mercury, M_venus, M_earth, M_moon, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune, M_pluto]
-
-
         else:
             raise ValueError('Model not recognized. Check the documentation.')
 
@@ -566,6 +561,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         return sim
 
+
     def orbits(self):
 
         M = Angle(np.linspace(0, 2*np.pi, 1000), u.rad)
@@ -593,24 +589,6 @@ class SpaceRock(OrbitFuncs, Convenience):
         Just compute the xyz position of an object. Used for iterative
         equatorial calculation.
         '''
-        # compute eccentric anomaly E
-        #M = array(M)
-        #M[M > pi] -= 2 * pi
-        #alpha = (3 * pi**2 + 1.6 * (pi**2 - pi * abs(M))/(1 + e))/(pi**2 - 6)
-        #d = 3 * (1 - e) + alpha * e
-        #q = 2 * alpha * d * (1 - e) - M**2
-        #r = 3 * alpha * d * (d - 1 + e) * M + M**3
-        #w = (abs(r) + sqrt(q**3 + r**2))**(2/3)
-        #E1 = (2 * r * w / (w**2 + w*q + q**2) + M)/d
-        #f2 = e * sin(E1)
-        #f3 = e * cos(E1)
-        #f0 = E1 - f2 - M
-        #f1 = 1 - f3
-        #d3 = -f0 / (f1 - f0 * f2 / (2 * f1))
-        #d4 = -f0 / (f1 + f2 * d3 / 2 + d3**2 * f3/6)
-        #d5 = -f0 / (f1 + d4*f2/2 + d4**2*f3/6 - d4**3*f2/24)
-        #E = E1 + d5
-        #E = E % (2 * pi)
 
         E = np.zeros(len(M))
 
