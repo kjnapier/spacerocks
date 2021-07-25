@@ -131,7 +131,6 @@ class Ephemerides:
             if hasattr(self, 'delta_H'):
                 ltt = self.delta / c
                 dH = self.delta_H * np.sin((self.epoch.jd - self.t0.jd - ltt.value) * 2 * np.pi / self.rotation_period + self.phi0.rad)
-                mag += dH
 
                 self.H = self.H0 + dH
 
