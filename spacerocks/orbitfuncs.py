@@ -30,13 +30,6 @@ class OrbitFuncs:
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
 
             # calculate the barycentric xyz postion
-            #self.x += x_sun
-            #self.y += y_sun
-            #self.z += z_sun
-            #self.vx += vx_sun
-            #self.vy += vy_sun
-            #self.vz += vz_sun
-
             x = self.x + x_sun
             y = self.y + y_sun
             z = self.z + z_sun
@@ -68,18 +61,7 @@ class OrbitFuncs:
             x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
             vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
 
-            #x_sun, y_sun, z_sun = sun.at(t).position.au * u.au
-            #vx_sun, vy_sun, vz_sun = sun.at(t).velocity.au_per_d * u.au / u.day
-
-
             # calculate the heliocentric xyz postion
-            #self.x -= x_sun
-            #self.y -= y_sun
-            #self.z -= z_sun
-            #self.vx -= vx_sun
-            #self.vy -= vy_sun
-            #self.vz -= vz_sun
-
             x = self.x - x_sun
             y = self.y - y_sun
             z = self.z - z_sun
@@ -508,7 +490,7 @@ class OrbitFuncs:
                 E = np.zeros(len(self))
                 E[self.e < 1] = 2 * arctan2(sqrt(1 - self.e[self.e < 1]) * sin(self.true_anomaly[self.e < 1].rad/2), sqrt(1 + self.e[self.e < 1]) * cos(self.true_anomaly[self.e < 1].rad/2))
                 #E[self.e > 1] = 2 * arctanh(sqrt((self.e[self.e > 1] - 1) / (1 + self.e[self.e > 1])) * tan(self.true_anomaly[self.e > 1].rad/2))
-                E[self.e > 1] = np.arccosh((np.cos(self.true_anomaly[self.e > 1]) + self.e[self.e > 1]) / (1 + self.e[self.e > 1] * np.cos(self.true_anomaly[self.e > 1])))
+                E[self.e >= 1] = np.arccosh((np.cos(self.true_anomaly[self.e > 1]) + self.e[self.e > 1]) / (1 + self.e[self.e > 1] * np.cos(self.true_anomaly[self.e > 1])))
                 self.E = Angle(E, u.rad)
 
             elif hasattr(self, '_M') or hasattr(self, '_mean_longitude') or hasattr(self, '_t_peri'):
@@ -563,7 +545,7 @@ class OrbitFuncs:
             elif hasattr(self, '_E') or hasattr(self, '_M') or hasattr(self, '_mean_longitude') or hasattr(self, '_t_peri'):
                 true_anomaly = np.zeros(len(self))
                 true_anomaly[self.e < 1] = 2 * arctan2(sqrt(1 + self.e[self.e < 1]) * sin(self.E.rad[self.e < 1] / 2), sqrt(1 - self.e[self.e < 1]) * cos(self.E.rad[self.e < 1] / 2))
-                true_anomaly[self.e > 1] = 2 * arctan2(sqrt(self.e[self.e >= 1] + 1) * tanh(self.E.rad[self.e >= 1] / 2), sqrt(self.e[self.e >= 1] - 1))
+                true_anomaly[self.e >= 1] = 2 * arctan2(sqrt(self.e[self.e >= 1] + 1) * tanh(self.E.rad[self.e >= 1] / 2), sqrt(self.e[self.e >= 1] - 1))
                 self.true_anomaly = Angle(true_anomaly, u.rad)
                 #self.true_anomaly[(self.e > 1) & (self.rrdot < 0)] *= -1
 
@@ -771,7 +753,7 @@ class OrbitFuncs:
             else:
                 rs = np.zeros(len(self))
                 rs[self.e < 1] = self.a[self.e < 1] * (1 - self.e[self.e < 1] * cos(self.E[self.e < 1].rad))
-                rs[self.e > 1] = self.p[self.e > 1] / (1 + self.e[self.e > 1] * cos(self.true_anomaly[self.e > 1]))
+                rs[self.e >= 1] = self.p[self.e >=1] / (1 + self.e[self.e >= 1] * cos(self.true_anomaly[self.e >= 1]))
                 self.r = Distance(rs, u.au)
         return self._r
 

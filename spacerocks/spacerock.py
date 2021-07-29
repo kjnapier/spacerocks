@@ -16,6 +16,8 @@ import numpy as np
 import pandas as pd
 
 import rebound
+from rebound import hash as h
+
 import reboundx
 from reboundx import constants
 from scipy.optimize import newton
@@ -242,15 +244,7 @@ class SpaceRock(OrbitFuncs, Convenience):
         epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
 
         Nx = len(epochs)
-        Ny = len(self)
-        x_values = zeros([Nx, Ny])
-        y_values = zeros([Nx, Ny])
-        z_values = zeros([Nx, Ny])
-        vx_values = zeros([Nx, Ny])
-        vy_values = zeros([Nx, Ny])
-        vz_values = zeros([Nx, Ny])
-        obsdate_values = np.zeros([Nx, Ny])
-        name_values = np.tile(self.name, Nx)
+
         frame = self.frame
 
         # We need to integrate in barycentric coordinates
@@ -258,7 +252,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         # Integrate all particles to the same obsdate
         pickup_times = self.epoch.tdb.jd
-        sim = self.set_simulation(np.min(pickup_times), units=units, model=model, gr=gr)
+        sim, planet_names = self.set_simulation(np.min(pickup_times), units=units, model=model, gr=gr)
         sim.t = np.min(pickup_times) #np.min(df.epoch)
 
         # need to ensure these are computed
@@ -271,37 +265,63 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         for time in np.sort(np.unique(pickup_times)):
             ps = self[self.epoch.tdb.jd == time]
-            for p in ps:
-                sim.add(x=p.x.value, y=p.y.value, z=p.z.value,
-                        vx=p.vx.value, vy=p.vy.value, vz=p.vz.value,
-                        hash=p.name)
-
+            for x, y, z, vx, vy, vz, name in zip(ps.x.value, ps.y.value, ps.z.value, ps.vx.value, ps.vy.value, ps.vz.value, ps.name):
+                sim.add(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, hash=name)
                 sim.integrate(time, exact_finish_time=1)
+
+        x_values = np.zeros((Nx, sim.N))
+        y_values = np.zeros((Nx, sim.N))
+        z_values = np.zeros((Nx, sim.N))
+        vx_values = np.zeros((Nx, sim.N))
+        vy_values = np.zeros((Nx, sim.N))
+        vz_values = np.zeros((Nx, sim.N))
+        name_values = np.zeros((Nx, sim.N), dtype='object')
+        obsdate_values = np.zeros((Nx, sim.N))
+
+        p_names = planet_names + [name for name in self.name]
 
         for ii, time in enumerate(np.sort(epochs.tdb.jd)):
             sim.integrate(time, exact_finish_time=1)
-            for jj, name in enumerate(self.name):
-                x_values[ii, jj] = sim.particles[name].x
-                y_values[ii, jj] = sim.particles[name].y
-                z_values[ii, jj] = sim.particles[name].z
-                vx_values[ii, jj] = sim.particles[name].vx
-                vy_values[ii, jj] = sim.particles[name].vy
-                vz_values[ii, jj] = sim.particles[name].vz
-                obsdate_values[ii, jj] = sim.t
+            a = np.zeros((sim.N, 3), dtype='float64')
+            b = np.zeros((sim.N, 3), dtype='float64')
+            sim.serialize_particle_data(xyz=a, vxvyvz=b)
 
-        x = x_values.flatten()
-        y = y_values.flatten()
-        z = z_values.flatten()
-        vx = vx_values.flatten()
-        vy = vy_values.flatten()
-        vz = vz_values.flatten()
-        name = name_values.flatten()
-        epoch = obsdate_values.flatten()
+            x, y, z = a.T
+            vx, vy, vz = b.T
+
+            x_values[ii] = x
+            y_values[ii] = y
+            z_values[ii] = z
+            vx_values[ii] = vx
+            vy_values[ii] = vy
+            vz_values[ii] = vz
+            name_values[ii] = p_names
+            obsdate_values[ii] = np.repeat(sim.t, sim.N)
+
+
+        x = x_values[:, sim.N_active:].flatten()
+        y = y_values[:, sim.N_active:].flatten()
+        z = z_values[:, sim.N_active:].flatten()
+        vx = vx_values[:, sim.N_active:].flatten()
+        vy = vy_values[:, sim.N_active:].flatten()
+        vz = vz_values[:, sim.N_active:].flatten()
+        name = name_values[:, sim.N_active:].flatten()
+        epoch = obsdate_values[:, sim.N_active:].flatten()
+
+        px = x_values[:, :sim.N_active].flatten()
+        py = y_values[:, :sim.N_active].flatten()
+        pz = z_values[:, :sim.N_active].flatten()
+        pvx = vx_values[:, :sim.N_active].flatten()
+        pvy = vy_values[:, :sim.N_active].flatten()
+        pvz = vz_values[:, :sim.N_active].flatten()
+        pname = name_values[:, :sim.N_active].flatten()
+        pepoch = obsdate_values[:, :sim.N_active].flatten()
+
 
         units = Units()
         units.timescale = 'tdb'
         rocks = self.__class__(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, frame='barycentric', units=units)
-
+        planets = self.__class__(x=px, y=py, z=pz, vx=pvx, vy=pvy, vz=pvz, name=pname, epoch=pepoch, frame='barycentric', units=units)
 
         # be polite and return orbital parameters in the input frame.
         if frame == 'heliocentric':
@@ -324,7 +344,7 @@ class SpaceRock(OrbitFuncs, Convenience):
         elif hasattr(self, 'H0'):
             rocks.H0 = np.tile(self.H0, Nx)
 
-        return rocks
+        return rocks, planets, sim
 
     def calc_H(self, obscode):
         obs = self.observe(obscode=obscode)
@@ -559,7 +579,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         sim.move_to_com()
 
-        return sim
+        return sim, names
 
 
     def orbits(self):
