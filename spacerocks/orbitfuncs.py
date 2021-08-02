@@ -15,6 +15,7 @@ ts = load.timescale()
 planets = load('de440.bsp')
 sun = planets['sun']
 
+
 class OrbitFuncs:
 
 
@@ -462,7 +463,7 @@ class OrbitFuncs:
             elif hasattr(self, '_true_anomaly') or hasattr(self, '_true_longitude') or hasattr(self, '_E') or (hasattr(self, '_position') and hasattr(self, '_velocity')):
                 M = np.zeros(len(self))
                 M[self.e < 1] = (self.E.rad[self.e < 1] - self.e[self.e < 1] * sin(self.E.rad[self.e < 1])) % (2 * pi)
-                M[self.e >= 1] = (self.e[self.e >= 1] * sinh(self.E.rad[self.e >= 1]) - self.E.rad[self.e >= 1]) % (2 * pi)
+                M[self.e >= 1] = (self.e[self.e >= 1] * sinh(self.E.rad[self.e >= 1]) - self.E.rad[self.e >= 1])
                 self.M = Angle(M, u.rad)
 
             elif hasattr(self, '_t_peri'):
@@ -486,12 +487,22 @@ class OrbitFuncs:
     def E(self):
         if not hasattr(self, '_E'):
 
-            if hasattr(self, '_true_anomaly') or hasattr(self, '_true_longitude') or (hasattr(self, '_position') and hasattr(self, '_velocity')):
+            if hasattr(self, '_true_anomaly') or hasattr(self, '_true_longitude'): #or (hasattr(self, '_position') and hasattr(self, '_velocity')):
                 E = np.zeros(len(self))
                 E[self.e < 1] = 2 * arctan2(sqrt(1 - self.e[self.e < 1]) * sin(self.true_anomaly[self.e < 1].rad/2), sqrt(1 + self.e[self.e < 1]) * cos(self.true_anomaly[self.e < 1].rad/2))
                 #E[self.e > 1] = 2 * arctanh(sqrt((self.e[self.e > 1] - 1) / (1 + self.e[self.e > 1])) * tan(self.true_anomaly[self.e > 1].rad/2))
                 E[self.e >= 1] = np.arccosh((np.cos(self.true_anomaly[self.e > 1]) + self.e[self.e > 1]) / (1 + self.e[self.e > 1] * np.cos(self.true_anomaly[self.e > 1])))
                 self.E = Angle(E, u.rad)
+
+            if (hasattr(self, '_position') and hasattr(self, '_velocity')):
+                E = np.zeros(len(self))
+                E[self.e < 1] = np.arccos((1 - self.r[self.e < 1]/self.a[self.e < 1]) / self.e[self.e < 1])
+                #E[self.e > 1] = 2 * arctanh(sqrt((self.e[self.e > 1] - 1) / (1 + self.e[self.e > 1])) * tan(self.true_anomaly[self.e > 1].rad/2))
+                E[self.e >= 1] = np.arccosh((1 - self.r[self.e >= 1]/self.a[self.e >= 1])/self.e[self.e >= 1])
+                #E[(self.e >= 1) * (self.rrdot < 0)] *= -1
+                E[self.rrdot < 0] *= -1
+                self.E = Angle(E, u.rad)
+
 
             elif hasattr(self, '_M') or hasattr(self, '_mean_longitude') or hasattr(self, '_t_peri'):
                 E = np.zeros(len(self))
@@ -552,8 +563,10 @@ class OrbitFuncs:
             elif hasattr(self, '_position') and hasattr(self, '_velocity'):
                 true_anomaly = zeros_like(self.e * u.rad)
                 true_anomaly[self.e == 0] = arccos(self.position[self.e == 0].x / self.position[self.e == 0].norm)
-                true_anomaly[self.e != 0] = arccos(self.evec[self.e != 0].dot(self.position[self.e != 0]) / (self.evec[self.e != 0].norm * self.position[self.e != 0].norm))
-
+                true_anomaly[(self.e > 0) * (self.e < 1)] = arccos(self.evec[(self.e > 0) * (self.e < 1)].dot(self.position[(self.e > 0) * (self.e < 1)]) / (self.evec[(self.e > 0) * (self.e < 1)].norm * self.position[(self.e > 0) * (self.e < 1)].norm))
+                true_anomaly[self.e >= 1] = 2 * arctan2(sqrt(self.e[self.e >= 1] + 1) * tanh(self.E[self.e >= 1].rad / 2), sqrt(self.e[self.e >= 1] - 1)) * u.rad
+                #l = self.a[self.e >= 1] * (self.e[self.e >= 1]**2 - 1)
+                #true_anomaly[self.e >= 1] = arccos(((l / self.r[self.e >= 1]) - 1) / self.e[self.e >= 1])
                 true_anomaly[self.position.dot(self.velocity).value < 0] = 2 * pi * u.rad - true_anomaly[self.position.dot(self.velocity).value < 0]
                 self.true_anomaly = Angle(true_anomaly.value, u.rad) # compute true anomaly from cartesian vectors. Other properties can be computed lazily.
 

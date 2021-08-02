@@ -20,7 +20,9 @@ planets = load('de440.bsp')
 earth = planets['earth']
 sun = planets['sun']
 
-class Ephemerides:
+from .convenience import Convenience
+
+class Ephemerides(Convenience):
 
     '''
     Take in the ecliptic state vector (relative to the observer) and
@@ -39,6 +41,7 @@ class Ephemerides:
 
         if kwargs.get('H0') is not None:
             self.H0 = kwargs.get('H0')
+            self.G = kwargs.get('G')
 
         if kwargs.get('r_helio') is not None:
             self.r_helio = kwargs.get('r_helio')
@@ -50,7 +53,7 @@ class Ephemerides:
             self.t0 = kwargs.get('t0')
 
         self.delta = Distance(np.sqrt(self.x**2 + self.y**2 + self.z**2), u.au)
-        self.G = kwargs.get('G')
+
 
 
     @property
@@ -145,6 +148,28 @@ class Ephemerides:
     @H.deleter
     def H(self):
         del self._H
+
+
+    @property
+    def b(self):
+        return Angle(arcsin(cos(epsilon) * sin(self.dec) - sin(epsilon) * cos(self.dec) * sin(self.ra)), u.rad)
+
+    @property
+    def l(self):
+        return Angle(arctan2((cos(epsilon) * cos(self.dec) * sin(self.ra) + sin(epsilon) * sin(self.dec)), (cos(self.dec) * cos(self.ra))), u.rad)
+
+    @property
+    def b_rate(self):
+        num = self.dec_rate * (cos(epsilon) * cos(self.dec) + sin(epsilon) * sin(self.dec) * sin(self.ra)) - self.ra_rate * cos(self.dec) * cos(self.ra) * sin(epsilon)
+        denom = sqrt(1 - (cos(epsilon) * sin(self.dec) - cos(self.dec) * sin(self.ra) * sin(epsilon))**2)
+        return num / denom
+
+    @property
+    def l_rate(self):
+        num = self.ra_rate * (1/cos(self.ra)) * (cos(epsilon) * (1/cos(self.ra)) + sin(epsilon) * tan(self.ra))
+        denom = 1 + ((1/cos(self.ra)) * sin(epsilon) + cos(epsilon) * tan(self.ra))**2
+        return num / denom
+
 
 
 

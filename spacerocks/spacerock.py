@@ -46,6 +46,20 @@ from skyfield.data import iers
 
 ts = load.timescale()
 
+import ctypes
+from numpy.ctypeslib import ndpointer
+
+sr_cpp = ctypes.CDLL('sr_cpp.so')
+sr_cpp.kep_to_xyz_temp.argtypes = [ctypes.c_int,
+                                   ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                   ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                   ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                   ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                   ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                   ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
+
+sr_cpp.kep_to_xyz_temp.restype = ctypes.POINTER(ctypes.c_double)
+
 class SpaceRock(OrbitFuncs, Convenience):
 
     def __init__(self, frame='barycentric', units=Units(), *args, **kwargs):
@@ -269,6 +283,9 @@ class SpaceRock(OrbitFuncs, Convenience):
                 sim.add(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, hash=name)
                 sim.integrate(time, exact_finish_time=1)
 
+        sim.move_to_com()
+
+
         x_values = np.zeros((Nx, sim.N))
         y_values = np.zeros((Nx, sim.N))
         z_values = np.zeros((Nx, sim.N))
@@ -419,47 +436,84 @@ class SpaceRock(OrbitFuncs, Convenience):
         t = ts.tdb(jd=unique_times)
         earth = planets['earth']
 
+        if obscode == 'ssb':
+            x_observer = np.zeros(len(alltimes)) * u.au
+            y_observer = np.zeros(len(alltimes)) * u.au
+            z_observer = np.zeros(len(alltimes)) * u.au
 
+            vx_observer = np.zeros(len(alltimes)) * u.au / u.day
+            vy_observer = np.zeros(len(alltimes)) * u.au / u.day
+            vz_observer = np.zeros(len(alltimes)) * u.au / u.day
+
+        elif obscode == 'sun':
+            ss = sun.at(t)
+
+            xx, yy, zz = ss.position.au * u.au # earth ICRS position
+            vxx, vyy, vzz = ss.velocity.au_per_d * u.au / u.day # earth ICRS position
+
+
+            sxs = {t:x.value for t, x in zip(unique_times, xx)}
+            sys = {t:y.value for t, y in zip(unique_times, yy)}
+            szs = {t:z.value for t, z in zip(unique_times, zz)}
+            svxs = {t:vx.value for t, vx in zip(unique_times, vxx)}
+            svys = {t:vy.value for t, vy in zip(unique_times, vyy)}
+            svzs = {t:vz.value for t, vz in zip(unique_times, vzz)}
+
+            x_observer = np.array([sxs[t] for t in alltimes]) * u.au
+            y_observer = np.array([sys[t] for t in alltimes]) * u.au
+            z_observer = np.array([szs[t] for t in alltimes]) * u.au
+
+            vx_observer = np.array([svxs[t] for t in alltimes]) * u.au / u.day
+            vy_observer = np.array([svys[t] for t in alltimes]) * u.au / u.day
+            vz_observer = np.array([svzs[t] for t in alltimes]) * u.au / u.day
 
         # Only used for the topocentric calculation.
-        if (obscode != 500) and (obscode != '500'):
-            earth += wgs84.latlon(obslat, obslon, obselev)
+        else:
+            if (obscode != 500) and (obscode != '500'):
+                earth += wgs84.latlon(obslat, obslon, obselev)
 
-        ee = earth.at(t)
+            ee = earth.at(t)
 
-        xx, yy, zz = ee.position.au * u.au # earth ICRS position
-        vxx, vyy, vzz = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
+            xx, yy, zz = ee.position.au * u.au # earth ICRS position
+            vxx, vyy, vzz = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
 
 
-        exs = {t:x.value for t, x in zip(unique_times, xx)}
-        eys = {t:y.value for t, y in zip(unique_times, yy)}
-        ezs = {t:z.value for t, z in zip(unique_times, zz)}
-        evxs = {t:vx.value for t, vx in zip(unique_times, vxx)}
-        evys = {t:vy.value for t, vy in zip(unique_times, vyy)}
-        evzs = {t:vz.value for t, vz in zip(unique_times, vzz)}
+            exs = {t:x.value for t, x in zip(unique_times, xx)}
+            eys = {t:y.value for t, y in zip(unique_times, yy)}
+            ezs = {t:z.value for t, z in zip(unique_times, zz)}
+            evxs = {t:vx.value for t, vx in zip(unique_times, vxx)}
+            evys = {t:vy.value for t, vy in zip(unique_times, vyy)}
+            evzs = {t:vz.value for t, vz in zip(unique_times, vzz)}
 
-        x_earth = np.array([exs[t] for t in alltimes]) * u.au
-        y_earth = np.array([eys[t] for t in alltimes]) * u.au
-        z_earth = np.array([ezs[t] for t in alltimes]) * u.au
+            x_observer = np.array([exs[t] for t in alltimes]) * u.au
+            y_observer = np.array([eys[t] for t in alltimes]) * u.au
+            z_observer = np.array([ezs[t] for t in alltimes]) * u.au
 
-        vx_earth = np.array([evxs[t] for t in alltimes]) * u.au / u.day
-        vy_earth = np.array([evys[t] for t in alltimes]) * u.au / u.day
-        vz_earth = np.array([evzs[t] for t in alltimes]) * u.au / u.day
-
+            vx_observer = np.array([evxs[t] for t in alltimes]) * u.au / u.day
+            vy_observer = np.array([evys[t] for t in alltimes]) * u.au / u.day
+            vz_observer = np.array([evzs[t] for t in alltimes]) * u.au / u.day
 
         x0, y0, z0 = self.x, self.y, self.z
         vx0, vy0, vz0 = self.vx, self.vy, self.vz
 
         ltt0 = 0
 
+        N = len(self)
+        a = self.a.au.astype(np.double)
+        e = self.e.astype(np.double)
+        inc = self.inc.rad.astype(np.double)
+        arg = self.arg.rad.astype(np.double)
+        node = self.node.rad.astype(np.double)
+
+
         for idx in range(10):
 
-            dx = x0 - x_earth
-            dy = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_earth
-            dz = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_earth
-            dvx = vx0 - vx_earth
-            dvy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_earth
-            dvz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_earth
+            dx = x0 - x_observer
+            dy = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_observer
+            dz = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_observer
+            dvx = vx0 - vx_observer
+            dvy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_observer
+            dvz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_observer
 
             delta = sqrt(dx**2 + dy**2 + dz**2)
 
@@ -470,12 +524,7 @@ class SpaceRock(OrbitFuncs, Convenience):
                 break
 
             M = self.M - (ltt * self.n)
-            x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(self.a,
-                                                             self.e,
-                                                             self.inc,
-                                                             self.arg,
-                                                             self.node,
-                                                             M)
+            x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(N, a, e, inc, arg, node, M.rad.astype(np.double))
 
             ltt0 = ltt
 
@@ -544,6 +593,7 @@ class SpaceRock(OrbitFuncs, Convenience):
         x, y, z = np.array([body.at(t).ecliptic_xyz().au for body in active_bodies]).T
         vx, vy, vz = np.array([body.at(t).ecliptic_velocity().au_per_d for body in active_bodies]).T
 
+
         # create a dataframe of the massive bodies in the solar system
         ss = pd.DataFrame()
         ss['x'] = x
@@ -577,7 +627,7 @@ class SpaceRock(OrbitFuncs, Convenience):
         sim.testparticle_type = 0
         sim.integrator = 'ias15'
 
-        sim.move_to_com()
+        #sim.move_to_com()
 
         return sim, names
 
@@ -603,80 +653,89 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         return xs, ys, zs
 
+    def kep_to_xyz_temp(self, N, a, e, inc, arg, node, M):
 
-    def kep_to_xyz_temp(self, a, e, inc, arg, node, M):
-        '''
-        Just compute the xyz position of an object. Used for iterative
-        equatorial calculation.
-        '''
+        rock = sr_cpp.kep_to_xyz_temp(N, a, e, inc, arg, node, M)
+        arr = np.ctypeslib.as_array(rock, (6 * N,))
 
-        E = np.zeros(len(M))
-
-        MM = M[e < 1].rad
-        ee = e[e < 1]
-
-        MM[MM > pi] -= 2 * pi
-        alpha = (3 * pi**2 + 1.6 * (pi**2 - pi * abs(MM))/(1 + ee))/(pi**2 - 6)
-        d = 3 * (1 - ee) + alpha * ee
-        q = 2 * alpha * d * (1 - ee) - MM**2
-        r = 3 * alpha * d * (d - 1 + ee) * MM + MM**3
-        w = (abs(r) + sqrt(q**3 + r**2))**(2/3)
-        E1 = (2 * r * w / (w**2 + w*q + q**2) + MM)/d
-        f2 = ee * sin(E1)
-        f3 = ee * cos(E1)
-        f0 = E1 - f2 - MM
-        f1 = 1 - f3
-        d3 = -f0 / (f1 - f0 * f2 / (2 * f1))
-        d4 = -f0 / (f1 + f2 * d3 / 2 + d3**2 * f3 / 6)
-        d5 = -f0 / (f1 + d4 * f2 / 2 + d4**2 * f3 / 6 - d4**3 * f2 / 24)
-        E[e < 1] = (E1 + d5) % (2 * pi)
-
-        if np.any(e >= 1):
-            MMM = M[e >= 1].rad
-            eee = e[e >= 1]
-            f = lambda E, MMM, eee: eee * sinh(E) - E - MMM
-            E0 = MMM
-            E[e >= 1] = np.array([newton(f, E0[idx], args=(MMM[idx], eee[idx]), maxiter=10000) for idx in range(len(MMM))])
-
-        # compute true anomaly ν
-        #true_anomaly = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2), (1 - e)**0.5*np.cos(E/2))
-
-        true_anomaly = np.zeros(len(M))
-        true_anomaly[e < 1] = 2 * arctan2(sqrt(1 + e[e < 1]) * sin(E[e < 1] / 2), sqrt(1 - e[e < 1]) * cos(E[e < 1] / 2))
-        true_anomaly[e >= 1] = 2 * arctan2(sqrt(e[e >= 1] + 1) * tanh(E[e >= 1] / 2), sqrt(e[e >= 1] - 1))
+        x, y, z, vx, vy, vz = arr.reshape(N, 6).T
+        return x * u.au, y * u.au, z * u.au, vx * u.au/u.d, vy * u.au/u.d, vz * u.au/u.d
 
 
-        r = np.zeros(len(M))
-        r[e < 1] = a[e < 1] * (1 - e[e < 1] * cos(E[e < 1]))
-        r[e >= 1] = abs(a[e >= 1]) * abs(1 - e[e >= 1]**2) / (1 + e[e >= 1] * cos(true_anomaly[e >= 1]))
 
-        # compute the distance to the central body r
-        #r = a * (1 - e * np.cos(E))
+    #def kep_to_xyz_temp(self, a, e, inc, arg, node, M):
+    #    '''
+    #    Just compute the xyz position of an object. Used for iterative
+    #    equatorial calculation.
+    #    '''
 
-        # obtain the position vector o
-        o = Vector(r * cos(true_anomaly), r * sin(true_anomaly), np.zeros_like(true_anomaly))
+    #    E = np.zeros(len(M))
 
-        vx = np.zeros(len(M))
-        vy = np.zeros(len(M))
-        vz = np.zeros(len(M))
-        xi_bound = sqrt(mu_bary / u.rad**2 * abs(a[e < 1])) / r[e < 1]
-        xi_unbound = sqrt(mu_bary / u.rad**2 * abs(a[e >= 1])) / r[e >= 1]
+    #    MM = M[e < 1].rad
+    #    ee = e[e < 1]
 
-        vx[e < 1] = - xi_bound * sin(E[e < 1])
-        vx[e >= 1] = - xi_unbound * sinh(E[e >= 1])
+    #    MM[MM > pi] -= 2 * pi
+    #    alpha = (3 * pi**2 + 1.6 * (pi**2 - pi * abs(MM))/(1 + ee))/(pi**2 - 6)
+    #    d = 3 * (1 - ee) + alpha * ee
+    #    q = 2 * alpha * d * (1 - ee) - MM**2
+    #    r = 3 * alpha * d * (d - 1 + ee) * MM + MM**3
+    #    w = (abs(r) + sqrt(q**3 + r**2))**(2/3)
+    #    E1 = (2 * r * w / (w**2 + w*q + q**2) + MM)/d
+    #    f2 = ee * sin(E1)
+    #    f3 = ee * cos(E1)
+    #    f0 = E1 - f2 - MM
+    #    f1 = 1 - f3
+    #    d3 = -f0 / (f1 - f0 * f2 / (2 * f1))
+    #    d4 = -f0 / (f1 + f2 * d3 / 2 + d3**2 * f3 / 6)
+    #    d5 = -f0 / (f1 + d4 * f2 / 2 + d4**2 * f3 / 6 - d4**3 * f2 / 24)
+    #    E[e < 1] = (E1 + d5) % (2 * pi)
 
-        vy[e < 1] = xi_bound * sqrt(abs(1 - e[e < 1]**2)) * cos(E[e < 1])
-        vy[e >= 1] = xi_unbound * sqrt(abs(1 - e[e >= 1]**2)) * np.cosh(E[e >= 1])
+    #    if np.any(e >= 1):
+    #        MMM = M[e >= 1].rad
+    #        eee = e[e >= 1]
+    #        f = lambda E, MMM, eee: eee * sinh(E) - E - MMM
+    #        E0 = MMM
+    #        E[e >= 1] = np.array([newton(f, E0[idx], args=(MMM[idx], eee[idx]), maxiter=10000) for idx in range(len(MMM))])
 
-        vz[e < 1] = xi_bound * zeros_like(E[e < 1])
-        vz[e >= 1] = xi_unbound * zeros_like(E[e >= 1])
+    #    # compute true anomaly ν
+    #    #true_anomaly = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2), (1 - e)**0.5*np.cos(E/2))
 
-        ov = Vector(vx, vy, vz)
+    #    true_anomaly = np.zeros(len(M))
+    #    true_anomaly[e < 1] = 2 * arctan2(sqrt(1 + e[e < 1]) * sin(E[e < 1] / 2), sqrt(1 - e[e < 1]) * cos(E[e < 1] / 2))
+    #    true_anomaly[e >= 1] = 2 * arctan2(sqrt(e[e >= 1] + 1) * tanh(E[e >= 1] / 2), sqrt(e[e >= 1] - 1))
 
-        #ov = Vector((mu_bary * a)**0.5 / r * (-np.sin(E))/ u.rad, (mu_bary * a)**0.5 / r * ((1 - e**2)**0.5 * np.cos(E))/ u.rad, np.zeros(len(true_anomaly))/ u.rad)
 
-        # Rotate o to the inertial frame
-        position = o.euler_rotation(arg, inc, node) #* u.au
-        velocity = ov.euler_rotation(arg, inc, node) #* u.au / u.day
+    #    r = np.zeros(len(M))
+    #    r[e < 1] = a[e < 1] * (1 - e[e < 1] * cos(E[e < 1]))
+    #    r[e >= 1] = abs(a[e >= 1]) * abs(1 - e[e >= 1]**2) / (1 + e[e >= 1] * cos(true_anomaly[e >= 1]))
 
-        return position.x * u.au, position.y * u.au, position.z * u.au, velocity.x * u.au/u.d, velocity.y * u.au/u.d, velocity.z * u.au/u.d
+    #    # compute the distance to the central body r
+    #    #r = a * (1 - e * np.cos(E))
+
+    #    # obtain the position vector o
+    #    o = Vector(r * cos(true_anomaly), r * sin(true_anomaly), np.zeros_like(true_anomaly))
+
+    #    vx = np.zeros(len(M))
+    #    vy = np.zeros(len(M))
+    #    vz = np.zeros(len(M))
+    #    xi_bound = sqrt(mu_bary / u.rad**2 * abs(a[e < 1])) / r[e < 1]
+    #    xi_unbound = sqrt(mu_bary / u.rad**2 * abs(a[e >= 1])) / r[e >= 1]
+
+    #    vx[e < 1] = - xi_bound * sin(E[e < 1])
+    #    vx[e >= 1] = - xi_unbound * sinh(E[e >= 1])
+
+    #    vy[e < 1] = xi_bound * sqrt(abs(1 - e[e < 1]**2)) * cos(E[e < 1])
+    #    vy[e >= 1] = xi_unbound * sqrt(abs(1 - e[e >= 1]**2)) * np.cosh(E[e >= 1])
+
+    #    vz[e < 1] = xi_bound * zeros_like(E[e < 1])
+    #    vz[e >= 1] = xi_unbound * zeros_like(E[e >= 1])
+
+    #    ov = Vector(vx, vy, vz)
+
+    #    #ov = Vector((mu_bary * a)**0.5 / r * (-np.sin(E))/ u.rad, (mu_bary * a)**0.5 / r * ((1 - e**2)**0.5 * np.cos(E))/ u.rad, np.zeros(len(true_anomaly))/ u.rad)
+
+    #    # Rotate o to the inertial frame
+    #    position = o.euler_rotation(arg, inc, node) #* u.au
+    #    velocity = ov.euler_rotation(arg, inc, node) #* u.au / u.day
+
+    #    return position.x * u.au, position.y * u.au, position.z * u.au, velocity.x * u.au/u.d, velocity.y * u.au/u.d, velocity.z * u.au/u.d
