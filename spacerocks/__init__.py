@@ -10,10 +10,10 @@ __author__ = 'Kevin Napier'
 # Import shared library
 import os
 import warnings
-pymodulepath = os.path.dirname(__file__)
-from ctypes import cdll, c_char_p
-__libpath__ = pymodulepath+"/sr_cpp.so"#+suffix
-clibspacerocks = cdll.LoadLibrary(__libpath__)
+#pymodulepath = os.path.dirname(__file__)
+#from ctypes import cdll, c_char_p
+#__libpath__ = pymodulepath+"/sr_cpp.so"#+suffix
+#clibspacerocks = cdll.LoadLibrary(__libpath__)
 
 from .spacerock import SpaceRock
 from .units import Units
