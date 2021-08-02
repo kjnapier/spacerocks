@@ -4,25 +4,25 @@ from codecs import open
 import os
 import sys
 
-import sysconfig
-suffix = sysconfig.get_config_var('EXT_SUFFIX')
-if suffix is None:
-    suffix = ".so"
-
-extra_link_args=[]
-if sys.platform == 'darwin':
-    from distutils import sysconfig
-    vars = sysconfig.get_config_vars()
-    vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
-    extra_link_args=['-Wl,-install_name,@rpath/libspacerocks'+suffix]
-
-libspacerocksmodule = Extension('libspacerocks',
-                                sources = ['src/speedy.cpp'],
-                                include_dirs = ['src'],
-                                #define_macros=[ ('LIBSPACEROCKS', None) ],
-                                extra_compile_args=['-O3', '-fPIC'],
-                                extra_link_args=extra_link_args
-                                )
+#import sysconfig
+#suffix = sysconfig.get_config_var('EXT_SUFFIX')
+#if suffix is None:
+#    suffix = ".so"
+#
+#extra_link_args=[]
+#if sys.platform == 'darwin':
+#    from distutils import sysconfig
+#    vars = sysconfig.get_config_vars()
+#    vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
+#    extra_link_args=['-Wl,-install_name,@rpath/libspacerocks'+suffix]
+#
+#libspacerocksmodule = Extension('libspacerocks',
+#                                sources = ['src/speedy.cpp'],
+#                                include_dirs = ['src'],
+#                                #define_macros=[ ('LIBSPACEROCKS', None) ],
+#                                extra_compile_args=['-O3', '-fPIC'],
+#                                extra_link_args=extra_link_args
+#                                )
 
 
 setup(
@@ -42,6 +42,6 @@ setup(
                      'pandas',
                      'rebound',
                      'reboundx'],
-   include_package_data=True,
-   ext_modules = [libspacerocksmodule]
+   include_package_data=True
+   #ext_modules = [libspacerocksmodule]
 )
