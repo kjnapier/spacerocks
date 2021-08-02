@@ -13,7 +13,7 @@ import warnings
 pymodulepath = os.path.dirname(__file__)
 from ctypes import cdll, c_char_p
 __libpath__ = pymodulepath+"/sr_cpp.so"#+suffix
-sr_cpp = cdll.LoadLibrary(__libpath__)
+clibspacerocks = cdll.LoadLibrary(__libpath__)
 
 from .spacerock import SpaceRock
 from .units import Units

@@ -49,7 +49,7 @@ ts = load.timescale()
 import ctypes
 from numpy.ctypeslib import ndpointer
 
-sr_cpp = ctypes.CDLL('sr_cpp.so')
+sr_cpp = ctypes.CDLL(os.path.join(os.path.dirname(__file__), 'sr_cpp.so')
 sr_cpp.kep_to_xyz_temp.argtypes = [ctypes.c_int,
                                    ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                    ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),

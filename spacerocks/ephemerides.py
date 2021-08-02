@@ -6,7 +6,7 @@ from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
 
-from numpy import sin, cos, arctan2, sqrt, array, pi, zeros, arcsin
+from numpy import sin, cos, arctan2, sqrt, array, pi, zeros, arcsin, tan
 import numpy as np
 import pandas as pd
 
