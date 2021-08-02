@@ -34,7 +34,7 @@ setup(
    url="https://github.com/kjnapier/spacerocks",
    packages=['spacerocks'],
    # I'm not sure package_data is working.
-   package_data={'spacerocks': ['data/observatories.csv']},
+   package_data={'spacerocks': ['data/observatories.csv', 'sr_cpp.so']},
    install_requires=['healpy',
                      'numpy',
                      'skyfield',
