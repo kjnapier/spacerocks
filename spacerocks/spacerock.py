@@ -49,8 +49,9 @@ ts = load.timescale()
 import ctypes
 from numpy.ctypeslib import ndpointer
 
-sr_cpp = ctypes.CDLL(os.path.join(os.path.dirname(__file__), 'sr_cpp.so'))
-sr_cpp.kep_to_xyz_temp.argtypes = [ctypes.c_int,
+from . import clibspacerocks
+
+clibspacerocks.kep_to_xyz_temp.argtypes = [ctypes.c_int,
                                    ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                    ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                    ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
@@ -58,11 +59,11 @@ sr_cpp.kep_to_xyz_temp.argtypes = [ctypes.c_int,
                                    ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                    ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
 
-sr_cpp.kep_to_xyz_temp.restype = ctypes.POINTER(ctypes.c_double)
+clibspacerocks.kep_to_xyz_temp.restype = ctypes.POINTER(ctypes.c_double)
 
-def kep_to_xyz_temp_cpp(self, N, a, e, inc, arg, node, M):
+def kep_to_xyz_temp_cpp(N, a, e, inc, arg, node, M):
 
-    rock = sr_cpp.kep_to_xyz_temp(N, a, e, inc, arg, node, M)
+    rock = clibspacerocks.kep_to_xyz_temp(N, a, e, inc, arg, node, M)
     arr = np.ctypeslib.as_array(rock, (6 * N,))
 
     x, y, z, vx, vy, vz = arr.reshape(N, 6).T
@@ -663,7 +664,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
     def kep_to_xyz_temp(self, N, a, e, inc, arg, node, M):
 
-        rock = sr_cpp.kep_to_xyz_temp(N, a, e, inc, arg, node, M)
+        rock = clibspacerocks.kep_to_xyz_temp(N, a, e, inc, arg, node, M)
         arr = np.ctypeslib.as_array(rock, (6 * N,))
 
         x, y, z, vx, vy, vz = arr.reshape(N, 6).T

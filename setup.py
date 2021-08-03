@@ -1,6 +1,5 @@
 from setuptools import setup, Extension
 
-from codecs import open
 import os
 import sys
 
@@ -14,14 +13,14 @@ if sys.platform == 'darwin':
     from distutils import sysconfig
     vars = sysconfig.get_config_vars()
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
-    extra_link_args=['-Wl,-install_name,@rpath/libspacerocks'+suffix]
+    extra_link_args=['-Wl,-install_name,@rpath/librebound'+suffix]
 
 libspacerocksmodule = Extension('libspacerocks',
                                 sources = ['src/speedy.cpp'],
                                 include_dirs = ['src'],
-                                #define_macros=[ ('LIBSPACEROCKS', None) ],
-                                extra_compile_args=['-O3', '-fPIC'],
-                                extra_link_args=extra_link_args
+                                define_macros=[ ('LIBSPACEROCKS', None) ],
+                                extra_compile_args=['-O3', '-fPIC', '-DLIBSPACEROCKS'],
+                                extra_link_args=extra_link_args,
                                 )
 
 
@@ -34,7 +33,7 @@ setup(
    url="https://github.com/kjnapier/spacerocks",
    packages=['spacerocks'],
    # I'm not sure package_data is working.
-   package_data={'spacerocks': ['data/observatories.csv', 'sr_cpp.so']},
+   package_data={'spacerocks': ['data/observatories.csv']},
    install_requires=['healpy',
                      'numpy',
                      'skyfield',
@@ -42,6 +41,6 @@ setup(
                      'pandas',
                      'rebound',
                      'reboundx'],
-   include_package_data=True
+   include_package_data=True,
    ext_modules = [libspacerocksmodule]
 )
