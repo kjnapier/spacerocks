@@ -18,8 +18,8 @@ import pandas as pd
 import rebound
 from rebound import hash as h
 
-import reboundx
-from reboundx import constants
+#import reboundx
+#from reboundx import constants
 from scipy.optimize import newton
 
 from .constants import *
@@ -258,7 +258,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         return rocks
 
-    def propagate(self, epochs, model, units=Units(), gr=False):
+    def propagate(self, epochs, model, units=Units()):
         '''
         Integrate all bodies to the desired date. The logic could be cleaner
         but it works.
@@ -275,7 +275,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         # Integrate all particles to the same obsdate
         pickup_times = self.epoch.tdb.jd
-        sim, planet_names = self.set_simulation(np.min(pickup_times), units=units, model=model, gr=gr)
+        sim, planet_names = self.set_simulation(np.min(pickup_times), units=units, model=model)
         sim.t = np.min(pickup_times) #np.min(df.epoch)
 
         # need to ensure these are computed
@@ -544,7 +544,7 @@ class SpaceRock(OrbitFuncs, Convenience):
         return dx, dy, dz, dvx, dvy, dvz
 
 
-    def set_simulation(self, startdate, units, model, gr=False):
+    def set_simulation(self, startdate, units, model):
 
         sun = planets['sun']
         mercury = planets['mercury barycenter']
@@ -627,11 +627,11 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         sim.N_active = len(ss)
 
-        if gr == True:
-            rebx = reboundx.Extras(sim)
-            gr = rebx.load_force('gr_full')
-            gr.params["c"] = constants.C
-            rebx.add_force(gr)
+        #if gr == True:
+        #    rebx = reboundx.Extras(sim)
+        #    gr = rebx.load_force('gr_full')
+        #    gr.params["c"] = constants.C
+        #    rebx.add_force(gr)
 
         sim.testparticle_type = 0
         sim.integrator = 'ias15'
