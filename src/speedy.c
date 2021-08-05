@@ -1,6 +1,7 @@
-#include <iostream>
+//#include <iostream>
 #include <math.h>
-#include <cmath>
+#include <stdlib.h>
+//#include <cmath>
 
 const double mu_bary = 0.00029630927493457475;
 //# define M_PI           3.14159265358979323846;
@@ -71,14 +72,14 @@ double calc_E_hyp(double e, double M){
     return E;
 }
 
-StateVector kep_to_xyz_temp_cpp(double a, double e, double inc, double arg, double node, double M) {
+struct StateVector kep_to_xyz_temp_cpp(double a, double e, double inc, double arg, double node, double M) {
 
   double E, true_anomaly, r, c, ox, oy, vox, voy;
   double cosE, aba, omece;
   double si, sa, sn, ci, ca, cn;
   double c1, c2, c3, c4, c5, c6;
-  double x, y, z, vx, vy, vz;
-  StateVector rock;
+  //double x, y, z, vx, vy, vz;
+  struct StateVector rock;
 
   if (e < 1) {
 
@@ -100,21 +101,21 @@ StateVector kep_to_xyz_temp_cpp(double a, double e, double inc, double arg, doub
     vox = - c * sin(E);
     voy = c * sqrt(1 - e * e) * cosE;
 
-  } else if (e >= 1) {
+  } else {
 
-    aba = abs(a);
+    aba = fabs(a);
 
     E = calc_E_hyp(e, M);
 
     true_anomaly = 2 * atan2(sqrt(e + 1) * tanh(E / 2), sqrt(e - 1));
-    r = aba * abs(1 - e * e) / (1 + e * cos(true_anomaly));
+    r = aba * fabs(1 - e * e) / (1 + e * cos(true_anomaly));
 
     c = sqrt(mu_bary * aba) / r;
 
     ox = r * cos(true_anomaly);
     oy = r * sin(true_anomaly);
     vox = - c * sinh(E);
-    voy = c * sqrt(abs(1 - e * e)) * cosh(E);
+    voy = c * sqrt(fabs(1 - e * e)) * cosh(E);
 
   }
 
@@ -163,42 +164,79 @@ StateVector kep_to_xyz_temp_cpp(double a, double e, double inc, double arg, doub
 //
 //}
 
-extern "C" {
-    double* kep_to_xyz_temp(int N, double *as, double *es, double *incs, double *args, double *nodes, double *Ms)
-    {
-      //double output[6 * N];
-      double* output = new double[N * 6];
-      int dummy;
-      //double* output[N * 6];
+double* kep_to_xyz_temp(int N, double *as, double *es, double *incs, double *args, double *nodes, double *Ms)
+{
+  //double output[6 * N];
+  double* output = malloc(N * 6 * sizeof(double));// = double;
+  int dummy;
+  //double* output[N * 6];
 
-      double a, e, inc, arg, node, M;
-      StateVector rock;
+  //double a, e, inc, arg, node, M;
+  struct StateVector rock;
 
-      for (int idx = 0; idx < N; idx++) {
+  for (int idx = 0; idx < N; idx++) {
 
-        //a = as[idx];
-        //e = es[idx];
-        //inc = incs[idx];
-        //arg = args[idx];
-        //node = nodes[idx];
-        //M = Ms[idx];
+    //a = as[idx];
+    //e = es[idx];
+    //inc = incs[idx];
+    //arg = args[idx];
+    //node = nodes[idx];
+    //M = Ms[idx];
 
-        rock = kep_to_xyz_temp_cpp(as[idx], es[idx], incs[idx], args[idx], nodes[idx], Ms[idx]);
+    rock = kep_to_xyz_temp_cpp(as[idx], es[idx], incs[idx], args[idx], nodes[idx], Ms[idx]);
 
-        dummy = idx * 6;
+    dummy = idx * 6;
 
-        output[dummy] = rock.x;
-        output[dummy + 1] = rock.y;
-        output[dummy + 2] = rock.z;
-        output[dummy + 3] = rock.vx;
-        output[dummy + 4] = rock.vy;
-        output[dummy + 5] = rock.vz;
+    output[dummy] = rock.x;
+    output[dummy + 1] = rock.y;
+    output[dummy + 2] = rock.z;
+    output[dummy + 3] = rock.vx;
+    output[dummy + 4] = rock.vy;
+    output[dummy + 5] = rock.vz;
 
 
-      }
+  }
 
-      return output;
-
-    }
+  return output;
 
 }
+
+//extern "C" {
+//    double* kep_to_xyz_temp(int N, double *as, double *es, double *incs, double *args, double *nodes, double *Ms)
+//    {
+//      //double output[6 * N];
+//      double* output = new double[N * 6];
+//      int dummy;
+//      //double* output[N * 6];
+//
+//      //double a, e, inc, arg, node, M;
+//      struct StateVector rock;
+//
+//      for (int idx = 0; idx < N; idx++) {
+//
+//        //a = as[idx];
+//        //e = es[idx];
+//        //inc = incs[idx];
+//        //arg = args[idx];
+//        //node = nodes[idx];
+//        //M = Ms[idx];
+//
+//        rock = kep_to_xyz_temp_cpp(as[idx], es[idx], incs[idx], args[idx], nodes[idx], Ms[idx]);
+//
+//        dummy = idx * 6;
+//
+//        output[dummy] = rock.x;
+//        output[dummy + 1] = rock.y;
+//        output[dummy + 2] = rock.z;
+//        output[dummy + 3] = rock.vx;
+//        output[dummy + 4] = rock.vy;
+//        output[dummy + 5] = rock.vz;
+//
+//
+//      }
+//
+//      return output;
+//
+//    }
+//
+//}

@@ -13,27 +13,29 @@ if sys.platform == 'darwin':
     from distutils import sysconfig
     vars = sysconfig.get_config_vars()
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
-    extra_link_args=['-Wl,-install_name,@rpath/librebound'+suffix]
+    extra_link_args=['-Wl,-install_name,@rpath/libspacerocks'+suffix]
 
 libspacerocksmodule = Extension('libspacerocks',
-                                sources = ['src/speedy.cpp'],
-                                include_dirs = ['src'],
-                                define_macros=[ ('LIBSPACEROCKS', None) ],
-                                extra_compile_args=['-O3', '-fPIC', '-DLIBSPACEROCKS'],
-                                extra_link_args=extra_link_args,
+                                sources=['src/speedy.c'],
+                                include_dirs=['src'],
+                                language='c',
+                                extra_compile_args=['-O3', '-fPIC', '-Wno-unknown-pragmas', '-std=c99'],
+                                extra_link_args=extra_link_args
                                 )
 
 
 setup(
    name='spacerocks',
-   version='1.0.7',
+   version='1.0.23',
    description='A Python Package for Solar System Ephemerides and Dynamics.',
    author='Kevin J. Napier',
    author_email='kjnapier@umich.edu',
    url="https://github.com/kjnapier/spacerocks",
-   packages=['spacerocks'],
+   packages=['spacerocks', 'spacerocks.data'],
+   package_data={'spacerocks.data': ['*.csv']},
+   data_files=['spacerocks/data/observatories.csv'],
+   include_package_data=True,
    # I'm not sure package_data is working.
-   package_data={'spacerocks': ['data/observatories.csv']},
    install_requires=['healpy',
                      'numpy',
                      'skyfield',
@@ -41,6 +43,6 @@ setup(
                      'pandas',
                      'rebound',
                      'reboundx'],
-   include_package_data=True,
-   ext_modules = [libspacerocksmodule]
+   ext_modules=[libspacerocksmodule],
+   zip_safe=False
 )

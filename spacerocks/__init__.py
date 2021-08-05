@@ -1,4 +1,4 @@
-__version__ = '1.0.7'
+__version__ = '1.0.23'
 __author__ = 'Kevin Napier'
 
 # Find suffix

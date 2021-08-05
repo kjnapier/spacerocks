@@ -1,5 +1,5 @@
 ################################################################################
-# SpaceRocks, version 1.0.7
+# SpaceRocks, version 1.0.11
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -37,9 +37,11 @@ planets = load('de440.bsp')
 earth = planets['earth']
 sun = planets['sun']
 
-observatories = pd.read_csv(os.path.join(os.path.dirname(__file__),
-                            'data',
-                            'observatories.csv'))
+import pkg_resources
+
+DATA_PATH = pkg_resources.resource_filename('spacerocks', 'data/observatories.csv')
+
+observatories = pd.read_csv(DATA_PATH)
 
 from skyfield.api import wgs84
 from skyfield.data import iers
@@ -650,7 +652,8 @@ class SpaceRock(OrbitFuncs, Convenience):
         zs = []
 
         for r in self:
-            x, y, z, _, _, _ = self.kep_to_xyz_temp(np.repeat(r.a, 1000),
+            x, y, z, _, _, _ = self.kep_to_xyz_temp(1000,
+                                                    np.repeat(r.a, 1000),
                                                     np.repeat(r.e, 1000),
                                                     np.repeat(r.inc, 1000),
                                                     np.repeat(r.arg, 1000),
@@ -669,82 +672,3 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         x, y, z, vx, vy, vz = arr.reshape(N, 6).T
         return x * u.au, y * u.au, z * u.au, vx * u.au/u.d, vy * u.au/u.d, vz * u.au/u.d
-
-
-
-    #def kep_to_xyz_temp(self, a, e, inc, arg, node, M):
-    #    '''
-    #    Just compute the xyz position of an object. Used for iterative
-    #    equatorial calculation.
-    #    '''
-
-    #    E = np.zeros(len(M))
-
-    #    MM = M[e < 1].rad
-    #    ee = e[e < 1]
-
-    #    MM[MM > pi] -= 2 * pi
-    #    alpha = (3 * pi**2 + 1.6 * (pi**2 - pi * abs(MM))/(1 + ee))/(pi**2 - 6)
-    #    d = 3 * (1 - ee) + alpha * ee
-    #    q = 2 * alpha * d * (1 - ee) - MM**2
-    #    r = 3 * alpha * d * (d - 1 + ee) * MM + MM**3
-    #    w = (abs(r) + sqrt(q**3 + r**2))**(2/3)
-    #    E1 = (2 * r * w / (w**2 + w*q + q**2) + MM)/d
-    #    f2 = ee * sin(E1)
-    #    f3 = ee * cos(E1)
-    #    f0 = E1 - f2 - MM
-    #    f1 = 1 - f3
-    #    d3 = -f0 / (f1 - f0 * f2 / (2 * f1))
-    #    d4 = -f0 / (f1 + f2 * d3 / 2 + d3**2 * f3 / 6)
-    #    d5 = -f0 / (f1 + d4 * f2 / 2 + d4**2 * f3 / 6 - d4**3 * f2 / 24)
-    #    E[e < 1] = (E1 + d5) % (2 * pi)
-
-    #    if np.any(e >= 1):
-    #        MMM = M[e >= 1].rad
-    #        eee = e[e >= 1]
-    #        f = lambda E, MMM, eee: eee * sinh(E) - E - MMM
-    #        E0 = MMM
-    #        E[e >= 1] = np.array([newton(f, E0[idx], args=(MMM[idx], eee[idx]), maxiter=10000) for idx in range(len(MMM))])
-
-    #    # compute true anomaly ν
-    #    #true_anomaly = 2 * np.arctan2((1 + e)**0.5*np.sin(E/2), (1 - e)**0.5*np.cos(E/2))
-
-    #    true_anomaly = np.zeros(len(M))
-    #    true_anomaly[e < 1] = 2 * arctan2(sqrt(1 + e[e < 1]) * sin(E[e < 1] / 2), sqrt(1 - e[e < 1]) * cos(E[e < 1] / 2))
-    #    true_anomaly[e >= 1] = 2 * arctan2(sqrt(e[e >= 1] + 1) * tanh(E[e >= 1] / 2), sqrt(e[e >= 1] - 1))
-
-
-    #    r = np.zeros(len(M))
-    #    r[e < 1] = a[e < 1] * (1 - e[e < 1] * cos(E[e < 1]))
-    #    r[e >= 1] = abs(a[e >= 1]) * abs(1 - e[e >= 1]**2) / (1 + e[e >= 1] * cos(true_anomaly[e >= 1]))
-
-    #    # compute the distance to the central body r
-    #    #r = a * (1 - e * np.cos(E))
-
-    #    # obtain the position vector o
-    #    o = Vector(r * cos(true_anomaly), r * sin(true_anomaly), np.zeros_like(true_anomaly))
-
-    #    vx = np.zeros(len(M))
-    #    vy = np.zeros(len(M))
-    #    vz = np.zeros(len(M))
-    #    xi_bound = sqrt(mu_bary / u.rad**2 * abs(a[e < 1])) / r[e < 1]
-    #    xi_unbound = sqrt(mu_bary / u.rad**2 * abs(a[e >= 1])) / r[e >= 1]
-
-    #    vx[e < 1] = - xi_bound * sin(E[e < 1])
-    #    vx[e >= 1] = - xi_unbound * sinh(E[e >= 1])
-
-    #    vy[e < 1] = xi_bound * sqrt(abs(1 - e[e < 1]**2)) * cos(E[e < 1])
-    #    vy[e >= 1] = xi_unbound * sqrt(abs(1 - e[e >= 1]**2)) * np.cosh(E[e >= 1])
-
-    #    vz[e < 1] = xi_bound * zeros_like(E[e < 1])
-    #    vz[e >= 1] = xi_unbound * zeros_like(E[e >= 1])
-
-    #    ov = Vector(vx, vy, vz)
-
-    #    #ov = Vector((mu_bary * a)**0.5 / r * (-np.sin(E))/ u.rad, (mu_bary * a)**0.5 / r * ((1 - e**2)**0.5 * np.cos(E))/ u.rad, np.zeros(len(true_anomaly))/ u.rad)
-
-    #    # Rotate o to the inertial frame
-    #    position = o.euler_rotation(arg, inc, node) #* u.au
-    #    velocity = ov.euler_rotation(arg, inc, node) #* u.au / u.day
-
-    #    return position.x * u.au, position.y * u.au, position.z * u.au, velocity.x * u.au/u.d, velocity.y * u.au/u.d, velocity.z * u.au/u.d
