@@ -24,7 +24,7 @@ os.environ['ORBIT_OBSERVATORIES'] = pymodulepath + '/data/observatories.dat'
 
 from .spacerock import SpaceRock
 from .units import Units
-from .Orbfit import Orbfit
+from .orbfit import Orbfit
 from .pyOrbfit import *
 #from .propagate import Propagate
 #from .observe import Observe
