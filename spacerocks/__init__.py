@@ -15,8 +15,17 @@ from ctypes import cdll
 __libpath__ = pymodulepath+"/../libspacerocks"+suffix
 clibspacerocks = cdll.LoadLibrary(__libpath__)
 
+__libpath__ = pymodulepath+"/../_pyOrbfit"+suffix
+cliborbfit = cdll.LoadLibrary(__libpath__)
+
+os.environ['ORBIT_EPHEMERIS'] = pymodulepath + '/data/binEphem.423'
+os.environ['ORBIT_OBSERVATORIES'] = pymodulepath + '/data/observatories.dat'
+
+
 from .spacerock import SpaceRock
 from .units import Units
+from .Orbfit import Orbfit
+from .pyOrbfit import *
 #from .propagate import Propagate
 #from .observe import Observe
 #from .neptune_resonances import *

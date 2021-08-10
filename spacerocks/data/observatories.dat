@@ -1,0 +1,36 @@
+#	$Id: observatories.dat,v 2.0 2001/09/14 19:05:06 garyb Exp $	
+# File with data on observatories
+500    0:00:00     0:00:00    -6200.  Geocenter
+046  -14:17:17.2  48:51:47.8  1061.61 Klet Observatory, Ceske Budejovice
+260  149:03:58.0 -31:16:36.7  1187    Siding Spring Observaotry
+304   70:41:33.4 -29:00:52.6  2380    Las Campanas Observatory
+309   70:24:11.5 -24:37:33.2  2631    Cerro Paranal Observatory
+360 -132:56:39.1  33:40:27.5  605.4   Kuma Kogen
+402 -136:18:28.1  35:12:30.1  218.649 Dynic Astronomical Observatory
+413 -149:03:58.0 -31:16:36.7  1187.2  Siding Spring Observatory
+493    2:32:44.9  37:13:24.5  2172.62 Calar Alto
+566  156:15:27.4  20:42:29.9  3040.45 Haleakela-NEAT
+568  155:28:19.9  19:49:33.9  4207.24 Mauna Kea
+566  156:15:28.8  20:42:29.9  3040.45 Haleakela-AMOS
+621   -7:29:08.9  51:05:15.6  325.023 Bergisch Gladbach
+645  105:49:12.0  32:47:01.1  2674.42 Apache Point-Sloan Digital Sky Survey
+675  116:51:50.4  33:21:21.6  1713.14 Palomar Mountain
+688  111:32:07.8  35:05:45.4  2212.09 Lowell Obs., Anderson Mesa Sta.
+689  111:44:23.6  35:11:02.1  2297.35 U.S. Naval Observatory, Flagstaff
+691  111:35:57.8  31:57:46.4  2040.61 Steward Obs., Kitt Peak-Spacewatch
+695  111:35:40.9  31:57:31.8  2058.4  Kitt Peak
+696  110:53:04.6  31:41:20.4  2622.58 Whipple Observatory, Mt. Hopkins
+697  111:36:56.9  31:57:00.4  1913.37 Kitt Peak, McGraw-Hill
+705  105:49:12.0  32:47:01.1  2674.42 Apache Point
+709  105:46:16.3  32:57:21.0  2496.35 W & B Observatory, Cloudcroft
+711  104:01:17.4  30:40:17.4  2103.73 McDonald Observatory, Fort Davis
+807   70:48:21.2 -30:10:08.8  2385.89 Cerro Tololo Observatory, La Serena
+809   70:43:46.6 -29:15:25.7  2391.82 European Southern Obs., La Silla
+867 -134:07:19.9  35:20:20.1  386.665 Saji Observatory
+950   17:52:56.6  28:45:36.8  2324.09 La Palma
+954   16:29:48.1  28:17:30.3  2118.8  Teide Observatory
+-7    67:45:16.9 -23:01:45.0  5079.71 Atacama Large mm/sub-mm Array (ALMA) Center of Array
+# For orbiting spacecraft:
+#code inclination  period  precess_P  jd0   ra0  name
+#       (deg)      (days)  (days)          (deg)
+250  28.48       0.067125   56.     2452066.  255  Pseudo-HST
