@@ -10,7 +10,6 @@ from .spacerock import SpaceRock
 from .units import Units
 from astropy.coordinates import Angle, SkyCoord
 from astropy.time import Time
-import ephem
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.patches import Ellipse
@@ -273,7 +272,7 @@ class Orbfit(Convenience):
         ellipsePlot = Ellipse(xy=pos, width=2.0*np.sqrt(s[0]), height=2.0*np.sqrt(s[1]), angle=orient, facecolor=face, edgecolor=edge, alpha=alpha, label=label)
         return ellipsePlot
 
-    def predict_pos(self, date, obscode=807):
+    def predict_pos(self, date, obscode=807, units=Units()):
         """
         Computes ra, dec, and error ellipse at the date(s) and observatory specified.
         Date is an ephem.date object.
@@ -300,7 +299,12 @@ class Orbfit(Convenience):
         # Fill the OBSERVATION structure
         futobs = orbfit.OBSERVATION()
         futobs.obscode = obscode
-        futobs.obstime = (ephem.julian_date(date)-jd0)*orbfit.DAY
+
+        if units.timeformat is None:
+            futobs.obstime = self.detect_timescale(kwargs.get('epoch'), units.timescale)
+        else:
+            futobs.obstime = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
+        #futobs.obstime = (ephem.julian_date(date)-jd0)*orbfit.DAY
         futobs.xe = -999  # force evaluation of earth3D
         dx = orbfit.dvector(1,6)
         dy = orbfit.dvector(1,6)
@@ -329,9 +333,9 @@ class Orbfit(Convenience):
         det = xx*yy-xy*xy
         a = (det/bovasqrd)**(1/4)/orbfit.ARCSEC   # semimajor, minor axes of error ellipse, in arcsec
         b = (det*bovasqrd)**(1/4)/orbfit.ARCSEC
-        err_ellipse = dict(a=a, b=b, PA=pos_angle)   # store as a dictionary
+        err_ellipse = dict(a=Angle(a * u.arcsec), b=Angle(b * u.arcsec), PA=Angle(pos_angle * u.deg))   # store as a dictionary
 
-        pos = dict(ra=ephem.hours(ra_eq), dec=ephem.degrees(dec_eq), err=err_ellipse, elong=solar_elongation, opp=opposition_angle)
+        pos = dict(ra=Angle(ra_eq, u.rad), dec=Angle(dec_eq, u.rad), err=err_ellipse, elong=solar_elongation, opp=opposition_angle)
         return pos
 
     @property
@@ -360,64 +364,75 @@ class Orbfit(Convenience):
     def kepcov(self):
         return self.covar_aei
 
-    def orbit2df(self):
-        '''
-        Insert the orbit details into a pandas dataframe.
-        '''
-        orbit_cols = ['chisq', 'ndof', 'a', 'e', 'inc',
-        'aop', 'node', 'peri_jd', 'peri_date', 'epoch_jd',
-        'mean_anomaly', 'period', 'period_err',
-        'a_err', 'e_err', 'inc_err', 'aop_err', 'node_err', 'peri_err', 'lat0', 'lon0',
-        'xbary','ybary','zbary',
-        'abg_a', 'abg_b', 'abg_g',
-        'abg_adot', 'abg_bdot', 'abg_gdot',
-        'abg_a_err', 'abg_b_err', 'abg_g_err',
-        'abg_adot_err', 'abg_bdot_err', 'abg_gdot_err']
-        index = np.arange(1)
-        df = pd.DataFrame(columns=orbit_cols, index=index)
+    #def orbit2df(self):
+    #    '''
+    #    Insert the orbit details into a pandas dataframe.
+    #    '''
+    #    orbit_cols = ['chisq', 'ndof', 'a', 'e', 'inc',
+    #    'aop', 'node', 'peri_jd', 'peri_date', 'epoch_jd',
+    #    'mean_anomaly', 'period', 'period_err',
+    #    'a_err', 'e_err', 'inc_err', 'aop_err', 'node_err', 'peri_err', 'lat0', 'lon0',
+    #    'xbary','ybary','zbary',
+    #    'abg_a', 'abg_b', 'abg_g',
+    #    'abg_adot', 'abg_bdot', 'abg_gdot',
+    #    'abg_a_err', 'abg_b_err', 'abg_g_err',
+    #    'abg_adot_err', 'abg_bdot_err', 'abg_gdot_err']
+    #    index = np.arange(1)
+    #    df = pd.DataFrame(columns=orbit_cols, index=index)
 
-        elements, errs = self.get_elements()
-        elements_abg, errs_abg = self.get_elements_abg()
-        epoch = self.jd0
+    #    elements, errs = self.get_elements()
+    #    elements_abg, errs_abg = self.get_elements_abg()
+    #    epoch = self.jd0
 
-        peri_jd = -999 if np.isnan(elements['top']) else elements['top']
-        peri_date = -999 if np.isnan(elements['top']) else str(ephem.date(elements['top']-2415020))
-        peri_jd_err = -999 if (np.isnan(elements['top']) or np.isnan(errs['top'])) else errs['top']
-        period = elements['a']**1.5 if elements['a']>0 else -999
-        period_err = 3*np.sqrt(elements['a'])/2*errs['a'] if elements['a']>0 else -999
+    #    peri_jd = -999 if np.isnan(elements['top']) else elements['top']
+    #    #peri_date = -999 if np.isnan(elements['top']) else str(ephem.date(elements['top']-2415020))
+    #    peri_jd_err = -999 if (np.isnan(elements['top']) or np.isnan(errs['top'])) else errs['top']
+    #    period = elements['a']**1.5 if elements['a']>0 else -999
+    #    period_err = 3*np.sqrt(elements['a'])/2*errs['a'] if elements['a']>0 else -999
 
-        orbit_data = np.array([round(self.chisq,2), self.ndof, round(elements['a'],4), round(elements['e'],6), round(elements['i'],6),
-            round(elements['aop'],2), round(elements['lan'],3), round(peri_jd,2), peri_date, round(epoch,2),
-            self.mean_anomaly(), round(period,3) , round(period_err,3),
-            round(errs['a'],4), round(errs['e'],6), round(errs['i'],6), round(errs['aop'],2), round(errs['lan'],3), round(peri_jd_err,2), round(self.lat0,4), round(self.lon0,4),
-            round(self.xBary,4), round(self.yBary,4), round(self.zBary,4),
-            elements_abg['a'], elements_abg['b'], elements_abg['g'],
-            elements_abg['adot'], elements_abg['bdot'], elements_abg['gdot'],
-            errs_abg['a'], errs_abg['b'], errs_abg['g'],
-            errs_abg['adot'], errs_abg['bdot'], errs_abg['gdot']
-            ])
-        df.ix[0] = orbit_data
-        return df
+    #    #orbit_data = np.array([round(self.chisq,2), self.ndof, round(elements['a'],4), round(elements['e'],6), round(elements['i'],6),
+    #    #    round(elements['aop'],2), round(elements['lan'],3), round(peri_jd,2), peri_date, round(epoch,2),
+    #    #    self.mean_anomaly(), round(period,3) , round(period_err,3),
+    #    #    round(errs['a'],4), round(errs['e'],6), round(errs['i'],6), round(errs['aop'],2), round(errs['lan'],3), round(peri_jd_err,2), round(self.lat0,4), round(self.lon0,4),
+    #    #    round(self.xBary,4), round(self.yBary,4), round(self.zBary,4),
+    #    #    elements_abg['a'], elements_abg['b'], elements_abg['g'],
+    #    #    elements_abg['adot'], elements_abg['bdot'], elements_abg['gdot'],
+    #    #    errs_abg['a'], errs_abg['b'], errs_abg['g'],
+    #    #    errs_abg['adot'], errs_abg['bdot'], errs_abg['gdot']
+    #    #    ])
 
-    def residuals(self, obsdf, date_col='date', ra_col='ra', dec_col='dec'):
-        '''
-        Returns the residuals (in arcseconds) for the observations in obscat as a numpy array. Ordering is same as time-order of the observations,
-        from earliest to latest.
-        obsdf is a pandas dataframe containing the observations.
-        date, ra, dec are in the column names specified.
-        date is an ephem.date object
-        ra, dec are ephem.Angle objects (typically hours, degrees)
-        '''
-        resids = []
-        obsdf.sort_values('expnum', ascending=True, inplace=True)
-        for ind, obs in obsdf.iterrows():
-            if obs[date_col][0] != '#':
-                pos_pred = self.predict_pos(ephem.date(obs[date_col])+0.53*ephem.second + float(obs['exptime'])*ephem.second/2)
-                ra_pred, dec_pred = pos_pred['ra'], pos_pred['dec']
-                sep = ephem.separation( (ephem.hours(obs[ra_col]),ephem.degrees(obs[dec_col])), (ra_pred, dec_pred))
-                resid = sep*(180/np.pi)*3600    # convert to arcseconds
-                resids.append(resid)
-        return np.array(resids)
+    #    orbit_data = np.array([round(self.chisq,2), self.ndof, round(elements['a'],4), round(elements['e'],6), round(elements['i'],6),
+    #        round(elements['aop'],2), round(elements['lan'],3), round(peri_jd,2), round(epoch,2),
+    #        self.mean_anomaly(), round(period,3) , round(period_err,3),
+    #        round(errs['a'],4), round(errs['e'],6), round(errs['i'],6), round(errs['aop'],2), round(errs['lan'],3), round(peri_jd_err,2), round(self.lat0,4), round(self.lon0,4),
+    #        round(self.xBary,4), round(self.yBary,4), round(self.zBary,4),
+    #        elements_abg['a'], elements_abg['b'], elements_abg['g'],
+    #        elements_abg['adot'], elements_abg['bdot'], elements_abg['gdot'],
+    #        errs_abg['a'], errs_abg['b'], errs_abg['g'],
+    #        errs_abg['adot'], errs_abg['bdot'], errs_abg['gdot']
+    #        ])
+    #    df.ix[0] = orbit_data
+    #    return df
+
+    #def residuals(self, obsdf, date_col='date', ra_col='ra', dec_col='dec'):
+    #    '''
+    #    Returns the residuals (in arcseconds) for the observations in obscat as a numpy array. Ordering is same as time-order of the observations,
+    #    from earliest to latest.
+    #    obsdf is a pandas dataframe containing the observations.
+    #    date, ra, dec are in the column names specified.
+    #    date is an ephem.date object
+    #    ra, dec are ephem.Angle objects (typically hours, degrees)
+    #    '''
+    #    resids = []
+    #    obsdf.sort_values('expnum', ascending=True, inplace=True)
+    #    for ind, obs in obsdf.iterrows():
+    #        if obs[date_col][0] != '#':
+    #            #pos_pred = self.predict_pos(ephem.date(obs[date_col])+0.53*ephem.second + float(obs['exptime'])*ephem.second/2)
+    #            ra_pred, dec_pred = pos_pred['ra'], pos_pred['dec']
+    #            sep = ephem.separation( (ephem.hours(obs[ra_col]),ephem.degrees(obs[dec_col])), (ra_pred, dec_pred))
+    #            resid = sep*(180/np.pi)*3600    # convert to arcseconds
+    #            resids.append(resid)
+    #    return np.array(resids)
 
 
 
