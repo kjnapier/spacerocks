@@ -301,9 +301,12 @@ class Orbfit(Convenience):
         futobs.obscode = obscode
 
         if units.timeformat is None:
-            futobs.obstime = self.detect_timescale(kwargs.get('epoch'), units.timescale)
+            epoch = self.detect_timescale(date, units.timescale)
         else:
-            futobs.obstime = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
+            epoch = Time(date, format=units.timeformat, scale=units.timescale)
+
+        futobs.obstime = (epoch.jd - jd0) * orbfit.DAY
+
         #futobs.obstime = (ephem.julian_date(date)-jd0)*orbfit.DAY
         futobs.xe = -999  # force evaluation of earth3D
         dx = orbfit.dvector(1,6)
