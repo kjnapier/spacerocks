@@ -210,32 +210,32 @@ class Orbfit(Convenience):
         elements['a'] = self.orbit_aei.a
         try:                                # semimajor axis (AU)
             elements_errs['a'] = np.sqrt(self.covar_aei[0][0])
-        except RunTimeWarning:
+        except:
             elements_errs['a'] = -99
         elements['e'] = self.orbit_aei.e
         try:                                # eccentricity
             elements_errs['e'] = np.sqrt(self.covar_aei[1][1])
-        except RunTimeWarning:
+        except:
             elements_errs['e'] = -99
         elements['i'] = self.orbit_aei.i
         try:                                # inclination (deg)
             elements_errs['i'] = np.sqrt(self.covar_aei[2][2])/(np.pi/180)
-        except RunTimeWarning:
+        except:
             elements_errs['i'] = -99
         elements['lan'] = self.orbit_aei.lan
         try:                             # longitude of ascending node (deg)
             elements_errs['lan'] = np.sqrt(self.covar_aei[3][3])/(np.pi/180)
-        except RunTimeWarning:
+        except:
             elements_errs['lan'] = -99
         elements['aop'] = self.orbit_aei.aop
         try:                            # argument of perihelion (deg)
             elements_errs['aop'] = np.sqrt(self.covar_aei[4][4])/(np.pi/180)
-        except RunTimeWarning:
+        except:
             elements_errs['aop'] = -99
         elements['top'] = self.orbit_aei.T
         try:                                # time of periapsis (JD)
             elements_errs['top'] = np.sqrt(self.covar_aei[5][5])/orbfit.DAY
-        except RunTimeWarning:
+        except:
             elements_errs['top'] = -99
         return elements, elements_errs
 
