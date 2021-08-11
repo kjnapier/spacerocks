@@ -1,18 +1,24 @@
 #!/usr/bin/env python
 
-from __future__ import division
-
 import pyOrbfit as orbfit
 import numpy as np
+
+from spacerocks import SpaceRock, Units
+from astropy.coordinates import Angle, SkyCoord
+from astropy.time import Time
 import ephem
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.patches import Ellipse
 
-class Orbfit(object):
+from .convenience import Convenience
+from astropy import units as u
+
+
+class Orbfit(Convenience):
     """Class for interface to orbit-fitting code"""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, units=Units(), **kwargs):
         """
         Takes a set of input observations and fits the orbital elements. These can then be used to
         compute the position and error ellipse for the object on an arbitrary date.
@@ -25,6 +31,7 @@ class Orbfit(object):
                    where the error is the astrometric error on each measurement in arcsec (default 0.2)
                    and OBSCODE is the observatory code in observatories.dat
                    The number of digits in each field is unrestricted, but ra and dec must not contain spaces.
+
         The following options should be used only if obsfile is None. Then they must all be used. If obsfile
         is supplied then these arguments are ignored.
         dates -- list of observation dates, either in JD or YYYY MM DD.DDDDD format
@@ -63,36 +70,48 @@ class Orbfit(object):
                         iobs+=1
                 if 'err' in kwargs.keys(): # change: obserr need not be constant
                     obserr = kwargs['err']
-        elif len(args):              # observations supplied in a Catalog object
-            self.nobs = len(args[0])
-            self.obsarray = orbfit.OBSERVATION_ARRAY(self.nobs)
-            for iobs, pt in enumerate(args[0]):
-                thisobs = orbfit.OBSERVATION()
-                if pt.err is None: pt.err=0.15           # This is to avoid silent crash.
-                if pt.obscode is None: pt.obscode=807    # Ditto.
-                obsline = str(ephem.julian_date(pt.date))+' '+str(pt.ra)+' '+str(pt.dec)+' '+str(pt.err)+' '+str(pt.obscode)
-                orbfit.scan_observation(obsline, thisobs)
-                orbfit.add_to_obsarray(self.obsarray, iobs, thisobs)
+        #elif len(args):              # observations supplied in a Catalog object
+        #    self.nobs = len(args[0])
+        #    self.obsarray = orbfit.OBSERVATION_ARRAY(self.nobs)
+        #    for iobs, pt in enumerate(args[0]):
+        #        thisobs = orbfit.OBSERVATION()
+        #        if pt.err is None: pt.err=0.15           # This is to avoid silent crash.
+        #        if pt.obscode is None: pt.obscode=807    # Ditto.
+        #        obsline = str(ephem.julian_date(pt.date))+' '+str(pt.ra)+' '+str(pt.dec)+' '+str(pt.err)+' '+str(pt.obscode)
+        #        orbfit.scan_observation(obsline, thisobs)
+        #        orbfit.add_to_obsarray(self.obsarray, iobs, thisobs)
         else:                           # observations specified in input lists
-            required_keys = ['dates', 'ra', 'dec', 'obscode']
+            required_keys = ['epoch', 'ra', 'dec', 'obscode']
             for k in required_keys:
                 if k not in kwargs.keys():
                     raise KeyError('keyword '+k+' is missing')
-            obsdate = kwargs['dates']
-            ra = kwargs['ra']
-            dec = kwargs['dec']
-            obscode = kwargs['obscode']
+
+            if units.timeformat is None:
+                obsdate = self.detect_timescale(kwargs.get('epoch'), units.timescale)
+            else:
+                obsdate = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
+
+
+            c = SkyCoord(kwargs['ra'] * units.ra, kwargs['dec'] * units.dec)
+
+            if len(np.atleast_1d(kwargs['obscode'])) == 1:
+                obscode = np.repeat(kwargs['obscode'], len(c))
+
+
             self.nobs = len(obsdate)
             if 'err' in kwargs.keys(): # change: obserr need not be constant
                 obserr = kwargs['err']
                 if not np.iterable(obserr): obserr = [obserr for i in range(self.nobs)]
             else:
                 obserr = [0.15 for i in range(self.nobs)]       # obervation astrometric error defaults to 0.15"
-            assert self.nobs==len(ra) and self.nobs==len(dec) and self.nobs==len(obscode) and self.nobs==len(obserr)
+            assert self.nobs==len(c) and self.nobs==len(obscode) and self.nobs==len(obserr)
+
+
             self.obsarray = orbfit.OBSERVATION_ARRAY(self.nobs)   # create empty array of observations
             for iobs in range(self.nobs):   # fill the OBSERVATION_ARRAY
                 thisobs = orbfit.OBSERVATION()
-                obsline = str(ephem.julian_date(obsdate[iobs]))+' '+str(ra[iobs])+' '+str(dec[iobs])+' '+str(obserr[iobs])+' '+str(obscode[iobs])
+                obsline = str(obsdate[iobs].jd)+' '+str(c[iobs].ra.to_string(u.hour, sep=':'))+' '+str(c[iobs].dec.to_string(u.deg, sep=':', alwayssign=True))+' '+str(obserr[iobs])+' '+str(obscode[iobs])
+                #obsline = str(ephem.julian_date(obsdate[iobs]))+' '+str(ra[iobs])+' '+str(dec[iobs])+' '+str(obserr[iobs])+' '+str(obscode[iobs])
                 orbfit.scan_observation(obsline, thisobs)
                 orbfit.add_to_obsarray(self.obsarray, iobs, thisobs)
 
@@ -310,23 +329,31 @@ class Orbfit(object):
         pos = dict(ra=ephem.hours(ra_eq), dec=ephem.degrees(dec_eq), err=err_ellipse, elong=solar_elongation, opp=opposition_angle)
         return pos
 
-    def ellipticalBody(self, name=None):
+    @property
+    def spacerock(self):
         '''
-        Packs the orbital parameters into an EllipticalBody object suitable for use by pyEphem
+        Packs the orbital parameters into an SpaceRock object
         '''
-        DJD = 2415020   # Dublin Julian Date t=0 (used by pyephem Date object)
-        b = ephem.EllipticalBody()
-        if name is not None:
-            b.name=name
-        b._a = self.orbit_aei.a
-        b._inc = self.orbit_aei.i
-        b._Om = self.orbit_aei.lan
-        b._om = self.orbit_aei.aop
-        b._e = self.orbit_aei.e
-        b._epoch = ephem.date('2000/01/01')    # J2000
-        b._M = self.mean_anomaly()     # mean anomaly from perihelion (deg)
-        b._epoch_M = ephem.date(orbfit.cvar.jd0-DJD)   # date for measurement of mean anomaly _M
-        return b
+        units = Units()
+        units.angle = 'deg'
+        rock = SpaceRock(a=self.orbit_aei.a,
+                         e=self.orbit_aei.e,
+                         inc=self.orbit_aei.i,
+                         arg=self.orbit_aei.aop,
+                         node=self.orbit_aei.lan,
+                         M=self.mean_anomaly(),
+                         epoch=orbfit.cvar.jd0,
+                         frame='barycentric',
+                         units=units)
+        return rock
+
+    @property
+    def xyzcov(self):
+        return self.covar_xyz
+
+    @property
+    def kepcov(self):
+        return self.covar_aei
 
     def orbit2df(self):
         '''

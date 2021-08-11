@@ -15,10 +15,14 @@ class Units:
     def set_default(self):
         self.distance = u.au
         self.angle = u.deg
+
         self.timescale = 'utc'
         self.timeformat = None
         self.speed = u.au / u.d
         self.rotation_period = u.d
+
+        self.ra = u.deg
+        self.dec = u.deg
 
     def current(self):
         print("{:<20} {:<15}".format('Quantity', 'Unit'))
