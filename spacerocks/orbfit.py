@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import pyOrbfit as orbfit
+import .pyOrbfit as orbfit
 import numpy as np
 
 from spacerocks import SpaceRock, Units
@@ -258,7 +258,8 @@ class Orbfit(Convenience):
         return elements, elements_errs
 
     def plotEllipse(self, pos, cov, ind_x, ind_y, edge='k', face='b', alpha=0.5, scale_x=1.0, scale_y=1.0, label=None):
-        """Returns an error ellipse, suitable for plotting, given a covariance matrix and the indices of the two variables
+        """
+        Returns an error ellipse, suitable for plotting, given a covariance matrix and the indices of the two variables
         Usage: ellipsePlot=plotEllipse([x,y], covar_aei, 0, 1, edge='b', face='b', alpha=0.7, label='Error ellipse')
         """
         cov2x2 = np.array([cov[ind_x][ind_x]/scale_x**2, cov[ind_x][ind_y]/(scale_x*scale_y), \
