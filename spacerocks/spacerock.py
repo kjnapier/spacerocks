@@ -655,10 +655,10 @@ class SpaceRock(OrbitFuncs, Convenience):
             x, y, z, _, _, _ = self.kep_to_xyz_temp(1000,
                                                     np.repeat(r.a, 1000),
                                                     np.repeat(r.e, 1000),
-                                                    np.repeat(r.inc, 1000),
-                                                    np.repeat(r.arg, 1000),
-                                                    np.repeat(r.node, 1000),
-                                                    M)
+                                                    np.repeat(r.inc.rad, 1000),
+                                                    np.repeat(r.arg.rad, 1000),
+                                                    np.repeat(r.node.rad, 1000),
+                                                    M.rad)
             xs.append(x)
             ys.append(y)
             zs.append(z)

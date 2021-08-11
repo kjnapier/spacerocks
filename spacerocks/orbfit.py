@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 
-#import pyOrbfit as orbfit
-#from . import cliborbfit as orbfit
 from . import pyOrbfit as orbfit
 import numpy as np
 
 #from spacerocks import SpaceRock, Units
 from .spacerock import SpaceRock
 from .units import Units
+from .prediction import Prediction
+
 from astropy.coordinates import Angle, SkyCoord
 from astropy.time import Time
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.patches import Ellipse
+import dateutil
 
 from .convenience import Convenience
 from astropy import units as u
@@ -272,7 +273,16 @@ class Orbfit(Convenience):
         ellipsePlot = Ellipse(xy=pos, width=2.0*np.sqrt(s[0]), height=2.0*np.sqrt(s[1]), angle=orient, facecolor=face, edgecolor=edge, alpha=alpha, label=label)
         return ellipsePlot
 
-    def predict_pos(self, date, obscode=807, units=Units()):
+    def clone(self, N):
+        rock = self.spacerock
+        mean = np.array([rock.a.au, rock.e, rock.inc.deg, rock.node.deg, rock.arg.deg, rock.t_peri.jd]).flatten()
+        a, e, inc, node, arg, t_peri =  np.random.multivariate_normal(mean, self.kepcov, N).T
+
+        units = Units()
+        units.angle = 'deg'
+        return SpaceRock(a=a, e=e, inc=inc, arg=arg, node=node, t_peri=t_peri, epoch=np.repeat(rock.epoch.jd, N), frame='barycentric', units=Units())
+
+    def predict_pos(self, dates, obscode=807, units=Units()):
         """
         Computes ra, dec, and error ellipse at the date(s) and observatory specified.
         Date is an ephem.date object.
@@ -290,56 +300,81 @@ class Orbfit(Convenience):
         """
         p_in = self.orbit_abg
         jd0 = orbfit.cvar.jd0     # zeropoint of time scale
-        # Create space for various useful matrices
-        sigxy = orbfit.dmatrix(1,2,1,2)
-        derivs = orbfit.dmatrix(1,2,1,2)
-        covecl = orbfit.dmatrix(1,2,1,2)
-        coveq = orbfit.dmatrix(1,2,1,2)
 
-        # Fill the OBSERVATION structure
-        futobs = orbfit.OBSERVATION()
-        futobs.obscode = obscode
 
-        if units.timeformat is None:
-            epoch = self.detect_timescale(date, units.timescale)
-        else:
-            epoch = Time(date, format=units.timeformat, scale=units.timescale)
+        dates = np.atleast_1d(dates)
 
-        futobs.obstime = (epoch.jd - jd0) * orbfit.DAY
+        ra = []
+        dec = []
+        err_a = []
+        err_b = []
+        err_pa = []
+        elong = []
+        opp = []
 
-        #futobs.obstime = (ephem.julian_date(date)-jd0)*orbfit.DAY
-        futobs.xe = -999  # force evaluation of earth3D
-        dx = orbfit.dvector(1,6)
-        dy = orbfit.dvector(1,6)
-        # Sometimes hangs in next line... why?
-        thetax, thetay = orbfit.kbo2d(p_in, futobs, dx, dy)
-        # Predicted position, in abg basis:
-        orbfit.predict_posn(p_in, self.cov_abg, futobs, sigxy)
-        solar_elongation = orbfit.elongation(futobs)/orbfit.DTOR       # solar elongation in degrees
-        opposition_angle = orbfit.opposition_angle(futobs)/orbfit.DTOR # opposition angle in degrees
-        lat_ec, lon_ec = orbfit.proj_to_ec(futobs.thetax, futobs.thetay, orbfit.cvar.lat0, orbfit.cvar.lon0, derivs)  # project to ecliptic coords
-        orbfit.covar_map(sigxy, derivs, covecl, 2, 2)    # map the covariance
-        ra_eq, dec_eq = orbfit.ec_to_eq(lat_ec, lon_ec, derivs)    # transform to ICRS to compute ra, dec
-        if ra_eq<0: ra_eq += 2*np.pi        # convert angle to (0,2pi) range
-        orbfit.covar_map(covecl, derivs, coveq, 2, 2)    # map the covariance
+        for date in dates:
 
-        # Compute ICRS error ellipse
-        c = orbfit.doubleArray(4)   # stoopid workaround for double pointers...
-        orbfit.flatten_cov(coveq, 2, c)
-        covar_eq = np.array([c[i] for i in range(4)]).reshape(2,2)
-        xx = covar_eq[0][0]*np.cos(dec_eq)**2
-        xy = covar_eq[0][1]*np.cos(dec_eq)
-        yy = covar_eq[1][1]
-        pos_angle = 0.5*np.arctan2(2.*xy,(xx-yy)) * 180./np.pi
-        pos_angle = 90 - pos_angle     # convert to astronomy convention of measuring position angle North through East
-        bovasqrd  = (xx + yy - np.sqrt((xx-yy)**2 + (2*xy)**2)) / (xx + yy + np.sqrt((xx-yy)**2 + (2*xy)**2))
-        det = xx*yy-xy*xy
-        a = (det/bovasqrd)**(1/4)/orbfit.ARCSEC   # semimajor, minor axes of error ellipse, in arcsec
-        b = (det*bovasqrd)**(1/4)/orbfit.ARCSEC
-        err_ellipse = dict(a=Angle(a * u.arcsec), b=Angle(b * u.arcsec), PA=Angle(pos_angle * u.deg))   # store as a dictionary
+            # Create space for various useful matrices
+            sigxy = orbfit.dmatrix(1,2,1,2)
+            derivs = orbfit.dmatrix(1,2,1,2)
+            covecl = orbfit.dmatrix(1,2,1,2)
+            coveq = orbfit.dmatrix(1,2,1,2)
 
-        pos = dict(ra=Angle(ra_eq, u.rad), dec=Angle(dec_eq, u.rad), err=err_ellipse, elong=solar_elongation, opp=opposition_angle)
-        return pos
+            # Fill the OBSERVATION structure
+            futobs = orbfit.OBSERVATION()
+            futobs.obscode = obscode
+
+
+            if units.timeformat is None:
+                epoch = Time(dateutil.parser.parse(date, fuzzy_with_tokens=True)[0], format='datetime', scale=units.timescale)
+            else:
+                epoch = Time(date, format=units.timeformat, scale=units.timescale)
+
+
+            futobs.obstime = (epoch.jd - jd0) * orbfit.DAY
+
+
+            #futobs.obstime = (ephem.julian_date(date)-jd0)*orbfit.DAY
+            futobs.xe = -999  # force evaluation of earth3D
+            dx = orbfit.dvector(1,6)
+            dy = orbfit.dvector(1,6)
+            # Sometimes hangs in next line... why?
+            thetax, thetay = orbfit.kbo2d(p_in, futobs, dx, dy)
+            # Predicted position, in abg basis:
+            orbfit.predict_posn(p_in, self.cov_abg, futobs, sigxy)
+            solar_elongation = orbfit.elongation(futobs)/orbfit.DTOR       # solar elongation in degrees
+            opposition_angle = orbfit.opposition_angle(futobs)/orbfit.DTOR # opposition angle in degrees
+
+            elong.append(solar_elongation)
+            opp.append(opposition_angle)
+
+            lat_ec, lon_ec = orbfit.proj_to_ec(futobs.thetax, futobs.thetay, orbfit.cvar.lat0, orbfit.cvar.lon0, derivs)  # project to ecliptic coords
+            orbfit.covar_map(sigxy, derivs, covecl, 2, 2)    # map the covariance
+            ra_eq, dec_eq = orbfit.ec_to_eq(lat_ec, lon_ec, derivs)    # transform to ICRS to compute ra, dec
+            if ra_eq<0: ra_eq += 2*np.pi        # convert angle to (0,2pi) range
+
+            ra.append(ra_eq)
+            dec.append(dec_eq)
+            orbfit.covar_map(covecl, derivs, coveq, 2, 2)    # map the covariance
+
+            # Compute ICRS error ellipse
+            c = orbfit.doubleArray(4)   # stoopid workaround for double pointers...
+            orbfit.flatten_cov(coveq, 2, c)
+            covar_eq = np.array([c[i] for i in range(4)]).reshape(2,2)
+            xx = covar_eq[0][0]*np.cos(dec_eq)**2
+            xy = covar_eq[0][1]*np.cos(dec_eq)
+            yy = covar_eq[1][1]
+            pos_angle = 0.5*np.arctan2(2.*xy,(xx-yy)) * 180./np.pi
+            pos_angle = 90 - pos_angle     # convert to astronomy convention of measuring position angle North through East
+            err_pa.append(pos_angle)
+            bovasqrd  = (xx + yy - np.sqrt((xx-yy)**2 + (2*xy)**2)) / (xx + yy + np.sqrt((xx-yy)**2 + (2*xy)**2))
+            det = xx*yy-xy*xy
+            err_a.append((det/bovasqrd)**(1/4)/orbfit.ARCSEC)   # semimajor, minor axes of error ellipse, in arcsec
+            err_b.append((det*bovasqrd)**(1/4)/orbfit.ARCSEC)
+            #err_ellipse = dict(a=Angle(a * u.arcsec), b=Angle(b * u.arcsec), PA=Angle(pos_angle * u.deg))   # store as a dictionary
+
+        #pos = dict(ra=Angle(ra_eq, u.rad), dec=Angle(dec_eq, u.rad), err=err_ellipse, elong=solar_elongation, opp=opposition_angle)
+        return Prediction(epoch=epoch, ra=ra, dec=dec, err_a=err_a, err_b=err_b, err_pa=err_pa, elong=elong, opp=opp)
 
     @property
     def spacerock(self):
@@ -373,7 +408,7 @@ class Orbfit(Convenience):
     #    '''
     #    orbit_cols = ['chisq', 'ndof', 'a', 'e', 'inc',
     #    'aop', 'node', 'peri_jd', 'peri_date', 'epoch_jd',
-    #    'mean_anomaly', 'period', 'period_err',
+    #    'omaly', 'period', 'period_err',
     #    'a_err', 'e_err', 'inc_err', 'aop_err', 'node_err', 'peri_err', 'lat0', 'lon0',
     #    'xbary','ybary','zbary',
     #    'abg_a', 'abg_b', 'abg_g',
@@ -395,7 +430,7 @@ class Orbfit(Convenience):
 
     #    #orbit_data = np.array([round(self.chisq,2), self.ndof, round(elements['a'],4), round(elements['e'],6), round(elements['i'],6),
     #    #    round(elements['aop'],2), round(elements['lan'],3), round(peri_jd,2), peri_date, round(epoch,2),
-    #    #    self.mean_anomaly(), round(period,3) , round(period_err,3),
+    #    #    self.omaly(), round(period,3) , round(period_err,3),
     #    #    round(errs['a'],4), round(errs['e'],6), round(errs['i'],6), round(errs['aop'],2), round(errs['lan'],3), round(peri_jd_err,2), round(self.lat0,4), round(self.lon0,4),
     #    #    round(self.xBary,4), round(self.yBary,4), round(self.zBary,4),
     #    #    elements_abg['a'], elements_abg['b'], elements_abg['g'],
@@ -406,7 +441,7 @@ class Orbfit(Convenience):
 
     #    orbit_data = np.array([round(self.chisq,2), self.ndof, round(elements['a'],4), round(elements['e'],6), round(elements['i'],6),
     #        round(elements['aop'],2), round(elements['lan'],3), round(peri_jd,2), round(epoch,2),
-    #        self.mean_anomaly(), round(period,3) , round(period_err,3),
+    #        self.omaly(), round(period,3) , round(period_err,3),
     #        round(errs['a'],4), round(errs['e'],6), round(errs['i'],6), round(errs['aop'],2), round(errs['lan'],3), round(peri_jd_err,2), round(self.lat0,4), round(self.lon0,4),
     #        round(self.xBary,4), round(self.yBary,4), round(self.zBary,4),
     #        elements_abg['a'], elements_abg['b'], elements_abg['g'],

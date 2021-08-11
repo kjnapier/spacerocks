@@ -3,17 +3,19 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Documentation Status](https://readthedocs.org/projects/spacerocks/badge/?version=latest)](https://spacerocks.readthedocs.io/en/latest/?badge=latest)
 
-SpaceRocks is an open-source software written in pure Python. It is a suite of tools for performing observational and theoretical tasks in solar system dynamics.
+SpaceRocks is an open-source software written in Python. The most expensive operations are written in C, and then wrapped with Python. It is a suite of tools for performing observational and theoretical tasks in solar system dynamics.
 
 #### Currently implemented:
-
-- Calculate the ephemerides of solar system objects on future and past dates.
-- Transform between barycentric and heliocentric coordinates.
+- Coordinate transformations for arbitrary solar system objects.
+- Numerical propagation to future and past epochs.
+- Precise ephemeride calculation.
+- Transformations between barycentric and heliocentric coordinates.
+- Outer solar system orbit fitting.
+- Sky position predictions with uncertainties.
 
 #### In the works:
 
-- Positional uncertainty calculations.
-- Orbit fitting.
+- General orbit fitting.
 - Minor Planet Center Queries.
 
 
@@ -33,4 +35,4 @@ git clone https://github.com/kjnapier/spacerocks.git
 python setup.py install
 ```
 
-The software is currently verified to be stable on macOS Mojave and Catalina (10.14 and 10.15), as well as the latest version of Ubuntu. It is compatible with Python versions 3.6, 3.7, and 3.8. It is intentionally ***not*** compatible with Python 2, which became deprecated on January 1, 2020.
+The software is currently verified to be stable on the latest versions of macOS and Ubuntu. It is compatible with Python versions 3.6, and newer. It is intentionally ***not*** compatible with Python 2, which became deprecated on January 1, 2020.
