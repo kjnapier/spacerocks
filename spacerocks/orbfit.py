@@ -1,9 +1,13 @@
 #!/usr/bin/env python
 
-import .pyOrbfit as orbfit
+#import pyOrbfit as orbfit
+#from . import cliborbfit as orbfit
+from . import pyOrbfit as orbfit
 import numpy as np
 
-from spacerocks import SpaceRock, Units
+#from spacerocks import SpaceRock, Units
+from .spacerock import SpaceRock
+from .units import Units
 from astropy.coordinates import Angle, SkyCoord
 from astropy.time import Time
 import ephem

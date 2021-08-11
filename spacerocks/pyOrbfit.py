@@ -75,7 +75,7 @@ class OBSERVATION_ARRAY(_object):
     __swig_getmethods__ = {}
     __getattr__ = lambda self, name: _swig_getattr(self, OBSERVATION_ARRAY, name)
     __repr__ = _swig_repr
-    def __init__(self, *args): 
+    def __init__(self, *args):
         this = _pyOrbfit.new_OBSERVATION_ARRAY(*args)
         try: self.this.append(this)
         except: self.this = this
@@ -99,7 +99,7 @@ class doubleArray(_object):
     __swig_getmethods__ = {}
     __getattr__ = lambda self, name: _swig_getattr(self, doubleArray, name)
     __repr__ = _swig_repr
-    def __init__(self, *args): 
+    def __init__(self, *args):
         this = _pyOrbfit.new_doubleArray(*args)
         try: self.this.append(this)
         except: self.this = this
@@ -162,7 +162,7 @@ class PBASIS(_object):
     __swig_setmethods__["gdot"] = _pyOrbfit.PBASIS_gdot_set
     __swig_getmethods__["gdot"] = _pyOrbfit.PBASIS_gdot_get
     if _newclass:gdot = _swig_property(_pyOrbfit.PBASIS_gdot_get, _pyOrbfit.PBASIS_gdot_set)
-    def __init__(self): 
+    def __init__(self):
         this = _pyOrbfit.new_PBASIS()
         try: self.this.append(this)
         except: self.this = this
@@ -198,7 +198,7 @@ class XVBASIS(_object):
     __swig_setmethods__["jd0"] = _pyOrbfit.XVBASIS_jd0_set
     __swig_getmethods__["jd0"] = _pyOrbfit.XVBASIS_jd0_get
     if _newclass:jd0 = _swig_property(_pyOrbfit.XVBASIS_jd0_get, _pyOrbfit.XVBASIS_jd0_set)
-    def __init__(self): 
+    def __init__(self):
         this = _pyOrbfit.new_XVBASIS()
         try: self.this.append(this)
         except: self.this = this
@@ -234,7 +234,7 @@ class ORBIT(_object):
     __swig_setmethods__["ma"] = _pyOrbfit.ORBIT_ma_set
     __swig_getmethods__["ma"] = _pyOrbfit.ORBIT_ma_get
     if _newclass:ma = _swig_property(_pyOrbfit.ORBIT_ma_get, _pyOrbfit.ORBIT_ma_set)
-    def __init__(self): 
+    def __init__(self):
         this = _pyOrbfit.new_ORBIT()
         try: self.this.append(this)
         except: self.this = this
@@ -267,7 +267,7 @@ class date_time(_object):
     __swig_setmethods__["s"] = _pyOrbfit.date_time_s_set
     __swig_getmethods__["s"] = _pyOrbfit.date_time_s_get
     if _newclass:s = _swig_property(_pyOrbfit.date_time_s_get, _pyOrbfit.date_time_s_set)
-    def __init__(self): 
+    def __init__(self):
         this = _pyOrbfit.new_date_time()
         try: self.this.append(this)
         except: self.this = this
@@ -309,7 +309,7 @@ class OBSERVATION(_object):
     __swig_setmethods__["ze"] = _pyOrbfit.OBSERVATION_ze_set
     __swig_getmethods__["ze"] = _pyOrbfit.OBSERVATION_ze_get
     if _newclass:ze = _swig_property(_pyOrbfit.OBSERVATION_ze_get, _pyOrbfit.OBSERVATION_ze_set)
-    def __init__(self): 
+    def __init__(self):
         this = _pyOrbfit.new_OBSERVATION()
         try: self.this.append(this)
         except: self.this = this
@@ -525,4 +525,3 @@ deghms = _pyOrbfit.deghms
 # This file is compatible with both classic and new-style classes.
 
 cvar = _pyOrbfit.cvar
-
