@@ -1,7 +1,3 @@
-from .pyOrbfit import *
-from .orbfit import Orbfit
-from .units import Units
-from .spacerock import SpaceRock
 from ctypes import cdll
 import warnings
 import os
@@ -30,3 +26,8 @@ but rewriting the code would be a bear.
 '''
 os.environ['ORBIT_EPHEMERIS'] = pymodulepath + '/data/binEphem.423'
 os.environ['ORBIT_OBSERVATORIES'] = pymodulepath + '/data/observatories.dat'
+
+from .spacerock import SpaceRock
+from .units import Units
+from .orbfit import Orbfit
+from .pyOrbfit import *
