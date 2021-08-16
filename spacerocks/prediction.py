@@ -8,6 +8,7 @@ import dateutil
 
 from .convenience import Convenience
 
+
 class Prediction(Convenience):
 
     def __init__(self, **kwargs):
@@ -16,15 +17,18 @@ class Prediction(Convenience):
 
         if units.timeformat is None:
             if isinstance(kwargs.get('epoch')[0], str):
-                self.epoch = [Time(dateutil.parser.parse(date, fuzzy_with_tokens=True)[0], format='datetime', scale=units.timescale) for date in kwargs.get('epoch')]
+                self.epoch = [Time(dateutil.parser.parse(date, fuzzy_with_tokens=True)[
+                                   0], format='datetime', scale=units.timescale) for date in kwargs.get('epoch')]
             elif np.all(kwargs.get('epoch') > 100000):
-                self.epoch = Time(kwargs.get('epoch'), format='jd', scale=units.timescale)
+                self.epoch = Time(kwargs.get('epoch'),
+                                  format='jd', scale=units.timescale)
             else:
-                self.epoch = Time(kwargs.get('epoch'), format='mjd', scale=units.timescale)
+                self.epoch = Time(kwargs.get('epoch'),
+                                  format='mjd', scale=units.timescale)
         else:
-            self.epoch = Time(date, format=units.timeformat, scale=units.timescale)
+            self.epoch = Time(kwargs.get('epoch'),
+                              format=units.timeformat, scale=units.timescale)
 
-        
         self.ra = Angle(kwargs.get('ra'), u.rad)
         self.dec = Angle(kwargs.get('dec'), u.rad)
 
