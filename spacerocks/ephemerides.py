@@ -1,3 +1,4 @@
+from .convenience import Convenience
 import random
 import copy
 import os
@@ -20,7 +21,6 @@ planets = load('de440.bsp')
 earth = planets['earth']
 sun = planets['sun']
 
-from .convenience import Convenience
 
 class Ephemerides(Convenience):
 
@@ -54,12 +54,11 @@ class Ephemerides(Convenience):
 
         self.delta = Distance(np.sqrt(self.x**2 + self.y**2 + self.z**2), u.au)
 
-
-
     @property
     def ra(self):
         if not hasattr(self, '_ra'):
-            self.ra = Angle(np.arctan2(self.y, self.x), u.rad).wrap_at(2 * np.pi * u.rad)
+            self.ra = Angle(np.arctan2(self.y, self.x),
+                            u.rad).wrap_at(2 * np.pi * u.rad)
         return self._ra
 
     @ra.setter
@@ -73,7 +72,8 @@ class Ephemerides(Convenience):
     @property
     def dec(self):
         if not hasattr(self, '_dec'):
-            self.dec = Angle(np.arcsin(self.z / sqrt(self.x**2 + self.y**2 + self.z**2)), u.rad)
+            self.dec = Angle(
+                np.arcsin(self.z / sqrt(self.x**2 + self.y**2 + self.z**2)), u.rad)
         return self._dec
 
     @dec.setter
@@ -87,7 +87,8 @@ class Ephemerides(Convenience):
     @property
     def ra_rate(self):
         if not hasattr(self, '_ra_rate'):
-            self.ra_rate = -cos(self.dec) * (self.y * self.vx - self.x * self.vy) / (self.x**2 + self.y**2) * u.rad
+            self.ra_rate = -cos(self.dec) * (self.y * self.vx -
+                                             self.x * self.vy) / (self.x**2 + self.y**2) * u.rad
         return self._ra_rate
 
     @ra_rate.setter
@@ -102,7 +103,7 @@ class Ephemerides(Convenience):
     def dec_rate(self):
         if not hasattr(self, '_dec_rate'):
             self.dec_rate = (-self.z * (self.x * self.vx + self.y * self.vy) + ((self.x**2 + self.y**2) * self.vz)) \
-                            / (sqrt(self.x**2 + self.y**2) * (self.x**2 + self.y**2 + self.z**2)) * u.rad
+                / (sqrt(self.x**2 + self.y**2) * (self.x**2 + self.y**2 + self.z**2)) * u.rad
         return self._dec_rate
 
     @dec_rate.setter
@@ -127,13 +128,13 @@ class Ephemerides(Convenience):
     def mag(self):
         del self._mag
 
-
     @property
     def H(self):
         if not hasattr(self, '_H'):
             if hasattr(self, 'delta_H'):
                 ltt = self.delta / c
-                dH = self.delta_H * np.sin((self.epoch.jd - self.t0.jd - ltt.value) * 2 * np.pi / self.rotation_period + self.phi0.rad)
+                dH = self.delta_H * np.sin((self.epoch.jd - self.t0.jd - ltt.value)
+                                           * 2 * np.pi / self.rotation_period + self.phi0.rad)
 
                 self.H = self.H0 + dH
 
@@ -149,7 +150,6 @@ class Ephemerides(Convenience):
     def H(self):
         del self._H
 
-
     @property
     def b(self):
         return Angle(arcsin(cos(epsilon) * sin(self.dec) - sin(epsilon) * cos(self.dec) * sin(self.ra)), u.rad)
@@ -160,18 +160,19 @@ class Ephemerides(Convenience):
 
     @property
     def b_rate(self):
-        num = self.dec_rate * (cos(epsilon) * cos(self.dec) + sin(epsilon) * sin(self.dec) * sin(self.ra)) - self.ra_rate * cos(self.dec) * cos(self.ra) * sin(epsilon)
-        denom = sqrt(1 - (cos(epsilon) * sin(self.dec) - cos(self.dec) * sin(self.ra) * sin(epsilon))**2)
+        num = self.dec_rate * (cos(epsilon) * cos(self.dec) + sin(epsilon) * sin(
+            self.dec) * sin(self.ra)) - self.ra_rate * cos(self.dec) * cos(self.ra) * sin(epsilon)
+        denom = sqrt(1 - (cos(epsilon) * sin(self.dec) -
+                     cos(self.dec) * sin(self.ra) * sin(epsilon))**2)
         return num / denom
 
     @property
     def l_rate(self):
-        num = self.ra_rate * (1/cos(self.ra)) * (cos(epsilon) * (1/cos(self.ra)) + sin(epsilon) * tan(self.ra))
-        denom = 1 + ((1/cos(self.ra)) * sin(epsilon) + cos(epsilon) * tan(self.ra))**2
+        num = self.ra_rate * (1 / cos(self.ra)) * (cos(epsilon)
+                                                   * (1 / cos(self.ra)) + sin(epsilon) * tan(self.ra))
+        denom = 1 + ((1 / cos(self.ra)) * sin(epsilon) +
+                     cos(epsilon) * tan(self.ra))**2
         return num / denom
-
-
-
 
     def estimate_mag(self):
         '''
@@ -183,25 +184,26 @@ class Ephemerides(Convenience):
         s = sun.at(t)
         sx, sy, sz = s.ecliptic_xyz().au
         ex, ey, ez = e.ecliptic_xyz().au
-        earth_dist = ((ex-sx)**2 + (ey-sy)**2 + (ez-sz)**2)**0.5
+        earth_dist = ((ex - sx)**2 + (ey - sy)**2 + (ez - sz)**2)**0.5
 
-        q = (self.r_helio.au**2 + self.delta.au**2 - earth_dist)/(2 * self.r_helio.au * self.delta.au)
+        q = (self.r_helio.au**2 + self.delta.au**2 - earth_dist) / \
+            (2 * self.r_helio.au * self.delta.au)
 
-        ## pyephem
+        # pyephem
         beta = np.arccos(q)
         beta[np.where(q <= -1)[0]] = np.pi * u.rad
         beta[np.where(q >= 1)[0]] = 0 * u.rad
 
-        Psi_1 = np.exp(-3.332 * np.tan(beta/2)**0.631)
-        Psi_2 = np.exp(-1.862 * np.tan(beta/2)**1.218)
-        mag = self.H + 5 * np.log10(self.r_helio.au * self.delta.au)# / earth_dist**2)
-
+        Psi_1 = np.exp(-3.332 * np.tan(beta / 2)**0.631)
+        Psi_2 = np.exp(-1.862 * np.tan(beta / 2)**1.218)
+        # / earth_dist**2)
+        mag = self.H + 5 * np.log10(self.r_helio.au * self.delta.au)
 
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
-        mag[not_zero] -= 2.5 * np.log10((1 - self.G[not_zero]) * Psi_1[not_zero] + self.G[not_zero] * Psi_2[not_zero])
+        mag[not_zero] -= 2.5 * np.log10((1 - self.G[not_zero])
+                                        * Psi_1[not_zero] + self.G[not_zero] * Psi_2[not_zero])
 
         return mag
-
 
 
 #    def plot_radec(self, color='black', alpha=0.5, zoom=False, galactic_plane=False, ecliptic_plane=True):

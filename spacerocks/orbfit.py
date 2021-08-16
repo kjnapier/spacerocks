@@ -325,8 +325,16 @@ class Orbfit(Convenience):
             futobs.obscode = obscode
 
 
+
             if units.timeformat is None:
-                epoch = Time(dateutil.parser.parse(date, fuzzy_with_tokens=True)[0], format='datetime', scale=units.timescale)
+                if isinstance(date, str):
+                    epoch = Time(dateutil.parser.parse(date, fuzzy_with_tokens=True)[0], format='datetime', scale=units.timescale)
+                elif (date > 100000):
+                    epoch = Time(date, format='jd', scale=units.timescale)
+                else:
+                    epoch = Time(date, format='mjd', scale=units.timescale)
+
+
             else:
                 epoch = Time(date, format=units.timeformat, scale=units.timescale)
 
@@ -374,7 +382,7 @@ class Orbfit(Convenience):
             #err_ellipse = dict(a=Angle(a * u.arcsec), b=Angle(b * u.arcsec), PA=Angle(pos_angle * u.deg))   # store as a dictionary
 
         #pos = dict(ra=Angle(ra_eq, u.rad), dec=Angle(dec_eq, u.rad), err=err_ellipse, elong=solar_elongation, opp=opposition_angle)
-        return Prediction(epoch=epoch, ra=ra, dec=dec, err_a=err_a, err_b=err_b, err_pa=err_pa, elong=elong, opp=opp)
+        return Prediction(epoch=dates, ra=ra, dec=dec, err_a=err_a, err_b=err_b, err_pa=err_pa, elong=elong, opp=opp, units=units)
 
     @property
     def spacerock(self):

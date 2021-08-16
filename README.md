@@ -32,7 +32,9 @@ If you don't use pip, or if you want to be sure that you have the most up-to-dat
 
 ```zsh
 git clone https://github.com/kjnapier/spacerocks.git
-python setup.py install
+cd spacerocks
+python setup.py build_ext -i
+pip install .
 ```
 
 The software is currently verified to be stable on the latest versions of macOS and Ubuntu. It is compatible with Python versions 3.6, and newer. It is intentionally ***not*** compatible with Python 2, which became deprecated on January 1, 2020.

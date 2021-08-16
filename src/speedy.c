@@ -164,3 +164,31 @@ double* kep_to_xyz_temp(int N, double *as, double *es, double *incs, double *arg
   return output;
 
 }
+//
+// double** kep_to_xyz_temp(int N, double *as, double *es, double *incs, double *args, double *nodes, double *Ms)
+// {
+//
+//   //double** output[N] = malloc(N * 6 * sizeof(double));
+//   double* output[N] = malloc(N * 6 * sizeof(double));
+//   //for (int idx = 0; idx < N; idx++) {
+//   //  double* output[idx] = malloc(6 * sizeof(double));
+//   //}
+//
+//   struct StateVector rock;
+//
+//   for (int idx = 0; idx < N; idx++) {
+//
+//     rock = kep_to_xyz_temp_cpp(as[idx], es[idx], incs[idx], args[idx], nodes[idx], Ms[idx]);
+//
+//     output[idx][0] = rock.x;
+//     output[idx][1] = rock.y;
+//     output[idx][2] = rock.z;
+//     output[idx][3] = rock.vx;
+//     output[idx][4] = rock.vy;
+//     output[idx][5] = rock.vz;
+//
+//   }
+//
+//   return output;
+//
+// }

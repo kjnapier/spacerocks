@@ -135,7 +135,7 @@ double old_lat0=-999., old_lon0, clat0, slat0, clon0, slon0;
 
 void
 check_latlon0(double lat0,
-	      double lon0) 
+	      double lon0)
 {
   if (lat0 == old_lat0 && lon0==old_lon0) return;
   old_lat0 = lat0;
@@ -184,9 +184,11 @@ ec_to_proj(double lat_ec,
    */
 
   if (partials!=NULL) {
-    partials[1][2] = clat;
+    //partials[1][2] = clat;
     partials[1][1] = partials[2][2] = 0.;
-    partials[1][2] = 1.;
+    //partials[2][1] = 1.; // reversed indices
+		partials[1][2] = clat;
+		partials[1][2] = 1.;
   }
 
   return;
@@ -298,15 +300,15 @@ xyz_proj_to_ec( double x_p, double y_p, double z_p,
   return;
 }
 
- 
+
 void
 orbitElements(XVBASIS *xv,
 	      ORBIT  *orb)
 {
   int i,j,k;
 
-  double combinedMass; /* mass of Sun + mass of KBO */ 
-  double epochTime; 
+  double combinedMass; /* mass of Sun + mass of KBO */
+  double epochTime;
 
   /* We note that the origin of the inertial rectangular
      co-ordinate system is itself a dynamical center - the Sun. The
@@ -332,9 +334,9 @@ orbitElements(XVBASIS *xv,
   combinedMass = GM * 1.00134 ; /* Alter GM to account for total SS mass*/
   epochTime=jd0;
 
-  R[1] = xv->x; 
+  R[1] = xv->x;
   R[2] = xv->y;
-  R[3] = xv->z; 
+  R[3] = xv->z;
   V[1] = xv->xdot;
   V[2] = xv->ydot;
   V[3] = xv->zdot;
@@ -360,15 +362,15 @@ orbitElements(XVBASIS *xv,
   ascendingNode[3] = 0.0;
 
   semimajor = 1/(2/rMagnitude - velSquare/combinedMass);
-  eccentricity = sqrt(eccentricityVector[1]*eccentricityVector[1] + 
-		      eccentricityVector[2]*eccentricityVector[2] + 
+  eccentricity = sqrt(eccentricityVector[1]*eccentricityVector[1] +
+		      eccentricityVector[2]*eccentricityVector[2] +
 		      eccentricityVector[3]*eccentricityVector[3]);
-  semiLatusRectum = (angularMomentum[1]*angularMomentum[1] + 		    
-		     angularMomentum[2]*angularMomentum[2] +	
+  semiLatusRectum = (angularMomentum[1]*angularMomentum[1] +
+		     angularMomentum[2]*angularMomentum[2] +
 		     angularMomentum[3]*angularMomentum[3])/combinedMass;
   /* p = h-square by mu */
-  hMagnitude = sqrt( angularMomentum[1]*angularMomentum[1] + 		    
-		     angularMomentum[2]*angularMomentum[2] +	
+  hMagnitude = sqrt( angularMomentum[1]*angularMomentum[1] +
+		     angularMomentum[2]*angularMomentum[2] +
 		     angularMomentum[3]*angularMomentum[3] );
   inclination = acos(angularMomentum[3]/hMagnitude); /* in radians here */
   ascendingNodeMagnitude = sqrt(ascendingNode[1]*ascendingNode[1] +
@@ -376,16 +378,16 @@ orbitElements(XVBASIS *xv,
 				ascendingNode[3]*ascendingNode[3]);
   longitudeOfAscendingNode = acos(ascendingNode[1]/ascendingNodeMagnitude);
   /* Capital Omega in radians here */
-  if (ascendingNode[2] < 0) longitudeOfAscendingNode = 
+  if (ascendingNode[2] < 0) longitudeOfAscendingNode =
 			      2*PI - longitudeOfAscendingNode;
   /* ???could use atan2 here?? */
   ascEccDotProduct = ascendingNode[1]*eccentricityVector[1] +
     ascendingNode[2]*eccentricityVector[2] +
     ascendingNode[3]*eccentricityVector[3];
   argumentOfPerifocus = acos(ascEccDotProduct/
-			     (ascendingNodeMagnitude*eccentricity)); 
+			     (ascendingNodeMagnitude*eccentricity));
   /* Small omega in radians here */
-  if (eccentricityVector[3] < 0) argumentOfPerifocus = 
+  if (eccentricityVector[3] < 0) argumentOfPerifocus =
 				   2*PI - argumentOfPerifocus;
   xBar = (semiLatusRectum - rMagnitude)/eccentricity;
   yBar = radVelDotProduct*sqrt(semiLatusRectum/combinedMass)/eccentricity;
@@ -402,27 +404,27 @@ orbitElements(XVBASIS *xv,
   timeOfPerifocalPassage = epochTime - meanAnomaly/meanMotion/DAY;
   /* This comes from M=n(t-T) where t is epoch time and T is time of perifocal
      passage, in days */
-				
+
   orb->a=semimajor;
-  orb->e=eccentricity; 
-  orb->i=inclination/DTOR;/* in degrees now */  
+  orb->e=eccentricity;
+  orb->i=inclination/DTOR;/* in degrees now */
   orb->lan = longitudeOfAscendingNode / DTOR; /*Long of ascending node*/
   orb->aop = argumentOfPerifocus / DTOR; /*argument of perihelion, degrees*/
   orb->T=timeOfPerifocalPassage;  /*Time of perihelion passage (JD)*/
   orb->ma=meanAnomaly;
 
-  return; 
+  return;
 
 } /* function orbitElements ends */
 
 
-/* JD routine stolen from skycalc: 
+/* JD routine stolen from skycalc:
  * I have changed the structre & routine to allow floating d/h/m/s
  * entries.*/
 /* Converts a date (structure) into a julian date.
    Only good for 1900 -- 2100. */
 
-double 
+double
 date_to_jd(struct date_time date)
 {
 	short yr1=0, mo1=1;
@@ -456,7 +458,7 @@ date_to_jd(struct date_time date)
 }
 
 /******************************************************************
- * Get phase space from orbital elements 
+ * Get phase space from orbital elements
  ******************************************************************/
 void
 elements_to_xv(ORBIT *o,
@@ -479,7 +481,7 @@ elements_to_xv(ORBIT *o,
   /* Put it near 0 */
   t = floor (meanAnomaly / TPI);
   meanAnomaly -= t*TPI;
-  /* Use bisection to find solution (adapt Numerical Recipes)*/  
+  /* Use bisection to find solution (adapt Numerical Recipes)*/
   {
 #define JMAX 40
 #define TOLERANCE (DAY/24./3600.)
@@ -508,7 +510,7 @@ elements_to_xv(ORBIT *o,
     }
     meanAnomaly = rtb;
 #undef JMAX
-#undef TOLERANCE   
+#undef TOLERANCE
   }
 
   /*Coordinates and velocity in the system aligned with orbit: */
@@ -573,17 +575,17 @@ elements_to_pbasis(ORBIT *o,
   lon0 = atan2(xv.y, xv.x);
   lat0 = asin( xv.z / sqrt(xv.x*xv.x + xv.y*xv.y + xv.z*xv.z));
   jd0 = jd;
-      
+
   /* Rotate target and bary into the projected system */
   xyz_ec_to_proj(xec, yec, zec, &xBary, &yBary, &zBary, lat0, lon0, NULL);
   xyz_ec_to_proj(xv.x, xv.y, xv.z, &xv.x, &xv.y, &xv.z, lat0, lon0, NULL);
-  xyz_ec_to_proj(xv.xdot, xv.ydot, xv.zdot, 
+  xyz_ec_to_proj(xv.xdot, xv.ydot, xv.zdot,
 		 &xv.xdot, &xv.ydot, &xv.zdot, lat0, lon0, NULL);
   p->g = 1./xv.z;
   p->a = xv.x * p->g;
   p->b = xv.y * p->g;
-  p->adot = xv.xdot * p->g;  
-  p->bdot = xv.ydot * p->g;  
+  p->adot = xv.xdot * p->g;
+  p->bdot = xv.ydot * p->g;
   p->gdot = xv.zdot * p->g;
 
   return;

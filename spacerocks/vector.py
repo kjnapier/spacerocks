@@ -1,6 +1,7 @@
 from numpy import sqrt, sin, cos
 import copy
 
+
 class Vector:
 
     def __init__(self, x, y, z):
@@ -48,14 +49,15 @@ class Vector:
         cb = cos(b)
         cc = cos(c)
         # Currently assumes z=0. I'm going to modify this to the genreal case.
-        xrot = self.x * (ca * cc - sa * sc * cb) - self.y * (sa * cc + ca * sc * cb)
-        yrot = self.x * (ca * sc + sa * cc * cb) + self.y * (ca * cc * cb - sa * sc)
+        xrot = self.x * (ca * cc - sa * sc * cb) - \
+            self.y * (sa * cc + ca * sc * cb)
+        yrot = self.x * (ca * sc + sa * cc * cb) + \
+            self.y * (ca * cc * cb - sa * sc)
         zrot = self.x * (sa * sb) + self.y * (ca * sb)
         #xrot = self.x * (cos(a) * cos(c) - sin(a) * sin(c) * cos(b)) - self.y * (sin(a) * cos(c) + cos(a) * sin(c) * cos(b))
         #yrot = self.x * (cos(a) * sin(c) + sin(a) * cos(c) * cos(b)) + self.y * (cos(a) * cos(c) * cos(b) - sin(a) * sin(c))
         #zrot = self.x * (sin(a) * sin(b)) + self.y * (cos(a) * sin(b))
         return Vector(xrot, yrot, zrot)
-
 
     @property
     def norm(self):

@@ -643,21 +643,21 @@ class SpaceRock(OrbitFuncs, Convenience):
         return sim, names
 
 
-    def orbits(self):
+    def orbits(self, N=1000):
 
-        M = Angle(np.linspace(0, 2*np.pi, 1000), u.rad)
+        M = Angle(np.linspace(0, 2*np.pi, N), u.rad)
 
         xs = []
         ys = []
         zs = []
 
         for r in self:
-            x, y, z, _, _, _ = self.kep_to_xyz_temp(1000,
-                                                    np.repeat(r.a, 1000),
-                                                    np.repeat(r.e, 1000),
-                                                    np.repeat(r.inc.rad, 1000),
-                                                    np.repeat(r.arg.rad, 1000),
-                                                    np.repeat(r.node.rad, 1000),
+            x, y, z, _, _, _ = self.kep_to_xyz_temp(N,
+                                                    np.repeat(r.a, N),
+                                                    np.repeat(r.e, N),
+                                                    np.repeat(r.inc.rad, N),
+                                                    np.repeat(r.arg.rad, N),
+                                                    np.repeat(r.node.rad, N),
                                                     M.rad)
             xs.append(x)
             ys.append(y)

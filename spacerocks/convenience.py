@@ -6,6 +6,7 @@ import copy
 
 import dateutil
 
+
 class Convenience:
 
     def __len__(self):
@@ -13,7 +14,6 @@ class Convenience:
         This method allows you to use the len() function on a SpaceRocks object.
         '''
         return len(self.name)
-
 
     def __getitem__(self, idx):
         '''
@@ -26,10 +26,10 @@ class Convenience:
 
         return p
 
-
     def detect_timescale(self, timevalue, timescale):
         if isinstance(timevalue[0], str):
-            dates = [dateutil.parser.parse(d, fuzzy_with_tokens=True)[0] for d in timevalue]
+            dates = [dateutil.parser.parse(d, fuzzy_with_tokens=True)[
+                0] for d in timevalue]
             return Time(dates, format='datetime', scale=timescale)
         elif np.all(timevalue > 100000):
             return Time(timevalue, format='jd', scale=timescale)
@@ -38,7 +38,8 @@ class Convenience:
 
     def detect_coords(self, kwargs):
 
-        kep = ['a', 'e', 'q', 'inc', 'node', 'arg', 'M', 'true_anomaly', 'E', 'varpi', 't_peri', 'mean_longitude', 'true_longitude', 'v_inf', 'b', 'Q']
+        kep = ['a', 'e', 'q', 'inc', 'node', 'arg', 'M', 'true_anomaly', 'E',
+               'varpi', 't_peri', 'mean_longitude', 'true_longitude', 'v_inf', 'b', 'Q']
         xyz = ['x', 'y', 'z', 'vx', 'vy', 'vz']
 
         input_coords = list(kwargs.keys())
@@ -50,18 +51,16 @@ class Convenience:
             coords = 'xyz'
 
         else:
-            raise ValueError('Invalid input coordinates. Please see the documentation for accepted input.')
+            raise ValueError(
+                'Invalid input coordinates. Please see the documentation for accepted input.')
 
         return coords
-
-
 
     def astropy_table(self):
         '''
         Write the rocks to an astropy table. This can handle units.
         '''
         return Table(self.__dict__)
-
 
     def pandas_df(self):
         '''
