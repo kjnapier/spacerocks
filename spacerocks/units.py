@@ -16,11 +16,15 @@ class Units:
     def set_default(self):
         self.distance = u.au
         self.angle = u.deg
-
+        
         self.timescale = 'utc'
         self.timeformat = None
         self.speed = u.au / u.d
         self.rotation_period = u.d
+
+        self.size = u.km
+        self.density = u.g / u.cm**3
+        self.mass = u.kg
 
         self.ra = u.deg
         self.dec = u.deg
