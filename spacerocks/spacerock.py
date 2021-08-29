@@ -23,7 +23,7 @@ from rebound import hash as h
 from scipy.optimize import newton
 
 from .constants import *
-from .orbitfuncs import OrbitFuncs
+from .keplerorbit import KeplerOrbit
 from .convenience import Convenience
 from .units import Units
 from .vector import Vector
@@ -71,7 +71,11 @@ def kep_to_xyz_temp_cpp(N, a, e, inc, arg, node, M):
     x, y, z, vx, vy, vz = arr.reshape(N, 6).T
     return x * u.au, y * u.au, z * u.au, vx * u.au/u.d, vy * u.au/u.d, vz * u.au/u.d
 
-class SpaceRock(OrbitFuncs, Convenience):
+class SpaceRock(KeplerOrbit, Convenience):
+
+    '''
+    SpaceRock objects handle Keplerian orbits. 
+    '''
 
     def __init__(self, frame='barycentric', units=Units(), *args, **kwargs):
 
@@ -82,13 +86,11 @@ class SpaceRock(OrbitFuncs, Convenience):
         for idx, key in enumerate([*kwargs]):
             kwargs[key] = np.atleast_1d(kwargs.get(key))
 
-
         self.frame = frame
         if self.frame == 'barycentric':
             self.mu = mu_bary
         elif self.frame == 'heliocentric':
             self.mu = mu_helio
-
 
         if coords == 'kep':
 
@@ -129,7 +131,6 @@ class SpaceRock(OrbitFuncs, Convenience):
 
             if kwargs.get('M') is not None:
                 self.M = Angle(kwargs.get('M'), units.angle)
-                #self.M[(self.e > 1) & (self.M.rad > np.pi)] -= 2 * np.pi * u.rad
 
             if kwargs.get('E') is not None:
                 self.E = Angle(kwargs.get('E'), units.angle)
@@ -142,7 +143,6 @@ class SpaceRock(OrbitFuncs, Convenience):
 
             if kwargs.get('mean_longitude') is not None:
                 self.mean_longitude = Angle(kwargs.get('mean_longitude'), units.angle)
-
 
             if kwargs.get('epoch') is not None:
 
@@ -210,10 +210,20 @@ class SpaceRock(OrbitFuncs, Convenience):
             self.phi0 = Angle(kwargs.get('phi0'), units.angle)
             self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
 
+        if kwargs.get('radius') is not None:
+            self.radius = Distance(kwargs.get('radius'), units.size, allow_negative=False)
+
+        if kwargs.get('mass') is not None:
+            self.radius = kwargs.get('mass') * units.mass
+
+        if kwargs.get('density') is not None:
+            self.radius = kwargs.get('density') * units.density
+
+
 
     def analytic_propagate(self, epoch, propagate_frame = 'heliocentric'):
         '''
-        propagate all bodies to the desired date using Kieprian orbit.
+        propagate all bodies to the desired date using Keplerian orbit.
         '''
         in_frame = self.frame
         if propagate_frame != in_frame:
@@ -262,14 +272,11 @@ class SpaceRock(OrbitFuncs, Convenience):
 
     def propagate(self, epochs, model, units=Units()):
         '''
-        Integrate all bodies to the desired date. The logic could be cleaner
-        but it works.
+        Numerically integrate all bodies to the desired date.
+        This routine synchronizes the epochs.
         '''
 
         epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
-
-        Nx = len(epochs)
-
         frame = self.frame
 
         # We need to integrate in barycentric coordinates
@@ -296,7 +303,7 @@ class SpaceRock(OrbitFuncs, Convenience):
 
         sim.move_to_com()
 
-
+        Nx = len(epochs)
         x_values = np.zeros((Nx, sim.N))
         y_values = np.zeros((Nx, sim.N))
         z_values = np.zeros((Nx, sim.N))
@@ -326,24 +333,24 @@ class SpaceRock(OrbitFuncs, Convenience):
             name_values[ii] = p_names
             obsdate_values[ii] = np.repeat(sim.t, sim.N)
 
+        Nactive = sim.N_active
+        x = x_values[:, Nactive:].flatten()
+        y = y_values[:, Nactive:].flatten()
+        z = z_values[:, Nactive:].flatten()
+        vx = vx_values[:, Nactive:].flatten()
+        vy = vy_values[:, Nactive:].flatten()
+        vz = vz_values[:, Nactive:].flatten()
+        name = name_values[:, Nactive:].flatten()
+        epoch = obsdate_values[:, Nactive:].flatten()
 
-        x = x_values[:, sim.N_active:].flatten()
-        y = y_values[:, sim.N_active:].flatten()
-        z = z_values[:, sim.N_active:].flatten()
-        vx = vx_values[:, sim.N_active:].flatten()
-        vy = vy_values[:, sim.N_active:].flatten()
-        vz = vz_values[:, sim.N_active:].flatten()
-        name = name_values[:, sim.N_active:].flatten()
-        epoch = obsdate_values[:, sim.N_active:].flatten()
-
-        px = x_values[:, :sim.N_active].flatten()
-        py = y_values[:, :sim.N_active].flatten()
-        pz = z_values[:, :sim.N_active].flatten()
-        pvx = vx_values[:, :sim.N_active].flatten()
-        pvy = vy_values[:, :sim.N_active].flatten()
-        pvz = vz_values[:, :sim.N_active].flatten()
-        pname = name_values[:, :sim.N_active].flatten()
-        pepoch = obsdate_values[:, :sim.N_active].flatten()
+        px = x_values[:, :Nactive].flatten()
+        py = y_values[:, :Nactive].flatten()
+        pz = z_values[:, :Nactive].flatten()
+        pvx = vx_values[:, :Nactive].flatten()
+        pvy = vy_values[:, :Nactive].flatten()
+        pvz = vz_values[:, :Nactive].flatten()
+        pname = name_values[:, :Nactive].flatten()
+        pepoch = obsdate_values[:, :Nactive].flatten()
 
 
         units = Units()
@@ -356,10 +363,8 @@ class SpaceRock(OrbitFuncs, Convenience):
             rocks.to_helio()
             self.to_helio()
 
-
         if hasattr(self, 'G'):
             rocks.G = np.tile(self.G, Nx)
-
 
         if hasattr(self, 'delta_H'):
             rocks.delta_H = np.tile(self.delta_H, Nx)
@@ -367,7 +372,6 @@ class SpaceRock(OrbitFuncs, Convenience):
             rocks.phi0 = np.tile(self.phi0, Nx)
             rocks.t0 = Time(np.tile(self.t0.jd, Nx), format='jd')
             rocks.H0 = np.tile(self.H0, Nx)
-
 
         elif hasattr(self, 'H0'):
             rocks.H0 = np.tile(self.H0, Nx)
@@ -395,7 +399,7 @@ class SpaceRock(OrbitFuncs, Convenience):
         Psi_2 = np.exp(-1.862 * np.tan(beta/2)**1.218)
 
 
-        H = self.mag - 5 * np.log10(obs.r_helio.au * obs.delta.au)# / earth_dist**2)
+        H = self.mag - 5 * np.log10(obs.r_helio.au * obs.delta.au)
 
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
         H[not_zero] += 2.5 * np.log10((1 - self.G[not_zero]) * Psi_1[not_zero] + self.G[not_zero] * Psi_2[not_zero])
