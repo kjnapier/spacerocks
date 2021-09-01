@@ -4,6 +4,8 @@ from .spacerock import SpaceRock
 from .gauss import gauss
 from .observer import observer
 
+import numpy as np
+
 class OrbitFitter:
 
     def __init__(self, ra, dec, epoch, obscode):
