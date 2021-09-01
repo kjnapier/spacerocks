@@ -21,7 +21,7 @@ class Convenience:
         '''
         p = copy.copy(self)
         for attr in self.__dict__.keys():
-            if (attr != 'mu') and (attr != 'frame') and (attr != 'G'):
+            if (attr != 'mu') and (attr != 'frame') and (attr != 'G') and (attr != 'origin'):
                 setattr(p, attr, getattr(self, attr)[idx])
 
         return p
@@ -38,7 +38,7 @@ class Convenience:
 
     def detect_coords(self, kwargs):
 
-        kep = ['a', 'e', 'q', 'inc', 'node', 'arg', 'M', 'true_anomaly', 'E',
+        kep = ['a', 'e', 'q', 'inc', 'node', 'arg', 'M', 'f', 'E',
                'varpi', 't_peri', 'mean_longitude', 'true_longitude', 'v_inf', 'b', 'Q']
         xyz = ['x', 'y', 'z', 'vx', 'vy', 'vz']
 

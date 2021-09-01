@@ -39,18 +39,12 @@ class Ephemerides(Convenience):
         self.epoch = kwargs.get('epoch')
         self.name = kwargs.get('name')
 
-        if kwargs.get('H0') is not None:
-            self.H0 = kwargs.get('H0')
+        if kwargs.get('H') is not None:
+            self.H_func = kwargs.get('H')
             self.G = kwargs.get('G')
 
         if kwargs.get('r_helio') is not None:
             self.r_helio = kwargs.get('r_helio')
-
-        if kwargs.get('delta_H') is not None:
-            self.delta_H = kwargs.get('delta_H')
-            self.rotation_period = kwargs.get('rotation_period')
-            self.phi0 = kwargs.get('phi0')
-            self.t0 = kwargs.get('t0')
 
         self.delta = Distance(np.sqrt(self.x**2 + self.y**2 + self.z**2), u.au)
 
@@ -130,17 +124,7 @@ class Ephemerides(Convenience):
 
     @property
     def H(self):
-        if not hasattr(self, '_H'):
-            if hasattr(self, 'delta_H'):
-                ltt = self.delta / c
-                dH = self.delta_H * np.sin((self.epoch.jd - self.t0.jd - ltt.value)
-                                           * 2 * np.pi / self.rotation_period + self.phi0.rad)
-
-                self.H = self.H0 + dH
-
-            else:
-                self.H = self.H0
-        return self._H
+        return np.array([func(epoch - ltt.value) for epoch, ltt, func in zip(self.epoch.jd, self.delta / c, self.H_func)])
 
     @H.setter
     def H(self, value):

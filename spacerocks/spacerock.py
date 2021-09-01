@@ -48,48 +48,29 @@ from skyfield.data import iers
 
 ts = load.timescale()
 
-import ctypes
-from numpy.ctypeslib import ndpointer
-
-from . import clibspacerocks
-
-clibspacerocks.kep_to_xyz_temp.argtypes = [ctypes.c_int,
-                                   ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
-                                   ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
-                                   ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
-                                   ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
-                                   ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
-                                   ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
-
-clibspacerocks.kep_to_xyz_temp.restype = ctypes.POINTER(ctypes.c_double)
-
-def kep_to_xyz_temp_cpp(N, a, e, inc, arg, node, M):
-
-    rock = clibspacerocks.kep_to_xyz_temp(N, a, e, inc, arg, node, M)
-    arr = np.ctypeslib.as_array(rock, (6 * N,))
-
-    x, y, z, vx, vy, vz = arr.reshape(N, 6).T
-    return x * u.au, y * u.au, z * u.au, vx * u.au/u.d, vy * u.au/u.d, vz * u.au/u.d
+from .cbindings import kep_to_xyz_temp
 
 class SpaceRock(KeplerOrbit, Convenience):
 
     '''
-    SpaceRock objects handle Keplerian orbits. 
+    SpaceRock objects provide an interface to work with Keplerian orbits. 
     '''
 
-    def __init__(self, frame='barycentric', units=Units(), *args, **kwargs):
+    def __init__(self, origin='ssb', frame='eclipticJ2000', units=Units(), *args, **kwargs):
 
         coords = self.detect_coords(kwargs)
         frame = frame.lower()
+        origin = origin.lower()
 
         # input -> arrays
         for idx, key in enumerate([*kwargs]):
             kwargs[key] = np.atleast_1d(kwargs.get(key))
 
         self.frame = frame
-        if self.frame == 'barycentric':
+        self.origin = origin
+        if self.origin == 'ssb':
             self.mu = mu_bary
-        elif self.frame == 'heliocentric':
+        elif self.origin == 'sun':
             self.mu = mu_helio
 
         if coords == 'kep':
@@ -104,21 +85,36 @@ class SpaceRock(KeplerOrbit, Convenience):
                 self.v_inf = (kwargs.get('v_inf') * units.speed).to(u.au / u.day)
 
             if kwargs.get('e') is not None:
-                self.e = kwargs.get('e') #* u.dimensionless_unscaled
+                self.e = kwargs.get('e')
+                if np.any(self.e < 0):
+                    raise ValueError('Eccentricity must be positive')
+                if hasattr(self, '_a'):
+                    if np.any((self.a.au < 0) * (self.e < 1)):
+                        raise ValueError('Orbital elements mismatch. a must be positive for e < 1.') 
+                    if np.any((self.a.au > 0) * (self.e > 1)):
+                        raise ValueError('Orbital elements mismatch. a must be negative for e < 1.') 
 
             self.inc = Angle(kwargs.get('inc'), units.angle)
 
             if kwargs.get('q') is not None:
                 self.q = Distance(kwargs.get('q'), units.distance)
+                if np.any(self.q.au < 0):
+                    raise ValueError('pericenter distance must be positive')
 
             if kwargs.get('Q') is not None:
                 self.Q = Distance(kwargs.get('Q'), units.distance)
+                if np.any(self.Q.au < 0):
+                    raise ValueError('apocenter distance must be positive')
+                if np.any(self.Q < self.q):
+                    raise ValueError('Apocenter distance must be >= pericenter distance.')
 
             if kwargs.get('node') is not None:
                 self.node = Angle(kwargs.get('node'), units.angle)
 
             if kwargs.get('arg') is not None:
                 self.arg = Angle(kwargs.get('arg'), units.angle)
+                if np.any(self.arg.deg[self.e < 1e-8] != 0):
+                    raise ValueError('Cannot have e = 0 with arg != 0')
 
             if kwargs.get('varpi') is not None:
                 self.varpi = Angle(kwargs.get('varpi'), units.angle)
@@ -135,8 +131,8 @@ class SpaceRock(KeplerOrbit, Convenience):
             if kwargs.get('E') is not None:
                 self.E = Angle(kwargs.get('E'), units.angle)
 
-            if kwargs.get('true_anomaly') is not None:
-                self.true_anomaly = Angle(kwargs.get('true_anomaly'), units.angle)
+            if kwargs.get('f') is not None:
+                self.f = Angle(kwargs.get('f'), units.angle)
 
             if kwargs.get('true_longitude') is not None:
                 self.true_longitude = Angle(kwargs.get('true_longitude'), units.angle)
@@ -145,13 +141,11 @@ class SpaceRock(KeplerOrbit, Convenience):
                 self.mean_longitude = Angle(kwargs.get('mean_longitude'), units.angle)
 
             if kwargs.get('epoch') is not None:
-
                 if units.timeformat is None:
                     self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
                 else:
                     self.epoch = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
             else:
-
                 self.epoch = Time(np.zeros(len(self.inc)), format='jd', scale='utc')
 
             if kwargs.get('name') is not None:
@@ -182,52 +176,61 @@ class SpaceRock(KeplerOrbit, Convenience):
             else:
                 self.epoch = Time(np.zeros(len(self.x)), format='jd', scale='utc')
 
-
             if kwargs.get('name') is not None:
                 self.name = np.atleast_1d(kwargs.get('name'))
             else:
                 # produces random, non-repeting integers between 0 and 1e10 - 1
                 self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.x))])
 
-
-        if kwargs.get('H0') is not None:
-            self.H0 = kwargs.get('H0')
-
-
         if kwargs.get('G') is not None:
             self.G = kwargs.get('G')
         else:
             self.G = np.repeat(0.15, len(self))
 
+        if kwargs.get('H') is not None:
+            curves = kwargs.get('H')
+            curve_funcs = []
+            for curve in curves:
+                if callable(curve):
+                    curve_funcs.append(curve)
+                else:
+                    curve_funcs.append(lambda x: curve)
+            self.H_func = np.array(curve_funcs)
 
         if kwargs.get('mag') is not None:
-            self.mag = kwargs.get('mag')
-
-
-        if (kwargs.get('rotation_period') is not None) and (kwargs.get('delta_H') is not None) and (kwargs.get('phi0') is not None):
-            self.rotation_period = kwargs.get('rotation_period')
-            self.delta_H = kwargs.get('delta_H')
-            self.phi0 = Angle(kwargs.get('phi0'), units.angle)
-            self.t0 = Time(self.epoch.jd, format='jd', scale=units.timescale)
+            curves = kwargs.get('mag')
+            curve_funcs = []
+            for curve in curves:
+                if callable(curve):
+                    curve_funcs.append(curve)
+                else:
+                    curve_funcs.append(lambda x: curve)
+            self.mag_func = np.array(curve_funcs)
 
         if kwargs.get('radius') is not None:
             self.radius = Distance(kwargs.get('radius'), units.size, allow_negative=False)
 
         if kwargs.get('mass') is not None:
-            self.radius = kwargs.get('mass') * units.mass
+            self.mass = kwargs.get('mass') * units.mass
 
         if kwargs.get('density') is not None:
-            self.radius = kwargs.get('density') * units.density
+            self.density = kwargs.get('density') * units.density
+        
+    '''
+    TODO: to_mpc_format for ephemerides
+    '''
 
+    @property
+    def H(self):
+        return np.array([func(epoch) for epoch, func in zip(self.epoch.jd, self.H_func)])
 
-
-    def analytic_propagate(self, epoch, propagate_frame = 'heliocentric'):
+    def analytic_propagate(self, epoch: list, propagate_origin: str='sun'):
         '''
         propagate all bodies to the desired date using Keplerian orbit.
         '''
-        in_frame = self.frame
-        if propagate_frame != in_frame:
-            if propagate_frame == 'heliocentric':
+        in_origin = self.origin
+        if propagate_origin != in_origin:
+            if propagate_origin == 'sun':
                 self.to_helio()
             else:
                 self.to_bary()
@@ -242,11 +245,12 @@ class SpaceRock(KeplerOrbit, Convenience):
                           M=M,
                           name=self.name,
                           epoch=epoch,
-                          frame=propagate_frame)
+                          origin=propagate_origin, 
+                          frame=self.frame)
 
         # be polite and return orbital parameters in the input frame.
-        if in_frame != self.frame:
-            if in_frame == 'heliocentric':
+        if in_origin != self.origin:
+            if in_origin == 'sun':
                 self.to_helio()
             else:
                 self.to_bary()
@@ -277,7 +281,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         '''
 
         epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
-        frame = self.frame
+        origin = self.origin
 
         # We need to integrate in barycentric coordinates
         self.to_bary()
@@ -355,30 +359,27 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         units = Units()
         units.timescale = 'tdb'
-        rocks = self.__class__(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, frame='barycentric', units=units)
-        planets = self.__class__(x=px, y=py, z=pz, vx=pvx, vy=pvy, vz=pvz, name=pname, epoch=pepoch, frame='barycentric', units=units)
+        rocks = self.__class__(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, origin='ssb', units=units)
+        planets = self.__class__(x=px, y=py, z=pz, vx=pvx, vy=pvy, vz=pvz, name=pname, epoch=pepoch, origin='ssb', units=units)
 
-        # be polite and return orbital parameters in the input frame.
-        if frame == 'heliocentric':
+        # be polite and return orbital parameters using the input origin.
+        if origin == 'sun':
             rocks.to_helio()
             self.to_helio()
 
         if hasattr(self, 'G'):
             rocks.G = np.tile(self.G, Nx)
 
-        if hasattr(self, 'delta_H'):
-            rocks.delta_H = np.tile(self.delta_H, Nx)
-            rocks.rotation_period = np.tile(self.rotation_period, Nx)
-            rocks.phi0 = np.tile(self.phi0, Nx)
-            rocks.t0 = Time(np.tile(self.t0.jd, Nx), format='jd')
-            rocks.H0 = np.tile(self.H0, Nx)
+        if hasattr(self, 'H_func'):
+            rocks.H_func = np.tile(self.H_func, Nx)
 
-        elif hasattr(self, 'H0'):
-            rocks.H0 = np.tile(self.H0, Nx)
+        if hasattr(self, 'mag_func'):
+            rocks.mag_func = np.tile(self.mag_func, Nx)
 
         return rocks, planets, sim
 
-    def calc_H(self, obscode):
+
+    def calc_H_from_mag(self, obscode):
         obs = self.observe(obscode=obscode)
 
         t = ts.tdb(jd=self.epoch.tdb.jd)
@@ -409,21 +410,21 @@ class SpaceRock(KeplerOrbit, Convenience):
 
     def observe(self, obscode):
 
-        if self.frame == 'barycentric':
-            self.to_helio()
-            r_helio = self.r
-            self.to_bary()
-        else:
-            r_helio = self.r
+        #if self.origin == 'ssb':
+        #    self.to_helio()
+        #    r_helio = self.r
+        #    self.to_bary()
+        #else:
+        #    r_helio = self.r
+
+        #self.to_bary()
 
         x, y, z, vx, vy, vz = self.xyz_to_tel(obscode)
 
-        if not hasattr(self, 'H0'):
-            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio)
-        elif (not hasattr(self, 'delta_H')) and hasattr(self, 'H0'):
-            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio, H0=self.H0, G=self.G)
+        if not hasattr(self, 'H_func'):
+            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name)
         else:
-            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, r_helio=r_helio, H0=self.H0, G=self.G, delta_H=self.delta_H, t0=self.t0, rotation_period=self.rotation_period, phi0=self.phi0)
+            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, H=self.H_func, G=self.G)
 
     def xyz_to_tel(self, obscode=500):
         '''
@@ -441,15 +442,16 @@ class SpaceRock(KeplerOrbit, Convenience):
             obselev = obs.elevation.values
 
 
-        in_frame = self.frame
-        #if in_frame == 'heliocentric':
+        in_origin = self.origin
         self.to_bary()
 
 
-        alltimes = self.epoch.tdb.jd
+        alltimes = self.epoch.tdb.jd # this is the slowest part of observing 1 million objects...
         unique_times = np.unique(alltimes)
         t = ts.tdb(jd=unique_times)
         earth = planets['earth']
+
+        #observer = Observer(epoch=self.epoch)
 
         if obscode == 'ssb':
             x_observer = np.zeros(len(alltimes)) * u.au
@@ -463,8 +465,11 @@ class SpaceRock(KeplerOrbit, Convenience):
         elif obscode == 'sun':
             ss = sun.at(t)
 
-            xx, yy, zz = ss.position.au * u.au # earth ICRS position
-            vxx, vyy, vzz = ss.velocity.au_per_d * u.au / u.day # earth ICRS position
+            # xx, yy, zz = ss.position.au * u.au # earth ICRS position
+            # vxx, vyy, vzz = ss.velocity.au_per_d * u.au / u.day # earth ICRS position
+
+            xx, yy, zz = ss.ecliptic_xyz().au * u.au # earth ICRS position
+            vxx, vyy, vzz = ss.ecliptic_velocity().au_per_d * u.au / u.day # earth ICRS position
 
 
             sxs = {t:x.value for t, x in zip(unique_times, xx)}
@@ -489,9 +494,11 @@ class SpaceRock(KeplerOrbit, Convenience):
 
             ee = earth.at(t)
 
-            xx, yy, zz = ee.position.au * u.au # earth ICRS position
-            vxx, vyy, vzz = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
+            # xx, yy, zz = ee.position.au * u.au # earth ICRS position
+            # vxx, vyy, vzz = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
 
+            xx, yy, zz = ee.ecliptic_xyz().au * u.au # earth ICRS position
+            vxx, vyy, vzz = ee.ecliptic_velocity().au_per_d * u.au / u.day # earth ICRS position
 
             exs = {t:x.value for t, x in zip(unique_times, xx)}
             eys = {t:y.value for t, y in zip(unique_times, yy)}
@@ -513,22 +520,27 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         ltt0 = 0
 
-        N = len(self)
         a = self.a.au.astype(np.double)
         e = self.e.astype(np.double)
         inc = self.inc.rad.astype(np.double)
         arg = self.arg.rad.astype(np.double)
         node = self.node.rad.astype(np.double)
 
-
         for idx in range(10):
 
+            # dx = x0 - x_observer
+            # dy = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_observer
+            # dz = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_observer
+            # dvx = vx0 - vx_observer
+            # dvy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_observer
+            # dvz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_observer
+
             dx = x0 - x_observer
-            dy = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_observer
-            dz = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_observer
+            dy = y0 - y_observer
+            dz = z0 - z_observer
             dvx = vx0 - vx_observer
-            dvy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_observer
-            dvz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_observer
+            dvy = vy0 - vy_observer
+            dvz = vz0 - vz_observer
 
             delta = sqrt(dx**2 + dy**2 + dz**2)
 
@@ -539,16 +551,26 @@ class SpaceRock(KeplerOrbit, Convenience):
                 break
 
             M = self.M - (ltt * self.n)
-            x0, y0, z0, vx0, vy0, vz0 = self.kep_to_xyz_temp(N, a, e, inc, arg, node, M.rad.astype(np.double))
+            x0, y0, z0, vx0, vy0, vz0 = kep_to_xyz_temp(a, e, inc, arg, node, M.rad.astype(np.double))
 
             ltt0 = ltt
 
         # Be polite
-        if in_frame == 'heliocentric':
+        if in_origin == 'sun':
             self.to_helio()
 
-        return dx, dy, dz, dvx, dvy, dvz
+        # Transform to the equatorial frame
+        yrot = dy * np.cos(epsilon) - dz * np.sin(epsilon)
+        zrot = dy * np.sin(epsilon) + dz * np.cos(epsilon)
+        vyrot = dvy * np.cos(epsilon) - dvz * np.sin(epsilon)
+        vzrot = dvy * np.sin(epsilon) + dvz * np.cos(epsilon)
 
+        dy = yrot
+        dz = zrot
+        dvy = vyrot
+        dvz = vzrot
+
+        return dx, dy, dz, dvx, dvy, dvz
 
     def set_simulation(self, startdate, units, model):
 
@@ -570,13 +592,11 @@ class SpaceRock(KeplerOrbit, Convenience):
         M_earth = 3.0034896161241036e-06
         M_moon = M_earth / 81.3005690769
         M_mars = 3.2271560375549977e-7 # Mars Barycenter
-
         M_jupiter = 9.547919384243222e-4
         M_saturn = 2.858859806661029e-4
         M_uranus = 4.3662440433515637e-5
         M_neptune = 5.151389020535497e-5
         M_pluto = 7.361781606089469e-9
-
 
         if model == 0:
             active_bodies = [sun]
@@ -584,7 +604,6 @@ class SpaceRock(KeplerOrbit, Convenience):
             M_sun += M_mercury + M_venus + M_earth + M_mars \
                      + M_jupiter + M_saturn + M_uranus + M_neptune
             masses = [M_sun]
-
 
         elif model == 1:
             active_bodies = [sun, jupiter, saturn, uranus, neptune]
@@ -601,13 +620,11 @@ class SpaceRock(KeplerOrbit, Convenience):
         else:
             raise ValueError('Model not recognized. Check the documentation.')
 
-
         startdate = Time(startdate, scale=units.timescale, format='jd')
         t = ts.tdb(jd=startdate.tdb.jd)
 
         x, y, z = np.array([body.at(t).ecliptic_xyz().au for body in active_bodies]).T
         vx, vy, vz = np.array([body.at(t).ecliptic_velocity().au_per_d for body in active_bodies]).T
-
 
         # create a dataframe of the massive bodies in the solar system
         ss = pd.DataFrame()
@@ -621,7 +638,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         ss['a'] = 1 / (2 / sqrt(ss.x**2 + ss.y**2 + ss.z**2) - (ss.vx**2 + ss.vy**2 + ss.vz**2) / mu_bary.value)
         ss['hill_radius'] = ss.a * pow(ss.mass / (3 * M_sun), 1/3)
         ss['name'] = names
-
 
         sim = rebound.Simulation()
         sim.units = ('day', 'AU', 'Msun')
@@ -646,7 +662,6 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         return sim, names
 
-
     def orbits(self, N=1000):
 
         M = Angle(np.linspace(0, 2*np.pi, N), u.rad)
@@ -656,23 +671,15 @@ class SpaceRock(KeplerOrbit, Convenience):
         zs = []
 
         for r in self:
-            x, y, z, _, _, _ = self.kep_to_xyz_temp(N,
-                                                    np.repeat(r.a, N),
-                                                    np.repeat(r.e, N),
-                                                    np.repeat(r.inc.rad, N),
-                                                    np.repeat(r.arg.rad, N),
-                                                    np.repeat(r.node.rad, N),
-                                                    M.rad)
+            x, y, z, _, _, _ = kep_to_xyz_temp(N,
+                                               np.repeat(r.a, N),
+                                               np.repeat(r.e, N),
+                                               np.repeat(r.inc.rad, N),
+                                               np.repeat(r.arg.rad, N),
+                                               np.repeat(r.node.rad, N),
+                                               M.rad)
             xs.append(x)
             ys.append(y)
             zs.append(z)
 
         return xs, ys, zs
-
-    def kep_to_xyz_temp(self, N, a, e, inc, arg, node, M):
-
-        rock = clibspacerocks.kep_to_xyz_temp(N, a, e, inc, arg, node, M)
-        arr = np.ctypeslib.as_array(rock, (6 * N,))
-
-        x, y, z, vx, vy, vz = arr.reshape(N, 6).T
-        return x * u.au, y * u.au, z * u.au, vx * u.au/u.d, vy * u.au/u.d, vz * u.au/u.d

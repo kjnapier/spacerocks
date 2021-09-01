@@ -20,7 +20,6 @@ class Units:
         self.timescale = 'utc'
         self.timeformat = None
         self.speed = u.au / u.d
-        self.rotation_period = u.d
 
         self.size = u.km
         self.density = u.g / u.cm**3
