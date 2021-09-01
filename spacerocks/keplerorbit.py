@@ -7,7 +7,7 @@ from scipy.optimize import newton
 from .constants import *
 
 from .vector import Vector
-from .cbindings import *#calc_kep_from_xyz, calc_vovec_from_kep, calc_E_from_f, calc_E_from_M
+from .cbindings import *
 
 from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
@@ -137,56 +137,13 @@ class KeplerOrbit:
     def vovec(self):
         del self._vovec
 
-    # @property
-    # def nvec(self):
-    #     if not hasattr(self, '_nvec'):
-    #         self.nvec = Vector(-self.hvec.y, self.hvec.x, zeros_like(self.hvec.z))
-    #     return self._nvec
-
-    # @nvec.setter
-    # def nvec(self, value):
-    #     self._nvec = value
-
-    # @nvec.deleter
-    # def nvec(self):
-    #     del self._nvec
-
-    # @property
-    # def evec(self):
-    #     if not hasattr(self, '_evec'):
-    #         self.evec = self.velocity.cross(self.hvec) / (self.mu / u.rad**2) - self.position / self.position.norm
-    #     return self._evec
-
-    # @evec.setter
-    # def evec(self, value):
-    #     self._evec = value
-
-    # @evec.deleter
-    # def evec(self):
-    #     del self._evec
-
-    # @property
-    # def hvec(self):
-    #     if not hasattr(self, '_hvec'):
-    #         self.hvec = self.position.cross(self.velocity)
-    #     return self._hvec
-
-    # @hvec.setter
-    # def hvec(self, value):
-    #     self._hvec = value
-
-    # @hvec.deleter
-    # def hvec(self):
-    #     del self._hvec
-
     @property
     def position(self):
         if not hasattr(self, '_position'):
             if hasattr(self, '_x') and hasattr(self, '_y') and hasattr(self, '_z'):
                 self.position = Vector(self.x, self.y, self.z)
             else:
-                self.position = self.ovec.euler_rotation(
-                    self.arg, self.inc, self.node)
+                self.position = self.ovec.euler_rotation(self.arg, self.inc, self.node)
         return self._position
 
     @position.setter
@@ -404,18 +361,10 @@ class KeplerOrbit:
         if not hasattr(self, '_arg'):
 
             if hasattr(self, '_varpi') and hasattr(self, 'node'):
-                self.arg = Angle(
-                    (self.varpi.rad - self.node.rad) % (2 * pi), u.rad)
+                self.arg = Angle((self.varpi.rad - self.node.rad) % (2 * pi), u.rad)
 
             elif hasattr(self, '_position') and hasattr(self, '_velocity'):
                 self.kep_from_xyz()
-                # n = self.nvec.norm
-                # arg = zeros_like(self.e * u.rad)
-                # arg[(self.e == 0) | (n == 0)] = 0
-                # arg[(self.e != 0) & (n != 0)] = arccos(self.nvec[(self.e != 0) & (n != 0)].dot(self.evec[(
-                #     self.e != 0) & (n != 0)]) / (n[(self.e != 0) & (n != 0)] * self.e[(self.e != 0) & (n != 0)]))
-                # arg[self.evec.z < 0] = 2 * pi * u.rad - arg[self.evec.z < 0]
-                # self.arg = Angle(arg, u.rad)
 
         return self._arg
 

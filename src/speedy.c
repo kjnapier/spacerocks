@@ -469,12 +469,12 @@ double calc_E_from_f(double e, double f) {
   return E;
 }
 
-double* py_calc_E_from_f(int N, double* es, double* true_anomalies) {
+double* py_calc_E_from_f(int N, double* es, double* fs) {
 
   double* output = malloc(N * sizeof(double));
 
   for (int idx = 0; idx < N; idx++) {
-    output[idx] = calc_E_from_f(es[idx], true_anomalies[idx]);
+    output[idx] = calc_E_from_f(es[idx], fs[idx]);
   }
 
   return output;

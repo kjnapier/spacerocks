@@ -95,31 +95,31 @@ def calc_E_from_M(e, M):
     return Angle(E, u.rad)
 
 
-clibspacerocks.py_calc_E_from_true_anomaly.argtypes = [ctypes.c_int,
+clibspacerocks.py_calc_E_from_f.argtypes = [ctypes.c_int,
                                                        ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                                        ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
 
-clibspacerocks.py_calc_E_from_true_anomaly.restype = ctypes.POINTER(ctypes.c_double)
+clibspacerocks.py_calc_E_from_f.restype = ctypes.POINTER(ctypes.c_double)
 
 def calc_E_from_f(e, f):
 
     N = len(e)
-    rock = clibspacerocks.py_calc_E_from_true_anomaly(N, e, f)
+    rock = clibspacerocks.py_calc_E_from_f(N, e, f)
     E = np.ctypeslib.as_array(rock, (N,))
 
     return Angle(E, u.rad)
 
 
-clibspacerocks.py_calc_true_anomaly_from_E.argtypes = [ctypes.c_int,
+clibspacerocks.py_calc_f_from_E.argtypes = [ctypes.c_int,
                                                        ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                                        ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
 
-clibspacerocks.py_calc_true_anomaly_from_E.restype = ctypes.POINTER(ctypes.c_double)
+clibspacerocks.py_calc_f_from_E.restype = ctypes.POINTER(ctypes.c_double)
 
 def calc_f_from_E(e, E):
 
     N = len(e)
-    rock = clibspacerocks.py_calc_true_anomaly_from_E(N, e, E)
+    rock = clibspacerocks.py_calc_f_from_E(N, e, E)
     f = np.ctypeslib.as_array(rock, (N,))
 
     return Angle(f, u.rad)
