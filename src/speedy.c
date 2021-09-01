@@ -8,7 +8,7 @@ const double IMIN = 1e-8;
 const double mu_bary = 0.00029630927493457475;
 
 #ifndef M_PI
-    #define M_PI 3.14159265358979323846;
+    #define M_PI 3.14159265358979323846
 #endif
 
 struct StateVector{
