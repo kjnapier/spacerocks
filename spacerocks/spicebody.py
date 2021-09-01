@@ -7,9 +7,9 @@ class SpiceBody:
 
 class Planet(SpiceBody):
 
-    self.mass = mass
-    self.radius = radius
-    self.albedo = albedo
+    # self.mass = mass
+    # self.radius = radius
+    # self.albedo = albedo
     pass
 
 class SpaceCraft(SpiceBody):
