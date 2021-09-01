@@ -1,4 +1,4 @@
-import emcee
+#import emcee
 
 from .spacerock import SpaceRock
 from .gauss import gauss
