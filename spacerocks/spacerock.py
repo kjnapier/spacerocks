@@ -56,7 +56,7 @@ class SpaceRock(KeplerOrbit, Convenience):
     SpaceRock objects provide an interface to work with Keplerian orbits. 
     '''
 
-    def __init__(self, origin='ssb', frame='eclipticJ2000', units=Units(), *args, **kwargs):
+    def __init__(self, origin='ssb', frame='ECLIPJ2000', units=Units(), *args, **kwargs):
 
         coords = self.detect_coords(kwargs)
         frame = frame.lower()
@@ -379,7 +379,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         return rocks, planets, sim
 
 
-    def calc_H_from_mag(self, obscode):
+    def __calc_H_from_mag(self, obscode):
         obs = self.observe(obscode=obscode)
 
         t = ts.tdb(jd=self.epoch.tdb.jd)
@@ -408,17 +408,31 @@ class SpaceRock(KeplerOrbit, Convenience):
         return H
 
 
-    def observe(self, obscode):
+    def observe(self, obscode) -> Ephemerides:
 
-        #if self.origin == 'ssb':
-        #    self.to_helio()
-        #    r_helio = self.r
-        #    self.to_bary()
-        #else:
-        #    r_helio = self.r
+        '''
+        Calculate the ephemerides of a SpaceRock object from a observer's location.
 
-        #self.to_bary()
+        All MPC observatory codes are supported, as well as the Geocenter.
 
+        Currently-supported spacecraft are:
+        - The Hubble Space Telescope
+        - The New Horizons Spacecraft
+
+        Ephemerides can also be computed as observed from the Sun and the 
+        solar system barycenter (ssb).
+
+        The James Webb Space Telescope will be supported as soon as it launches
+        and NASA provides the necessary spk files.
+        '''
+
+        # if self.origin == 'ssb':
+        #     self.to_helio()
+        #     r_helio = self.r
+        #     self.to_bary()
+        # else:
+        #     r_helio = self.r
+            
         x, y, z, vx, vy, vz = self.xyz_to_tel(obscode)
 
         if not hasattr(self, 'H_func'):
@@ -447,73 +461,73 @@ class SpaceRock(KeplerOrbit, Convenience):
 
 
         alltimes = self.epoch.tdb.jd # this is the slowest part of observing 1 million objects...
-        unique_times = np.unique(alltimes)
-        t = ts.tdb(jd=unique_times)
-        earth = planets['earth']
+        # unique_times = np.unique(alltimes)
+        # t = ts.tdb(jd=unique_times)
+        # earth = planets['earth']
 
-        #observer = Observer(epoch=self.epoch)
+        # #observer = Observer(epoch=self.epoch)
 
-        if obscode == 'ssb':
-            x_observer = np.zeros(len(alltimes)) * u.au
-            y_observer = np.zeros(len(alltimes)) * u.au
-            z_observer = np.zeros(len(alltimes)) * u.au
+        # if obscode == 'ssb':
+        #     x_observer = np.zeros(len(alltimes)) * u.au
+        #     y_observer = np.zeros(len(alltimes)) * u.au
+        #     z_observer = np.zeros(len(alltimes)) * u.au
 
-            vx_observer = np.zeros(len(alltimes)) * u.au / u.day
-            vy_observer = np.zeros(len(alltimes)) * u.au / u.day
-            vz_observer = np.zeros(len(alltimes)) * u.au / u.day
+        #     vx_observer = np.zeros(len(alltimes)) * u.au / u.day
+        #     vy_observer = np.zeros(len(alltimes)) * u.au / u.day
+        #     vz_observer = np.zeros(len(alltimes)) * u.au / u.day
 
-        elif obscode == 'sun':
-            ss = sun.at(t)
+        # elif obscode == 'sun':
+        #     ss = sun.at(t)
 
-            # xx, yy, zz = ss.position.au * u.au # earth ICRS position
-            # vxx, vyy, vzz = ss.velocity.au_per_d * u.au / u.day # earth ICRS position
+        #     # xx, yy, zz = ss.position.au * u.au # earth ICRS position
+        #     # vxx, vyy, vzz = ss.velocity.au_per_d * u.au / u.day # earth ICRS position
 
-            xx, yy, zz = ss.ecliptic_xyz().au * u.au # earth ICRS position
-            vxx, vyy, vzz = ss.ecliptic_velocity().au_per_d * u.au / u.day # earth ICRS position
+        #     xx, yy, zz = ss.ecliptic_xyz().au * u.au # earth ICRS position
+        #     vxx, vyy, vzz = ss.ecliptic_velocity().au_per_d * u.au / u.day # earth ICRS position
 
 
-            sxs = {t:x.value for t, x in zip(unique_times, xx)}
-            sys = {t:y.value for t, y in zip(unique_times, yy)}
-            szs = {t:z.value for t, z in zip(unique_times, zz)}
-            svxs = {t:vx.value for t, vx in zip(unique_times, vxx)}
-            svys = {t:vy.value for t, vy in zip(unique_times, vyy)}
-            svzs = {t:vz.value for t, vz in zip(unique_times, vzz)}
+        #     sxs = {t:x.value for t, x in zip(unique_times, xx)}
+        #     sys = {t:y.value for t, y in zip(unique_times, yy)}
+        #     szs = {t:z.value for t, z in zip(unique_times, zz)}
+        #     svxs = {t:vx.value for t, vx in zip(unique_times, vxx)}
+        #     svys = {t:vy.value for t, vy in zip(unique_times, vyy)}
+        #     svzs = {t:vz.value for t, vz in zip(unique_times, vzz)}
 
-            x_observer = np.array([sxs[t] for t in alltimes]) * u.au
-            y_observer = np.array([sys[t] for t in alltimes]) * u.au
-            z_observer = np.array([szs[t] for t in alltimes]) * u.au
+        #     x_observer = np.array([sxs[t] for t in alltimes]) * u.au
+        #     y_observer = np.array([sys[t] for t in alltimes]) * u.au
+        #     z_observer = np.array([szs[t] for t in alltimes]) * u.au
 
-            vx_observer = np.array([svxs[t] for t in alltimes]) * u.au / u.day
-            vy_observer = np.array([svys[t] for t in alltimes]) * u.au / u.day
-            vz_observer = np.array([svzs[t] for t in alltimes]) * u.au / u.day
+        #     vx_observer = np.array([svxs[t] for t in alltimes]) * u.au / u.day
+        #     vy_observer = np.array([svys[t] for t in alltimes]) * u.au / u.day
+        #     vz_observer = np.array([svzs[t] for t in alltimes]) * u.au / u.day
 
-        # Only used for the topocentric calculation.
-        else:
-            if (obscode != 500) and (obscode != '500'):
-                earth += wgs84.latlon(obslat, obslon, obselev)
+        # # Only used for the topocentric calculation.
+        # else:
+        #     if (obscode != 500) and (obscode != '500'):
+        #         earth += wgs84.latlon(obslat, obslon, obselev)
 
-            ee = earth.at(t)
+        #     ee = earth.at(t)
 
-            # xx, yy, zz = ee.position.au * u.au # earth ICRS position
-            # vxx, vyy, vzz = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
+        #     # xx, yy, zz = ee.position.au * u.au # earth ICRS position
+        #     # vxx, vyy, vzz = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
 
-            xx, yy, zz = ee.ecliptic_xyz().au * u.au # earth ICRS position
-            vxx, vyy, vzz = ee.ecliptic_velocity().au_per_d * u.au / u.day # earth ICRS position
+        #     xx, yy, zz = ee.ecliptic_xyz().au * u.au # earth ICRS position
+        #     vxx, vyy, vzz = ee.ecliptic_velocity().au_per_d * u.au / u.day # earth ICRS position
 
-            exs = {t:x.value for t, x in zip(unique_times, xx)}
-            eys = {t:y.value for t, y in zip(unique_times, yy)}
-            ezs = {t:z.value for t, z in zip(unique_times, zz)}
-            evxs = {t:vx.value for t, vx in zip(unique_times, vxx)}
-            evys = {t:vy.value for t, vy in zip(unique_times, vyy)}
-            evzs = {t:vz.value for t, vz in zip(unique_times, vzz)}
+        #     exs = {t:x.value for t, x in zip(unique_times, xx)}
+        #     eys = {t:y.value for t, y in zip(unique_times, yy)}
+        #     ezs = {t:z.value for t, z in zip(unique_times, zz)}
+        #     evxs = {t:vx.value for t, vx in zip(unique_times, vxx)}
+        #     evys = {t:vy.value for t, vy in zip(unique_times, vyy)}
+        #     evzs = {t:vz.value for t, vz in zip(unique_times, vzz)}
 
-            x_observer = np.array([exs[t] for t in alltimes]) * u.au
-            y_observer = np.array([eys[t] for t in alltimes]) * u.au
-            z_observer = np.array([ezs[t] for t in alltimes]) * u.au
+        #     x_observer = np.array([exs[t] for t in alltimes]) * u.au
+        #     y_observer = np.array([eys[t] for t in alltimes]) * u.au
+        #     z_observer = np.array([ezs[t] for t in alltimes]) * u.au
 
-            vx_observer = np.array([evxs[t] for t in alltimes]) * u.au / u.day
-            vy_observer = np.array([evys[t] for t in alltimes]) * u.au / u.day
-            vz_observer = np.array([evzs[t] for t in alltimes]) * u.au / u.day
+        #     vx_observer = np.array([evxs[t] for t in alltimes]) * u.au / u.day
+        #     vy_observer = np.array([evys[t] for t in alltimes]) * u.au / u.day
+        #     vz_observer = np.array([evzs[t] for t in alltimes]) * u.au / u.day
 
         x0, y0, z0 = self.x, self.y, self.z
         vx0, vy0, vz0 = self.vx, self.vy, self.vz
@@ -527,13 +541,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         node = self.node.rad.astype(np.double)
 
         for idx in range(10):
-
-            # dx = x0 - x_observer
-            # dy = y0 * np.cos(epsilon) - z0 * np.sin(epsilon) - y_observer
-            # dz = y0 * np.sin(epsilon) + z0 * np.cos(epsilon) - z_observer
-            # dvx = vx0 - vx_observer
-            # dvy = vy0 * np.cos(epsilon) - vz0 * np.sin(epsilon) - vy_observer
-            # dvz = vy0 * np.sin(epsilon) + vz0 * np.cos(epsilon) - vz_observer
 
             dx = x0 - x_observer
             dy = y0 - y_observer
@@ -556,8 +563,8 @@ class SpaceRock(KeplerOrbit, Convenience):
             ltt0 = ltt
 
         # Be polite
-        if in_origin == 'sun':
-            self.to_helio()
+        if in_origin != self.origin:
+            self.switch_origin(in_origin)
 
         # Transform to the equatorial frame
         yrot = dy * np.cos(epsilon) - dz * np.sin(epsilon)

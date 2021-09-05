@@ -26,6 +26,81 @@ DATA_PATH = pkg_resources.resource_filename('spacerocks', 'data/observatories.cs
 observatories = pd.read_csv(DATA_PATH)
 
 
+class Observer:
+
+    def __init__(self, obscode):
+        self.obscode = obscode
+
+    def at(self, epoch):
+        unique_times = np.unique(alltimes)
+        t = ts.tdb(jd=unique_times)
+        earth = planets['earth']
+
+        #observer = Observer(epoch=self.epoch)
+
+        if obscode == 'ssb':
+            x_observer = np.zeros(len(alltimes)) * u.au
+            y_observer = np.zeros(len(alltimes)) * u.au
+            z_observer = np.zeros(len(alltimes)) * u.au
+
+            vx_observer = np.zeros(len(alltimes)) * u.au / u.day
+            vy_observer = np.zeros(len(alltimes)) * u.au / u.day
+            vz_observer = np.zeros(len(alltimes)) * u.au / u.day
+
+        elif obscode == 'sun':
+            ss = sun.at(t)
+
+            # xx, yy, zz = ss.position.au * u.au # earth ICRS position
+            # vxx, vyy, vzz = ss.velocity.au_per_d * u.au / u.day # earth ICRS position
+
+            xx, yy, zz = ss.ecliptic_xyz().au * u.au # earth ICRS position
+            vxx, vyy, vzz = ss.ecliptic_velocity().au_per_d * u.au / u.day # earth ICRS position
+
+
+            sxs = {t:x.value for t, x in zip(unique_times, xx)}
+            sys = {t:y.value for t, y in zip(unique_times, yy)}
+            szs = {t:z.value for t, z in zip(unique_times, zz)}
+            svxs = {t:vx.value for t, vx in zip(unique_times, vxx)}
+            svys = {t:vy.value for t, vy in zip(unique_times, vyy)}
+            svzs = {t:vz.value for t, vz in zip(unique_times, vzz)}
+
+            x_observer = np.array([sxs[t] for t in alltimes]) * u.au
+            y_observer = np.array([sys[t] for t in alltimes]) * u.au
+            z_observer = np.array([szs[t] for t in alltimes]) * u.au
+
+            vx_observer = np.array([svxs[t] for t in alltimes]) * u.au / u.day
+            vy_observer = np.array([svys[t] for t in alltimes]) * u.au / u.day
+            vz_observer = np.array([svzs[t] for t in alltimes]) * u.au / u.day
+
+        # Only used for the topocentric calculation.
+        else:
+            if (obscode != 500) and (obscode != '500'):
+                earth += wgs84.latlon(obslat, obslon, obselev)
+
+            ee = earth.at(t)
+
+            # xx, yy, zz = ee.position.au * u.au # earth ICRS position
+            # vxx, vyy, vzz = ee.velocity.au_per_d * u.au / u.day # earth ICRS position
+
+            xx, yy, zz = ee.ecliptic_xyz().au * u.au # earth ICRS position
+            vxx, vyy, vzz = ee.ecliptic_velocity().au_per_d * u.au / u.day # earth ICRS position
+
+            exs = {t:x.value for t, x in zip(unique_times, xx)}
+            eys = {t:y.value for t, y in zip(unique_times, yy)}
+            ezs = {t:z.value for t, z in zip(unique_times, zz)}
+            evxs = {t:vx.value for t, vx in zip(unique_times, vxx)}
+            evys = {t:vy.value for t, vy in zip(unique_times, vyy)}
+            evzs = {t:vz.value for t, vz in zip(unique_times, vzz)}
+
+            x_observer = np.array([exs[t] for t in alltimes]) * u.au
+            y_observer = np.array([eys[t] for t in alltimes]) * u.au
+            z_observer = np.array([ezs[t] for t in alltimes]) * u.au
+
+            vx_observer = np.array([evxs[t] for t in alltimes]) * u.au / u.day
+            vy_observer = np.array([evys[t] for t in alltimes]) * u.au / u.day
+            vz_observer = np.array([evzs[t] for t in alltimes]) * u.au / u.day
+
+
 def observer(obscodes, epochs):
 
     x = []

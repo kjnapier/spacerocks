@@ -4,7 +4,6 @@
 
 const double EMIN = 1e-8;
 const double IMIN = 1e-8;
-
 const double mu_bary = 0.00029630927493457475;
 
 #ifndef M_PI
@@ -349,84 +348,6 @@ double* py_calc_kep_from_xyz(int N, double mu, double* xs, double* ys, double* z
   }
   return output;
 }
-
-// double calc_f_from_state(double ex, double ey, double ez, double nx, double ny, double nz, double inc, double x, double y, double z, double vx, double vy, double vz, double a) {
-
-//   double e = sqrt(ex*ex + ey*ey + ez*ez);
-//   double r = sqrt(x*x + y*y + z*z);
-
-//   double f;
-
-//   // if ((e == 0) & (inc == 0)) {
-//   //   f = acos(x / r);
-//   //   if (vx > 0) {
-//   //     return 2 * M_PI - f;
-//   //   }
-//   // }
-//   // else if ((e == 0) & (inc != 0)){
-//   //   double ndotr = nx*x + ny*y + nz*z;
-//   //   double n = sqrt(nx*nx + ny*ny + nz*nz);
-//   //   f = acos(ndotr / (n * r));
-//   //   if (z < 0) {
-//   //     return 2 * M_PI - f;
-//   //   }
-//   // }
-
-//   if (e < 1) {
-//     if (inc < IMIN || inc > M_PI - IMIN) {
-//       // Handling the near-planar case
-//       if (e > EMIN) {
-//         // Near-planar, elliptical
-//         double theta = acos(x / r);
-//         double varpi = acos(ex / e);
-//         if (inc < M_PI/2) {
-//           f = theta - varpi;
-//         }
-//         else {
-//           f = varpi - theta;
-//         }
-//       }
-//       else {
-//       // Near-planar, near-circular
-//       }
-
-//     } 
-//     else if (inc > IMIN) {
-//       // Handling the non-planar case
-//       if (e > EMIN) {
-//         // Non-planar, elliptical
-//         double edotr = ex*x + ey*y + ez*z;
-//         f = acos(edotr / (e * r));
-//         if (x*vx + y*vy + z*vz < 0) {
-//           return 2 * M_PI - f;
-//         }
-//       else {
-//         // Non-planar, circular
-
-//       }
-//     }
-//   }
-//   else {
-//     double l = a * (e*e - 1);
-//     f = acos((l / r - 1) / e);
-//   }
-
-
-//   return f;
-
-// }
-
-// double* py_calc_f_from_state(int N, double* exs, double* eys, double* ezs, double* nxs, double* nys, double* nzs, double* incs, double* xs, double* ys, double* zs, double* vxs, double* vys, double* vzs, double* as) {
-//   double* output = malloc(N * sizeof(double));
-
-//   for (int idx = 0; idx < N; idx++) {
-//     output[idx] = calc_f_from_state(exs[idx], eys[idx], ezs[idx], nxs[idx], nys[idx], nzs[idx], incs[idx], xs[idx], ys[idx], zs[idx], vxs[idx], vys[idx], vzs[idx], as[idx]);
-//   }
-
-//   return output;
-// }
-
-
 
 double calc_M_from_E(double e, double E) {
 
