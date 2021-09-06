@@ -24,10 +24,12 @@ from . import clibspacerocks
 
 class KeplerOrbit:
 
-    def change_origin(self):
-        #new_origin = 
+    def change_origin(self, new_origin):
         #new_mu = the mu of the new origin
-        pass
+        if new_origin == 'ssb':
+            self.to_bary()
+        elif new_origin == 'sun':
+            self.to_helio()
 
     def change_frame(self):
         pass

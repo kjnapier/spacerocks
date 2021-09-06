@@ -28,6 +28,7 @@ from .convenience import Convenience
 from .units import Units
 from .vector import Vector
 from .ephemerides import Ephemerides
+from .observer import Observer
 
 from skyfield.api import Topos, Loader
 # Load in planets for ephemeride calculation.
@@ -460,12 +461,13 @@ class SpaceRock(KeplerOrbit, Convenience):
         self.to_bary()
 
 
-        alltimes = self.epoch.tdb.jd # this is the slowest part of observing 1 million objects...
+        # alltimes = self.epoch.tdb.jd # this is the slowest part of observing 1 million objects...
         # unique_times = np.unique(alltimes)
         # t = ts.tdb(jd=unique_times)
         # earth = planets['earth']
 
-        # #observer = Observer(epoch=self.epoch)
+        observer = Observer(obscode=obscode)
+        obs = observer.at(self.epoch)
 
         # if obscode == 'ssb':
         #     x_observer = np.zeros(len(alltimes)) * u.au
@@ -542,12 +544,12 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         for idx in range(10):
 
-            dx = x0 - x_observer
-            dy = y0 - y_observer
-            dz = z0 - z_observer
-            dvx = vx0 - vx_observer
-            dvy = vy0 - vy_observer
-            dvz = vz0 - vz_observer
+            dx = x0 - obs.x
+            dy = y0 - obs.y
+            dz = z0 - obs.z
+            dvx = vx0 - obs.vx
+            dvy = vy0 - obs.vy
+            dvz = vz0 - obs.vz
 
             delta = sqrt(dx**2 + dy**2 + dz**2)
 
@@ -564,7 +566,7 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         # Be polite
         if in_origin != self.origin:
-            self.switch_origin(in_origin)
+            self.change_origin(in_origin)
 
         # Transform to the equatorial frame
         yrot = dy * np.cos(epsilon) - dz * np.sin(epsilon)
@@ -678,8 +680,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         zs = []
 
         for r in self:
-            x, y, z, _, _, _ = kep_to_xyz_temp(N,
-                                               np.repeat(r.a, N),
+            x, y, z, _, _, _ = kep_to_xyz_temp(np.repeat(r.a, N),
                                                np.repeat(r.e, N),
                                                np.repeat(r.inc.rad, N),
                                                np.repeat(r.arg.rad, N),

@@ -32,5 +32,5 @@ from .units import Units
 from .orbfit import Orbfit
 from .pyOrbfit import *
 from .gauss import gauss
-from .observer import observer
+from .observer import Observer
 from .orbitfit import OrbitFitter
