@@ -1,8 +1,8 @@
 \begindata
    KERNELS_TO_LOAD=(
-   '/home/kevin/research/spacerocks/spacerocks/data/spice/latest_leapseconds.tls',
-   '/home/kevin/research/spacerocks/spacerocks/data/spice/de440s.bsp',
-   '/home/kevin/research/spacerocks/spacerocks/data/spice/hst.bsp',
-   '/home/kevin/research/spacerocks/spacerocks/data/spice/test.bsp',
-   '/home/kevin/research/spacerocks/spacerocks/data/spice/nh.bsp')
+   '/Users/kjnapier/research/spacerocks/spacerocks/data/spice/latest_leapseconds.tls',
+   '/Users/kjnapier/research/spacerocks/spacerocks/data/spice/de440s.bsp',
+   '/Users/kjnapier/research/spacerocks/spacerocks/data/spice/hst.bsp',
+   '/Users/kjnapier/research/spacerocks/spacerocks/data/spice/test.bsp',
+   '/Users/kjnapier/research/spacerocks/spacerocks/data/spice/nh.bsp')
 \begintext

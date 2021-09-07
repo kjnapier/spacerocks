@@ -746,7 +746,7 @@ observatory_geocenter(double jd,
     obsalt = sitelist[i].altitude;
 
     /* Get the LMST and calculate to ICRS vector */
-    obslmst=lst(jd,obslon);
+    obslmst = lst(jd, obslon);
     topo(obslmst*PI/12., obslat, obsalt, xobs, yobs, zobs);
 
   } else {
