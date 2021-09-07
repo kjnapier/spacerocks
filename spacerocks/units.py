@@ -1,5 +1,4 @@
 from astropy import units as u
-from astropy.table import Table
 
 # Units manager for spacerocks.
 # Usage:

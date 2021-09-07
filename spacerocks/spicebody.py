@@ -16,8 +16,8 @@ class SpiceBody:
 
         if len(kwargs.get('spiceid')) < len(self.epoch):
                 self.spiceid = np.repeat(kwargs.get('spiceid'), len(self.epoch))
-            else:
-                self.spiceid = np.atleast_1d(kwargs.get('spiceid'))
+        else:
+            self.spiceid = np.atleast_1d(kwargs.get('spiceid'))
 
     
     def __get_all_state_vectors(self):

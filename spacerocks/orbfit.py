@@ -8,10 +8,8 @@ from .spacerock import SpaceRock
 from .units import Units
 from .prediction import Prediction
 
-from astropy.coordinates import Angle, SkyCoord
+from astropy.coordinates import SkyCoord
 from astropy.time import Time
-import matplotlib.pyplot as plt
-import pandas as pd
 from matplotlib.patches import Ellipse
 import dateutil
 
@@ -347,7 +345,7 @@ class Orbfit(Convenience):
             dx = orbfit.dvector(1,6)
             dy = orbfit.dvector(1,6)
             # Sometimes hangs in next line... why?
-            thetax, thetay = orbfit.kbo2d(p_in, futobs, dx, dy)
+            #thetax, thetay = orbfit.kbo2d(p_in, futobs, dx, dy)
             # Predicted position, in abg basis:
             orbfit.predict_posn(p_in, self.cov_abg, futobs, sigxy)
             solar_elongation = orbfit.elongation(futobs)/orbfit.DTOR       # solar elongation in degrees

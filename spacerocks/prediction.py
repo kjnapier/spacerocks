@@ -17,8 +17,7 @@ class Prediction(Convenience):
 
         if units.timeformat is None:
             if isinstance(kwargs.get('epoch')[0], str):
-                self.epoch = [Time(dateutil.parser.parse(date, fuzzy_with_tokens=True)[
-                                   0], format='datetime', scale=units.timescale) for date in kwargs.get('epoch')]
+                self.epoch = [Time(dateutil.parser.parse(date, fuzzy_with_tokens=True)[0], format='datetime', scale=units.timescale) for date in kwargs.get('epoch')]
             elif np.all(kwargs.get('epoch') > 100000):
                 self.epoch = Time(kwargs.get('epoch'),
                                   format='jd', scale=units.timescale)

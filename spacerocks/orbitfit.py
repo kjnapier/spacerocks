@@ -16,11 +16,11 @@ class OrbitFitter:
         self.obscode = obscode
 
         #self.observer = observer(obscode=self.obscode, epoch=self.epoch)
-        self.observer = observer(self.obscode, self.epoch)
+        self.observer = Observer(self.obscode, self.epoch)
 
     def gauss_guess(self):
         x, y, z, vx, vy, vz, epoch = gauss(self.ra, self.dec, self.epoch, self.observer)
-        return SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=epoch)
+        return SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=epoch)    
 
     # def mcmc(self):
 

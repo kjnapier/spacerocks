@@ -1,26 +1,19 @@
-from numpy import pi, sqrt, cbrt, sin, cos, tan, sinh, tanh, exp, log10, zeros_like, arccos, arctan2, array, any, arctanh
+from numpy import pi, sqrt, cbrt, sin, cos, sinh, zeros_like
 import numpy as np
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
-from scipy.optimize import newton
 from .constants import *
 
 from .vector import Vector
 from .cbindings import *
 
-from skyfield.api import Topos, Loader
+from skyfield.api import Loader
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
 planets = load('de440.bsp')
 sun = planets['sun']
-
-import ctypes
-from numpy.ctypeslib import ndpointer
-
-from . import clibspacerocks
-
 
 class KeplerOrbit:
 

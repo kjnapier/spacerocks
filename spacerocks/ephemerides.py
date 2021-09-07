@@ -1,19 +1,15 @@
 from .convenience import Convenience
-import random
-import copy
-import os
 
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
-from astropy.time import Time
 
-from numpy import sin, cos, arctan2, sqrt, array, pi, zeros, arcsin, tan
+from numpy import sin, cos, arctan2, sqrt, arcsin, tan
 import numpy as np
 import pandas as pd
 
 from .constants import c, epsilon
 
-from skyfield.api import Topos, Loader
+from skyfield.api import Loader
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()

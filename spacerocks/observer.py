@@ -1,9 +1,5 @@
-from . import spacerock
-from .units import Units
-
 from astropy import units as u
 from astropy.coordinates import Distance, Angle
-from astropy.time import Time
 
 from .constants import epsilon
 
