@@ -6,27 +6,10 @@ import pandas as pd
 import numpy as np
 
 from .vector import Vector
-from .spacerock import SpaceRock, Units
+from .spacerock import SpaceRock
 from .constants import mu_bary as mu
 from .constants import epsilon
 mu = mu.value
-
-from skyfield.api import Topos, Loader
-# Load in planets for ephemeride calculation.
-load = Loader('./Skyfield-Data', expire=False, verbose=False)
-ts = load.timescale()
-planets = load('de440.bsp')
-earth = planets['earth']
-
-from skyfield.api import wgs84
-from skyfield.data import iers
-
-ts = load.timescale()
-
-import pkg_resources
-
-DATA_PATH = pkg_resources.resource_filename('spacerocks', 'data/observatories.csv')
-observatories = pd.read_csv(DATA_PATH)
 
 
 def gauss(ras, decs, epochs, observer) -> SpaceRock:
@@ -119,7 +102,6 @@ def gauss(ras, decs, epochs, observer) -> SpaceRock:
         # Step 13: The orbital state vectors have now been found, the position (r2) and velocity (v2) vector for the second observation of the orbiting body. With these two vectors, the orbital elements can be found and the orbit determined
         x, y, z = r2
         vx, vy, vz = v2
-        epoch = t2
 
         y_ec = y * cos(epsilon) + z * sin(epsilon)
         z_ec = -y * sin(epsilon) + z * cos(epsilon)

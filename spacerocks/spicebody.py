@@ -1,12 +1,10 @@
-from .units import Units
-from .spacerock import SpaceRock
-
 import spiceypy as spice
 from astropy import units as u
+import numpy as np
 
 class SpiceBody:
 
-    def __init__(self, frame='ECLIPJ2000', origin='ssb'):
+    def __init__(self, frame='ECLIPJ2000', origin='ssb', **kwargs):
 
         self.frame = frame
         self.origin = origin

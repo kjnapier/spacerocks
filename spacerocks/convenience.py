@@ -1,5 +1,4 @@
 from astropy.table import Table
-import pandas as pd
 import numpy as np
 from astropy.time import Time
 import copy

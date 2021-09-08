@@ -1,5 +1,4 @@
 from ctypes import cdll
-import warnings
 import os
 __version__ = '1.1.0'
 __author__ = 'Kevin Napier'
