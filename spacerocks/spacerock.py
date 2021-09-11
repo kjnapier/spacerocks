@@ -4,23 +4,19 @@
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
 import random
-import copy
-import os
 
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
 
-from numpy import sin, cos, arctan2, sqrt, array, pi, zeros, sinh, arctanh, arccosh, cosh, tanh, zeros_like
+from numpy import sqrt, array
 import numpy as np
 import pandas as pd
 
 import rebound
-from rebound import hash as h
 
 #import reboundx
 #from reboundx import constants
-from scipy.optimize import newton
 
 from .constants import *
 from .keplerorbit import KeplerOrbit
@@ -30,7 +26,7 @@ from .vector import Vector
 from .ephemerides import Ephemerides
 from .observer import Observer
 
-from skyfield.api import Topos, Loader
+from skyfield.api import Loader
 # Load in planets for ephemeride calculation.
 load = Loader('./Skyfield-Data', expire=False, verbose=False)
 ts = load.timescale()
@@ -44,8 +40,6 @@ DATA_PATH = pkg_resources.resource_filename('spacerocks', 'data/observatories.cs
 
 observatories = pd.read_csv(DATA_PATH)
 
-from skyfield.api import wgs84
-from skyfield.data import iers
 
 ts = load.timescale()
 
@@ -225,55 +219,6 @@ class SpaceRock(KeplerOrbit, Convenience):
     def H(self):
         return np.array([func(epoch) for epoch, func in zip(self.epoch.jd, self.H_func)])
 
-    def analytic_propagate(self, epoch: list, propagate_origin: str='sun'):
-        '''
-        propagate all bodies to the desired date using Keplerian orbit.
-        '''
-        in_origin = self.origin
-        if propagate_origin != in_origin:
-            if propagate_origin == 'sun':
-                self.to_helio()
-            else:
-                self.to_bary()
-
-        M = (self.n.value * (epoch - self.epoch.jd) + self.M.rad*180/np.pi)%360
-
-        rocks = SpaceRock(a=self.a,
-                          e=self.e,
-                          inc=self.inc,
-                          node=self.node,
-                          arg=self.arg,
-                          M=M,
-                          name=self.name,
-                          epoch=epoch,
-                          origin=propagate_origin, 
-                          frame=self.frame)
-
-        # be polite and return orbital parameters in the input frame.
-        if in_origin != self.origin:
-            if in_origin == 'sun':
-                self.to_helio()
-            else:
-                self.to_bary()
-
-        if hasattr(self, 'G'):
-            rocks.G = self.G
-
-        if hasattr(self, 'mag'):
-            rocks.mag = self.mag
-
-        if hasattr(self, 'delta_H'):
-            rocks.delta_H = self.delta_H
-            rocks.rotation_period = self.rotation_period
-            rocks.phi0 = self.phi0
-            rocks.t0 = Time(self.t0.jd, format='jd')
-
-            rocks.H = self.H + rocks.delta_H * np.sin(2 * np.pi * (rocks.epoch.jd - rocks.t0.jd) / rocks.rotation_period  - rocks.phi0)
-
-        elif hasattr(self, 'H'):
-            rocks.H = self.H
-
-        return rocks
 
     def propagate(self, epochs, model, units=Units()):
         '''
@@ -290,7 +235,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         # Integrate all particles to the same obsdate
         pickup_times = self.epoch.tdb.jd
         sim, planet_names = self.set_simulation(np.min(pickup_times), units=units, model=model)
-        sim.t = np.min(pickup_times) #np.min(df.epoch)
+        sim.t = np.min(pickup_times)
 
         # need to ensure these are computed
         self.x
@@ -465,19 +410,8 @@ class SpaceRock(KeplerOrbit, Convenience):
         else:
             raise ValueError('Must pass either an obscode or spiceid.')
 
-        # if obscode != 500:
-        #     obscode = str(obscode).zfill(3)
-        #     obs = observatories[observatories.obscode == obscode]
-        #     obslat = obs.lat.values
-        #     obslon = obs.lon.values
-        #     obselev = obs.elevation.values
-
-
         in_origin = self.origin
         self.to_bary()
-
-
-        
 
         x0, y0, z0 = self.x, self.y, self.z
         vx0, vy0, vz0 = self.vx, self.vy, self.vz
@@ -639,3 +573,53 @@ class SpaceRock(KeplerOrbit, Convenience):
             zs.append(z)
 
         return xs, ys, zs
+
+    def analytic_propagate(self, epoch: list, propagate_origin: str='sun'):
+        '''
+        propagate all bodies to the desired date using Keplerian orbit.
+        '''
+        in_origin = self.origin
+        if propagate_origin != in_origin:
+            if propagate_origin == 'sun':
+                self.to_helio()
+            else:
+                self.to_bary()
+
+        M = (self.n.value * (epoch - self.epoch.jd) + self.M.rad*180/np.pi)%360
+
+        rocks = SpaceRock(a=self.a,
+                          e=self.e,
+                          inc=self.inc,
+                          node=self.node,
+                          arg=self.arg,
+                          M=M,
+                          name=self.name,
+                          epoch=epoch,
+                          origin=propagate_origin, 
+                          frame=self.frame)
+
+        # be polite and return orbital parameters in the input frame.
+        if in_origin != self.origin:
+            if in_origin == 'sun':
+                self.to_helio()
+            else:
+                self.to_bary()
+
+        if hasattr(self, 'G'):
+            rocks.G = self.G
+
+        if hasattr(self, 'mag'):
+            rocks.mag = self.mag
+
+        if hasattr(self, 'delta_H'):
+            rocks.delta_H = self.delta_H
+            rocks.rotation_period = self.rotation_period
+            rocks.phi0 = self.phi0
+            rocks.t0 = Time(self.t0.jd, format='jd')
+
+            rocks.H = self.H + rocks.delta_H * np.sin(2 * np.pi * (rocks.epoch.jd - rocks.t0.jd) / rocks.rotation_period  - rocks.phi0)
+
+        elif hasattr(self, 'H'):
+            rocks.H = self.H
+
+        return rocks

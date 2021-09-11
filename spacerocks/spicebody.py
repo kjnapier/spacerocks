@@ -1,24 +1,44 @@
 import spiceypy as spice
+
 from astropy import units as u
+from astropy.coordinates import Distance
+
 import numpy as np
+
+from astropy.constants import G as GravitationalConstant
 
 class SpiceBody:
 
-    def __init__(self, frame='ECLIPJ2000', origin='ssb', **kwargs):
+    def __init__(self, spiceid, frame='ECLIPJ2000', origin='ssb'):
 
         self.frame = frame
         self.origin = origin
-
-        if kwargs.get('epoch') is not None:
-            self.epoch = np.atleast_1d(kwargs.get('epoch'))
-
-        if len(kwargs.get('spiceid')) < len(self.epoch):
-                self.spiceid = np.repeat(kwargs.get('spiceid'), len(self.epoch))
-        else:
-            self.spiceid = np.atleast_1d(kwargs.get('spiceid'))
+        self.spiceid = np.atleast_1d(spiceid)
 
     
-    def __get_all_state_vectors(self):
+    def at(self, epoch):
+        '''
+        Return a SpaceRock object at the specified epoch(s).
+        '''
+        epoch = epoch.utc.jd
+        x, y, z, vx, vy, vz = self.__get_all_state_vectors(epoch)
+
+    
+    def mass(self):
+        '''
+        Return mass of the specified body.
+        '''
+        return (spice.bodvrd(self.spiceid, 'GM', 1)[1][0] * u.km**3 * u.s**(-2) / GravitationalConstant).to(u.Msun)
+
+
+    def mu(self):
+        '''
+        Return GM of the specified body.
+        '''
+        return (spice.bodvrd(self.spiceid, 'GM', 1)[1][0] * u.km**3 * u.s**(-2)).to(u.au**3 / u.day**2) * u.radian**2
+
+    
+    def __get_all_state_vectors(self, epoch):
         '''
         Very optimized way to get all state vectors from spice.
 
@@ -41,17 +61,19 @@ class SpiceBody:
 
         '''
 
-        unique_rocks_and_times = set(list(zip(self.spiceid, self.epoch)))
+        unique_rocks_and_times = set(list(zip(self.spiceid, epoch)))
         unique_dict = {key:self.__state_from_spice(key) for key in unique_rocks_and_times}
-        x, y, z, vx, vy, vz = np.array([unique_dict[(body, time)] for body, time in zip(self.spiceid, self.epoch)]).T
+        x, y, z, vx, vy, vz = np.array([unique_dict[(body, time)] for body, time in zip(self.spiceid, epoch)]).T
        
-        self.x = Distance(x, u.km, allow_negative=True).to(u.au)
-        self.y = Distance(y, u.km, allow_negative=True).to(u.au)
-        self.z = Distance(z, u.km, allow_negative=True).to(u.au)
+        x = Distance(x, u.km, allow_negative=True).to(u.au)
+        y = Distance(y, u.km, allow_negative=True).to(u.au)
+        z = Distance(z, u.km, allow_negative=True).to(u.au)
 
-        self.vx = (vx * u.km/u.s).to(u.au / u.day)
-        self.vy = (vy * u.km/u.s).to(u.au / u.day)
-        self.vz = (vz * u.km/u.s).to(u.au / u.day)
+        vx = (vx * u.km/u.s).to(u.au / u.day)
+        vy = (vy * u.km/u.s).to(u.au / u.day)
+        vz = (vz * u.km/u.s).to(u.au / u.day)
+
+        return x.au, y.au, z.au, vx.values, vy.values, vz.values
 
 
     def __compute_ephemeris_time(self, epoch):
@@ -60,7 +82,11 @@ class SpiceBody:
         '''
         return spice.str2et('JD{} UTC'.format(epoch))
 
+
     def __state_from_spice(self, x):
+        '''
+        Routine for actually getting the state vector from spice.
+        '''
         spiceid, epoch = x
         ephemeris_time = self.__compute_ephemeris_time(epoch)
         state, _ = spice.spkezr(spiceid, ephemeris_time, self.frame, 'none', self.origin)
