@@ -7,13 +7,19 @@ from .constants import *
 
 from .vector import Vector
 from .cbindings import *
+from .spice import *
 
-from skyfield.api import Loader
-# Load in planets for ephemeride calculation.
-load = Loader('./Skyfield-Data', expire=False, verbose=False)
-ts = load.timescale()
-planets = load('de440.bsp')
-sun = planets['sun']
+import pkg_resources
+import spiceypy as spice
+import os
+
+SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
+spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
+spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
+spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
+spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
+
+sun = SpiceBody(spiceid='Sun')
 
 class KeplerOrbit:
 
@@ -33,18 +39,14 @@ class KeplerOrbit:
         '''
         if self.origin != 'ssb':
 
-            t = ts.tdb(jd=self.epoch.tdb.jd)
+            s = sun.at(self.epoch)
 
-            x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
-            vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
-
-            # calculate the barycentric xyz postion
-            x = self.x + x_sun
-            y = self.y + y_sun
-            z = self.z + z_sun
-            vx = self.vx + vx_sun
-            vy = self.vy + vy_sun
-            vz = self.vz + vz_sun
+            x = self.x + s.x
+            y = self.y + s.y
+            z = self.z + s.z
+            vx = self.vx + s.vx
+            vy = self.vy + s.vy
+            vz = self.vz + s.vz
 
             self.origin = 'ssb'
             self.mu = mu_bary
@@ -63,18 +65,15 @@ class KeplerOrbit:
         '''
         if self.origin != 'sun':
 
-            t = ts.tdb(jd=self.epoch.tdb.jd)
+            s = sun.at(self.epoch)
 
-            x_sun, y_sun, z_sun = sun.at(t).ecliptic_xyz().au * u.au
-            vx_sun, vy_sun, vz_sun = sun.at(t).ecliptic_velocity().au_per_d * u.au / u.day
+            x = self.x - s.x
+            y = self.y - s.y
+            z = self.z - s.z
+            vx = self.vx - s.vx
+            vy = self.vy - s.vy
+            vz = self.vz - s.vz
 
-            # calculate the heliocentric xyz postion
-            x = self.x - x_sun
-            y = self.y - y_sun
-            z = self.z - z_sun
-            vx = self.vx - vx_sun
-            vy = self.vy - vy_sun
-            vz = self.vz - vz_sun
 
             self.origin = 'sun'
             self.mu = mu_helio

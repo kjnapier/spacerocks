@@ -8,14 +8,17 @@ from numpy import sin, cos, sqrt
 import pandas as pd
 import spiceypy as spice
 
-
+import os
 import pkg_resources
 
 DATA_PATH = pkg_resources.resource_filename('spacerocks', 'data/observatories.csv')
 observatories = pd.read_csv(DATA_PATH)
 
-SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice-test.txt')
-spice.furnsh(SPICE_PATH)
+SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
+spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
+spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
+spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
+spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
 
 
 class Observer:

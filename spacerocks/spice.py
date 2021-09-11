@@ -1,4 +1,5 @@
 import spiceypy as spice
+import spacerocks.spacerock as sr
 
 from astropy import units as u
 from astropy.coordinates import Distance
@@ -7,13 +8,26 @@ import numpy as np
 
 from astropy.constants import G as GravitationalConstant
 
+import spiceypy as spice
+import os
+
+
+import pkg_resources
+
+SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
+spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
+spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
+spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
+spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
+spice.furnsh(os.path.join(SPICE_PATH, 'gm_de431.tpc'))
+
 class SpiceBody:
 
     def __init__(self, spiceid, frame='ECLIPJ2000', origin='ssb'):
 
         self.frame = frame
         self.origin = origin
-        self.spiceid = np.atleast_1d(spiceid)
+        self.spiceid = spiceid
 
     
     def at(self, epoch):
@@ -22,15 +36,16 @@ class SpiceBody:
         '''
         epoch = epoch.utc.jd
         x, y, z, vx, vy, vz = self.__get_all_state_vectors(epoch)
+        return sr.SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=epoch, name=self.spiceid)
 
-    
+    @property
     def mass(self):
         '''
         Return mass of the specified body.
         '''
         return (spice.bodvrd(self.spiceid, 'GM', 1)[1][0] * u.km**3 * u.s**(-2) / GravitationalConstant).to(u.Msun)
 
-
+    @property
     def mu(self):
         '''
         Return GM of the specified body.
@@ -61,9 +76,12 @@ class SpiceBody:
 
         '''
 
-        unique_rocks_and_times = set(list(zip(self.spiceid, epoch)))
+        epoch = np.atleast_1d(epoch)
+        spiceid = np.atleast_1d(self.spiceid)
+
+        unique_rocks_and_times = set(list(zip(spiceid, epoch)))
         unique_dict = {key:self.__state_from_spice(key) for key in unique_rocks_and_times}
-        x, y, z, vx, vy, vz = np.array([unique_dict[(body, time)] for body, time in zip(self.spiceid, epoch)]).T
+        x, y, z, vx, vy, vz = np.array([unique_dict[(body, time)] for body, time in zip(spiceid, epoch)]).T
        
         x = Distance(x, u.km, allow_negative=True).to(u.au)
         y = Distance(y, u.km, allow_negative=True).to(u.au)
@@ -73,7 +91,7 @@ class SpiceBody:
         vy = (vy * u.km/u.s).to(u.au / u.day)
         vz = (vz * u.km/u.s).to(u.au / u.day)
 
-        return x.au, y.au, z.au, vx.values, vy.values, vz.values
+        return x.au, y.au, z.au, vx.value, vy.value, vz.value
 
 
     def __compute_ephemeris_time(self, epoch):

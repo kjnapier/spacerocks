@@ -25,6 +25,22 @@ from .units import Units
 from .vector import Vector
 from .ephemerides import Ephemerides
 from .observer import Observer
+from .cbindings import kep_to_xyz_temp
+from .spice import *
+import os
+import pkg_resources
+import spiceypy as spice
+
+SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
+spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
+spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
+spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
+spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
+
+
+
+DATA_PATH = pkg_resources.resource_filename('spacerocks', 'data/observatories.csv')
+observatories = pd.read_csv(DATA_PATH)
 
 from skyfield.api import Loader
 # Load in planets for ephemeride calculation.
@@ -34,16 +50,6 @@ planets = load('de440.bsp')
 earth = planets['earth']
 sun = planets['sun']
 
-import pkg_resources
-
-DATA_PATH = pkg_resources.resource_filename('spacerocks', 'data/observatories.csv')
-
-observatories = pd.read_csv(DATA_PATH)
-
-
-ts = load.timescale()
-
-from .cbindings import kep_to_xyz_temp
 
 class SpaceRock(KeplerOrbit, Convenience):
 
@@ -219,7 +225,6 @@ class SpaceRock(KeplerOrbit, Convenience):
     def H(self):
         return np.array([func(epoch) for epoch, func in zip(self.epoch.jd, self.H_func)])
 
-
     def propagate(self, epochs, model, units=Units()):
         '''
         Numerically integrate all bodies to the desired date.
@@ -234,7 +239,7 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         # Integrate all particles to the same obsdate
         pickup_times = self.epoch.tdb.jd
-        sim, planet_names = self.set_simulation(np.min(pickup_times), units=units, model=model)
+        sim, planet_names = self.set_simulation(np.min(pickup_times), model=model)
         sim.t = np.min(pickup_times)
 
         # need to ensure these are computed
@@ -325,6 +330,111 @@ class SpaceRock(KeplerOrbit, Convenience):
         return rocks, planets, sim
 
 
+    # def propagate(self, epochs, model, units=Units()):
+    #     '''
+    #     Numerically integrate all bodies to the desired date.
+    #     This routine synchronizes the epochs.
+    #     '''
+
+    #     epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
+    #     origin = self.origin
+
+    #     # We need to integrate in barycentric coordinates
+    #     self.to_bary()
+
+    #     # Integrate all particles to the same epoch
+    #     pickup_times = self.epoch.tdb.jd
+    #     sim, planet_names = self.set_simulation(np.min(pickup_times), units=units, model=model)
+    #     sim.t = np.min(pickup_times)
+
+    #     # need to ensure these are computed
+    #     self.x
+    #     self.y
+    #     self.z
+    #     self.vx
+    #     self.vy
+    #     self.vz
+
+    #     for time in np.sort(np.unique(pickup_times)):
+    #         ps = self[self.epoch.tdb.jd == time]
+    #         for x, y, z, vx, vy, vz, name in zip(ps.x.value, ps.y.value, ps.z.value, ps.vx.value, ps.vy.value, ps.vz.value, ps.name):
+    #             sim.add(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, hash=name)
+    #             sim.integrate(time, exact_finish_time=1)
+
+    #     #sim.move_to_com()
+
+    #     Nx = len(epochs)
+    #     x_values = np.zeros((Nx, sim.N))
+    #     y_values = np.zeros((Nx, sim.N))
+    #     z_values = np.zeros((Nx, sim.N))
+    #     vx_values = np.zeros((Nx, sim.N))
+    #     vy_values = np.zeros((Nx, sim.N))
+    #     vz_values = np.zeros((Nx, sim.N))
+    #     name_values = np.zeros((Nx, sim.N), dtype='object')
+    #     obsdate_values = np.zeros((Nx, sim.N))
+
+    #     p_names = planet_names + [name for name in self.name]
+
+    #     for ii, time in enumerate(np.sort(epochs.tdb.jd)):
+    #         sim.integrate(time, exact_finish_time=1)
+    #         a = np.zeros((sim.N, 3), dtype='float64')
+    #         b = np.zeros((sim.N, 3), dtype='float64')
+    #         sim.serialize_particle_data(xyz=a, vxvyvz=b)
+
+    #         x, y, z = a.T
+    #         vx, vy, vz = b.T
+
+    #         x_values[ii] = x
+    #         y_values[ii] = y
+    #         z_values[ii] = z
+    #         vx_values[ii] = vx
+    #         vy_values[ii] = vy
+    #         vz_values[ii] = vz
+    #         name_values[ii] = p_names
+    #         obsdate_values[ii] = np.repeat(sim.t, sim.N)
+
+    #     Nactive = sim.N_active
+    #     x = x_values[:, Nactive:].flatten()
+    #     y = y_values[:, Nactive:].flatten()
+    #     z = z_values[:, Nactive:].flatten()
+    #     vx = vx_values[:, Nactive:].flatten()
+    #     vy = vy_values[:, Nactive:].flatten()
+    #     vz = vz_values[:, Nactive:].flatten()
+    #     name = name_values[:, Nactive:].flatten()
+    #     epoch = obsdate_values[:, Nactive:].flatten()
+
+    #     px = x_values[:, :Nactive].flatten()
+    #     py = y_values[:, :Nactive].flatten()
+    #     pz = z_values[:, :Nactive].flatten()
+    #     pvx = vx_values[:, :Nactive].flatten()
+    #     pvy = vy_values[:, :Nactive].flatten()
+    #     pvz = vz_values[:, :Nactive].flatten()
+    #     pname = name_values[:, :Nactive].flatten()
+    #     pepoch = obsdate_values[:, :Nactive].flatten()
+
+
+    #     units = Units()
+    #     units.timescale = 'tdb'
+    #     rocks = self.__class__(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, origin='ssb', units=units)
+    #     planets = self.__class__(x=px, y=py, z=pz, vx=pvx, vy=pvy, vz=pvz, name=pname, epoch=pepoch, origin='ssb', units=units)
+
+    #     # be polite and return orbital parameters using the input origin.
+    #     if origin == 'sun':
+    #         rocks.to_helio()
+    #         self.to_helio()
+
+    #     if hasattr(self, 'G'):
+    #         rocks.G = np.tile(self.G, Nx)
+
+    #     if hasattr(self, 'H_func'):
+    #         rocks.H_func = np.tile(self.H_func, Nx)
+
+    #     if hasattr(self, 'mag_func'):
+    #         rocks.mag_func = np.tile(self.mag_func, Nx)
+
+    #     return rocks, planets, sim
+
+
     def __calc_H_from_mag(self, obscode):
         obs = self.observe(obscode=obscode)
 
@@ -380,15 +490,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         else:
             raise ValueError('Must pass either an obscode or spiceid.')
 
-
-        # if self.origin == 'ssb':
-        #     self.to_helio()
-        #     r_helio = self.r
-        #     self.to_bary()
-        # else:
-        #     r_helio = self.r
-            
-        
 
         if not hasattr(self, 'H_func'):
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name)
@@ -463,31 +564,117 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         return dx, dy, dz, dvx, dvy, dvz
 
-    def set_simulation(self, startdate, units, model):
+    def set_simulation(self, startdate, model):
 
-        sun = planets['sun']
-        mercury = planets['mercury barycenter']
-        venus = planets['venus barycenter']
-        earth = planets['earth']
-        moon = planets['moon']
-        mars = planets['mars barycenter']
-        jupiter = planets['jupiter barycenter']
-        saturn = planets['saturn barycenter']
-        uranus = planets['uranus barycenter']
-        neptune = planets['neptune barycenter']
-        pluto = planets['pluto barycenter']
+        # sun = SpiceBody(spiceid='Sun')
+        # mercury = SpiceBody(spiceid='Mercury Barycenter')
+        # venus = SpiceBody(spiceid='Venus Barycenter')
+        # earth = SpiceBody(spiceid='Earth')
+        # moon = SpiceBody(spiceid='Moon')
+        # mars = SpiceBody(spiceid='Mars Barycenter')
+        # jupiter = SpiceBody(spiceid='Jupiter Barycenter')
+        # saturn = SpiceBody(spiceid='Saturn Barycenter')
+        # uranus = SpiceBody(spiceid='Uranus Barycenter')
+        # neptune = SpiceBody(spiceid='Neptune Barycenter')
+        # pluto = SpiceBody(spiceid='Pluto Barycenter')
 
-        M_sun = 1
-        M_mercury = 1.6601367952719304e-7 # Mercury Barycenter
-        M_venus = 2.4478383396645447e-6 # Venus Barycenter
-        M_earth = 3.0034896161241036e-06
-        M_moon = M_earth / 81.3005690769
-        M_mars = 3.2271560375549977e-7 # Mars Barycenter
-        M_jupiter = 9.547919384243222e-4
-        M_saturn = 2.858859806661029e-4
-        M_uranus = 4.3662440433515637e-5
-        M_neptune = 5.151389020535497e-5
-        M_pluto = 7.361781606089469e-9
+        # M_sun = sun.mass.value
+        # M_mercury = mercury.mass.value
+        # M_venus = venus.mass.value
+        # M_earth = earth.mass.value
+        # M_moon = moon.mass.value
+        # M_mars = mars.mass.value
+        # M_jupiter = jupiter.mass.value
+        # M_saturn = saturn.mass.value
+        # M_uranus = uranus.mass.value
+        # M_neptune = neptune.mass.value
+        # M_pluto = pluto.mass.value
+
+
+        # if model == 0:
+        #     active_bodies = [sun]
+        #     names = ['Sun']
+        #     M_sun += M_mercury + M_venus + M_earth + M_mars + M_jupiter + M_saturn + M_uranus + M_neptune
+        #     masses = [M_sun]
+
+        # elif model == 1:
+        #     active_bodies = [sun, jupiter, saturn, uranus, neptune]
+        #     names = ['Sun', 'Jupiter', 'Saturn', 'Uranus', 'Neptune']
+        #     M_sun += M_mercury + M_venus + M_earth + M_mars
+        #     masses = [M_sun, M_jupiter, M_saturn, M_uranus, M_neptune]
+
+
+        # elif model == 2:
+        #     active_bodies = [sun, mercury, venus, earth, moon, mars, jupiter, saturn, uranus, neptune, pluto]
+        #     names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Moon', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
+        #     masses = [M_sun, M_mercury, M_venus, M_earth, M_moon, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune, M_pluto]
+
+        # else:
+        #     raise ValueError('Model not recognized. Check the documentation.')
+
+        # startdate = Time(startdate, scale=units.timescale, format='jd')
+        # bodies = [body.at(startdate) for body in active_bodies]
+
+        # # create a dataframe of the massive bodies in the solar system
+        # ss = pd.DataFrame()
+        # ss['x'] = [body.x.au[0] for body in bodies]
+        # ss['y'] = [body.y.au[0] for body in bodies]
+        # ss['z'] = [body.z.au[0] for body in bodies]
+        # ss['vx'] = [body.vx.value[0] for body in bodies]
+        # ss['vy'] = [body.vy.value[0] for body in bodies]
+        # ss['vz'] = [body.vz.value[0] for body in bodies]
+        # ss['mass'] = masses
+        # ss['a'] = 1 / (2 / sqrt(ss.x**2 + ss.y**2 + ss.z**2) - (ss.vx**2 + ss.vy**2 + ss.vz**2) / mu_bary.value)
+        # ss['hill_radius'] = ss.a * pow(ss.mass / (3 * M_sun), 1/3)
+        # ss['name'] = names
+
+        sun = SpiceBody(spiceid='Sun')
+        mercury = SpiceBody(spiceid='Mercury Barycenter')
+        venus = SpiceBody(spiceid='Venus Barycenter')
+        earth = SpiceBody(spiceid='Earth')
+        moon = SpiceBody(spiceid='Moon')
+        mars = SpiceBody(spiceid='Mars Barycenter')
+        jupiter = SpiceBody(spiceid='Jupiter Barycenter')
+        saturn = SpiceBody(spiceid='Saturn Barycenter')
+        uranus = SpiceBody(spiceid='Uranus Barycenter')
+        neptune = SpiceBody(spiceid='Neptune Barycenter')
+        pluto = SpiceBody(spiceid='Pluto Barycenter')
+
+        M_sun = sun.mass.value
+        M_mercury = mercury.mass.value
+        M_venus = venus.mass.value
+        M_earth = earth.mass.value
+        M_moon = moon.mass.value
+        M_mars = mars.mass.value
+        M_jupiter = jupiter.mass.value
+        M_saturn = saturn.mass.value
+        M_uranus = uranus.mass.value
+        M_neptune = neptune.mass.value
+        M_pluto = pluto.mass.value
+
+        # sun = planets['sun']
+        # mercury = planets['mercury barycenter']
+        # venus = planets['venus barycenter']
+        # earth = planets['earth']
+        # moon = planets['moon']
+        # mars = planets['mars barycenter']
+        # jupiter = planets['jupiter barycenter']
+        # saturn = planets['saturn barycenter']
+        # uranus = planets['uranus barycenter']
+        # neptune = planets['neptune barycenter']
+        # pluto = planets['pluto barycenter']
+
+        # M_sun = 1
+        # M_mercury = 1.6601367952719304e-7 # Mercury Barycenter
+        # M_venus = 2.4478383396645447e-6 # Venus Barycenter
+        # M_earth = 3.0034896161241036e-06
+        # M_moon = M_earth / 81.3005690769
+        # M_mars = 3.2271560375549977e-7 # Mars Barycenter
+        # M_jupiter = 9.547919384243222e-4
+        # M_saturn = 2.858859806661029e-4
+        # M_uranus = 4.3662440433515637e-5
+        # M_neptune = 5.151389020535497e-5
+        # M_pluto = 7.361781606089469e-9
 
         if model == 0:
             active_bodies = [sun]
@@ -511,24 +698,40 @@ class SpaceRock(KeplerOrbit, Convenience):
         else:
             raise ValueError('Model not recognized. Check the documentation.')
 
-        startdate = Time(startdate, scale=units.timescale, format='jd')
-        t = ts.tdb(jd=startdate.tdb.jd)
+        # startdate = Time(startdate, scale=units.timescale, format='jd')
+        startdate = Time(startdate, scale='tdb', format='jd')
+        #t = ts.tdb(jd=startdate.tdb.jd)
 
-        x, y, z = np.array([body.at(t).ecliptic_xyz().au for body in active_bodies]).T
-        vx, vy, vz = np.array([body.at(t).ecliptic_velocity().au_per_d for body in active_bodies]).T
+        bodies = [body.at(startdate) for body in active_bodies]
 
-        # create a dataframe of the massive bodies in the solar system
+        #create a dataframe of the massive bodies in the solar system
         ss = pd.DataFrame()
-        ss['x'] = x
-        ss['y'] = y
-        ss['z'] = z
-        ss['vx'] = vx
-        ss['vy'] = vy
-        ss['vz'] = vz
+        ss['x'] = [body.x.au[0] for body in bodies]
+        ss['y'] = [body.y.au[0] for body in bodies]
+        ss['z'] = [body.z.au[0] for body in bodies]
+        ss['vx'] = [body.vx.value[0] for body in bodies]
+        ss['vy'] = [body.vy.value[0] for body in bodies]
+        ss['vz'] = [body.vz.value[0] for body in bodies]
         ss['mass'] = masses
         ss['a'] = 1 / (2 / sqrt(ss.x**2 + ss.y**2 + ss.z**2) - (ss.vx**2 + ss.vy**2 + ss.vz**2) / mu_bary.value)
         ss['hill_radius'] = ss.a * pow(ss.mass / (3 * M_sun), 1/3)
         ss['name'] = names
+
+        # x, y, z = np.array([body.at(t).ecliptic_xyz().au for body in active_bodies]).T
+        # vx, vy, vz = np.array([body.at(t).ecliptic_velocity().au_per_d for body in active_bodies]).T
+
+        # # create a dataframe of the massive bodies in the solar system
+        # ss = pd.DataFrame()
+        # ss['x'] = x
+        # ss['y'] = y
+        # ss['z'] = z
+        # ss['vx'] = vx
+        # ss['vy'] = vy
+        # ss['vz'] = vz
+        # ss['mass'] = masses
+        # ss['a'] = 1 / (2 / sqrt(ss.x**2 + ss.y**2 + ss.z**2) - (ss.vx**2 + ss.vy**2 + ss.vz**2) / mu_bary.value)
+        # ss['hill_radius'] = ss.a * pow(ss.mass / (3 * M_sun), 1/3)
+        # ss['name'] = names
 
         sim = rebound.Simulation()
         sim.units = ('day', 'AU', 'Msun')
@@ -548,8 +751,6 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         sim.testparticle_type = 0
         sim.integrator = 'ias15'
-
-        #sim.move_to_com()
 
         return sim, names
 
