@@ -9,13 +9,14 @@ import pandas as pd
 
 from .constants import c, epsilon
 
-from skyfield.api import Loader
-# Load in planets for ephemeride calculation.
-load = Loader('./Skyfield-Data', expire=False, verbose=False)
-ts = load.timescale()
-planets = load('de440.bsp')
-earth = planets['earth']
-sun = planets['sun']
+SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
+spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
+spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
+spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
+spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
+
+sun = SpiceBody(spiceid='Sun')
+earth = SpiceBody(spiceid='Earth')
 
 
 class Ephemerides(Convenience):
@@ -159,12 +160,10 @@ class Ephemerides(Convenience):
         Estimate the apparent magnitude of a TNO
         https://iopscience.iop.org/article/10.3847/1538-3881/ab18a9/pdf for light curves
         '''
-        t = ts.tdb(jd=self.epoch.tdb.jd)
-        e = earth.at(t)
-        s = sun.at(t)
-        sx, sy, sz = s.ecliptic_xyz().au
-        ex, ey, ez = e.ecliptic_xyz().au
-        earth_dist = ((ex - sx)**2 + (ey - sy)**2 + (ez - sz)**2)**0.5
+        e = earth.at(self.epoch)
+        s = sun.at(self.epoch)
+        
+        earth_dist = ((e.x - s.x)**2 + (e.y - s.y)**2 + (e.z - s.z)**2)**0.5
 
         q = (self.r_helio.au**2 + self.delta.au**2 - earth_dist) / \
             (2 * self.r_helio.au * self.delta.au)

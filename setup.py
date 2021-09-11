@@ -90,7 +90,7 @@ setup(
     include_package_data=True,
     install_requires=['healpy',
                       'numpy',
-                      'skyfield',
+                      'spiceypy',
                       'astropy',
                       'pandas',
                       'rebound',
