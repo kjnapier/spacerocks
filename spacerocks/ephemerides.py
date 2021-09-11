@@ -8,6 +8,11 @@ import numpy as np
 import pandas as pd
 
 from .constants import c, epsilon
+import spiceypy as spice
+import pkg_resources
+import os
+
+from .spice import *
 
 SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
 spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))

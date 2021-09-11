@@ -38,6 +38,8 @@ spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
 spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
 spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
 
+sun = SpiceBody(spiceid='Sun')
+earth = SpiceBody(spiceid='Earth')
 
 DATA_PATH = pkg_resources.resource_filename('spacerocks', 'data/observatories.csv')
 observatories = pd.read_csv(DATA_PATH)
@@ -325,13 +327,11 @@ class SpaceRock(KeplerOrbit, Convenience):
     def __calc_H_from_mag(self, obscode):
         obs = self.observe(obscode=obscode)
 
-        t = ts.tdb(jd=self.epoch.tdb.jd)
-        e = earth.at(t)
-        s = sun.at(t)
+        e = earth.at(self.epoch)
+        s = sun.at(self.epoch)
 
-        sx, sy, sz = s.ecliptic_xyz().au
-        ex, ey, ez = e.ecliptic_xyz().au
-        earth_dist = ((ex-sx)**2 + (ey-sy)**2 + (ez-sz)**2)**0.5
+       
+        earth_dist = ((e.x-s.x)**2 + (e.y-s.y)**2 + (e.z-s.z)**2)**0.5
 
         q = (obs.r_helio.au**2 + obs.delta.au**2 - earth_dist**2)/(2 * obs.r_helio.au * obs.delta.au)
 
