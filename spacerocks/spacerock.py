@@ -58,15 +58,18 @@ class SpaceRock(KeplerOrbit, Convenience):
         origin = origin.lower()
 
         # input -> arrays
-        for idx, key in enumerate([*kwargs]):
+        for key in [*kwargs]:
             kwargs[key] = np.atleast_1d(kwargs.get(key))
 
         self.frame = frame
+
         self.origin = origin
+
         if self.origin == 'ssb':
             self.mu = mu_bary
-        elif self.origin == 'sun':
-            self.mu = mu_helio
+        else:
+            o = SpiceBody(spiceid=self.origin)
+            self.mu = o.mu
 
         if coords == 'kep':
 
@@ -211,9 +214,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         if kwargs.get('density') is not None:
             self.density = kwargs.get('density') * units.density
         
-    '''
-    TODO: to_mpc_format for ephemerides
-    '''
 
     @property
     def H(self):

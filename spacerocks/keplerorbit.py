@@ -19,16 +19,45 @@ spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
 spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
 spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
 
-sun = SpiceBody(spiceid='Sun')
 
 class KeplerOrbit:
 
-    def change_origin(self, new_origin):
-        #new_mu = the mu of the new origin
-        if new_origin == 'ssb':
-            self.to_bary()
-        elif new_origin == 'sun':
-            self.to_helio()
+    def change_origin(self, new_origin: str):
+        '''
+        Method to convert coordinates to a new origin.
+        Modifies the SpaceRock object inplace.
+
+        new_origin: string of the spiceid of the new origin.
+        '''
+        if self.origin != new_origin:
+
+            current_origin = SpiceBody(spiceid=self.origin)
+            new = SpiceBody(spiceid=new_origin)
+            co = current_origin.at(self.epoch)
+            no = new.at(self.epoch)
+
+            x = self.x + co.x - no.x
+            y = self.y + co.y - no.y
+            z = self.z + co.z - no.z
+            vx = self.vx + co.vx - no.vx
+            vy = self.vy + co.vy - no.vy
+            vz = self.vz + co.vz - no.vz
+
+            self.origin = new_origin
+
+            if new_origin == 'ssb':
+                self.mu = mu_bary
+            else:
+                self.mu = no.mu
+
+            # clear the keplerian variables because they need to be recomputed
+            self.clear_kep()
+
+            self.position = Vector(x, y, z)
+            self.velocity = Vector(vx, vy, vz)
+
+        return self
+        
 
     def change_frame(self):
         pass
@@ -37,54 +66,15 @@ class KeplerOrbit:
         '''
         Method to convert heliocentric coordinates to barycentric coordinates.
         '''
-        if self.origin != 'ssb':
-
-            s = sun.at(self.epoch)
-
-            x = self.x + s.x
-            y = self.y + s.y
-            z = self.z + s.z
-            vx = self.vx + s.vx
-            vy = self.vy + s.vy
-            vz = self.vz + s.vz
-
-            self.origin = 'ssb'
-            self.mu = mu_bary
-
-            # clear the keplerian variables because they need to be recomputed
-            self.clear_kep()
-
-            self.position = Vector(x, y, z)
-            self.velocity = Vector(vx, vy, vz)
-
-        return self
+        self.change_origin('ssb')
+        
 
     def to_helio(self):
         '''
         Method to convert barycentric coordinates to heliocentric coordinates.
         '''
-        if self.origin != 'sun':
-
-            s = sun.at(self.epoch)
-
-            x = self.x - s.x
-            y = self.y - s.y
-            z = self.z - s.z
-            vx = self.vx - s.vx
-            vy = self.vy - s.vy
-            vz = self.vz - s.vz
-
-
-            self.origin = 'sun'
-            self.mu = mu_helio
-
-            # clear the keplerian variables because they need to be recomputed
-            self.clear_kep()
-
-            self.position = Vector(x, y, z)
-            self.velocity = Vector(vx, vy, vz)
-
-        return self
+        self.change_origin('sun')
+       
 
     def clear_kep(self):
 

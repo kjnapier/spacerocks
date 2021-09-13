@@ -5,7 +5,6 @@ from astropy.coordinates import Angle, Distance
 
 from numpy import sin, cos, arctan2, sqrt, arcsin, tan
 import numpy as np
-import pandas as pd
 
 from .constants import c, epsilon
 import spiceypy as spice
@@ -22,7 +21,6 @@ spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
 
 sun = SpiceBody(spiceid='Sun')
 earth = SpiceBody(spiceid='Earth')
-
 
 class Ephemerides(Convenience):
 
@@ -45,10 +43,11 @@ class Ephemerides(Convenience):
             self.H_func = kwargs.get('H')
             self.G = kwargs.get('G')
 
-        if kwargs.get('r_helio') is not None:
-            self.r_helio = kwargs.get('r_helio')
-
         self.delta = Distance(np.sqrt(self.x**2 + self.y**2 + self.z**2), u.au)
+
+    '''
+    TODO: to_mpc_format for ephemerides
+    '''
 
     @property
     def ra(self):
@@ -167,11 +166,17 @@ class Ephemerides(Convenience):
         '''
         e = earth.at(self.epoch)
         s = sun.at(self.epoch)
+
+        x_helio = self.x + e.x - s.x
+        y_helio = self.y + e.y - s.y
+        z_helio = self.z + e.z - s.z
+
+        r_helio = Distance(np.sqrt(x_helio*x_helio + y_helio*y_helio + z_helio*z_helio).value, u.au)
         
         earth_dist = ((e.x - s.x)**2 + (e.y - s.y)**2 + (e.z - s.z)**2)**0.5
 
-        q = (self.r_helio.au**2 + self.delta.au**2 - earth_dist) / \
-            (2 * self.r_helio.au * self.delta.au)
+        q = (r_helio.au**2 + self.delta.au**2 - earth_dist.value) / \
+            (2 * r_helio.au * self.delta.au)
 
         # pyephem
         beta = np.arccos(q)
@@ -181,7 +186,7 @@ class Ephemerides(Convenience):
         Psi_1 = np.exp(-3.332 * np.tan(beta / 2)**0.631)
         Psi_2 = np.exp(-1.862 * np.tan(beta / 2)**1.218)
         # / earth_dist**2)
-        mag = self.H + 5 * np.log10(self.r_helio.au * self.delta.au)
+        mag = self.H + 5 * np.log10(r_helio.au * self.delta.au)
 
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
         mag[not_zero] -= 2.5 * np.log10((1 - self.G[not_zero])
