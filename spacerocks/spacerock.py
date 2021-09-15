@@ -537,7 +537,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         #    rebx.add_force(gr)
 
         sim.testparticle_type = 0
-        sim.integrator = 'mercurius'
+        sim.integrator = 'ias15'
         
 
         return sim, names
