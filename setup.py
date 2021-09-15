@@ -82,7 +82,7 @@ setup(
                 'spacerocks/data/spice/2000001.bsp',
                 'spacerocks/data/spice/2000004.bsp',
                 'spacerocks/data/spice/de440s.bsp',
-                'spacerocks/data/spice/gm_de431.tcp',
+                'spacerocks/data/spice/gm_de431.tpc',
                 'spacerocks/data/spice/hst.bsp',
                 'spacerocks/data/spice/latest_leapseconds.tls',
                 'spacerocks/data/spice/test.bsp',
