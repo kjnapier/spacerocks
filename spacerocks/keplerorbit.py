@@ -19,7 +19,6 @@ spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
 spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
 spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
 
-
 class KeplerOrbit:
 
     def change_origin(self, new_origin: str):
@@ -78,11 +77,36 @@ class KeplerOrbit:
 
     def clear_kep(self):
 
-        to_delete = ['_a', '_e', '_inc', '_arg', '_node', '_varpi', '_M', '_E',
-                     '_f', '_true_longitude', '_mean_longitude',
-                     '_q', '_t_peri', '_b', '_p', '_n', '_Q', '_hill_radius', '_r',
-                     '_ovec', '_vovec', '_nvec', '_hvec', '_evec', '_position', '_velocity', '_rrdot',
-                     '_x', '_y', '_z', '_vx', '_vy', '_vz']
+        to_delete = ['_a', 
+                     '_e', 
+                     '_inc', 
+                     '_arg', 
+                     '_node', 
+                     '_varpi', 
+                     '_M', 
+                     '_E',
+                     '_f', 
+                     '_true_longitude', 
+                     '_mean_longitude',
+                     '_q', 
+                     '_t_peri', 
+                     '_b', 
+                     '_p', 
+                     '_n', 
+                     '_Q', 
+                     '_hill_radius', 
+                     '_r',
+                     '_ovec', 
+                     '_vovec', 
+                     '_position', 
+                     '_velocity', 
+                     '_rrdot',
+                     '_x', 
+                     '_y', 
+                     '_z', 
+                     '_vx', 
+                     '_vy', 
+                     '_vz']
 
         for attr in to_delete:
             self.__dict__.pop(attr, None)
@@ -249,8 +273,6 @@ class KeplerOrbit:
         if not hasattr(self, '_a'):
             if hasattr(self, '_position') and hasattr(self, '_velocity'):
                 self.kep_from_xyz()
-                #self.a = Distance(1 / (2 / self.position.norm - self.velocity.dot(
-                #    self.velocity) / self.mu * u.rad**2), u.au, allow_negative=True)
             elif hasattr(self, '_e') and hasattr(self, '_q'):
                 self.a = self.q / (1 - self.e)
             elif hasattr(self, '_e') and hasattr(self, '_b'):
@@ -303,7 +325,6 @@ class KeplerOrbit:
     def inc(self):
         if not hasattr(self, '_inc'):
             self.kep_from_xyz()
-            #self.inc = Angle(arccos(self.hvec.z / self.hvec.norm), u.rad)
         return self._inc
 
     @inc.setter
@@ -324,12 +345,6 @@ class KeplerOrbit:
                     (self.varpi.rad - self.arg.rad) % (2 * pi), u.rad)
             elif hasattr(self, '_position') and hasattr(self, '_velocity'):
                 self.kep_from_xyz()
-                # node = zeros_like(self.inc.rad * u.rad)
-                # node[self.inc == 0] = 0
-                # node[self.inc != 0] = arccos(
-                #     self.nvec[self.inc != 0].x / self.nvec[self.inc != 0].norm)
-                # node[self.nvec.y < 0] = 2 * pi * u.rad - node[self.nvec.y < 0]
-                # self.node = Angle(node, u.rad)
         return self._node
 
     @node.setter
@@ -657,35 +672,7 @@ class KeplerOrbit:
     @r.deleter
     def r(self):
         del self._r
-
-    # @property
-    # def mag(self):
-    #    if not hasattr(self, '_mag'):
-    #        self.mag = 0
-    #    return self._mag
-
-    # @mag.setter
-    # def mag(self, value):
-    #    self._mag = value
-
-    # @mag.deleter
-    # def mag(self):
-    #    del self._mag
-
-
-    # @property
-    # def hill_radius(self):
-    #    if not hasattr(self, '_hill_radius'):
-    #        self.hill_radius = self.a * (1 - self.e) * cbrt(self.m / 3)
-    #    return self._hill_radius
-
-    # @hill_radius.setter
-    # def hill_radius(self, value):
-    #    self._hill_radius = value
-
-    # @hill_radius.deleter
-    # def hill_radius(self):
-    #    del self._hill_radius
+        
 
     @property
     def TisserandJ(self):

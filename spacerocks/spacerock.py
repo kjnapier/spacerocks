@@ -244,6 +244,8 @@ class SpaceRock(KeplerOrbit, Convenience):
         self.vy
         self.vz
 
+        
+
         for time in np.sort(np.unique(pickup_times)):
             ps = self[self.epoch.tdb.jd == time]
             for x, y, z, vx, vy, vz, name in zip(ps.x.value, ps.y.value, ps.z.value, ps.vx.value, ps.vy.value, ps.vz.value, ps.name):
@@ -522,7 +524,9 @@ class SpaceRock(KeplerOrbit, Convenience):
         for p in ss.itertuples():
             sim.add(x=p.x, y=p.y, z=p.z,
                     vx=p.vx, vy=p.vy, vz=p.vz,
-                    m=p.mass, hash=p.name, r=p.hill_radius)
+                    m=p.mass, hash=p.name)
+
+        
 
         sim.N_active = len(ss)
 
@@ -533,7 +537,8 @@ class SpaceRock(KeplerOrbit, Convenience):
         #    rebx.add_force(gr)
 
         sim.testparticle_type = 0
-        sim.integrator = 'ias15'
+        sim.integrator = 'mercurius'
+        
 
         return sim, names
 

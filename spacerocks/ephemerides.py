@@ -185,7 +185,6 @@ class Ephemerides(Convenience):
 
         Psi_1 = np.exp(-3.332 * np.tan(beta / 2)**0.631)
         Psi_2 = np.exp(-1.862 * np.tan(beta / 2)**1.218)
-        # / earth_dist**2)
         mag = self.H + 5 * np.log10(r_helio.au * self.delta.au)
 
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
