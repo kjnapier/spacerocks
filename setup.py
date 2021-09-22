@@ -71,7 +71,7 @@ _pyOrbfitModule = Extension('_pyOrbfit',
 
 setup(
     name='spacerocks',
-    version='1.1.0',
+    version='1.1.1',
     description='A Python Package for Solar System Ephemerides and Dynamics.',
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
@@ -85,7 +85,6 @@ setup(
                 'spacerocks/data/spice/gm_de431.tpc',
                 'spacerocks/data/spice/hst.bsp',
                 'spacerocks/data/spice/latest_leapseconds.tls',
-                'spacerocks/data/spice/test.bsp',
                 'spacerocks/data/spice/nh.bsp',
                 'spacerocks/data/observatories.dat',
                 'spacerocks/data/binEphem.423'],

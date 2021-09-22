@@ -7,7 +7,7 @@ from astropy.coordinates import Angle, Distance
 
 from . import clibspacerocks
 
-clibspacerocks.py_kep_to_xyz_temp.argtypes = [ctypes.c_int,
+clibspacerocks.py_kepM_to_xyz.argtypes = [ctypes.c_int,
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
@@ -15,12 +15,36 @@ clibspacerocks.py_kep_to_xyz_temp.argtypes = [ctypes.c_int,
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
 
-clibspacerocks.py_kep_to_xyz_temp.restype = ctypes.POINTER(ctypes.c_double)
+clibspacerocks.py_kepM_to_xyz.restype = ctypes.POINTER(ctypes.c_double)
 
-def kep_to_xyz_temp(a, e, inc, arg, node, M):
+def kepM_to_xyz(a, e, inc, arg, node, M):
 
     N = len(a)
-    rock = clibspacerocks.py_kep_to_xyz_temp(N, a, e, inc, arg, node, M)
+    rock = clibspacerocks.py_kepM_to_xyz(N, a, e, inc, arg, node, M)
+    arr = np.ctypeslib.as_array(rock, (6 * N,))
+
+    x, y, z, vx, vy, vz = arr.reshape(N, 6).T
+
+    x = Distance(x, u.au, allow_negative=True)
+    y = Distance(y, u.au, allow_negative=True)
+    z = Distance(z, u.au, allow_negative=True)
+    
+    return x, y, z, vx * u.au/u.d, vy * u.au/u.d, vz * u.au/u.d
+
+clibspacerocks.py_kepE_to_xyz.argtypes = [ctypes.c_int,
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
+
+clibspacerocks.py_kepE_to_xyz.restype = ctypes.POINTER(ctypes.c_double)
+
+def kepE_to_xyz(a, e, inc, arg, node, E):
+
+    N = len(a)
+    rock = clibspacerocks.py_kepE_to_xyz(N, a, e, inc, arg, node, E)
     arr = np.ctypeslib.as_array(rock, (6 * N,))
 
     x, y, z, vx, vy, vz = arr.reshape(N, 6).T
@@ -93,6 +117,21 @@ def calc_E_from_M(e, M):
     E = np.ctypeslib.as_array(rock, (N,))
 
     return Angle(E, u.rad)
+
+
+clibspacerocks.py_calc_M_from_E.argtypes = [ctypes.c_int,
+                                            ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                            ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
+
+clibspacerocks.py_calc_M_from_E.restype = ctypes.POINTER(ctypes.c_double)
+
+def calc_M_from_E(e, E):
+
+    N = len(e)
+    rock = clibspacerocks.py_calc_M_from_E(N, e, E)
+    M = np.ctypeslib.as_array(rock, (N,))
+
+    return Angle(M, u.rad)
 
 
 clibspacerocks.py_calc_E_from_f.argtypes = [ctypes.c_int,

@@ -168,8 +168,7 @@ class KeplerOrbit:
             if hasattr(self, '_vx') and hasattr(self, '_vy') and hasattr(self, '_vz'):
                 self.velocity = Vector(self.vx, self.vy, self.vz)
             else:
-                self.velocity = self.vovec.euler_rotation(
-                    self.arg, self.inc, self.node)
+                self.velocity = self.vovec.euler_rotation(self.arg, self.inc, self.node)
         return self._velocity
 
     @velocity.setter
@@ -416,12 +415,13 @@ class KeplerOrbit:
                 self.M = Angle(M, u.rad)
 
             elif hasattr(self, '_f') or hasattr(self, '_true_longitude') or hasattr(self, '_E') or (hasattr(self, '_position') and hasattr(self, '_velocity')):
-                M = np.zeros(len(self))
-                M[self.e < 1] = (self.E.rad[self.e < 1] - self.e[self.e < 1]
-                                 * sin(self.E.rad[self.e < 1])) % (2 * pi)
-                M[self.e >= 1] = (
-                    self.e[self.e >= 1] * sinh(self.E.rad[self.e >= 1]) - self.E.rad[self.e >= 1])
-                self.M = Angle(M, u.rad)
+                self.M = calc_M_from_E(self.e, self.E.rad)
+                # M = np.zeros(len(self))
+                # M[self.e < 1] = (self.E.rad[self.e < 1] - self.e[self.e < 1]
+                #                  * sin(self.E.rad[self.e < 1])) % (2 * pi)
+                # M[self.e >= 1] = (
+                #     self.e[self.e >= 1] * sinh(self.E.rad[self.e >= 1]) - self.E.rad[self.e >= 1])
+                # self.M = Angle(M, u.rad)
 
             elif hasattr(self, '_t_peri'):
                 M = self.n * (self.epoch - self.t_peri)

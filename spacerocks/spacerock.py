@@ -1,5 +1,5 @@
 ################################################################################
-# SpaceRocks, version 1.1.0
+# SpaceRocks, version 1.1.1
 #
 # Author: Kevin Napier kjnapier@umich.edu
 ################################################################################
@@ -25,7 +25,7 @@ from .units import Units
 from .vector import Vector
 from .ephemerides import Ephemerides
 from .observer import Observer
-from .cbindings import kep_to_xyz_temp
+from .cbindings import kepM_to_xyz, kepE_to_xyz
 from .spice import *
 import os
 import pkg_resources
@@ -46,11 +46,9 @@ observatories = pd.read_csv(DATA_PATH)
 
 
 class SpaceRock(KeplerOrbit, Convenience):
-
     '''
     SpaceRock objects provide an interface to work with Keplerian orbits. 
     '''
-
     def __init__(self, origin='ssb', frame='ECLIPJ2000', units=Units(), *args, **kwargs):
 
         coords = self.detect_coords(kwargs)
@@ -244,8 +242,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         self.vy
         self.vz
 
-        
-
         for time in np.sort(np.unique(pickup_times)):
             ps = self[self.epoch.tdb.jd == time]
             for x, y, z, vx, vy, vz, name in zip(ps.x.value, ps.y.value, ps.z.value, ps.vx.value, ps.vy.value, ps.vz.value, ps.name):
@@ -302,7 +298,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         pvz = vz_values[:, :Nactive].flatten()
         pname = name_values[:, :Nactive].flatten()
         pepoch = obsdate_values[:, :Nactive].flatten()
-
 
         units = Units()
         units.timescale = 'tdb'
@@ -432,7 +427,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                 break
 
             M = self.M - (ltt * self.n)
-            x0, y0, z0, vx0, vy0, vz0 = kep_to_xyz_temp(a, e, inc, arg, node, M.rad.astype(np.double))
+            x0, y0, z0, vx0, vy0, vz0 = kepM_to_xyz(a, e, inc, arg, node, M.rad.astype(np.double))
 
             ltt0 = ltt
 
@@ -498,6 +493,14 @@ class SpaceRock(KeplerOrbit, Convenience):
             names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Moon', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
             masses = [M_sun, M_mercury, M_venus, M_earth, M_moon, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune, M_pluto]
 
+        elif model == 3:
+            spice.furnsh(os.path.join(SPICE_PATH, '2000004.bsp'))
+            vesta = SpiceBody(spiceid='Vesta')
+            M_vesta = vesta.mass.value
+            active_bodies = [sun, mercury, venus, earth, moon, mars, jupiter, saturn, uranus, neptune, pluto, vesta]
+            names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Moon', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'Vesta']
+            masses = [M_sun, M_mercury, M_venus, M_earth, M_moon, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune, M_pluto, M_vesta]
+
         else:
             raise ValueError('Model not recognized. Check the documentation.')
 
@@ -538,6 +541,7 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         sim.testparticle_type = 0
         sim.integrator = 'ias15'
+        #sim.integrator = 'mercurius'
         
 
         return sim, names
@@ -551,12 +555,12 @@ class SpaceRock(KeplerOrbit, Convenience):
         zs = []
 
         for r in self:
-            x, y, z, _, _, _ = kep_to_xyz_temp(np.repeat(r.a, N),
-                                               np.repeat(r.e, N),
-                                               np.repeat(r.inc.rad, N),
-                                               np.repeat(r.arg.rad, N),
-                                               np.repeat(r.node.rad, N),
-                                               M.rad)
+            x, y, z, _, _, _ = kepM_to_xyz(np.repeat(r.a, N),
+                                           np.repeat(r.e, N),
+                                           np.repeat(r.inc.rad, N),
+                                           np.repeat(r.arg.rad, N),
+                                           np.repeat(r.node.rad, N),
+                                           M.rad)
             xs.append(x)
             ys.append(y)
             zs.append(z)
