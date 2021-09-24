@@ -218,6 +218,11 @@ class SpaceRock(KeplerOrbit, Convenience):
         if hasattr(self, 'H_func'):
             return np.array([func(epoch) for epoch, func in zip(self.epoch.jd, self.H_func)])
 
+    @property
+    def mag(self):
+        if hasattr(self, 'mag_func'):
+            return np.array([func(epoch) for epoch, func in zip(self.epoch.jd, self.mag_func)])
+
     def propagate(self, epochs, model, units=Units()):
         '''
         Numerically integrate all bodies to the desired date.
@@ -330,10 +335,16 @@ class SpaceRock(KeplerOrbit, Convenience):
         e = earth.at(self.epoch)
         s = sun.at(self.epoch)
 
+        x_helio = self.x - s.x
+        y_helio = self.y - s.y
+        z_helio = self.z - s.z
+
+        r_helio = Distance(sqrt(x_helio*x_helio + y_helio*y_helio + z_helio*z_helio).value, u.au)
+
        
         earth_dist = ((e.x-s.x)**2 + (e.y-s.y)**2 + (e.z-s.z)**2)**0.5
 
-        q = (obs.r_helio.au**2 + obs.delta.au**2 - earth_dist**2)/(2 * obs.r_helio.au * obs.delta.au)
+        q = (r_helio.au**2 + obs.delta.au**2 - earth_dist.value**2)/(2 * r_helio.au * obs.delta.au)
 
         beta = np.arccos(q)
         beta[np.where(q <= -1)[0]] = np.pi * u.rad
@@ -343,7 +354,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         Psi_2 = np.exp(-1.862 * np.tan(beta/2)**1.218)
 
 
-        H = self.mag - 5 * np.log10(obs.r_helio.au * obs.delta.au)
+        H = self.mag - 5 * np.log10(r_helio.au * obs.delta.au)
 
         not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
         H[not_zero] += 2.5 * np.log10((1 - self.G[not_zero]) * Psi_1[not_zero] + self.G[not_zero] * Psi_2[not_zero])
