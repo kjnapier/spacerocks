@@ -215,7 +215,8 @@ class SpaceRock(KeplerOrbit, Convenience):
 
     @property
     def H(self):
-        return np.array([func(epoch) for epoch, func in zip(self.epoch.jd, self.H_func)])
+        if hasattr(self, 'H_func'):
+            return np.array([func(epoch) for epoch, func in zip(self.epoch.jd, self.H_func)])
 
     def propagate(self, epochs, model, units=Units()):
         '''
@@ -320,6 +321,8 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         return rocks, planets, sim
 
+    def calc_H(self, obscode):
+        return self.__calc_H_from_mag(obscode=obscode)
 
     def __calc_H_from_mag(self, obscode):
         obs = self.observe(obscode=obscode)
