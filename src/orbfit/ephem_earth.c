@@ -341,9 +341,9 @@ void Interpolate_Position( double Time , int Target , double Position[3] )
      {
        printf("\n  In: Interpolate_Position\n");
        printf("\n  Target = %2d",Target);
-       printf("\n  C      = %4d (before)",C);
-       printf("\n  N      = %4d",N);
-       printf("\n  G      = %4d\n",G);
+       printf("\n  C      = %4ld (before)",C);
+       printf("\n  N      = %4ld",N);
+       printf("\n  G      = %4ld\n",G);
      }
 
   /*--------------------------------------------------------------------------*/
@@ -388,8 +388,8 @@ void Interpolate_Position( double Time , int Target , double Position[3] )
 
   if ( FALSE )
      {
-       printf("\n  C      = %4d (after)",C);
-       printf("\n  offset = %4d",offset);
+       printf("\n  C      = %4ld (after)",C);
+       printf("\n  offset = %4ld",offset);
        printf("\n  Time   = %12.7f",Time);
        printf("\n  T_sub  = %12.7f",T_sub);
        printf("\n  T_seg  = %12.7f",T_seg);
@@ -477,9 +477,9 @@ void Interpolate_State(double Time,
      {
        printf("\n  In: Interpolate_State\n");
        printf("\n  Target = %2d",Target);
-       printf("\n  C      = %4d (before)",C);
-       printf("\n  N      = %4d",N);
-       printf("\n  G      = %4d\n",G);
+       printf("\n  C      = %4ld (before)",C);
+       printf("\n  N      = %4ld",N);
+       printf("\n  G      = %4ld\n",G);
      }
 
   /*--------------------------------------------------------------------------*/
@@ -524,8 +524,8 @@ void Interpolate_State(double Time,
 
   if ( FALSE )
      {
-       printf("\n  C      = %4d (after)",C);
-       printf("\n  offset = %4d",offset);
+       printf("\n  C      = %4ld (after)",C);
+       printf("\n  offset = %4ld",offset);
        printf("\n  Time   = %12.7f",Time);
        printf("\n  T_sub  = %12.7f",T_sub);
        printf("\n  T_seg  = %12.7f",T_seg);
@@ -784,6 +784,8 @@ observatory_geocenter(double jd,
   return;
 }
 
+extern double dmsdeg(char *string);
+extern double hmsdeg(char *string);
 
 /* Read the look-up table for observatories.  
  * Note that ground-based longitudes are stored in hours, 
@@ -797,8 +799,7 @@ read_observatories(char *fname)
   int nchar, obscode;
   char fileName[FNAMESIZE];
 
-  extern double dmsdeg(char *string);
-  extern double hmsdeg(char *string);
+  
 
   nsites = nspacecraft = 0;
 

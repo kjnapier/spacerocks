@@ -1,8 +1,9 @@
 #include <math.h>
 
+float ran1(long *idum);
 float gasdev(long *idum)
 {
-	float ran1(long *idum);
+	
 	static int iset=0;
 	static float gset;
 	float fac,rsq,v1,v2;

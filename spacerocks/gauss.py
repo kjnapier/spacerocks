@@ -1,9 +1,7 @@
 '''
 Do a Gauss orbit fit.
 '''
-from numpy import sin, cos
-import pandas as pd
-import numpy as np
+from numpy import sin, cos, roots, isreal, array
 
 from .vector import Vector
 from .spacerock import SpaceRock
@@ -43,9 +41,9 @@ def gauss(ras, decs, epochs, observer) -> SpaceRock:
     D0 = rho1.dot(p1)
 
     # Step 4: Compute the D tensor
-    D = np.array([[R1.dot(p1), R1.dot(p2), R1.dot(p3)],
-                  [R2.dot(p1), R2.dot(p2), R2.dot(p3)],
-                  [R3.dot(p1), R3.dot(p2), R3.dot(p3)]])
+    D = array([[R1.dot(p1), R1.dot(p2), R1.dot(p3)],
+               [R2.dot(p1), R2.dot(p2), R2.dot(p3)],
+               [R3.dot(p1), R3.dot(p2), R3.dot(p3)]])
 
     # Step 5: Calculate scalar position coefficients
     A = (1/D0) * (-D[0][1] * (tau3/tau) + D[1][1] + D[2][1] * (tau1/tau))
@@ -62,9 +60,9 @@ def gauss(ras, decs, epochs, observer) -> SpaceRock:
 
     # Step 8: Find the root of the scalar distance polynomial for the second observation of the orbiting body
     coeff = [1, 0, a.value, 0, 0, b.value, 0, 0, c.value]
-    roots = np.roots(coeff)
-    roots = roots[np.isreal(roots)]
-    roots = roots[roots > 0]
+    rts = roots(coeff)
+    rts = rts[isreal(rts)]
+    rts = rts[rts > 0]
 
     x_out = []
     y_out = []
@@ -74,7 +72,7 @@ def gauss(ras, decs, epochs, observer) -> SpaceRock:
     vz_out = []
     epoch_out = []
 
-    for root in roots:
+    for root in rts:
 
         root = root.real
 
@@ -86,9 +84,9 @@ def gauss(ras, decs, epochs, observer) -> SpaceRock:
         # Step 10: Calculate the orbiting body position vectors, by adding the observer position vector to the slant direction vector
 
 
-        r1 = np.array([R1.x, R1.y, R1.z]) + a1 * np.array([rho1.x, rho1.y, rho1.z])
-        r2 = np.array([R2.x, R2.y, R2.z]) + a2 * np.array([rho2.x, rho2.y, rho2.z])
-        r3 = np.array([R3.x, R3.y, R3.z]) + a3 * np.array([rho3.x, rho3.y, rho3.z])
+        r1 = array([R1.x, R1.y, R1.z]) + a1 * array([rho1.x, rho1.y, rho1.z])
+        r2 = array([R2.x, R2.y, R2.z]) + a2 * array([rho2.x, rho2.y, rho2.z])
+        r3 = array([R3.x, R3.y, R3.z]) + a3 * array([rho3.x, rho3.y, rho3.z])
 
         # Step 11: Calculate the Lagrange Coefficients
         f1 = 1 - 0.5 * (mu/root**3) * tau1**2

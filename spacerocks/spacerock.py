@@ -190,7 +190,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                 if callable(curve):
                     curve_funcs.append(curve)
                 else:
-                    curve_funcs.append(lambda x: curve)
+                    curve_funcs.append(lambda _, x=curve: x)
             self.H_func = np.array(curve_funcs)
 
         if kwargs.get('mag') is not None:
@@ -200,7 +200,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                 if callable(curve):
                     curve_funcs.append(curve)
                 else:
-                    curve_funcs.append(lambda x: curve)
+                    curve_funcs.append(lambda _, x=curve: x)
             self.mag_func = np.array(curve_funcs)
 
         if kwargs.get('radius') is not None:

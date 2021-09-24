@@ -29,7 +29,6 @@ os.environ['ORBIT_OBSERVATORIES'] = pymodulepath + '/data/observatories.dat'
 from .spacerock import SpaceRock
 from .units import Units
 from .orbfit import Orbfit
-from .pyOrbfit import *
 from .gauss import gauss
 from .observer import Observer
 from .orbitfit import OrbitFitter

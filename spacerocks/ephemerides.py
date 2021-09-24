@@ -3,8 +3,8 @@ from .convenience import Convenience
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
 
-from numpy import sin, cos, arctan2, sqrt, arcsin, tan
-import numpy as np
+
+from numpy import sin, cos, arctan2, sqrt, arcsin, tan, exp, log10, where, array, arccos, pi
 
 from .constants import c, epsilon
 import spiceypy as spice
@@ -43,7 +43,7 @@ class Ephemerides(Convenience):
             self.H_func = kwargs.get('H')
             self.G = kwargs.get('G')
 
-        self.delta = Distance(np.sqrt(self.x**2 + self.y**2 + self.z**2), u.au)
+        self.delta = Distance(sqrt(self.x**2 + self.y**2 + self.z**2), u.au)
 
     '''
     TODO: to_mpc_format for ephemerides
@@ -52,8 +52,7 @@ class Ephemerides(Convenience):
     @property
     def ra(self):
         if not hasattr(self, '_ra'):
-            self.ra = Angle(np.arctan2(self.y, self.x),
-                            u.rad).wrap_at(2 * np.pi * u.rad)
+            self.ra = Angle(arctan2(self.y, self.x), u.rad).wrap_at(2 * np.pi * u.rad)
         return self._ra
 
     @ra.setter
@@ -67,8 +66,7 @@ class Ephemerides(Convenience):
     @property
     def dec(self):
         if not hasattr(self, '_dec'):
-            self.dec = Angle(
-                np.arcsin(self.z / sqrt(self.x**2 + self.y**2 + self.z**2)), u.rad)
+            self.dec = Angle(arcsin(self.z / sqrt(self.x**2 + self.y**2 + self.z**2)), u.rad)
         return self._dec
 
     @dec.setter
@@ -124,7 +122,7 @@ class Ephemerides(Convenience):
 
     @property
     def H(self):
-        return np.array([func(epoch - ltt.value) for epoch, ltt, func in zip(self.epoch.jd, self.delta / c, self.H_func)])
+        return array([func(epoch - ltt.value) for epoch, ltt, func in zip(self.epoch.jd, self.delta / c, self.H_func)])
 
     @H.setter
     def H(self, value):
@@ -170,7 +168,7 @@ class Ephemerides(Convenience):
         y_helio = self.y + e.y - s.y
         z_helio = self.z + e.z - s.z
 
-        r_helio = Distance(np.sqrt(x_helio*x_helio + y_helio*y_helio + z_helio*z_helio).value, u.au)
+        r_helio = Distance(sqrt(x_helio*x_helio + y_helio*y_helio + z_helio*z_helio).value, u.au)
         
         earth_dist = ((e.x - s.x)**2 + (e.y - s.y)**2 + (e.z - s.z)**2)**0.5
 
@@ -178,17 +176,16 @@ class Ephemerides(Convenience):
             (2 * r_helio.au * self.delta.au)
 
         # pyephem
-        beta = np.arccos(q)
-        beta[np.where(q <= -1)[0]] = np.pi * u.rad
-        beta[np.where(q >= 1)[0]] = 0 * u.rad
+        beta = arccos(q)
+        beta[where(q <= -1)[0]] = pi * u.rad
+        beta[where(q >= 1)[0]] = 0 * u.rad
 
-        Psi_1 = np.exp(-3.332 * np.tan(beta / 2)**0.631)
-        Psi_2 = np.exp(-1.862 * np.tan(beta / 2)**1.218)
-        mag = self.H + 5 * np.log10(r_helio.au * self.delta.au)
+        Psi_1 = exp(-3.332 * tan(beta / 2)**0.631)
+        Psi_2 = exp(-1.862 * tan(beta / 2)**1.218)
+        mag = self.H + 5 * log10(r_helio.au * self.delta.au)
 
-        not_zero = np.where((Psi_1 != 0) | (Psi_2 != 0))[0]
-        mag[not_zero] -= 2.5 * np.log10((1 - self.G[not_zero])
-                                        * Psi_1[not_zero] + self.G[not_zero] * Psi_2[not_zero])
+        not_zero = where((Psi_1 != 0) | (Psi_2 != 0))[0]
+        mag[not_zero] -= 2.5 * log10((1 - self.G[not_zero]) * Psi_1[not_zero] + self.G[not_zero] * Psi_2[not_zero])
 
         return mag
 
