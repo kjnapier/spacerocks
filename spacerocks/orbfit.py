@@ -195,8 +195,8 @@ class Orbfit(Convenience):
 
     def cov_pq(self):
         """Covariance matrix for perihelion and aphelion (p,q)"""
-        p, dp = self.perihelion()
-        q, dq = self.aphelion()
+        #p, dp = self.perihelion()
+        #q, dq = self.aphelion()
         a = self.orbit_aei.a
         e = self.orbit_aei.e
         J = np.array([[1-e, -a],[1+e, a]])   # Jacobian of transformation
@@ -212,32 +212,32 @@ class Orbfit(Convenience):
         elements['a'] = self.orbit_aei.a
         try:                                # semimajor axis (AU)
             elements_errs['a'] = np.sqrt(self.covar_aei[0][0])
-        except:
+        except Exception as e:
             elements_errs['a'] = -99
         elements['e'] = self.orbit_aei.e
         try:                                # eccentricity
             elements_errs['e'] = np.sqrt(self.covar_aei[1][1])
-        except:
+        except Exception as e:
             elements_errs['e'] = -99
         elements['i'] = self.orbit_aei.i
         try:                                # inclination (deg)
             elements_errs['i'] = np.sqrt(self.covar_aei[2][2])/(np.pi/180)
-        except:
+        except Exception as e:
             elements_errs['i'] = -99
         elements['lan'] = self.orbit_aei.lan
         try:                             # longitude of ascending node (deg)
             elements_errs['lan'] = np.sqrt(self.covar_aei[3][3])/(np.pi/180)
-        except:
+        except Exception as e:
             elements_errs['lan'] = -99
         elements['aop'] = self.orbit_aei.aop
         try:                            # argument of perihelion (deg)
             elements_errs['aop'] = np.sqrt(self.covar_aei[4][4])/(np.pi/180)
-        except:
+        except Exception as e:
             elements_errs['aop'] = -99
         elements['top'] = self.orbit_aei.T
         try:                                # time of periapsis (JD)
             elements_errs['top'] = np.sqrt(self.covar_aei[5][5])/orbfit.DAY
-        except:
+        except Exception as e:
             elements_errs['top'] = -99
         return elements, elements_errs
 
@@ -342,8 +342,8 @@ class Orbfit(Convenience):
 
             #futobs.obstime = (ephem.julian_date(date)-jd0)*orbfit.DAY
             futobs.xe = -999  # force evaluation of earth3D
-            dx = orbfit.dvector(1,6)
-            dy = orbfit.dvector(1,6)
+            #dx = orbfit.dvector(1,6)
+            #dy = orbfit.dvector(1,6)
             # Sometimes hangs in next line... why?
             #thetax, thetay = orbfit.kbo2d(p_in, futobs, dx, dy)
             # Predicted position, in abg basis:

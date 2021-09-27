@@ -1,13 +1,12 @@
-from numpy import pi, sqrt, cbrt, sin, cos, sinh, zeros_like
 import numpy as np
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
-from .constants import *
+from .constants import mu_bary
 
 from .vector import Vector
-from .cbindings import *
-from .spice import *
+from .cbindings import calc_kep_from_xyz, calc_vovec_from_kep, calc_M_from_E, calc_E_from_f, calc_E_from_M, calc_f_from_E
+from .spice import SpiceBody
 
 import pkg_resources
 import spiceypy as spice
@@ -119,7 +118,7 @@ class KeplerOrbit:
     @property
     def ovec(self):
         if not hasattr(self, '_ovec'):
-            self.ovec = Vector(self.r * cos(self.f), self.r * sin(self.f), zeros_like(self.f))
+            self.ovec = Vector(self.r * np.cos(self.f), self.r * np.sin(self.f), np.zeros_like(self.f))
         return self._ovec
 
     @ovec.setter
@@ -341,7 +340,7 @@ class KeplerOrbit:
         if not hasattr(self, '_node'):
             if hasattr(self, '_varpi') and hasattr(self, '_arg'):
                 self.node = Angle(
-                    (self.varpi.rad - self.arg.rad) % (2 * pi), u.rad)
+                    (self.varpi.rad - self.arg.rad) % (2 * np.pi), u.rad)
             elif hasattr(self, '_position') and hasattr(self, '_velocity'):
                 self.kep_from_xyz()
         return self._node
@@ -359,7 +358,7 @@ class KeplerOrbit:
         if not hasattr(self, '_arg'):
 
             if hasattr(self, '_varpi') and hasattr(self, 'node'):
-                self.arg = Angle((self.varpi.rad - self.node.rad) % (2 * pi), u.rad)
+                self.arg = Angle((self.varpi.rad - self.node.rad) % (2 * np.pi), u.rad)
 
             elif hasattr(self, '_position') and hasattr(self, '_velocity'):
                 self.kep_from_xyz()
@@ -378,7 +377,7 @@ class KeplerOrbit:
     def varpi(self):
         if not hasattr(self, '_varpi'):
             self.varpi = Angle((self.node.rad + self.arg.rad) %
-                               (2 * pi), u.rad)
+                               (2 * np.pi), u.rad)
         return self._varpi
 
     @varpi.setter
@@ -411,7 +410,7 @@ class KeplerOrbit:
         if not hasattr(self, '_M'):
 
             if hasattr(self, '_mean_longitude'):
-                M = (self.mean_longitude.rad - self.varpi.rad) % (2 * pi)
+                M = (self.mean_longitude.rad - self.varpi.rad) % (2 * np.pi)
                 self.M = Angle(M, u.rad)
 
             elif hasattr(self, '_f') or hasattr(self, '_true_longitude') or hasattr(self, '_E') or (hasattr(self, '_position') and hasattr(self, '_velocity')):
@@ -425,7 +424,7 @@ class KeplerOrbit:
 
             elif hasattr(self, '_t_peri'):
                 M = self.n * (self.epoch - self.t_peri)
-                M = M % (2 * pi * u.rad)
+                M = M % (2 * np.pi * u.rad)
                 self.M = Angle(M, u.rad)
 
         return self._M
@@ -483,7 +482,7 @@ class KeplerOrbit:
     @property
     def true_longitude(self):
         if not hasattr(self, '_true_longitude') or (hasattr(self, '_position') and hasattr(self, '_velocity')):
-            self.true_longitude = Angle((self.f.rad + self.varpi.rad) % (2 * pi), u.rad)
+            self.true_longitude = Angle((self.f.rad + self.varpi.rad) % (2 * np.pi), u.rad)
         return self._true_longitude
 
     @true_longitude.setter
@@ -498,7 +497,7 @@ class KeplerOrbit:
     def mean_longitude(self):
         if not hasattr(self, '_mean_longitude'):
             self.mean_longitude = Angle(
-                (self.M.rad + self.varpi.rad) % (2 * pi), u.rad)
+                (self.M.rad + self.varpi.rad) % (2 * np.pi), u.rad)
         return self._mean_longitude
 
     @mean_longitude.setter
@@ -539,7 +538,7 @@ class KeplerOrbit:
     def radius(self):
         if not hasattr(self, '_radius'):
             if hasattr(self, 'mass') and hasattr(self, 'density'):
-               self.radius = Distance(cbrt((3 / (4 * np.pi * self.density)) * self.mass).to(u.km))
+               self.radius = Distance(np.cbrt((3 / (4 * np.pi * self.density)) * self.mass).to(u.km))
             else:
                 self.radius = 1e-16
         return self._radius
@@ -563,7 +562,7 @@ class KeplerOrbit:
     @property
     def b(self):
         if not hasattr(self, '_b'):
-            self.b = abs(self.a) * sqrt(abs(1 - self.e**2))
+            self.b = abs(self.a) * np.sqrt(abs(1 - self.e**2))
         return self._b
 
     @b.setter
@@ -619,7 +618,7 @@ class KeplerOrbit:
     @property
     def v_inf(self):
         if not hasattr(self, '_v_inf'):
-            self.v_inf = sqrt(- self.mu / self.a) / u.rad
+            self.v_inf = np.sqrt(- self.mu / self.a) / u.rad
         return self._v_inf
 
     @v_inf.setter
@@ -633,7 +632,7 @@ class KeplerOrbit:
     @property
     def n(self):
         if not hasattr(self, '_n'):
-            self.n = sqrt(self.mu / abs(self.a)**3)
+            self.n = np.sqrt(self.mu / abs(self.a)**3)
         return self._n
 
     @n.setter
@@ -658,10 +657,10 @@ class KeplerOrbit:
             else:
                 rs = np.zeros(len(self))
                 rs[self.e < 1] = self.a[self.e < 1] * \
-                    (1 - self.e[self.e < 1] * cos(self.E[self.e < 1].rad))
+                    (1 - self.e[self.e < 1] * np.cos(self.E[self.e < 1].rad))
                 rs[self.e >= 1] = self.p[self.e >= 1] / \
                     (1 + self.e[self.e >= 1] *
-                     cos(self.f[self.e >= 1]))
+                     np.cos(self.f[self.e >= 1]))
                 self.r = Distance(rs, u.au)
         return self._r
 
@@ -677,4 +676,4 @@ class KeplerOrbit:
     @property
     def TisserandJ(self):
         aJ = 5.2 * u.au
-        return aJ / self.a * 2 * cos(self.inc) * sqrt(self.p / aJ)
+        return aJ / self.a * 2 * np.cos(self.inc) * np.sqrt(self.p / aJ)

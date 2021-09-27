@@ -1,4 +1,4 @@
-![Alt text](images/logo.svg)
+![Alt text](assets/logo.svg)
 
 ![spacerocks](https://github.com/kjnapes/spacerocks/workflows/spacerocks/badge.svg?branch=master)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
@@ -22,7 +22,7 @@ SpaceRocks is a Python package for performing observational and theoretical task
 - Minor Planet Center Queries.
 
 
-### Obtaining and using the software
+### Installation
 
 The easiest way to install spacerocks is with pip:
 

@@ -1,4 +1,3 @@
-import spiceypy as spice
 import spacerocks.spacerock as sr
 
 from astropy import units as u
@@ -19,7 +18,8 @@ spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
 spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
 spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
 spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
-spice.furnsh(os.path.join(SPICE_PATH, 'gm_de431.tpc'))
+#spice.furnsh(os.path.join(SPICE_PATH, 'gm_de431.tpc'))
+spice.furnsh(os.path.join(SPICE_PATH, 'gm_Horizons.pck'))
 
 class SpiceBody:
 

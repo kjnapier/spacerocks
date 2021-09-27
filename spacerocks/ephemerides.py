@@ -11,7 +11,7 @@ import spiceypy as spice
 import pkg_resources
 import os
 
-from .spice import *
+from .spice import SpiceBody
 
 SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
 spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
@@ -52,7 +52,7 @@ class Ephemerides(Convenience):
     @property
     def ra(self):
         if not hasattr(self, '_ra'):
-            self.ra = Angle(arctan2(self.y, self.x), u.rad).wrap_at(2 * np.pi * u.rad)
+            self.ra = Angle(arctan2(self.y, self.x), u.rad).wrap_at(2 * pi * u.rad)
         return self._ra
 
     @ra.setter

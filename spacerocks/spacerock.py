@@ -9,7 +9,6 @@ from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
 
-from numpy import sqrt, array
 import numpy as np
 import pandas as pd
 
@@ -18,15 +17,15 @@ import rebound
 #import reboundx
 #from reboundx import constants
 
-from .constants import *
+from .constants import mu_bary, c, epsilon
 from .keplerorbit import KeplerOrbit
 from .convenience import Convenience
 from .units import Units
 from .vector import Vector
 from .ephemerides import Ephemerides
 from .observer import Observer
-from .cbindings import kepM_to_xyz, kepE_to_xyz
-from .spice import *
+from .cbindings import kepM_to_xyz
+from .spice import SpiceBody
 import os
 import pkg_resources
 import spiceypy as spice
@@ -148,7 +147,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                 self.name = np.atleast_1d(kwargs.get('name'))
             else:
                 # produces random, non-repeting integers between 0 and 1e10 - 1
-                self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.inc))])
+                self.name = np.array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.inc))])
 
 
         elif coords == 'xyz':
@@ -176,7 +175,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                 self.name = np.atleast_1d(kwargs.get('name'))
             else:
                 # produces random, non-repeting integers between 0 and 1e10 - 1
-                self.name = array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.x))])
+                self.name = np.array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.x))])
 
         if kwargs.get('G') is not None:
             self.G = kwargs.get('G')
@@ -339,7 +338,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         y_helio = self.y - s.y
         z_helio = self.z - s.z
 
-        r_helio = Distance(sqrt(x_helio*x_helio + y_helio*y_helio + z_helio*z_helio).value, u.au)
+        r_helio = Distance(np.sqrt(x_helio*x_helio + y_helio*y_helio + z_helio*z_helio).value, u.au)
 
        
         earth_dist = ((e.x-s.x)**2 + (e.y-s.y)**2 + (e.z-s.z)**2)**0.5
@@ -432,7 +431,7 @@ class SpaceRock(KeplerOrbit, Convenience):
             dvy = vy0 - observer.vy
             dvz = vz0 - observer.vz
 
-            delta = sqrt(dx**2 + dy**2 + dz**2)
+            delta = np.sqrt(dx**2 + dy**2 + dz**2)
 
             ltt = delta / c
             dltt = (ltt - ltt0)
@@ -508,12 +507,73 @@ class SpaceRock(KeplerOrbit, Convenience):
             masses = [M_sun, M_mercury, M_venus, M_earth, M_moon, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune, M_pluto]
 
         elif model == 3:
-            spice.furnsh(os.path.join(SPICE_PATH, '2000004.bsp'))
+
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000001.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000002.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000003.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000004.bsp'))
+            #spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000006.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000007.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000010.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000015.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000016.bsp'))
+            #spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000029.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000031.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000052.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000065.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000087.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000088.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000107.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000511.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000704.bsp'))
+
+            ceres = SpiceBody(spiceid='Ceres')
             vesta = SpiceBody(spiceid='Vesta')
+            pallas = SpiceBody(spiceid='Pallas')
+            juno = SpiceBody(spiceid='2000003')
+            #hebe = SpiceBody(spiceid='2000006')
+            iris = SpiceBody(spiceid='2000007')
+            hygiea = SpiceBody(spiceid='2000010')
+            eunomia = SpiceBody(spiceid='2000015')
+            psyche = SpiceBody(spiceid='2000016')
+            #amphitrite = SpiceBody(spiceid='2000029')
+            euphrosyne = SpiceBody(spiceid='2000031')
+            europa = SpiceBody(spiceid='2000052')
+            cybele = SpiceBody(spiceid='2000065')
+            sylvia = SpiceBody(spiceid='2000087')
+            thisbe = SpiceBody(spiceid='2000088')
+            camilla = SpiceBody(spiceid='2000107')
+            davida = SpiceBody(spiceid='2000511')
+            interamnia = SpiceBody(spiceid='2000704')
+            
             M_vesta = vesta.mass.value
-            active_bodies = [sun, mercury, venus, earth, moon, mars, jupiter, saturn, uranus, neptune, pluto, vesta]
-            names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Moon', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'Vesta']
-            masses = [M_sun, M_mercury, M_venus, M_earth, M_moon, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune, M_pluto, M_vesta]
+            M_ceres = ceres.mass.value
+            M_pallas = pallas.mass.value
+            M_juno = juno.mass.value
+            #M_hebe = hebe.mass.value
+            M_iris = iris.mass.value
+            M_hygiea = hygiea.mass.value
+            M_eunomia = eunomia.mass.value
+            M_psyche = psyche.mass.value
+            #M_amphitrite = amphitrite.mass.value
+            M_europa = europa.mass.value
+            M_cybele = cybele.mass.value
+            M_sylvia = sylvia.mass.value
+            M_thisbe = thisbe.mass.value
+            M_davida = davida.mass.value
+            M_interamnia = interamnia.mass.value
+            M_camilla = camilla.mass.value
+            M_euphrosyne = euphrosyne.mass.value
+
+            active_bodies = [sun, mercury, venus, earth, moon, mars, jupiter, saturn, uranus, neptune, pluto, 
+                             ceres, vesta, pallas, interamnia, juno, camilla, iris, hygiea, eunomia, psyche, 
+                             euphrosyne, europa, cybele, sylvia, thisbe, davida]
+            names = ['Sun', 'Mercury', 'Venus', 'Earth', 'Moon', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 
+                     'Ceres', 'Vesta', 'Pallas', 'Interamnia', 'Juno', 'Camilla', 'Iris', 'Hygiea', 'Eunomia', 
+                     'Psyche', 'Euphrosyne', 'Europa', 'Cybele', 'Sylvia', 'Thisbe', 'Davida']
+            masses = [M_sun, M_mercury, M_venus, M_earth, M_moon, M_mars, M_jupiter, M_saturn, M_uranus, M_neptune, M_pluto, 
+                      M_ceres, M_vesta, M_pallas, M_interamnia, M_juno, M_camilla, M_iris, M_hygiea, M_eunomia, M_psyche, 
+                             M_euphrosyne, M_europa, M_cybele, M_sylvia, M_thisbe, M_davida]
 
         else:
             raise ValueError('Model not recognized. Check the documentation.')
@@ -531,7 +591,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         ss['vy'] = [body.vy.value[0] for body in bodies]
         ss['vz'] = [body.vz.value[0] for body in bodies]
         ss['mass'] = masses
-        ss['a'] = 1 / (2 / sqrt(ss.x**2 + ss.y**2 + ss.z**2) - (ss.vx**2 + ss.vy**2 + ss.vz**2) / mu_bary.value)
+        ss['a'] = 1 / (2 / np.sqrt(ss.x**2 + ss.y**2 + ss.z**2) - (ss.vx**2 + ss.vy**2 + ss.vz**2) / mu_bary.value)
         ss['hill_radius'] = ss.a * pow(ss.mass / (3 * M_sun), 1/3)
         ss['name'] = names
 
