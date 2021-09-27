@@ -67,7 +67,6 @@ _pyOrbfitModule = Extension('_pyOrbfit',
                             extra_link_args=extra_link_args
                             )
 
-
 setup(
     name='spacerocks',
     version='1.1.1',
@@ -78,7 +77,22 @@ setup(
     packages=['spacerocks', 'spacerocks.data'],
     package_data={'spacerocks.data': ['*.csv', '*.dat', '*.423'], 'spacerocks.data.spice': ['*']},
     data_files=['spacerocks/data/observatories.csv',
-                'spacerocks/data/spice/asteroids/*.bsp',
+                'spacerocks/data/spice/asteroids/2000001.bsp',
+                'spacerocks/data/spice/asteroids/2000002.bsp',
+                'spacerocks/data/spice/asteroids/2000003.bsp',
+                'spacerocks/data/spice/asteroids/2000004.bsp',
+                'spacerocks/data/spice/asteroids/2000007.bsp',
+                'spacerocks/data/spice/asteroids/2000010.bsp',
+                'spacerocks/data/spice/asteroids/2000015.bsp',
+                'spacerocks/data/spice/asteroids/2000016.bsp',
+                'spacerocks/data/spice/asteroids/2000031.bsp',
+                'spacerocks/data/spice/asteroids/2000052.bsp',
+                'spacerocks/data/spice/asteroids/2000065.bsp',
+                'spacerocks/data/spice/asteroids/2000087.bsp',
+                'spacerocks/data/spice/asteroids/2000088.bsp',
+                'spacerocks/data/spice/asteroids/2000107.bsp',
+                'spacerocks/data/spice/asteroids/2000511.bsp',
+                'spacerocks/data/spice/asteroids/2000704.bsp',
                 'spacerocks/data/spice/de440s.bsp',
                 'spacerocks/data/spice/gm_de431.tpc',
                 'spacerocks/data/spice/hst.bsp',
