@@ -1,4 +1,4 @@
-![Alt text](assets/logo.svg)
+![Alt text](assets/logo.png)
 
 ![spacerocks](https://github.com/kjnapes/spacerocks/workflows/spacerocks/badge.svg?branch=master)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)

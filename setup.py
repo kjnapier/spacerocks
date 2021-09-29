@@ -1,9 +1,8 @@
 import numpy
 from setuptools import setup, Extension
-
 import sys
-
 import sysconfig
+
 suffix = sysconfig.get_config_var('EXT_SUFFIX')
 if suffix is None:
     suffix = ".so"

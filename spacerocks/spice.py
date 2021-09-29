@@ -1,4 +1,5 @@
-import spacerocks.spacerock as sr
+#import spacerocks.spacerock as sr
+#from .spacerock import SpaceRock
 
 from astropy import units as u
 from astropy.coordinates import Distance
@@ -9,7 +10,6 @@ from astropy.constants import G as GravitationalConstant
 
 import spiceypy as spice
 import os
-
 
 import pkg_resources
 
@@ -34,9 +34,10 @@ class SpiceBody:
         '''
         Return a SpaceRock object at the specified epoch(s).
         '''
+        from spacerocks.spacerock import SpaceRock
         epoch = epoch.utc.jd
         x, y, z, vx, vy, vz = self.__get_all_state_vectors(epoch)
-        return sr.SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=epoch, name=self.spiceid)
+        return SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=epoch, name=self.spiceid)
 
     @property
     def mass(self):
