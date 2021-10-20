@@ -1,6 +1,6 @@
 from ctypes import cdll
 import os
-__version__ = '1.1.2'
+__version__ = '1.1.6'
 __author__ = 'Kevin Napier'
 
 # Find suffix
