@@ -78,14 +78,14 @@ for dir in dirs:
 
 setup(
     name='spacerocks',
-    version='1.1.1',
+    version='1.1.2',
     description='A Python Package for Solar System Ephemerides and Dynamics.',
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
     url="https://github.com/kjnapier/spacerocks",
     packages=['spacerocks', 'spacerocks.data'],
     package_data={'spacerocks.data': ['*.csv', '*.dat', '*.423'], 'spacerocks.data.spice': ['*']},
-    data_files=data_files,
+    #data_files=data_files,
     include_package_data=True,
     install_requires=['healpy',
                       'numpy',
