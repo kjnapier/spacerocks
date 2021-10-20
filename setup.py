@@ -1,7 +1,9 @@
+import os
 import numpy
 from setuptools import setup, Extension
 import sys
 import sysconfig
+import glob
 
 suffix = sysconfig.get_config_var('EXT_SUFFIX')
 if suffix is None:
@@ -66,6 +68,14 @@ _pyOrbfitModule = Extension('_pyOrbfit',
                             extra_link_args=extra_link_args
                             )
 
+data_files = []
+dirs = ['spacerocks/data/spice/*','spacerocks/data/spice/asteroids/*','spacerocks/data/*']
+for dir in dirs:
+   for filename in glob.glob(dir):
+      if os.path.isfile(filename):
+         data_files.append(filename)
+
+
 setup(
     name='spacerocks',
     version='1.1.1',
@@ -75,30 +85,7 @@ setup(
     url="https://github.com/kjnapier/spacerocks",
     packages=['spacerocks', 'spacerocks.data'],
     package_data={'spacerocks.data': ['*.csv', '*.dat', '*.423'], 'spacerocks.data.spice': ['*']},
-    data_files=['spacerocks/data/observatories.csv',
-                'spacerocks/data/spice/asteroids/2000001.bsp',
-                'spacerocks/data/spice/asteroids/2000002.bsp',
-                'spacerocks/data/spice/asteroids/2000003.bsp',
-                'spacerocks/data/spice/asteroids/2000004.bsp',
-                'spacerocks/data/spice/asteroids/2000007.bsp',
-                'spacerocks/data/spice/asteroids/2000010.bsp',
-                'spacerocks/data/spice/asteroids/2000015.bsp',
-                'spacerocks/data/spice/asteroids/2000016.bsp',
-                'spacerocks/data/spice/asteroids/2000031.bsp',
-                'spacerocks/data/spice/asteroids/2000052.bsp',
-                'spacerocks/data/spice/asteroids/2000065.bsp',
-                'spacerocks/data/spice/asteroids/2000087.bsp',
-                'spacerocks/data/spice/asteroids/2000088.bsp',
-                'spacerocks/data/spice/asteroids/2000107.bsp',
-                'spacerocks/data/spice/asteroids/2000511.bsp',
-                'spacerocks/data/spice/asteroids/2000704.bsp',
-                'spacerocks/data/spice/de440s.bsp',
-                'spacerocks/data/spice/gm_de431.tpc',
-                'spacerocks/data/spice/hst.bsp',
-                'spacerocks/data/spice/latest_leapseconds.tls',
-                'spacerocks/data/spice/nh.bsp',
-                'spacerocks/data/observatories.dat',
-                'spacerocks/data/binEphem.423'],
+    data_files=data_files,
     include_package_data=True,
     install_requires=['healpy',
                       'numpy',
