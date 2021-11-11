@@ -18,7 +18,6 @@ clibspacerocks = cdll.LoadLibrary(__libpath__)
 __libpath__ = pymodulepath + "/../_pyOrbfit" + suffix
 cliborbfit = cdll.LoadLibrary(__libpath__)
 
-
 '''
 Set the environment variables for pyOrbfit. This is clunky,
 but rewriting the code would be a bear.
@@ -28,7 +27,7 @@ os.environ['ORBIT_OBSERVATORIES'] = pymodulepath + '/data/observatories.dat'
 
 from .spacerock import SpaceRock
 from .units import Units
-from .orbfit import Orbfit
-from .gauss import gauss
-from .observer import Observer
-from .orbitfit import OrbitFitter
+#from .orbfit import Orbfit
+#from .gauss import gauss
+#from .observer import Observer
+#from .orbitfit import OrbitFitter

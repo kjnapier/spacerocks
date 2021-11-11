@@ -60,7 +60,7 @@ _pyOrbfitModule = Extension('_pyOrbfit',
                              'src/orbfit/lubksb.c',
                              'src/orbfit/transforms.c',
                              'src/orbfit/mrqcof_orbit.c'],
-                            include_dirs=[numpy_include],
+                            include_dirs=[numpy_include, 'src/orbfit'],
                             language='c',
                             extra_compile_args=[
                                 '-O3', '-Wno-implicit-function-declaration', '-Wno-unknown-pragmas'],
