@@ -77,8 +77,6 @@ class Simulation(rebound.Simulation, Convenience):
         else:
             f = False
 
-
-        units = units
         units.timescale = 'tdb'
 
         epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
