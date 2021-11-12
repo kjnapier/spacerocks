@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 import rebound
+import asdf
 
 #import reboundx
 #from reboundx import constants
@@ -211,6 +212,21 @@ class SpaceRock(KeplerOrbit, Convenience):
         if kwargs.get('density') is not None:
             self.density = kwargs.get('density') * units.density
         
+
+    @classmethod
+    def fromfile(cls, name):
+        with asdf.open(name) as f:
+            N = len(f['x'])
+            if len(f['name']) == 1:
+                names = np.repeat(f['name'], N)
+            else:
+                names = f['name']
+            units = Units()
+            units.timescale = 'tdb'
+            return cls(x=f['x'], y=f['y'], z=f['z'], 
+                       vx=f['vx'], vy=f['vy'], vz=f['vz'], 
+                       epoch=f['epoch'], name=names, 
+                       origin=f['origin'], frame=f['frame'], units=units)
 
     @property
     def H(self):
@@ -640,6 +656,28 @@ class SpaceRock(KeplerOrbit, Convenience):
             zs.append(z)
 
         return xs, ys, zs
+
+    def writeto(self, path):
+        uniquenames = np.unique(self.name)
+        if len(uniquenames) == 1:
+            name = uniquenames
+        tree = {
+            'frame': self.frame,
+            'origin': self.origin,
+            'mu': self.mu,
+            'epoch': self.epoch.tdb.jd,
+            'name': uniquenames.tolist(),
+            'x': self.x.au,
+            'y': self.y.au,
+            'z': self.z.au,
+            'vx': self.vx.to(u.au/u.day).value,
+            'vy': self.vy.to(u.au/u.day).value,
+            'vz': self.vz.to(u.au/u.day).value
+        }
+
+        # Create the ASDF file object from our data tree
+        af = asdf.AsdfFile(tree)
+        af.write_to(path, all_array_compression='zlib')
 
     def analytic_propagate(self, epoch: list, propagate_origin: str='sun'):
         '''

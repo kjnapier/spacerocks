@@ -34,46 +34,12 @@ try:
 except AttributeError:
     numpy_include = numpy.get_numpy_include()
 
-extra_link_args = []
-if sys.platform == 'darwin':
-    from distutils import sysconfig
-    vars = sysconfig.get_config_vars()
-    vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
-    extra_link_args = ['-Wl,-install_name,@rpath/_pyOrbfit' + suffix]
-
-_pyOrbfitModule = Extension('_pyOrbfit',
-                            ['src/orbfit/fit_radec.c',
-                             'src/orbfit/orbfit1.c',
-                             'src/orbfit/nrutil.c',
-                             'src/orbfit/ephem_earth.c',
-                             'src/orbfit/aeiderivs.c',
-                             'src/orbfit/gasdev.c',
-                             'src/orbfit/abg_to_xyz.c',
-                             'src/orbfit/gaussj.c',
-                             'src/orbfit/orbfit2.c',
-                             'src/orbfit/mrqmin_orbit.c',
-                             'src/orbfit/abg_to_aei.c',
-                             'src/orbfit/ludcmp.c',
-                             'src/orbfit/dms.c',
-                             'src/orbfit/covsrt.c',
-                             'src/orbfit/ran1.c',
-                             'src/orbfit/lubksb.c',
-                             'src/orbfit/transforms.c',
-                             'src/orbfit/mrqcof_orbit.c'],
-                            include_dirs=[numpy_include, 'src/orbfit'],
-                            language='c',
-                            extra_compile_args=[
-                                '-O3', '-Wno-implicit-function-declaration', '-Wno-unknown-pragmas'],
-                            extra_link_args=extra_link_args
-                            )
-
 data_files = []
 dirs = ['spacerocks/data/spice/*','spacerocks/data/spice/asteroids/*','spacerocks/data/*']
 for dir in dirs:
    for filename in glob.glob(dir):
       if os.path.isfile(filename):
          data_files.append(filename)
-
 
 setup(
     name='spacerocks',
@@ -83,18 +49,18 @@ setup(
     author_email='kjnapier@umich.edu',
     url="https://github.com/kjnapier/spacerocks",
     packages=['spacerocks', 'spacerocks.data'],
-    package_data={'spacerocks': ['src/orbfit/*.h', 'src/orbfit/*.i'], 
-                  'spacerocks.data': ['*.csv', '*.dat', '*.423'], 
+    package_data={'spacerocks.data': ['*.csv', '*.dat', '*.423'], 
                   'spacerocks.data.spice': ['*'], 
                   'spacerocks.data.spice.asteroids': ['*.bsp']},
     #data_files=data_files,
     include_package_data=True,
     install_requires=['healpy',
+                      'asdf',
                       'numpy',
                       'spiceypy',
                       'astropy',
                       'pandas',
                       'rebound'],
-    ext_modules=[libspacerocksmodule, _pyOrbfitModule],
+    ext_modules=[libspacerocksmodule],
     zip_safe=False
 )
