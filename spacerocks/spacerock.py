@@ -1,8 +1,3 @@
-################################################################################
-# SpaceRocks, version 1.1.1
-#
-# Author: Kevin Napier kjnapier@umich.edu
-################################################################################
 import random
 
 from astropy import units as u
@@ -15,15 +10,12 @@ import pandas as pd
 import rebound
 import asdf
 
-#import reboundx
-#from reboundx import constants
-
 from .constants import mu_bary, c, epsilon
 from .keplerorbit import KeplerOrbit
 from .convenience import Convenience
 from .units import Units
 from .vector import Vector
-from .ephemerides import Ephemerides
+from .ephemerides import Ephemerides 
 from .observer import Observer
 from .cbindings import kepM_to_xyz
 from .spice import SpiceBody
@@ -178,11 +170,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                 # produces random, non-repeting integers between 0 and 1e10 - 1
                 self.name = np.array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.x))])
 
-        if kwargs.get('G') is not None:
-            self.G = kwargs.get('G')
-        else:
-            self.G = np.repeat(0.15, len(self))
-
+        
         if kwargs.get('H') is not None:
             curves = kwargs.get('H')
             curve_funcs = []
@@ -192,6 +180,12 @@ class SpaceRock(KeplerOrbit, Convenience):
                 else:
                     curve_funcs.append(lambda _, x=curve: x)
             self.H_func = np.array(curve_funcs)
+
+            if kwargs.get('G') is not None:
+                self.G = kwargs.get('G')
+            else:
+                self.G = np.repeat(0.15, len(self))
+
 
         if kwargs.get('mag') is not None:
             curves = kwargs.get('mag')
@@ -212,9 +206,8 @@ class SpaceRock(KeplerOrbit, Convenience):
         if kwargs.get('density') is not None:
             self.density = kwargs.get('density') * units.density
         
-
     @classmethod
-    def fromfile(cls, name):
+    def from_file(cls, name):
         with asdf.open(name) as f:
             N = len(f['x'])
             if len(f['name']) == 1:
@@ -355,8 +348,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         z_helio = self.z - s.z
 
         r_helio = Distance(np.sqrt(x_helio*x_helio + y_helio*y_helio + z_helio*z_helio).value, u.au)
-
-       
         earth_dist = ((e.x-s.x)**2 + (e.y-s.y)**2 + (e.z-s.z)**2)**0.5
 
         q = (r_helio.au**2 + obs.delta.au**2 - earth_dist.value**2)/(2 * r_helio.au * obs.delta.au)
@@ -367,7 +358,6 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         Psi_1 = np.exp(-3.332 * np.tan(beta/2)**0.631)
         Psi_2 = np.exp(-1.862 * np.tan(beta/2)**1.218)
-
 
         H = self.mag - 5 * np.log10(r_helio.au * obs.delta.au)
 

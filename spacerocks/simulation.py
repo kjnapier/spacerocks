@@ -6,6 +6,7 @@ import numpy as np
 import copy
 from rich.progress import track
 
+
 from .spice import SpiceBody
 from .units import Units
 from .convenience import Convenience
@@ -83,8 +84,12 @@ class Simulation(rebound.Simulation, Convenience):
 
         self.move_to_com()
         
-        for time in track(np.sort(epochs.tdb.jd)):
+        #for time in track(np.sort(epochs.tdb.jd)):
+        #    self.integrate(time, exact_finish_time=1)
+
+        for time in np.sort(epochs.tdb.jd):
             self.integrate(time, exact_finish_time=1)
+
 
             if f == True:
                 func(self)
