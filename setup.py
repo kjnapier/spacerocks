@@ -25,15 +25,6 @@ libspacerocksmodule = Extension('libspacerocks',
                                 extra_link_args=extra_link_args
                                 )
 
-
-# Third-party modules - we depend on numpy for everything
-
-# Obtain the numpy include directory.  This logic works across numpy versions.
-try:
-    numpy_include = numpy.get_include()
-except AttributeError:
-    numpy_include = numpy.get_numpy_include()
-
 data_files = []
 dirs = ['spacerocks/data/spice/*','spacerocks/data/spice/asteroids/*','spacerocks/data/*']
 for dir in dirs:
@@ -43,7 +34,7 @@ for dir in dirs:
 
 setup(
     name='spacerocks',
-    version='1.1.7',
+    version='1.2.0',
     description='A Python Package for Solar System Ephemerides and Dynamics.',
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
