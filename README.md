@@ -10,7 +10,9 @@
 for orbital dynamics and solar system observations. Its modern, 
 expressive API makes it extremely easy to use.
 
-The primary data structure in `spacerocks` is a class called `SpaceRock`.
+The primary data structure in `spacerocks` is a class called `SpaceRock`. 
+You can instantiate a `SpaceRock` object using any valid set of 6 Keplerian 
+elements, or a state vector.
 
 ```Python
 from spacerocks import SpaceRock
@@ -19,7 +21,7 @@ from spacerocks.units import Units
 units = Units()
 units.timescale = 'utc'
 
-rock = SpaceRock(a=44, e=0.1, inc=10, node=140, arg=109, M=98, epoch='1 December 2021', origin='ssb', units=units)
+rock = SpaceRock(a=44, e=0.1, inc=10, node=140, arg=109, M=98, H=7, epoch='1 December 2021', origin='ssb', units=units)
 ```
 The `Units` object we instantiated is extremely useful for avoiding bugs, 
 as it allows for an explicit set of units to be specified only once. 
@@ -47,7 +49,8 @@ rocks = SpaceRock(a=[44, 45],
                   node=[140, 303], 
                   arg=[109, 23], 
                   f=[98, 124], 
-                  epoch=['1 December 2021', '3 December 2021'] , 
+                  H=[7, 8.2],
+                  epoch=['1 December 2021', '3 December 2021'], 
                   origin='ssb', 
                   units=units)
 ```
@@ -76,7 +79,7 @@ rocks.change_origin(spiceid=-98)
 ```
 
 You can use the `propagate` method to propagate the rocks to any epochs. 
-This method uses `rebound's` `ias15` integrator under the hood automatically 
+This method uses `rebound's` `ias15` integrator under the hood, and automatically 
 synchronizes the epochs of the rocks so you don't have to. Notice that we are 
 specifying the epochs to be in Barycentric Dynamical Time.
 
@@ -90,7 +93,7 @@ prop, planets, sim = rock.propagate(epochs=['2 December 2021', '4 December 2021'
 Here `prop` is a `SpaceRock` object containing the test particles at 
 all of the epochs, `planets` is a `SpaceRock` object containing the 
 perturbers at all of the epochs, and `sim` is the rebound simulation 
-object at the final epoch. The `model` argument 
+object at the final epoch. The `model` argument sets the perturbers as follows.
 
 | model | Perturbers                                                               |
 |:-----:|:-------------------------------------------------------------------------|
@@ -105,6 +108,18 @@ our rocks from DECam.
 
 ```Python
 obs = rocks.observe(obscode='W84')
+```
+
+This method returns an `Ephemerides` object which contains the rocks' state 
+vectors with respect to the observer, corrected for light travel time. 
+These values allow us to compute the objects' observable properties, which 
+are accessible as attriutes to the `Ephemerides` object.
+
+Finally, you can write and read `SpaceRock` objects to and from `asdf` files.
+```Python
+rocks.to_file('rocks.rocks')
+
+rocks_from_disk = SpaceRock.from_file('rocks.rocks')
 ```
 
 
