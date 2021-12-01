@@ -21,7 +21,17 @@ from spacerocks.units import Units
 units = Units()
 units.timescale = 'utc'
 
-rock = SpaceRock(a=44, e=0.1, inc=10, node=140, arg=109, M=98, H=7, epoch='1 December 2021', origin='ssb', units=units)
+rock = SpaceRock(a=44, 
+                 e=0.1, 
+                 inc=10, 
+                 node=140, 
+                 arg=109, 
+                 M=98, 
+                 H=7, 
+                 epoch='1 December 2021', 
+                 origin='ssb', 
+                 frame='eclipJ2000', 
+                 units=units)
 ```
 The `Units` object we instantiated is extremely useful for avoiding bugs, 
 as it allows for an explicit set of units to be specified only once. 
@@ -122,6 +132,7 @@ rocks.to_file('rocks.rocks')
 rocks_from_disk = SpaceRock.from_file('rocks.rocks')
 ```
 
+For more information, see [this link](../cods/spacerocks.md)
 
 ### Installation
 

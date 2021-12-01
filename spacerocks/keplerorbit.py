@@ -57,8 +57,22 @@ class KeplerOrbit:
         return self
         
 
-    def change_frame(self):
-        pass
+    def change_frame(self, new_frame: str):
+
+        if self.frame != new_frame:
+
+            x, y, z = self.position
+            vx, vy, vz = self.velocity
+
+            self.frame = new_frame
+    
+            # clear the keplerian variables because they need to be recomputed
+            self.clear_kep()
+    
+            self.position = Vector(x, y, z)
+            self.velocity = Vector(vx, vy, vz)
+
+        return self
 
     def to_bary(self):
         '''
