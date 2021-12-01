@@ -6,20 +6,106 @@
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/kjnapier/spacerocks.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/kjnapier/spacerocks/context:python)
 
 
-SpaceRocks is a Python package for performing observational and theoretical tasks in solar system dynamics.
+`spacerocks` is a Python package that provides high-level abstractions 
+for orbital dynamics and solar system observations. Its modern, 
+expressive API makes it extremely easy to use.
 
-#### Currently implemented:
-- Coordinate transformations for arbitrary solar system objects.
-- Numerical propagation to future and past epochs.
-- Precise ephemeride calculation.
-- Transformations between barycentric and heliocentric coordinates.
-- Outer solar system orbit fitting.
-- Sky position predictions with uncertainties.
+The primary data structure in `spacerocks` is a class called `SpaceRock`.
 
-#### Under Development:
+```Python
+from spacerocks import SpaceRock
+from spacerocks.units import Units
 
-- General orbit fitting.
-- Minor Planet Center Queries.
+units = Units()
+units.timescale = 'utc'
+
+rock = SpaceRock(a=44, e=0.1, inc=10, node=140, arg=109, M=98, epoch='1 December 2021', origin='ssb', units=units)
+```
+The `Units` object we instantiated is extremely useful for avoiding bugs, 
+as it allows for an explicit set of units to be specified only once. 
+You can print the current units with `units.current()`, and 
+you can set the individual attributes using either strings or astropy units.
+We advise using explicit astropy units where applicable 
+(i.e. `units.angle = u.deg` rather than `units.angle = 'deg'`). 
+Finally, note that you can also pass a JD or an MJD as an epoch. 
+If you provide a string (in any format) the program will use `dateutil` 
+to try to parse the date.
+
+You can then access the attributes of your `SpaceRock` object. 
+The attributes are lazily computed in the interest of efficiency. 
+The attributed all carry `astropy` units, with angles stored as `Angle` 
+objects, distances stored as `Distance` objects, and times are 
+stored as `Time` objects. This encures a complete lack of ambiguity, 
+and very easy unit conversions.
+
+`SpaceRock` objects are vectorized, allowing for the processing of multiple objects at once. 
+
+```Python
+rocks = SpaceRock(a=[44, 45], 
+                  e=[0.1, 1.2], 
+                  inc=[10, 170], 
+                  node=[140, 303], 
+                  arg=[109, 23], 
+                  f=[98, 124], 
+                  epoch=['1 December 2021', '3 December 2021'] , 
+                  origin='ssb', 
+                  units=units)
+```
+Notice that a `SpaceRock` object can handle both elliptical and hyperbolic orbits 
+simultaneously (though parabolic orbits are not yet supported), and it can handle 
+nonuniform epochs. 
+
+`SpaceRock` objects have a number of other utilities. 
+First, you can slice `SpaceRock` objects in a Pythonic way
+```Python
+r = rocks[rocks.e < 1]
+```
+
+You can easily change the origin of the coordinate system. This is particularly 
+useful for converting the Minor Planet Center's heliocentric elements to 
+barycentric elements. 
+```Python
+# convert to heliocentric coordinates
+rocks.to_helio()
+
+# convert back to barycentric coordinates
+rocks.to_bary()
+
+# convert to New Horizons-centric coordinates
+rocks.change_origin(spiceid=-98)
+```
+
+You can use the `propagate` method to propagate the rocks to any epochs. 
+This method uses `rebound's` `ias15` integrator under the hood automatically 
+synchronizes the epochs of the rocks so you don't have to. Notice that we are 
+specifying the epochs to be in Barycentric Dynamical Time.
+
+```Python
+units = Units()
+units.timescale = 'tdb'
+
+prop, planets, sim = rock.propagate(epochs=['2 December 2021', '4 December 2021'], model=2, units=units)
+```
+
+Here `prop` is a `SpaceRock` object containing the test particles at 
+all of the epochs, `planets` is a `SpaceRock` object containing the 
+perturbers at all of the epochs, and `sim` is the rebound simulation 
+object at the final epoch. The `model` argument 
+
+| model | Perturbers                                                               |
+|:-----:|:-------------------------------------------------------------------------|
+|   0   | Sun                                                                      |
+|   1   | Sun, Jupiter, Saturn, Uranus, Neptune                                    |
+|   2   | Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, Neptune |
+|   3   | Full set of JPL Horizons perturbers                                      |
+
+You can use the `observe` method compute the objects' ephemerides from an 
+arbitrary location in the solar system. Here we compute the ephemerides of
+our rocks from DECam.
+
+```Python
+obs = rocks.observe(obscode='W84')
+```
 
 
 ### Installation
