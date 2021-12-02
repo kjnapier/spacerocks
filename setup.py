@@ -43,7 +43,7 @@ setup(
     package_data={'spacerocks.data': ['*.csv', '*.dat', '*.423'], 
                   'spacerocks.data.spice': ['*'], 
                   'spacerocks.data.spice.asteroids': ['*.bsp']},
-    #data_files=data_files,
+    data_files=data_files,
     include_package_data=True,
     install_requires=['healpy',
                       'asdf',
