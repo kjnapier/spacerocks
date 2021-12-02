@@ -7,8 +7,8 @@
 
 
 `spacerocks` is a Python package that provides high-level abstractions 
-for orbital dynamics and solar system observations. Its modern, 
-expressive API makes it extremely easy to use.
+for orbital dynamics and solar system observations. With just orbit propagation Its modern, 
+expressive API makes it extremely easy to use. It
 
 The primary data structure in `spacerocks` is a class called `SpaceRock`. 
 You can instantiate a `SpaceRock` object using any valid set of 6 Keplerian 
@@ -132,7 +132,7 @@ rocks.to_file('rocks.rocks')
 rocks_from_disk = SpaceRock.from_file('rocks.rocks')
 ```
 
-For more information, see [this link](../cods/spacerocks.md)
+For more information, see [this link](./docs/spacerock.md)
 
 ### Installation
 

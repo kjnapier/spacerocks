@@ -518,12 +518,10 @@ class SpaceRock(KeplerOrbit, Convenience):
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000002.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000003.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000004.bsp'))
-            #spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000006.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000007.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000010.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000015.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000016.bsp'))
-            #spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000029.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000031.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000052.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000065.bsp'))
@@ -537,12 +535,10 @@ class SpaceRock(KeplerOrbit, Convenience):
             vesta = SpiceBody(spiceid='Vesta')
             pallas = SpiceBody(spiceid='Pallas')
             juno = SpiceBody(spiceid='2000003')
-            #hebe = SpiceBody(spiceid='2000006')
             iris = SpiceBody(spiceid='2000007')
             hygiea = SpiceBody(spiceid='2000010')
             eunomia = SpiceBody(spiceid='2000015')
             psyche = SpiceBody(spiceid='2000016')
-            #amphitrite = SpiceBody(spiceid='2000029')
             euphrosyne = SpiceBody(spiceid='2000031')
             europa = SpiceBody(spiceid='2000052')
             cybele = SpiceBody(spiceid='2000065')
@@ -556,12 +552,10 @@ class SpaceRock(KeplerOrbit, Convenience):
             M_ceres = ceres.mass.value
             M_pallas = pallas.mass.value
             M_juno = juno.mass.value
-            #M_hebe = hebe.mass.value
             M_iris = iris.mass.value
             M_hygiea = hygiea.mass.value
             M_eunomia = eunomia.mass.value
             M_psyche = psyche.mass.value
-            #M_amphitrite = amphitrite.mass.value
             M_europa = europa.mass.value
             M_cybele = cybele.mass.value
             M_sylvia = sylvia.mass.value
@@ -621,9 +615,7 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         sim.testparticle_type = 0
         sim.integrator = 'ias15'
-        #sim.integrator = 'mercurius'
         
-
         return sim, names
 
     def orbits(self, N=1000):
