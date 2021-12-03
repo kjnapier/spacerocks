@@ -1,3 +1,4 @@
 docs/* linguist-documentation
 notebooks/* linguist-documentation
 spacerocks/data/* linguist-documentation
+spacerocks/data/spice/* linguist-documentation
