@@ -8,3 +8,5 @@ recursive-include src *.c
 recursive-include src *.h
 
 include spacerocks/data/*.csv
+include spacerocks/data/spice/*
+include spacerocks/data/spice/asteroids/*

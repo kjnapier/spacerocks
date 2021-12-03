@@ -1,9 +1,0 @@
-\begindata
-   KERNELS_TO_LOAD=(
-   '/Users/kjnapier/research/spacerocks/spacerocks/data/spice/latest_leapseconds.tls',
-   '/Users/kjnapier/research/spacerocks/spacerocks/data/spice/de440s.bsp',
-   '/Users/kjnapier/research/spacerocks/spacerocks/data/spice/hst.bsp',
-   '/Users/kjnapier/research/spacerocks/spacerocks/data/spice/test.bsp',
-   '/Users/kjnapier/research/spacerocks/spacerocks/data/spice/nh.bsp',
-   '/Users/kjnapier/research/spacerocks/spacerocks/data/spice/gm_de431.tpc')
-\begintext
