@@ -1,5 +1,4 @@
-# Units
-------
+# The `Units` Object
 
 In my experience, units are one of the most common sources of bugs in 
 solar system computations (or any computations, really). `spacerocks`
@@ -14,7 +13,9 @@ from spacerocks.units import Units
 
 units = Units()
 print(units.current())
+```
 
+```zsh
 >>>  Quantity             Unit           
      ---------------------------------------
      distance             AU             
@@ -39,5 +40,5 @@ units.timeformat = 'jd'
 units.angle = u.rad
 ```
 
-While most fields can be set using raw strnigs (i.e. `'deg'` or `'rad'`), 
+While most fields can be set using raw strings (i.e. `'deg'` or `'rad'`), 
 but I recommend explicitly passing an `astropy` unit where applicable. 

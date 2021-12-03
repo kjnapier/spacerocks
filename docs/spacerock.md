@@ -25,11 +25,9 @@ rock = SpaceRock(a=44,
 ```
 The `Units` object we instantiated is extremely useful for avoiding bugs, 
 as it allows for an explicit set of units to be specified only once. 
-You can print the current units with `units.current()`, and 
-you can set the individual attributes using either strings or astropy units.
-We advise using explicit astropy units where applicable 
-(i.e. `units.angle = u.deg` rather than `units.angle = 'deg'`). 
-Finally, note that you can also pass a JD or an MJD as an epoch. 
+You can read more about it [here](./Units.md).
+
+Note that you can also pass a JD or an MJD as an epoch. 
 If you provide a string (in any format) the program will use `dateutil` 
 to try to parse the date.
 
@@ -110,7 +108,7 @@ rocks.to_bary()
 rocks.change_origin(spiceid=-98)
 ```
 
-You can use the `propagate` method to propagate the rocks to any epochs. 
+You can use the [propagate](./propagate.md) method to propagate the rocks to any epochs. 
 This method uses `rebound's` `ias15` integrator under the hood, and automatically 
 synchronizes the epochs of the rocks so you don't have to. Notice that we are 
 specifying the epochs to be in Barycentric Dynamical Time.
@@ -134,7 +132,7 @@ object at the final epoch. The `model` argument sets the perturbers as follows.
 |   2   | Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, Neptune |
 |   3   | Full set of JPL Horizons perturbers                                      |
 
-You can use the `observe` method compute the objects' ephemerides from an 
+You can use the [observe](./observe.md) method compute the objects' ephemerides from an 
 arbitrary location in the solar system. Here we compute the ephemerides of
 our rocks from DECam.
 
@@ -142,7 +140,7 @@ our rocks from DECam.
 obs = rocks.observe(obscode='W84')
 ```
 
-This method returns an `Ephemerides` object which contains the rocks' state 
+This method returns an [Ephemerides](./Ephemerides.md) object which contains the rocks' state 
 vectors with respect to the observer, corrected for light travel time. 
 These values allow us to compute the objects' observable properties, which 
 are accessible as attriutes to the `Ephemerides` object.
