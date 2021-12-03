@@ -42,10 +42,10 @@ class SpaceRock(KeplerOrbit, Convenience):
     '''
     SpaceRock objects provide an interface to work with Keplerian orbits. 
     '''
-    def __init__(self, origin='ssb', frame='ECLIPJ2000', units=Units(), *args, **kwargs):
+    def __init__(self, origin='ssb', frame='eclipJ2000', units=Units(), *args, **kwargs):
 
         coords = self.detect_coords(kwargs)
-        frame = frame.lower()
+        #frame = frame.lower()
         origin = origin.lower()
 
         # input -> arrays
