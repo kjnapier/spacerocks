@@ -12,13 +12,13 @@ The attributes (listed in the following tables) are computed lazily in the inter
 
 | Observed Parameter                    | Attribute   |
 |:--------------------------------------|:------------|
-| Right Ascension                       | ra          |
-| Declination                           | dec         |
-| Apparent Magnitude                    | mag         |
-| Ecliptic Latitude                     | b           |
-| Ecliptic Longitude                    | l           |
-| RA Rate                               | ra_rate     |
-| Dec Rate                              | dec_rate    |
+| right ascension                       | ra          |
+| declination                           | dec         |
+| apparent magnitude                    | mag         |
+| ecliptic latitude                     | b           |
+| ecliptic longitude                    | l           |
+| ra rate                               | ra_rate     |
+| dec rate                              | dec_rate    |
 
 | Physical Parameter                    | Attribute   |
 |:--------------------------------------|:------------|
@@ -28,14 +28,18 @@ The attributes (listed in the following tables) are computed lazily in the inter
 | vx velocity with respect to observer  | vx          |
 | vy velocity with respect to observer  | vy          |
 | vz velocity with respect to observer  | vz          |
+| distance from observer                | delta       |
 
 | Physical Property                     | Attribute   |
 |:--------------------------------------|:------------|
-| Absolute Magnitude                    | H           |
+| absolute magnitude                    | H           |
+| phase slope constant                  | G           |
+
 
 | Metadata                              | Attribute   |
 |:--------------------------------------|:------------|
-| Name                                  | name        |
+| name                                  | name        |
+| epoch                                 | epoch       |
 
 ## The `hpix` Method
 

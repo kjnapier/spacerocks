@@ -59,6 +59,7 @@ and very easy unit conversions.
 | Metadata                               | Attribute    |
 |:---------------------------------------|:-------------|
 | name                                   | name         |
+| epoch                                  | epoch        |
 
 
 | Physical Property                      | Attribute  | 
