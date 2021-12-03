@@ -111,7 +111,7 @@ struct Vector3 calc_vovec_from_kep(double mu, double a, double e, double r, doub
 struct StateVector kepM_to_xyz(double a, double e, double inc, double arg, double node, double M) {
 
   double E, f, r, c, ox, oy, vox, voy;
-  double cosE, aba, omece;
+  double cosE, omece;
   double si, sa, sn, ci, ca, cn;
   double c1, c2, c3, c4, c5, c6;
 
@@ -182,7 +182,7 @@ struct StateVector kepM_to_xyz(double a, double e, double inc, double arg, doubl
 struct StateVector kepE_to_xyz(double a, double e, double inc, double arg, double node, double E) {
 
   double f, r, c, ox, oy, vox, voy;
-  double cosE, aba, omece;
+  double cosE, omece;
   double si, sa, sn, ci, ca, cn;
   double c1, c2, c3, c4, c5, c6;
 
