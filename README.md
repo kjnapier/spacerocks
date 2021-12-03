@@ -53,10 +53,10 @@ obs = prop.observe(obscode='W84')
 ```
 ![Alt text](assets/ceres-residuals.png)
 
-The `spacerocks` prediction never differs from the JPL Horizons prediction by more than half of an arcsecond.
+The `spacerocks` prediction never differs from the JPL Horizons prediction by more than half an arcsecond.
 
 Several common use cases are illustrated in [tutorial notebooks](./notebooks/).
-For more information, see [the documentation](./docs/). The [SpaceRock](./docs/SpaceRock.md) is a good place to start.
+For more information, see [the documentation](./docs/). The [SpaceRock](./docs/SpaceRock.md) doc is a good place to start.
 
 ### Installation
 
