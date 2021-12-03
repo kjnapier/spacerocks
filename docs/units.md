@@ -41,4 +41,4 @@ units.angle = u.rad
 ```
 
 While most fields can be set using raw strings (i.e. `'deg'` or `'rad'`), 
-but I recommend explicitly passing an `astropy` unit where applicable. 
+I recommend explicitly passing an `astropy` unit where applicable. 
