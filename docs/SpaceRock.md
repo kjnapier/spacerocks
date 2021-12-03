@@ -4,6 +4,8 @@ The primary data structure in `spacerocks` is a class called `SpaceRock`.
 You can instantiate a `SpaceRock` object using any valid set of 6 Keplerian 
 elements, or a state vector.
 
+## Instantiation
+
 ```Python
 from spacerocks import SpaceRock
 from spacerocks.units import Units
@@ -59,7 +61,6 @@ and very easy unit conversions.
 | name                                   | name         |
 
 
-
 | Physical Property                      | Attribute  | 
 |:---------------------------------------|:-----------|
 | absolute magnitude                     | H          |
@@ -69,6 +70,8 @@ and very easy unit conversions.
 | radius                                 | radius     |
 | diameter                               | diameter   |
 
+
+## Vectorization
 
 `SpaceRock` objects are vectorized, allowing for the processing of multiple objects at once. 
 
@@ -88,11 +91,15 @@ Notice that a `SpaceRock` object can handle both elliptical and hyperbolic orbit
 simultaneously (though parabolic orbits are not yet supported), and it can handle 
 nonuniform epochs. 
 
+## Object Slicing
+
 `SpaceRock` objects have a number of other utilities. 
 First, you can slice `SpaceRock` objects in a Pythonic way
 ```Python
 r = rocks[rocks.e < 1]
 ```
+
+## Coordinate Transformations
 
 You can easily change the origin of the coordinate system. This is particularly 
 useful for converting the Minor Planet Center's heliocentric elements to 
@@ -108,7 +115,9 @@ rocks.to_bary()
 rocks.change_origin(spiceid=-98)
 ```
 
-You can use the [propagate](./propagate.md) method to propagate the rocks to any epochs. 
+## The `propagate` Method
+
+You can use the `propagate` method to propagate the rocks to any epochs. 
 This method uses `rebound's` `ias15` integrator under the hood, and automatically 
 synchronizes the epochs of the rocks so you don't have to. Notice that we are 
 specifying the epochs to be in Barycentric Dynamical Time.
@@ -132,9 +141,11 @@ object at the final epoch. The `model` argument sets the perturbers as follows.
 |   2   | Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, Neptune |
 |   3   | Full set of JPL Horizons perturbers                                      |
 
-You can use the [observe](./observe.md) method compute the objects' ephemerides from an 
+You can use the `observe` method compute the objects' ephemerides from an 
 arbitrary location in the solar system. Here we compute the ephemerides of
 our rocks from DECam.
+
+## The `observe` Method
 
 ```Python
 obs = rocks.observe(obscode='W84')
