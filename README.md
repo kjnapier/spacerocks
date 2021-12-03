@@ -4,6 +4,8 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Documentation Status](https://readthedocs.org/projects/spacerocks/badge/?version=latest)](https://spacerocks.readthedocs.io/en/latest/?badge=latest)
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/kjnapier/spacerocks.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/kjnapier/spacerocks/context:python)
+[![HitCount](http://hits.dwyl.com/kjnapier/spacerocks.svg?style=flat-square)](http://hits.dwyl.com/kjnapier/spacerocks)
+
 
 
 `spacerocks` is a Python package that provides high-level abstractions 
