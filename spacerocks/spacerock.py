@@ -216,10 +216,17 @@ class SpaceRock(KeplerOrbit, Convenience):
                 names = f['name']
             units = Units()
             units.timescale = 'tdb'
-            return cls(x=f['x'], y=f['y'], z=f['z'], 
-                       vx=f['vx'], vy=f['vy'], vz=f['vz'], 
-                       epoch=f['epoch'], name=names, 
-                       origin=f['origin'], frame=f['frame'], units=units)
+            return cls(x=f['x'], 
+                       y=f['y'], 
+                       z=f['z'], 
+                       vx=f['vx'], 
+                       vy=f['vy'], 
+                       vz=f['vz'], 
+                       epoch=f['epoch'], 
+                       name=names, 
+                       origin=f['origin'], 
+                       frame=f['frame'], 
+                       units=units)
 
     @property
     def H(self):
