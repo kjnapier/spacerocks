@@ -26,7 +26,7 @@ libspacerocksmodule = Extension('libspacerocks',
                                 )
 
 data_files = []
-dirs = ['spacerocks/data/spice/*','spacerocks/data/spice/asteroids/*','spacerocks/data/*']
+dirs = ['spacerocks/data/spice/*', 'spacerocks/data/spice/asteroids/*', 'spacerocks/data/*']
 for dir in dirs:
    for filename in glob.glob(dir):
       if os.path.isfile(filename):
