@@ -1,8 +1,8 @@
 # SpaceRock
 
 The primary data structure in `spacerocks` is a class called `SpaceRock`. 
-You can instantiate a `SpaceRock` object using any valid set of 6 Keplerian 
-elements, or a state vector.
+_You can instantiate a `SpaceRock` object using any valid set of 6 Keplerian 
+elements, or a state vector._
 
 ## Instantiation
 
@@ -141,20 +141,25 @@ object at the final epoch. The `model` argument sets the perturbers as follows.
 |   2   | Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, Neptune |
 |   3   | Full set of JPL Horizons perturbers                                      |
 
-You can use the `observe` method compute the objects' ephemerides from an 
-arbitrary location in the solar system. Here we compute the ephemerides of
-our rocks from DECam.
 
 ## The `observe` Method
+
+You can use the `observe` method compute objects' ephemerides from an 
+arbitrary location in the solar system. Here we compute the ephemerides of
+our rocks from DECam.
 
 ```Python
 obs = rocks.observe(obscode='W84')
 ```
 
-This method returns an [Ephemerides](./Ephemerides.md) object which contains the rocks' state 
+The only argument taken by `observe` is an `obscode` (see [this link](https://minorplanetcenter.net/iau/lists/ObsCodesF.html) for a full list) or a `spiceid`.
+
+The `observe` method returns an [Ephemerides](./Ephemerides.md) object which contains the rocks' state 
 vectors with respect to the observer, corrected for light travel time. 
-These values allow us to compute the objects' observable properties, which 
+These values allow us to compute the rocks' observable properties, which 
 are accessible as attriutes to the `Ephemerides` object.
+
+## The `to_file` Method
 
 Finally, you can write and read `SpaceRock` objects to and from `asdf` files.
 ```Python
@@ -162,6 +167,8 @@ rocks.to_file('rocks.rocks')
 
 rocks_from_disk = SpaceRock.from_file('rocks.rocks')
 ```
+
+This is useful for saving your work, and getting your exact objects back at a later date.
 
 
 
