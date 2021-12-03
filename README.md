@@ -59,8 +59,8 @@ obs = prop.observe(obscode='W84')
 
 The `spacerocks` prediction never differs from the JPL Horizons prediction by more than half an arcsecond.
 
-Several common use cases are illustrated in [tutorial notebooks](./notebooks/).
-For more information, see [the documentation](./docs/). The [SpaceRock](./docs/SpaceRock.md) doc is a good place to start.
+Several common use cases are illustrated in [tutorial notebooks](./notebooks/). One that I find rather useful is a subclass of `rebound's`
+`Simulation` class. See a short tutorial [here](./notebooks/Simulation.ipynb). For more information, see [the documentation](./docs/). The [SpaceRock](./docs/SpaceRock.md) doc is a good place to start.
 
 ### Installation
 

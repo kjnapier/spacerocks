@@ -31,14 +31,17 @@ You can read more about it [here](./Units.md).
 
 Note that you can also pass a JD or an MJD as an epoch. 
 If you provide a string (in any format) the program will use `dateutil` 
-to try to parse the date.
+to try to parse the date. This is slow when compared to passing explicit 
+values and time formats.
 
 You can then access the attributes of your `SpaceRock` object. 
 The attributes are lazily computed in the interest of efficiency. 
-The attributed all carry `astropy` units, with angles stored as `Angle` 
-objects, distances stored as `Distance` objects, and times are 
-stored as `Time` objects. This encures a complete lack of ambiguity, 
-and very easy unit conversions.
+The attributes all carry `astropy` units, with angles stored as `Angle` 
+objects, distances stored as `Distance` objects, and times 
+stored as `Time` objects. This ensures a complete lack of ambiguity, 
+and facilitates unit conversions.
+
+The attributes of a `SpaceRock` object are listed in the tables below.
 
 | Orbital Parameter                      | Attribute    |
 |:---------------------------------------|:-------------|
@@ -151,6 +154,8 @@ object at the final epoch. The `model` argument sets the perturbers as follows.
 |   2   | Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, Neptune |
 |   3   | Full set of JPL Horizons perturbers                                      |
 
+The perturbers' masses are from JPL Horizons, and their state vectors are computed using `spiceypy`.
+
 
 ## The `observe` Method
 
@@ -162,12 +167,12 @@ our rocks from DECam.
 obs = rocks.observe(obscode='W84')
 ```
 
-The only argument taken by `observe` is an `obscode` (see [this link](https://minorplanetcenter.net/iau/lists/ObsCodesF.html) for a full list) or a `spiceid`.
+The only argument taken by `observe` is an `obscode` (see [this link](https://minorplanetcenter.net/iau/lists/ObsCodesF.html) for a full list) or a `spiceid` (`Earth`, `Jupiter Barycenter`, `-98`, etc.).
 
-The `observe` method returns an [Ephemerides](./Ephemerides.md) object which contains the rocks' state 
-vectors with respect to the observer, corrected for light travel time. 
+The `observe` method returns an `Ephemerides` object which contains the rocks' state 
+vectors with respect to the observer in the equatorial frame, corrected for light travel time. 
 These values allow us to compute the rocks' observable properties, which 
-are accessible as attriutes to the `Ephemerides` object.
+are accessible as attriutes to the [Ephemerides](./Ephemerides.md) object.
 
 ## The `to_file` Method
 
