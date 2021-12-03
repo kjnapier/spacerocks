@@ -1,3 +1,5 @@
+# SpaceRock
+
 The primary data structure in `spacerocks` is a class called `SpaceRock`. 
 You can instantiate a `SpaceRock` object using any valid set of 6 Keplerian 
 elements, or a state vector.
@@ -52,6 +54,23 @@ and very easy unit conversions.
 | semi-minor axis                        | b            |
 | pericenter distance                    | q            |
 | apocenter distance                     | Q            |
+
+
+| Metadata                               | Attribute    |
+|:---------------------------------------|:-------------|
+| name                                   | name         |
+
+
+
+| Physical Property                      | Attribute  | 
+|:---------------------------------------|:-----------|
+| absolute magnitude                     | H          |
+| phase-slope constant                   | G          |
+| albedo                                 | albedo     |
+| mass                                   | mass       |
+| radius                                 | radius     |
+| diameter                               | diameter   |
+
 
 `SpaceRock` objects are vectorized, allowing for the processing of multiple objects at once. 
 
@@ -139,29 +158,6 @@ rocks_from_disk = SpaceRock.from_file('rocks.rocks')
 
 
 
-| Metadata                               | Attribute    |
-|:---------------------------------------|:-------------|
-| name                                   | name         |
 
 
 
-| Physical Property                      | Attribute  | 
-|:---------------------------------------|:-----------|
-| absolute magnitude                     | H          |
-| phase-slope constant                   | G          |
-| albedo                                 | albedo     |
-| mass                                   | mass       |
-| radius                                 | radius     |
-| diameter                               | diameter   |
-
-
-
-| Observed Parameter                    | Attribute   |
-|:--------------------------------------|:------------|
-| Right Ascension                       | ra          |
-| Declination                           | dec         |
-| Apparent Magnitude                    | mag         |
-| Ecliptic Latitude                     | b           |
-| Ecliptic Longitude                    | l           |
-| RA Rate                               | ra_rate     |
-| Dec Rate                              | dec_rate    |
