@@ -116,6 +116,15 @@ rocks.to_bary()
 rocks.change_origin(spiceid=-98)
 ```
 
+You can also change the coordinate frame between `J2000` and `ecliptic J2000`.
+```Python
+# Convert to J2000 coordinates
+rocks.change_frame('J2000')
+
+# Convert back to ecliptic J2000 coordinates
+rocks.change_frame('eclipJ2000')
+```
+
 ## The `propagate` Method
 
 You can use the `propagate` method to propagate the rocks to any epochs. 

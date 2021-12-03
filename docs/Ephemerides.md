@@ -20,15 +20,15 @@ The attributes (listed in the following tables) are computed lazily in the inter
 | ra rate                               | ra_rate     |
 | dec rate                              | dec_rate    |
 
-| Physical Parameter                    | Attribute   |
-|:--------------------------------------|:------------|
-| x position with respect to observer   | x           |
-| y position with respect to observer   | y           |
-| z position with respect to observer   | z           |
-| vx velocity with respect to observer  | vx          |
-| vy velocity with respect to observer  | vy          |
-| vz velocity with respect to observer  | vz          |
-| distance from observer                | delta       |
+| Physical Parameter                               | Attribute   |
+|:-------------------------------------------------|:------------|
+| equatorial x position with respect to observer   | x           |
+| equatorial y position with respect to observer   | y           |
+| equatorial z position with respect to observer   | z           |
+| equatorial vx velocity with respect to observer  | vx          |
+| equatorial vy velocity with respect to observer  | vy          |
+| equatorial vz velocity with respect to observer  | vz          |
+| distance from observer                           | delta       |
 
 | Physical Property                     | Attribute   |
 |:--------------------------------------|:------------|
