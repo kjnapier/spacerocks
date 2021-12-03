@@ -11,6 +11,7 @@
 /spacerocks/tests/Skyfield-Data/
 # Ipython checkpoints
 /.ipynb_checkpoints/
+/notebooks/.ipynb_checkpoints/
 /spacerocks/.ipynb_checkpoints/
 
 dates.py
