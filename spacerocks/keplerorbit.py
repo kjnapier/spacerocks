@@ -2,7 +2,7 @@ import numpy as np
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
-from .constants import mu_bary
+from .constants import mu_bary, epsilon
 
 from .vector import Vector
 from .cbindings import calc_kep_from_xyz, calc_vovec_from_kep, calc_M_from_E, calc_E_from_f, calc_E_from_M, calc_f_from_E
@@ -57,8 +57,42 @@ class KeplerOrbit:
         return self
         
 
-    def change_frame(self):
-        pass
+    def change_frame(self, new_frame: str):
+
+        if self.frame != new_frame:
+
+            if new_frame == 'eclipJ2000':
+
+                x = self.x
+                y = self.y * np.cos(epsilon) + self.z * np.sin(epsilon)
+                z = -self.y * np.sin(epsilon) + self.z * np.cos(epsilon)
+
+                vx = self.vx
+                vy = self.vy * np.cos(epsilon) + self.vz * np.sin(epsilon)
+                vz = -self.vy * np.sin(epsilon) + self.vz * np.cos(epsilon)
+            
+            elif new_frame == 'J2000':
+                x = self.x
+                y = self.y * np.cos(epsilon) - self.z * np.sin(epsilon)
+                z = self.y * np.sin(epsilon) + self.z * np.cos(epsilon)
+
+                vx = self.vx
+                vy = self.vy * np.cos(epsilon) - self.vz * np.sin(epsilon)
+                vz = self.vy * np.sin(epsilon) + self.vz * np.cos(epsilon)
+            
+            else:
+                raise ValueError(f'Frame {new_frame} is not supported.')
+
+            self.frame = new_frame
+    
+            # clear the keplerian variables because they need to be recomputed
+            self.clear_kep()
+    
+            self.position = Vector(x, y, z)
+            self.velocity = Vector(vx, vy, vz)
+
+        return self
+
 
     def to_bary(self):
         '''

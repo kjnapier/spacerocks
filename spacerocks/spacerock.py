@@ -1,8 +1,3 @@
-################################################################################
-# SpaceRocks, version 1.1.1
-#
-# Author: Kevin Napier kjnapier@umich.edu
-################################################################################
 import random
 
 from astropy import units as u
@@ -13,16 +8,15 @@ import numpy as np
 import pandas as pd
 
 import rebound
-
-#import reboundx
-#from reboundx import constants
+import asdf
+import copy
 
 from .constants import mu_bary, c, epsilon
 from .keplerorbit import KeplerOrbit
 from .convenience import Convenience
 from .units import Units
 from .vector import Vector
-from .ephemerides import Ephemerides
+from .ephemerides import Ephemerides 
 from .observer import Observer
 from .cbindings import kepM_to_xyz
 from .spice import SpiceBody
@@ -177,11 +171,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                 # produces random, non-repeting integers between 0 and 1e10 - 1
                 self.name = np.array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.x))])
 
-        if kwargs.get('G') is not None:
-            self.G = kwargs.get('G')
-        else:
-            self.G = np.repeat(0.15, len(self))
-
+        
         if kwargs.get('H') is not None:
             curves = kwargs.get('H')
             curve_funcs = []
@@ -191,6 +181,12 @@ class SpaceRock(KeplerOrbit, Convenience):
                 else:
                     curve_funcs.append(lambda _, x=curve: x)
             self.H_func = np.array(curve_funcs)
+
+            if kwargs.get('G') is not None:
+                self.G = kwargs.get('G')
+            else:
+                self.G = np.repeat(0.15, len(self))
+
 
         if kwargs.get('mag') is not None:
             curves = kwargs.get('mag')
@@ -211,6 +207,27 @@ class SpaceRock(KeplerOrbit, Convenience):
         if kwargs.get('density') is not None:
             self.density = kwargs.get('density') * units.density
         
+    @classmethod
+    def from_file(cls, name):
+        with asdf.open(name) as f:
+            N = len(f['x'])
+            if len(f['name']) == 1:
+                names = np.repeat(f['name'], N)
+            else:
+                names = f['name']
+            units = Units()
+            units.timescale = 'tdb'
+            return cls(x=f['x'], 
+                       y=f['y'], 
+                       z=f['z'], 
+                       vx=f['vx'], 
+                       vy=f['vy'], 
+                       vz=f['vz'], 
+                       epoch=f['epoch'], 
+                       name=names, 
+                       origin=f['origin'], 
+                       frame=f['frame'], 
+                       units=units)
 
     @property
     def H(self):
@@ -229,10 +246,14 @@ class SpaceRock(KeplerOrbit, Convenience):
         '''
 
         epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
-        origin = self.origin
+        origin = copy.copy(self.origin)
+        frame = copy.copy(self.frame)
 
         # We need to integrate in barycentric coordinates
         self.to_bary()
+
+        # Put the simulation into ecliptic coordinates
+        self.change_frame('eclipJ2000')
 
         # Integrate all particles to the same obsdate
         pickup_times = self.epoch.tdb.jd
@@ -306,13 +327,19 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         units = Units()
         units.timescale = 'tdb'
-        rocks = self.__class__(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, origin='ssb', units=units)
-        planets = self.__class__(x=px, y=py, z=pz, vx=pvx, vy=pvy, vz=pvz, name=pname, epoch=pepoch, origin='ssb', units=units)
+        rocks = self.__class__(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, origin='ssb', frame='eclipJ2000', units=units)
+        planets = self.__class__(x=px, y=py, z=pz, vx=pvx, vy=pvy, vz=pvz, name=pname, epoch=pepoch, origin='ssb', frame='eclipJ2000', units=units)
 
         # be polite and return orbital parameters using the input origin.
-        if origin == 'sun':
-            rocks.to_helio()
-            self.to_helio()
+        if origin != 'ssb':
+            self.change_origin(origin)
+            rocks.change_origin(origin)
+            planets.change_origin(origin)
+
+        if frame != 'eclipJ2000':
+            self.change_frame(frame)
+            rocks.change_frame(frame)
+            planets.change_frame(frame)
 
         if hasattr(self, 'G'):
             rocks.G = np.tile(self.G, Nx)
@@ -339,8 +366,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         z_helio = self.z - s.z
 
         r_helio = Distance(np.sqrt(x_helio*x_helio + y_helio*y_helio + z_helio*z_helio).value, u.au)
-
-       
         earth_dist = ((e.x-s.x)**2 + (e.y-s.y)**2 + (e.z-s.z)**2)**0.5
 
         q = (r_helio.au**2 + obs.delta.au**2 - earth_dist.value**2)/(2 * r_helio.au * obs.delta.au)
@@ -351,7 +376,6 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         Psi_1 = np.exp(-3.332 * np.tan(beta/2)**0.631)
         Psi_2 = np.exp(-1.862 * np.tan(beta/2)**1.218)
-
 
         H = self.mag - 5 * np.log10(r_helio.au * obs.delta.au)
 
@@ -377,7 +401,6 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         The James Webb Space Telescope will be supported as soon as it launches
         and NASA provides the necessary spk files.
-
         '''
 
         if kwargs.get('obscode') is not None:
@@ -387,11 +410,11 @@ class SpaceRock(KeplerOrbit, Convenience):
         else:
             raise ValueError('Must pass either an obscode or spiceid.')
 
-
         if not hasattr(self, 'H_func'):
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name)
         else:
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, H=self.H_func, G=self.G)
+
 
     def xyz_to_tel(self, **kwargs):
         '''
@@ -408,8 +431,11 @@ class SpaceRock(KeplerOrbit, Convenience):
         else:
             raise ValueError('Must pass either an obscode or spiceid.')
 
-        in_origin = self.origin
+        in_origin = copy.copy(self.origin)
         self.to_bary()
+
+        in_frame = copy.copy(self.frame)
+        self.change_frame('eclipJ2000') 
 
         x0, y0, z0 = self.x, self.y, self.z
         vx0, vy0, vz0 = self.vx, self.vy, self.vz
@@ -447,6 +473,9 @@ class SpaceRock(KeplerOrbit, Convenience):
         # Be polite
         if in_origin != self.origin:
             self.change_origin(in_origin)
+
+        if in_frame != self.frame:
+            self.change_frame(in_frame)
 
         # Transform to the equatorial frame
         yrot = dy * np.cos(epsilon) - dz * np.sin(epsilon)
@@ -512,12 +541,10 @@ class SpaceRock(KeplerOrbit, Convenience):
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000002.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000003.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000004.bsp'))
-            #spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000006.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000007.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000010.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000015.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000016.bsp'))
-            #spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000029.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000031.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000052.bsp'))
             spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000065.bsp'))
@@ -531,12 +558,10 @@ class SpaceRock(KeplerOrbit, Convenience):
             vesta = SpiceBody(spiceid='Vesta')
             pallas = SpiceBody(spiceid='Pallas')
             juno = SpiceBody(spiceid='2000003')
-            #hebe = SpiceBody(spiceid='2000006')
             iris = SpiceBody(spiceid='2000007')
             hygiea = SpiceBody(spiceid='2000010')
             eunomia = SpiceBody(spiceid='2000015')
             psyche = SpiceBody(spiceid='2000016')
-            #amphitrite = SpiceBody(spiceid='2000029')
             euphrosyne = SpiceBody(spiceid='2000031')
             europa = SpiceBody(spiceid='2000052')
             cybele = SpiceBody(spiceid='2000065')
@@ -550,12 +575,10 @@ class SpaceRock(KeplerOrbit, Convenience):
             M_ceres = ceres.mass.value
             M_pallas = pallas.mass.value
             M_juno = juno.mass.value
-            #M_hebe = hebe.mass.value
             M_iris = iris.mass.value
             M_hygiea = hygiea.mass.value
             M_eunomia = eunomia.mass.value
             M_psyche = psyche.mass.value
-            #M_amphitrite = amphitrite.mass.value
             M_europa = europa.mass.value
             M_cybele = cybele.mass.value
             M_sylvia = sylvia.mass.value
@@ -615,9 +638,7 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         sim.testparticle_type = 0
         sim.integrator = 'ias15'
-        #sim.integrator = 'mercurius'
         
-
         return sim, names
 
     def orbits(self, N=1000):
@@ -641,52 +662,26 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         return xs, ys, zs
 
-    def analytic_propagate(self, epoch: list, propagate_origin: str='sun'):
-        '''
-        propagate all bodies to the desired date using Keplerian orbit.
-        '''
-        in_origin = self.origin
-        if propagate_origin != in_origin:
-            if propagate_origin == 'sun':
-                self.to_helio()
-            else:
-                self.to_bary()
+    def writeto(self, path):
+        uniquenames = np.unique(self.name)
+        if len(uniquenames) == 1:
+            name = uniquenames
+        else:
+            name = self.name.tolist()
+        tree = {
+            'frame': self.frame,
+            'origin': self.origin,
+            'mu': self.mu,
+            'epoch': self.epoch.tdb.jd,
+            'name': name,
+            'x': self.x.au,
+            'y': self.y.au,
+            'z': self.z.au,
+            'vx': self.vx.to(u.au/u.day).value,
+            'vy': self.vy.to(u.au/u.day).value,
+            'vz': self.vz.to(u.au/u.day).value
+        }
 
-        M = (self.n.value * (epoch - self.epoch.jd) + self.M.rad*180/np.pi)%360
-
-        rocks = SpaceRock(a=self.a,
-                          e=self.e,
-                          inc=self.inc,
-                          node=self.node,
-                          arg=self.arg,
-                          M=M,
-                          name=self.name,
-                          epoch=epoch,
-                          origin=propagate_origin, 
-                          frame=self.frame)
-
-        # be polite and return orbital parameters in the input frame.
-        if in_origin != self.origin:
-            if in_origin == 'sun':
-                self.to_helio()
-            else:
-                self.to_bary()
-
-        if hasattr(self, 'G'):
-            rocks.G = self.G
-
-        if hasattr(self, 'mag'):
-            rocks.mag = self.mag
-
-        if hasattr(self, 'delta_H'):
-            rocks.delta_H = self.delta_H
-            rocks.rotation_period = self.rotation_period
-            rocks.phi0 = self.phi0
-            rocks.t0 = Time(self.t0.jd, format='jd')
-
-            rocks.H = self.H + rocks.delta_H * np.sin(2 * np.pi * (rocks.epoch.jd - rocks.t0.jd) / rocks.rotation_period  - rocks.phi0)
-
-        elif hasattr(self, 'H'):
-            rocks.H = self.H
-
-        return rocks
+        # Create the ASDF file object from our data tree
+        af = asdf.AsdfFile(tree)
+        af.write_to(path, all_array_compression='zlib')

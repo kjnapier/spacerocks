@@ -3,6 +3,8 @@ from .convenience import Convenience
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
 
+from healpy.pixelfunc import ang2pix
+
 
 from numpy import sin, cos, arctan2, sqrt, arcsin, tan, exp, log10, where, array, arccos, pi
 
@@ -155,6 +157,9 @@ class Ephemerides(Convenience):
         denom = 1 + ((1 / cos(self.ra)) * sin(epsilon) +
                      cos(epsilon) * tan(self.ra))**2
         return num / denom
+
+    def hpix(self, nside=64, nest=True):
+        return ang2pix(nside, -self.dec.rad + pi/2, self.ra.rad, nest)
 
     def estimate_mag(self):
         '''
