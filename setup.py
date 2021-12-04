@@ -1,5 +1,4 @@
 import os
-import numpy
 from setuptools import setup, Extension
 import sys
 import sysconfig
@@ -39,7 +38,7 @@ setup(
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
     url="https://github.com/kjnapier/spacerocks",
-    packages=['spacerocks'], #, 'spacerocks.data'],
+    packages=['spacerocks'],
     package_data={'spacerocks.data': ['*.csv'], 
                   'spacerocks.data.spice': ['*'], 
                   'spacerocks.data.spice.asteroids': ['*.bsp']},
