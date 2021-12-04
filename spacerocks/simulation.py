@@ -1,10 +1,8 @@
 import rebound
-from rebound import hash as reb_hash
 import pkg_resources
 from astropy.time import Time
 import numpy as np
 import copy
-from rich.progress import track
 
 
 from .spice import SpiceBody
@@ -19,6 +17,7 @@ class Simulation(rebound.Simulation, Convenience):
 
 
     def __init__(self):
+        super().__init__(self)
         self.units = ('day', 'AU', 'Msun')
         self.simdata = {}
 
@@ -108,7 +107,7 @@ class Simulation(rebound.Simulation, Convenience):
         pvz     = []
         pname   = []
         for n in self.perturber_names:
-            ts, xs, ys, zs, vxs, vys, vzs = np.array(self.simdata[reb_hash(n).value]).T
+            ts, xs, ys, zs, vxs, vys, vzs = np.array(self.simdata[rebound.hash(n).value]).T
             pepoch.append(ts.tolist())
             px.append(xs.tolist())
             py.append(ys.tolist())
@@ -139,7 +138,7 @@ class Simulation(rebound.Simulation, Convenience):
             vz     = []
             name   = []
             for n in self.testparticle_names:
-                ts, xs, ys, zs, vxs, vys, vzs = np.array(self.simdata[reb_hash(n).value]).T
+                ts, xs, ys, zs, vxs, vys, vzs = np.array(self.simdata[rebound.hash(n).value]).T
                 epoch.append(ts.tolist())
                 x.append(xs.tolist())
                 y.append(ys.tolist())

@@ -4,7 +4,6 @@ from astropy.coordinates import Distance, Angle
 from .constants import epsilon
 
 import numpy as np
-from numpy import sin, cos, sqrt
 import pandas as pd
 import spiceypy as spice
 
@@ -124,16 +123,16 @@ class Observer:
 
         lon = self.__compute_local_sidereal_time(epoch, observer_lon)
         
-        denom = (1 - FLATTEN) * sin(observer_lat)
-        denom = cos(observer_lat) * cos(observer_lat) + denom*denom
+        denom = (1 - FLATTEN) * np.sin(observer_lat)
+        denom = np.cos(observer_lat) * np.cos(observer_lat) + denom*denom
 
-        C_geo = 1 / sqrt(denom)
+        C_geo = 1 / np.sqrt(denom)
         S_geo = (1 - FLATTEN) * (1 - FLATTEN) * C_geo
         C_geo = C_geo * EQUAT_RAD + observer_elevation
         S_geo = S_geo * EQUAT_RAD + observer_elevation
-        dx = C_geo * cos(observer_lat) * cos(lon)
-        dy = C_geo * cos(observer_lat) * sin(lon)
-        dz = S_geo * sin(observer_lat)
+        dx = C_geo * np.cos(observer_lat) * np.cos(lon)
+        dy = C_geo * np.cos(observer_lat) * np.sin(lon)
+        dz = S_geo * np.sin(observer_lat)
         return dx, dy, dz
 
     def __compute_local_sidereal_time(self, epoch, lon):
