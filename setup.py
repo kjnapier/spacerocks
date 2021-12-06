@@ -20,7 +20,7 @@ libspacerocksmodule = Extension('libspacerocks',
                                 include_dirs=['src'],
                                 language='c',
                                 extra_compile_args=[
-                                    '-O3', '-fPIC', '-Wno-unknown-pragmas', '-std=c99'],
+                                    '-O3', '-fPIC', '-std=c99'],#, '-march=native'],
                                 extra_link_args=extra_link_args
                                 )
 
@@ -33,7 +33,7 @@ for dir in dirs:
 
 setup(
     name='spacerocks',
-    version='2.0.0',
+    version='2.0.1',
     description='A Python Package for Solar System Ephemerides and Dynamics.',
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
