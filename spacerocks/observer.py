@@ -133,7 +133,7 @@ class Observer:
         dx = C_geo * np.cos(observer_lat) * np.cos(lon)
         dy = C_geo * np.cos(observer_lat) * np.sin(lon)
         dz = S_geo * np.sin(observer_lat)
-        return dx, dy, dz
+        return dx.value, dy.value, dz.value
 
     def __compute_local_sidereal_time(self, epoch, lon):
         T = (epoch - 2451545.0) / 36525

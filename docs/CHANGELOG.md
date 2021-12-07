@@ -1,3 +1,8 @@
+### 2.0.1
+- Large speedup to Observer class internal list comprehension by turning a `Quantity` into a `float`
+- Renamed `SpaceRock.writeto` to `SpaceRock.write_to`.
+- Added a compression kwarg to `SpaceRock.write_to`.
+
 ### 2.0.0
 - Dropped support for pyOrbfit, as installing across platforms was difficult.
 - Began maintaining documentation.
