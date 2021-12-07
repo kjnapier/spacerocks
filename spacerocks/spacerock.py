@@ -662,7 +662,7 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         return xs, ys, zs
 
-    def writeto(self, path):
+    def write_to(self, path, compression='zlib'):
         uniquenames = np.unique(self.name)
         if len(uniquenames) == 1:
             name = uniquenames
@@ -684,4 +684,4 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         # Create the ASDF file object from our data tree
         af = asdf.AsdfFile(tree)
-        af.write_to(path, all_array_compression='zlib')
+        af.write_to(path, all_array_compression=compression)
