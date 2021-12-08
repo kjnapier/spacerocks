@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-const double EMIN = 1e-8;
-const double IMIN = 1e-8;
+const double EMIN    = 1e-8;
+const double IMIN    = 1e-8;
 const double mu_bary = 0.00029630927493457475;
+const double c       = 173.14463267424034;
 
 #ifndef M_PI
     #define M_PI 3.14159265358979323846
@@ -581,6 +582,100 @@ double* py_calc_vovec_from_kep(int N, double mu, double* as, double* es, double*
     output[dummy] = vec.x;
     output[dummy + 1] = vec.y;
     output[dummy + 2] = vec.z;
+
+  }
+
+  return output;
+
+}
+
+struct StateVector correct_for_ltt(double a, double e, double inc, double arg, double node, double M0, 
+                                   double ox, double oy, double oz, double ovx, double ovy, double ovz) {
+
+  struct StateVector rock;
+  struct StateVector out;
+  double ltt0 = 0;
+  double dx, dy, dz, dvx, dvy, dvz;
+
+  rock = kepM_to_xyz(a, e, inc, arg, node, M0);
+
+  double n = sqrt(mu_bary / fabs(a*a*a));
+
+  for (int idx = 0; idx < 5; idx++) {
+
+    double x0   = rock.x;
+    double y0   = rock.y;
+    double z0   = rock.z;
+    double vx0  = rock.vx;
+    double vy0  = rock.vy;
+    double vz0  = rock.vz;
+
+    dx  = x0 - ox;
+    dy  = y0 - oy;
+    dz  = z0 - oz;
+    dvx  = vx0 - ovx;
+    dvy  = vy0 - ovy;
+    dvz  = vz0 - ovz;
+   
+    double delta = sqrt(dx*dx + dy*dy + dz*dz);
+
+    double ltt = delta / c;
+    double dltt = fabs(ltt - ltt0);
+
+    if (dltt < 1e-12) {
+      break;
+    }
+    else {
+      double M = M0 - (ltt * n);
+      rock = kepM_to_xyz(a, e, inc, arg, node, M);
+
+      ltt0 = ltt;
+    }
+  }
+
+  out.x  = dx;
+  out.y  = dy;
+  out.z  = dz;
+  out.vx = dvx;
+  out.vy = dvy;
+  out.vz = dvz;
+
+  return out;
+
+}
+
+double* py_correct_for_ltt(int N, double* as, double* es, double* incs, double* args, double* nodes, double* Ms, 
+                           double* obsx, double* obsy, double* obsz, double* obsvx, double* obsvy, double* obsvz) {
+
+  double* output = malloc(N * sizeof(struct StateVector));
+  struct StateVector rock;
+  int dummy;
+
+  for (int idx = 0; idx < N; idx++) {
+
+    double a    = as[idx];
+    double e    = es[idx];
+    double inc  = incs[idx];
+    double arg  = args[idx];
+    double node = nodes[idx];
+    double M0   = Ms[idx];
+
+    double ox  = obsx[idx];
+    double oy  = obsy[idx];
+    double oz  = obsz[idx];
+    double ovx = obsvx[idx];
+    double ovy = obsvy[idx];
+    double ovz = obsvz[idx];
+
+    rock = correct_for_ltt(a, e, inc, arg, node, M0, ox, oy, oz, ovx, ovy, ovz);
+
+    dummy = idx * 6;
+    output[dummy]     = rock.x;
+    output[dummy + 1] = rock.y;
+    output[dummy + 2] = rock.z;
+    output[dummy + 3] = rock.vx;
+    output[dummy + 4] = rock.vy;
+    output[dummy + 5] = rock.vz;
 
   }
 

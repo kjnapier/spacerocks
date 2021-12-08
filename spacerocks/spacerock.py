@@ -1,4 +1,4 @@
-import random
+import uuid
 
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
@@ -18,7 +18,7 @@ from .units import Units
 from .vector import Vector
 from .ephemerides import Ephemerides 
 from .observer import Observer
-from .cbindings import kepM_to_xyz
+from .cbindings import kepM_to_xyz, correct_for_ltt
 from .spice import SpiceBody
 import os
 import pkg_resources
@@ -141,7 +141,8 @@ class SpaceRock(KeplerOrbit, Convenience):
                 self.name = np.atleast_1d(kwargs.get('name'))
             else:
                 # produces random, non-repeting integers between 0 and 1e10 - 1
-                self.name = np.array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.inc))])
+                #self.name = np.array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.inc))])
+                self.name = np.array([uuid.uuid4().hex for _ in range(len(self.inc))])
 
 
         elif coords == 'xyz':
@@ -169,7 +170,8 @@ class SpaceRock(KeplerOrbit, Convenience):
                 self.name = np.atleast_1d(kwargs.get('name'))
             else:
                 # produces random, non-repeting integers between 0 and 1e10 - 1
-                self.name = np.array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.x))])
+                #self.name = np.array(['{:010}'.format(value) for value in random.sample(range(int(1e10)), len(self.x))])
+                self.name = np.array([uuid.uuid4().hex for _ in range(len(self.x))])
 
         
         if kwargs.get('H') is not None:
@@ -437,38 +439,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         in_frame = copy.copy(self.frame)
         self.change_frame('eclipJ2000') 
 
-        x0, y0, z0 = self.x, self.y, self.z
-        vx0, vy0, vz0 = self.vx, self.vy, self.vz
-
-        ltt0 = 0
-
-        a = self.a.au.astype(np.double)
-        e = self.e.astype(np.double)
-        inc = self.inc.rad.astype(np.double)
-        arg = self.arg.rad.astype(np.double)
-        node = self.node.rad.astype(np.double)
-
-        for idx in range(10):
-
-            dx = x0 - observer.x
-            dy = y0 - observer.y
-            dz = z0 - observer.z
-            dvx = vx0 - observer.vx
-            dvy = vy0 - observer.vy
-            dvz = vz0 - observer.vz
-
-            delta = np.sqrt(dx**2 + dy**2 + dz**2)
-
-            ltt = delta / c
-            dltt = (ltt - ltt0)
-
-            if np.all(abs(max(dltt.value)) < 1e-12):
-                break
-
-            M = self.M - (ltt * self.n)
-            x0, y0, z0, vx0, vy0, vz0 = kepM_to_xyz(a, e, inc, arg, node, M.rad.astype(np.double))
-
-            ltt0 = ltt
+        dx, dy, dz, dvx, dvy, dvz = correct_for_ltt(self, observer)
 
         # Be polite
         if in_origin != self.origin:
