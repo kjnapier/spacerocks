@@ -7,7 +7,8 @@
 [![Documentation Status](https://readthedocs.org/projects/spacerocks/badge/?version=latest)](https://spacerocks.readthedocs.io/en/latest/?badge=latest)
 
 
-`spacerocks` is a Python package that provides high-level abstractions 
+`spacerocks` is a Python package that puts the solar system at your fingertips. 
+It provides high-level abstractions 
 for orbital dynamics and solar system observations. Its modern, 
 expressive API makes it extremely easy to define orbits, work 
 with multiple objects (bound or unbound), transform coordinates, 
