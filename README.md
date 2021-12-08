@@ -76,5 +76,3 @@ cd spacerocks
 python setup.py build_ext -i
 pip install .
 ```
-
-The software is currently verified to be stable on the latest versions of macOS and Ubuntu. It is compatible with Python versions 3.6, and newer.
