@@ -20,24 +20,47 @@ class Simulation(rebound.Simulation, Convenience):
         super().__init__(self)
         self.units = ('day', 'AU', 'Msun')
         self.simdata = {}
+        self.perturber_names = []
+        self.N_active = 0
 
-    def add_perturbers(self, names, epoch):
-        names = np.atleast_1d(names)
-        self.perturber_names = names
-        self.N_active = len(self.perturber_names)
+    def add_perturbers(self, epoch, **kwargs):
+        
         epoch = Time(epoch, scale='tdb', format='jd')
         self.t = epoch.jd
-        for name in names:
-            body = SpiceBody(spiceid=name)
-            b = body.at(epoch)
-            self.add(x=b.x.au, 
-                     y=b.y.au, 
-                     z=b.z.au,
-                     vx=b.vx.value, 
-                     vy=b.vy.value, 
-                     vz=b.vz.value,
-                     m=body.mass.value, 
-                     hash=name)
+
+        if kwargs.get('spiceid') is not None:
+            names = np.atleast_1d(kwargs.get('spiceid'))
+            for name in names:
+                self.perturber_names.append(name)
+                self.N_active += 1
+                
+            
+                body = SpiceBody(spiceid=name)
+                b = body.at(epoch)
+                self.add(x=b.x.au, 
+                         y=b.y.au, 
+                         z=b.z.au,
+                         vx=b.vx.value, 
+                         vy=b.vy.value, 
+                         vz=b.vz.value,
+                         m=body.mass.value, 
+                         hash=name)
+
+        if kwargs.get('rocks') is not None:
+            rocks = kwargs.get('rocks')
+            for name in np.unique(rocks.name):
+                self.perturber_names.append(name)
+                self.N_active += 1
+                r = rocks[rocks.name == name]
+
+                self.add(x=r.x.au, 
+                         y=r.y.au, 
+                         z=r.z.au,
+                         vx=r.vx.value, 
+                         vy=r.vy.value, 
+                         vz=r.vz.value,
+                         m=r.mass.value, 
+                         hash=name)
 
         for n in self.perturber_names:
             h = self.particles[n].hash

@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-const double EMIN    = 1e-8;
-const double IMIN    = 1e-8;
-const double mu_bary = 0.00029630927493457475;
-const double c       = 173.14463267424034;
+const double EMIN           = 1e-8;
+const double IMIN           = 1e-8;
+const double mu_bary        = 0.00029630927493457475;
+const double speed_of_light = 173.14463267424034;
 
 #ifndef M_PI
     #define M_PI 3.14159265358979323846
@@ -619,7 +619,7 @@ struct StateVector correct_for_ltt(double a, double e, double inc, double arg, d
    
     double delta = sqrt(dx*dx + dy*dy + dz*dz);
 
-    double ltt = delta / c;
+    double ltt = delta / speed_of_light;
     double dltt = fabs(ltt - ltt0);
 
     if (dltt < 1e-12) {
