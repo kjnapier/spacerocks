@@ -147,12 +147,12 @@ all of the epochs, `planets` is a `SpaceRock` object containing the
 perturbers at all of the epochs, and `sim` is the rebound simulation 
 object at the final epoch. The `model` argument sets the perturbers as follows.
 
-| model | Perturbers                                                               |
-|:-----:|:-------------------------------------------------------------------------|
-|   0   | Sun                                                                      |
-|   1   | Sun, Jupiter, Saturn, Uranus, Neptune                                    |
-|   2   | Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, Neptune |
-|   3   | Full set of JPL Horizons perturbers                                      |
+| model | Perturbers                                                                      |
+|:-----:|:--------------------------------------------------------------------------------|
+|   0   | Sun                                                                             |
+|   1   | Sun, Jupiter, Saturn, Uranus, Neptune                                           |
+|   2   | Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto |
+|   3   | Full set of JPL Horizons perturbers                                             |
 
 The perturbers' masses are from JPL Horizons, and their state vectors are computed using `spiceypy`.
 
