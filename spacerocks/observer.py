@@ -31,7 +31,7 @@ class Observer:
             self.epoch = np.atleast_1d(kwargs.get('epoch'))
 
         if kwargs.get('obscode') is not None:
-            if len(kwargs.get('obscode')) < len(self.epoch):
+            if len(np.atleast_1d(kwargs.get('obscode'))) < len(self.epoch):
                 self.obscode = np.repeat(kwargs.get('obscode'), len(self.epoch)) 
             else:
                 self.obscode = np.atleast_1d(kwargs.get('obscode'))
@@ -47,7 +47,7 @@ class Observer:
             self.elevation = elevations
 
         elif kwargs.get('spiceid') is not None:
-            if len(kwargs.get('spiceid')) < len(self.epoch):
+            if len(np.atleast_1d(kwargs.get('spiceid'))) < len(self.epoch):
                 self.spiceid = np.repeat(kwargs.get('spiceid'), len(self.epoch))
             else:
                 self.spiceid = np.atleast_1d(kwargs.get('spiceid'))
@@ -85,6 +85,9 @@ class Observer:
         unique_rocks_and_times = set(list(zip(self.spiceid, self.epoch)))
         unique_dict = {key:self.__state_from_spice(key) for key in unique_rocks_and_times}
         x, y, z, vx, vy, vz = np.array([unique_dict[(body, time)] for body, time in zip(self.spiceid, self.epoch)]).T
+
+        #print(x, y, z, vx, vy, vz)
+        #print(unique_dict)
 
         if hasattr(self, 'obscode'):
             unique_locations_and_times = set(list(zip(self.lon.deg, self.lat.deg, self.elevation, self.epoch)))

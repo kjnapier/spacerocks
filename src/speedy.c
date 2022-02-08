@@ -123,7 +123,6 @@ struct StateVector kepM_to_xyz(double a, double e, double inc, double arg, doubl
     // Compute E
     E = calc_E_from_M(e, M);
 
-
     cosE = cos(E);
     omece = 1 - e * cosE;
 
@@ -270,10 +269,17 @@ struct KeplerOrbit calc_kep_from_xyz(double mu, double x, double y, double z, do
   hvec.y = position.z * velocity.x - position.x * velocity.z;
   hvec.z = position.x * velocity.y - position.y * velocity.x;
 
+  // double rinv = 1 / r;
+  // double muinv = 1 / mu;
+
   // Compute the eccentricity vector
   evec.x = (velocity.y * hvec.z - velocity.z * hvec.y) / mu - position.x / r;
   evec.y = (velocity.z * hvec.x - velocity.x * hvec.z) / mu - position.y / r;
   evec.z = (velocity.x * hvec.y - velocity.y * hvec.x) / mu - position.z / r;
+
+  // evec.x = (velocity.y * hvec.z - velocity.z * hvec.y) * muinv - position.x * rinv;
+  // evec.y = (velocity.z * hvec.x - velocity.x * hvec.z) * muinv - position.y * rinv;
+  // evec.z = (velocity.x * hvec.y - velocity.y * hvec.x) * muinv - position.z * rinv;
 
 
   // Compute the normal vector
@@ -283,6 +289,7 @@ struct KeplerOrbit calc_kep_from_xyz(double mu, double x, double y, double z, do
 
   // Compute the semi-major axis (a)
   a = 1 / (2 / r - vsq / mu);
+  // a = 1 / (2 * rinv - vsq * muinv);
 
   // Compute the eccentricity (e)
   e = sqrt(evec.x*evec.x + evec.y*evec.y + evec.z*evec.z);
@@ -442,6 +449,8 @@ double* py_calc_M_from_E(int N, double* es, double* Es) {
 
 }
 
+// If inc > pi/2, varpi = node - arg
+
 double calc_E_from_f(double e, double f) {
 
   double E;
@@ -590,59 +599,133 @@ double* py_calc_vovec_from_kep(int N, double mu, double* as, double* es, double*
 }
 
 struct StateVector correct_for_ltt(double a, double e, double inc, double arg, double node, double M0, 
-                                   double ox, double oy, double oz, double ovx, double ovy, double ovz) {
+                                  double ox, double oy, double oz, double ovx, double ovy, double ovz) {
 
-  struct StateVector rock;
-  struct StateVector out;
-  double ltt0 = 0;
-  double dx, dy, dz, dvx, dvy, dvz;
+ struct StateVector rock;
+ struct StateVector out;
+ double ltt0 = 0;
+ double dx, dy, dz, dvx, dvy, dvz;
+ double x0, y0, z0;
+ double delta, ltt, dltt;
+ double M;
 
-  rock = kepM_to_xyz(a, e, inc, arg, node, M0);
+ rock = kepM_to_xyz(a, e, inc, arg, node, M0);
+ double n = sqrt(mu_bary / fabs(a*a*a));
 
-  double n = sqrt(mu_bary / fabs(a*a*a));
+ for (int idx = 0; idx < 5; idx++) {
 
-  for (int idx = 0; idx < 5; idx++) {
+   x0   = rock.x;
+   y0   = rock.y;
+   z0   = rock.z;
+   //double vx0  = rock.vx;
+   //double vy0  = rock.vy;
+   //double vz0  = rock.vz;
 
-    double x0   = rock.x;
-    double y0   = rock.y;
-    double z0   = rock.z;
-    double vx0  = rock.vx;
-    double vy0  = rock.vy;
-    double vz0  = rock.vz;
+   dx  = x0 - ox;
+   dy  = y0 - oy;
+   dz  = z0 - oz;
+   //dvx  = vx0 - ovx;
+   //dvy  = vy0 - ovy;
+   //dvz  = vz0 - ovz;
+  
+   delta = sqrt(dx*dx + dy*dy + dz*dz);
 
-    dx  = x0 - ox;
-    dy  = y0 - oy;
-    dz  = z0 - oz;
-    dvx  = vx0 - ovx;
-    dvy  = vy0 - ovy;
-    dvz  = vz0 - ovz;
-   
-    double delta = sqrt(dx*dx + dy*dy + dz*dz);
+   ltt = delta / speed_of_light;
+   dltt = fabs(ltt - ltt0);
 
-    double ltt = delta / speed_of_light;
-    double dltt = fabs(ltt - ltt0);
+   if (dltt < 1e-12) {
+     break;
+   }
+   else {
+     M = M0 - (ltt * n);
+     rock = kepM_to_xyz(a, e, inc, arg, node, M);
 
-    if (dltt < 1e-12) {
-      break;
-    }
-    else {
-      double M = M0 - (ltt * n);
-      rock = kepM_to_xyz(a, e, inc, arg, node, M);
+     ltt0 = ltt;
+   }
+ }
 
-      ltt0 = ltt;
-    }
-  }
+ dvx = rock.vx - ovx;
+ dvy = rock.vy - ovy;
+ dvz = rock.vz - ovz;
 
-  out.x  = dx;
-  out.y  = dy;
-  out.z  = dz;
-  out.vx = dvx;
-  out.vy = dvy;
-  out.vz = dvz;
+ out.x  = dx;
+ out.y  = dy;
+ out.z  = dz;
+ out.vx = dvx;
+ out.vy = dvy;
+ out.vz = dvz;
 
-  return out;
+ return out;
 
 }
+
+// struct StateVector correct_for_ltt(double a, double e, double inc, double arg, double node, double M0, 
+//                                    double ox, double oy, double oz, double ovx, double ovy, double ovz) {
+
+//   struct StateVector rock;
+//   struct StateVector temp;
+//   struct StateVector out;
+
+//   double ltt0 = 0;
+//   double dx, dy, dz, dvx, dvy, dvz;
+//   double acc;
+
+//   rock = kepM_to_xyz(a, e, inc, arg, node, M0);
+//   double r = sqrt(rock.x*rock.x + rock.y*rock.y + rock.z*rock.z);
+
+//   temp.x  = rock.x;
+//   temp.y  = rock.y;
+//   temp.z  = rock.z;
+//   temp.vx = rock.vx;
+//   temp.vy = rock.vy;
+//   temp.vz = rock.vz;
+
+//   double xi = mu_bary / (r * r * r);
+
+//   for (int idx = 0; idx < 3; idx++) {
+
+//     dx  = temp.x - ox;
+//     dy  = temp.y - oy;
+//     dz  = temp.z - oz;
+    
+//     double delta = sqrt(dx*dx + dy*dy + dz*dz);
+
+//     double ltt = delta / speed_of_light;
+//     double dltt = fabs(ltt - ltt0);
+
+//     if (dltt < 1e-12) {
+//       break;
+//     }
+//     else {
+      
+//       acc = xi * ltt;
+
+//       temp.x = rock.x - (0.5 * acc * rock.x + rock.vx) * ltt;
+//       temp.y = rock.y - (0.5 * acc * rock.y + rock.vy) * ltt;
+//       temp.z = rock.z - (0.5 * acc * rock.z + rock.vz) * ltt;
+
+//       ltt0 = ltt;
+//     }
+//   }
+
+//   temp.vx = rock.vx + acc * rock.x;
+//   temp.vy = rock.vy + acc * rock.y;
+//   temp.vz = rock.vz + acc * rock.z;
+
+//   dvx  = temp.vx - ovx;
+//   dvy  = temp.vy - ovy;
+//   dvz  = temp.vz - ovz;
+
+//   out.x  = dx;
+//   out.y  = dy;
+//   out.z  = dz;
+//   out.vx = dvx;
+//   out.vy = dvy;
+//   out.vz = dvz;
+
+//   return out;
+
+// }
 
 double* py_correct_for_ltt(int N, double* as, double* es, double* incs, double* args, double* nodes, double* Ms, 
                            double* obsx, double* obsy, double* obsz, double* obsvx, double* obsvy, double* obsvz) {

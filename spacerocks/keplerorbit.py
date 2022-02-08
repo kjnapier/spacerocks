@@ -373,8 +373,16 @@ class KeplerOrbit:
     def node(self):
         if not hasattr(self, '_node'):
             if hasattr(self, '_varpi') and hasattr(self, '_arg'):
-                self.node = Angle(
-                    (self.varpi.rad - self.arg.rad) % (2 * np.pi), u.rad)
+                #self.node = Angle(
+                #    (self.varpi.rad - self.arg.rad) % (2 * np.pi), u.rad)
+
+                node = np.zeros(len(self))
+                prograde = self.inc.deg < 90
+                retrograde = ~prograde
+                node[prograde] = self.varpi[prograde].rad - self.arg[prograde].rad
+                node[retrograde] = self.varpi[retrograde].rad + self.arg[retrograde].rad
+                self.node = Angle(node % (2 * np.pi), u.rad)
+
             elif hasattr(self, '_position') and hasattr(self, '_velocity'):
                 self.kep_from_xyz()
         return self._node
@@ -392,7 +400,14 @@ class KeplerOrbit:
         if not hasattr(self, '_arg'):
 
             if hasattr(self, '_varpi') and hasattr(self, 'node'):
-                self.arg = Angle((self.varpi.rad - self.node.rad) % (2 * np.pi), u.rad)
+                arg = np.zeros(len(self))
+                prograde = self.inc.deg < 90
+                retrograde = ~prograde
+                arg[prograde] = self.varpi[prograde].rad - self.node[prograde].rad
+                arg[retrograde] = self.node[retrograde].rad - self.varpi[retrograde].rad
+
+                #self.arg = Angle((self.varpi.rad - self.node.rad) % (2 * np.pi), u.rad)
+                self.arg = Angle(arg % (2 * np.pi), u.rad)
 
             elif hasattr(self, '_position') and hasattr(self, '_velocity'):
                 self.kep_from_xyz()
@@ -410,8 +425,16 @@ class KeplerOrbit:
     @property
     def varpi(self):
         if not hasattr(self, '_varpi'):
-            self.varpi = Angle((self.node.rad + self.arg.rad) %
-                               (2 * np.pi), u.rad)
+            #self.varpi = Angle((self.node.rad + self.arg.rad) %
+            #                   (2 * np.pi), u.rad)
+
+            varpi = np.zeros(len(self))
+            prograde = self.inc.deg < 90
+            retrograde = ~prograde
+            varpi[prograde] = self.node[prograde].rad + self.arg[prograde].rad
+            varpi[retrograde] = self.node[retrograde].rad - self.arg[retrograde].rad
+            self.varpi = Angle(varpi % (2 * np.pi), u.rad)
+
         return self._varpi
 
     @varpi.setter

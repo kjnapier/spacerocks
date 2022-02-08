@@ -50,7 +50,17 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         # input -> arrays
         for key in [*kwargs]:
-            kwargs[key] = np.atleast_1d(kwargs.get(key))
+            k = kwargs.get(key)
+            if not isinstance(k, np.ndarray):
+                if isinstance(k, list):
+                    if key == 'name':
+                        kwargs[key] = np.array(k, dtype=object)
+                        
+                        raise Warning('Object names must be strings. Converting')
+                    else:
+                        kwargs[key] = np.array(k)
+                else:
+                    kwargs[key] = np.atleast_1d(k)
 
         self.frame = frame
 
