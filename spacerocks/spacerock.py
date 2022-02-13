@@ -57,8 +57,6 @@ class SpaceRock(KeplerOrbit, Convenience):
                 if isinstance(k, list):
                     if key == 'name':
                         kwargs[key] = np.array(k, dtype=object)
-                        
-                        raise Warning('Object names must be strings. Converting')
                     else:
                         kwargs[key] = np.array(k)
                 else:
@@ -223,7 +221,7 @@ class SpaceRock(KeplerOrbit, Convenience):
 
 
     @classmethod
-    def from_horizons(cls, name, epoch=datetime.date.today()):
+    def from_horizons(cls, name):
 
         try:
             from urllib.parse import urlencode
@@ -236,42 +234,72 @@ class SpaceRock(KeplerOrbit, Convenience):
         def quote(text):
             return "'{}'".format(text)
 
-        start = epoch.jd
+        start = datetime.date.today()
+        end = start + datetime.timedelta(days=1)
+
+        xs = []
+        ys = []
+        zs = []
+        vxs = []
+        vys = []
+        vzs = []
+        Hs = []
+        Gs = []
+        epochs = []
+        names = []
+
+        for n in name:
         
-        params = {
-                  "format": "text",
-                  "COMMAND": quote(name),
-                  "START_TIME": quote(start),
-                  #"STOP_TIME": quote(end),
-                  "MAKE_EPHEM": quote("YES"),
-                  "EPHEM_TYPE": quote("VECTORS"),
-                  "CENTER": quote("@ssb"),
-                  "REF_PLANE": quote("ecliptic"),
-                  "STEP_SIZE": quote("2"),  # seconds
-                  "REF_SYSTEM": quote("ECLIPJ2000"),
-                  "VEC_CORR": quote("NONE"),
-                  "OUT_UNITS": quote("KM-S"),
-                  "CSV_FORMAT": quote("NO"),
-                  "VEC_DELTA_T": quote("NO"),
-                  "VEC_TABLE": quote("3"),
-                  "VEC_LABELS": quote("NO")
-                 }
+            params = {
+                      "format":      "text",
+                      "COMMAND":     quote(n),
+                      "START_TIME":  quote(start),
+                      "STOP_TIME":   quote(end),
+                      "MAKE_EPHEM":  quote("YES"),
+                      "EPHEM_TYPE":  quote("VECTORS"),
+                      "CENTER":      quote("@ssb"),
+                      "REF_PLANE":   quote("ecliptic"),
+                      "STEP_SIZE":   quote("1"),
+                      "REF_SYSTEM":  quote("J2000"),
+                      "VEC_CORR":    quote("NONE"),
+                      "OUT_UNITS":   quote("KM-S"),
+                      "CSV_FORMAT":  quote("NO"),
+                      "VEC_DELTA_T": quote("NO"),
+                      "VEC_TABLE":   quote("3"),
+                      "VEC_LABELS":  quote("NO")
+                     }
+    
+            url = "https://ssd.jpl.nasa.gov/api/horizons.api?" + urlencode(params)
+            # don't use a context manager for python2 compatibility
+            with urlopen(url) as f:
+                body = f.read().decode()
+    
+            lines = body.split("$$SOE")[-1].split("\n")
+            x, y, z = [float(i) for i in lines[2].split()]
+            vx, vy, vz = [float(i) for i in lines[3].split()]
+    
+            pps = body.split('physical parameters')[-1].split('\n')[2].split()
+            H = float(pps[1])
+            G = float(pps[3])
 
-        url = "https://ssd.jpl.nasa.gov/api/horizons.api?" + urlencode(params)
-        # don't use a context manager for python2 compatibility
-        with urlopen(url) as f:
-            body = f.read().decode()
-
-        lines = body.split("$$SOE")[-1].split("\n")
-        x, y, z = [float(i) for i in lines[2].split()]
-        vx, vy, vz = [float(i) for i in lines[3].split()]
+            xs.append(x)
+            ys.append(y)
+            zs.append(z)
+            vxs.append(vx)
+            vys.append(vy)
+            vzs.append(vz)
+            Hs.append(H)
+            Gs.append(G)
+            epochs.append(start.ctime())
+            names.append(n)
 
         units = Units()
         units.distance = u.km
         units.speed = u.km/u.s
         units.timescale = 'tdb'
 
-        return cls(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, origin='ssb', frame='eclipJ2000', units=units, epoch=epoch)
+        return cls(x=xs, y=ys, z=zs, vx=vxs, vy=vys, vz=vzs, name=names,
+                   origin='ssb', frame='eclipJ2000', units=units, H=Hs, G=Gs, epoch=epochs)
         
     @classmethod
     def from_file(cls, name):
