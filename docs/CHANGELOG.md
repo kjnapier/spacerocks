@@ -1,4 +1,5 @@
 ### 2.0.1
+- Added `from_horizons` instantiator for the SpaceRock class.
 - Changed a bug in the Observer class that was sometimes comparing the length of a string rather than an array.
 - Fixed a bug in [varpi, node, arg] relations for retrograde orbits.
 - Large speedup to Observer class internal list comprehension by turning a `Quantity` into a `float`

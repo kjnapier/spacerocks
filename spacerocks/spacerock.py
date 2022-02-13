@@ -157,9 +157,9 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         elif coords == 'xyz':
 
-            x = Distance(kwargs.get('x'), units.distance, allow_negative=True)
-            y = Distance(kwargs.get('y'), units.distance, allow_negative=True)
-            z = Distance(kwargs.get('z'), units.distance, allow_negative=True)
+            x = Distance(kwargs.get('x'), units.distance, allow_negative=True).to(u.au)
+            y = Distance(kwargs.get('y'), units.distance, allow_negative=True).to(u.au)
+            z = Distance(kwargs.get('z'), units.distance, allow_negative=True).to(u.au)
             vx = (kwargs.get('vx') * units.speed).to(u.au / u.day)
             vy = (kwargs.get('vy') * units.speed).to(u.au / u.day)
             vz = (kwargs.get('vz') * units.speed).to(u.au / u.day)
@@ -248,7 +248,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         epochs = []
         names = []
 
-        for n in name:
+        for n in np.atleast_1d(name):
         
             params = {
                       "format":      "text",
@@ -257,7 +257,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                       "STOP_TIME":   quote(end),
                       "MAKE_EPHEM":  quote("YES"),
                       "EPHEM_TYPE":  quote("VECTORS"),
-                      "CENTER":      quote("@ssb"),
+                      "CENTER":      quote("@sun"),
                       "REF_PLANE":   quote("ecliptic"),
                       "STEP_SIZE":   quote("1"),
                       "REF_SYSTEM":  quote("J2000"),
@@ -269,37 +269,41 @@ class SpaceRock(KeplerOrbit, Convenience):
                       "VEC_LABELS":  quote("NO")
                      }
     
-            url = "https://ssd.jpl.nasa.gov/api/horizons.api?" + urlencode(params)
-            # don't use a context manager for python2 compatibility
-            with urlopen(url) as f:
-                body = f.read().decode()
-    
-            lines = body.split("$$SOE")[-1].split("\n")
-            x, y, z = [float(i) for i in lines[2].split()]
-            vx, vy, vz = [float(i) for i in lines[3].split()]
-    
-            pps = body.split('physical parameters')[-1].split('\n')[2].split()
-            H = float(pps[1])
-            G = float(pps[3])
+            try:
+                url = "https://ssd.jpl.nasa.gov/api/horizons.api?" + urlencode(params)
+                with urlopen(url) as f:
+                    body = f.read().decode()
 
-            xs.append(x)
-            ys.append(y)
-            zs.append(z)
-            vxs.append(vx)
-            vys.append(vy)
-            vzs.append(vz)
-            Hs.append(H)
-            Gs.append(G)
-            epochs.append(start.ctime())
-            names.append(n)
+                lines = body.split("$$SOE")[-1].split("\n")
+                x, y, z = [float(i) for i in lines[2].split()]
+                vx, vy, vz = [float(i) for i in lines[3].split()]
+        
+                pps = body.split('physical parameters')[-1].split('\n')[2].split()
+                H = float(pps[1])
+                G = float(pps[3])
+    
+                xs.append(x)
+                ys.append(y)
+                zs.append(z)
+                vxs.append(vx)
+                vys.append(vy)
+                vzs.append(vz)
+                Hs.append(H)
+                Gs.append(G)
+                epochs.append(start.ctime())
+                names.append(n)
 
+            except Exception as E:
+                raise ValueError(f'Body {n} not found.')
+    
+            
         units = Units()
         units.distance = u.km
         units.speed = u.km/u.s
         units.timescale = 'tdb'
 
         return cls(x=xs, y=ys, z=zs, vx=vxs, vy=vys, vz=vzs, name=names,
-                   origin='ssb', frame='eclipJ2000', units=units, H=Hs, G=Gs, epoch=epochs)
+                   origin='sun', frame='eclipJ2000', units=units, H=Hs, G=Gs, epoch=epochs)
         
     @classmethod
     def from_file(cls, name):
