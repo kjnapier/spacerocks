@@ -4,6 +4,8 @@ from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
 
+import datetime
+
 import numpy as np
 import pandas as pd
 
@@ -218,6 +220,58 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         if kwargs.get('density') is not None:
             self.density = kwargs.get('density') * units.density
+
+
+    @classmethod
+    def from_horizons(cls, name, epoch=datetime.date.today()):
+
+        try:
+            from urllib.parse import urlencode
+            from urllib.request import urlopen
+        except ImportError:
+            from urllib import urlencode
+            from urllib2 import urlopen
+
+
+        def quote(text):
+            return "'{}'".format(text)
+
+        start = epoch.jd
+        
+        params = {
+                  "format": "text",
+                  "COMMAND": quote(name),
+                  "START_TIME": quote(start),
+                  #"STOP_TIME": quote(end),
+                  "MAKE_EPHEM": quote("YES"),
+                  "EPHEM_TYPE": quote("VECTORS"),
+                  "CENTER": quote("@ssb"),
+                  "REF_PLANE": quote("ecliptic"),
+                  "STEP_SIZE": quote("2"),  # seconds
+                  "REF_SYSTEM": quote("ECLIPJ2000"),
+                  "VEC_CORR": quote("NONE"),
+                  "OUT_UNITS": quote("KM-S"),
+                  "CSV_FORMAT": quote("NO"),
+                  "VEC_DELTA_T": quote("NO"),
+                  "VEC_TABLE": quote("3"),
+                  "VEC_LABELS": quote("NO")
+                 }
+
+        url = "https://ssd.jpl.nasa.gov/api/horizons.api?" + urlencode(params)
+        # don't use a context manager for python2 compatibility
+        with urlopen(url) as f:
+            body = f.read().decode()
+
+        lines = body.split("$$SOE")[-1].split("\n")
+        x, y, z = [float(i) for i in lines[2].split()]
+        vx, vy, vz = [float(i) for i in lines[3].split()]
+
+        units = Units()
+        units.distance = u.km
+        units.speed = u.km/u.s
+        units.timescale = 'tdb'
+
+        return cls(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, origin='ssb', frame='eclipJ2000', units=units, epoch=epoch)
         
     @classmethod
     def from_file(cls, name):
