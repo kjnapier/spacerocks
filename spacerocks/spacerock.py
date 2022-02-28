@@ -278,9 +278,15 @@ class SpaceRock(KeplerOrbit, Convenience):
                 x, y, z = [float(i) for i in lines[2].split()]
                 vx, vy, vz = [float(i) for i in lines[3].split()]
         
-                pps = body.split('physical parameters')[-1].split('\n')[2].split()
-                H = float(pps[1])
-                G = float(pps[3])
+                try:
+                    pps = body.split('physical parameters')[-1].split('\n')[2].split()
+                    H = float(pps[1])
+                    G = float(pps[3])
+                except Exception as E:
+                    print(f'Magnitude information not available for {name}. Is this a comet?')
+                    H = None
+                    G = None
+                    pass
     
                 xs.append(x)
                 ys.append(y)
@@ -295,7 +301,6 @@ class SpaceRock(KeplerOrbit, Convenience):
 
             except Exception as E:
                 raise ValueError(f'Body {n} not found.')
-    
             
         units = Units()
         units.distance = u.km
