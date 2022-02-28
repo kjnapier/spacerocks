@@ -56,8 +56,8 @@ class TestSpacerocks(unittest.TestCase):
         sep = pos_pred.separation(pos_Horizons)
 
         assert sep.arcsec.max() < 1
-        assert obs.mag.max() < 23
-        assert obs.mag.min() > 20
+        assert obs.mag.max() < 10.5
+        assert obs.mag.min() > 6
 
 
     def test_circular_nonplanar(self):
