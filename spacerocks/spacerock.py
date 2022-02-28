@@ -251,22 +251,22 @@ class SpaceRock(KeplerOrbit, Convenience):
         for n in np.atleast_1d(name):
         
             params = {
-                      "format":      "text",
-                      "COMMAND":     quote(n),
-                      "START_TIME":  quote(start),
-                      "STOP_TIME":   quote(end),
-                      "MAKE_EPHEM":  quote("YES"),
-                      "EPHEM_TYPE":  quote("VECTORS"),
-                      "CENTER":      quote("@sun"),
-                      "REF_PLANE":   quote("ecliptic"),
-                      "STEP_SIZE":   quote("1"),
-                      "REF_SYSTEM":  quote("J2000"),
-                      "VEC_CORR":    quote("NONE"),
-                      "OUT_UNITS":   quote("KM-S"),
-                      "CSV_FORMAT":  quote("NO"),
-                      "VEC_DELTA_T": quote("NO"),
-                      "VEC_TABLE":   quote("3"),
-                      "VEC_LABELS":  quote("NO")
+                      'format':      "text",
+                      'COMMAND':     quote(n),
+                      'START_TIME':  quote(start),
+                      'STOP_TIME':   quote(end),
+                      'MAKE_EPHEM':  quote("YES"),
+                      'EPHEM_TYPE':  quote("VECTORS"),
+                      'CENTER':      quote("@sun"),
+                      'REF_PLANE':   quote("ecliptic"),
+                      'STEP_SIZE':   quote("1"),
+                      'REF_SYSTEM':  quote("J2000"),
+                      'VEC_CORR':    quote("NONE"),
+                      'OUT_UNITS':   quote("KM-S"),
+                      'CSV_FORMAT':  quote("NO"),
+                      'VEC_DELTA_T': quote("NO"),
+                      'VEC_TABLE':   quote("3"),
+                      'VEC_LABELS':  quote("NO")
                      }
     
             try:
