@@ -50,7 +50,8 @@ setup(
                       'spiceypy',
                       'astropy',
                       'pandas',
-                      'rebound'],
+                      'rebound', 
+                      'astroquery'],
     ext_modules=[libspacerocksmodule],
     zip_safe=False
 )
