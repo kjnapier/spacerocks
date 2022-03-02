@@ -2,7 +2,7 @@ import numpy as np
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
 from astropy.time import Time
-from .constants import mu_bary, epsilon
+from .constants import mu_bary, frames
 
 from .vector import Vector
 from .cbindings import calc_kep_from_xyz, calc_vovec_from_kep, calc_M_from_E, calc_E_from_f, calc_E_from_M, calc_f_from_E
@@ -61,34 +61,24 @@ class KeplerOrbit:
 
         if self.frame != new_frame:
 
-            if new_frame == 'eclipJ2000':
+            rotation_matrix = frames[new_frame.upper()] @ np.linalg.inv(frames[self.frame.upper()])
+            xyz = [self.x, self.y, self.z]
+            vxyz = [self.vx, self.vy, self.vz]
 
-                x = self.x
-                y = self.y * np.cos(epsilon) + self.z * np.sin(epsilon)
-                z = -self.y * np.sin(epsilon) + self.z * np.cos(epsilon)
+            distance_units = self.x._unit
+            velo_units = self.vx._unit
 
-                vx = self.vx
-                vy = self.vy * np.cos(epsilon) + self.vz * np.sin(epsilon)
-                vz = -self.vy * np.sin(epsilon) + self.vz * np.cos(epsilon)
-            
-            elif new_frame == 'J2000':
-                x = self.x
-                y = self.y * np.cos(epsilon) - self.z * np.sin(epsilon)
-                z = self.y * np.sin(epsilon) + self.z * np.cos(epsilon)
-
-                vx = self.vx
-                vy = self.vy * np.cos(epsilon) - self.vz * np.sin(epsilon)
-                vz = self.vy * np.sin(epsilon) + self.vz * np.cos(epsilon)
-            
-            else:
-                raise ValueError(f'Frame {new_frame} is not supported.')
+            x, y, z = rotation_matrix.dot(xyz)
+            vx, vy, vz = rotation_matrix.dot(vxyz) * velo_units
 
             self.frame = new_frame
     
             # clear the keplerian variables because they need to be recomputed
             self.clear_kep()
     
-            self.position = Vector(x, y, z)
+            self.position = Vector(Distance(x, distance_units, allow_negative=True), 
+                                   Distance(y, distance_units, allow_negative=True), 
+                                   Distance(z, distance_units, allow_negative=True))
             self.velocity = Vector(vx, vy, vz)
 
         return self
@@ -472,12 +462,6 @@ class KeplerOrbit:
 
             elif hasattr(self, '_f') or hasattr(self, '_true_longitude') or hasattr(self, '_E') or (hasattr(self, '_position') and hasattr(self, '_velocity')):
                 self.M = calc_M_from_E(self.e, self.E.rad)
-                # M = np.zeros(len(self))
-                # M[self.e < 1] = (self.E.rad[self.e < 1] - self.e[self.e < 1]
-                #                  * sin(self.E.rad[self.e < 1])) % (2 * pi)
-                # M[self.e >= 1] = (
-                #     self.e[self.e >= 1] * sinh(self.E.rad[self.e >= 1]) - self.E.rad[self.e >= 1])
-                # self.M = Angle(M, u.rad)
 
             elif hasattr(self, '_t_peri'):
                 M = self.n * (self.epoch - self.t_peri)
@@ -597,7 +581,7 @@ class KeplerOrbit:
             if hasattr(self, 'mass') and hasattr(self, 'density'):
                self.radius = Distance(np.cbrt((3 / (4 * np.pi * self.density)) * self.mass).to(u.km))
             else:
-                self.radius = 1e-16
+                self.radius = [None] * len(self)
         return self._radius
 
     @radius.setter
@@ -607,7 +591,7 @@ class KeplerOrbit:
     @property
     def density(self):
        if not hasattr(self, '_density'):
-           self.density = 1e-16
+           self.density = [None] * len(self)
        return self._density
 
     @density.setter
@@ -730,7 +714,7 @@ class KeplerOrbit:
         del self._r
         
 
-    @property
-    def TisserandJ(self):
-        aJ = 5.2 * u.au
-        return aJ / self.a * 2 * np.cos(self.inc) * np.sqrt(self.p / aJ)
+    #@property
+    #def TisserandJ(self):
+    #    aJ = 5.2 * u.au
+    #    return aJ / self.a * 2 * np.cos(self.inc) * np.sqrt(self.p / aJ)
