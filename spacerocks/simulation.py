@@ -3,13 +3,12 @@ import pkg_resources
 from astropy.time import Time
 import numpy as np
 import copy
-
+from rich.progress import track
 
 from .spice import SpiceBody
 from .units import Units
 from .convenience import Convenience
 from .spacerock import SpaceRock
-
 
 SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
 
@@ -33,8 +32,7 @@ class Simulation(rebound.Simulation, Convenience):
             for name in names:
                 self.perturber_names.append(name)
                 self.N_active += 1
-                
-            
+                   
                 body = SpiceBody(spiceid=name)
                 b = body.at(epoch)
                 self.add(x=b.x.au, 
@@ -82,13 +80,12 @@ class Simulation(rebound.Simulation, Convenience):
                      vz=rock.vz.value,
                      m=0, 
                      hash=rock.name)
-
         
         for n in rocks.name:
             h = self.particles[n].hash
             self.simdata[h.value] = []
 
-    def propagate(self, epochs, units=Units(), **kwargs):
+    def propagate(self, epochs, units=Units(), progress=True, **kwargs):
         '''
         Numerically integrate all bodies to the desired date.
         This routine synchronizes the epochs.
@@ -105,13 +102,14 @@ class Simulation(rebound.Simulation, Convenience):
         epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
 
         self.move_to_com()
+
+        if progress == True:
+            iterator = track(np.sort(epochs.tdb.jd))
+        else:
+            iterator = np.sort(epochs.tdb.jd)
         
-        #for time in track(np.sort(epochs.tdb.jd)):
-        #    self.integrate(time, exact_finish_time=1)
-
-        for time in np.sort(epochs.tdb.jd):
+        for time in iterator:
             self.integrate(time, exact_finish_time=1)
-
 
             if f == True:
                 func(self)
