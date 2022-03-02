@@ -1,4 +1,5 @@
 ### 2.0.1
+- Added a `rich` progress bar to the `Simulation` `propagate` method.
 - Added more involved tests.
 - Added `from_horizons` instantiator for the SpaceRock class.
 - Changed a bug in the Observer class that was sometimes comparing the length of a string rather than an array.

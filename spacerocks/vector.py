@@ -20,6 +20,14 @@ class Vector:
 
         return p
 
+    def __eq__(self, other):
+        if isinstance(other, Vector):
+            if self.x == other.x:
+                if self.y == other.y:
+                    if self.z == other.z:
+                        return True
+        return False
+
     def __add__(self, other):
         return Vector(self.x + other.x, self.y + other.y, self.z + other.z)
 
