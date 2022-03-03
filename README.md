@@ -5,7 +5,7 @@
 [![PyPI version shields.io](https://img.shields.io/pypi/v/spacerocks.svg)](https://pypi.python.org/pypi/spacerocks/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Documentation Status](https://readthedocs.org/projects/spacerocks/badge/?version=latest)](https://spacerocks.readthedocs.io/en/latest/?badge=latest)
-
+[![codecov](https://codecov.io/gh/kjnapier/spacerocks/branch/master/graph/badge.svg?token=1WO1H5WNYV)](https://codecov.io/gh/kjnapier/spacerocks)
 
 `spacerocks` is a Python package that puts the solar system at your fingertips. 
 It provides high-level abstractions 
@@ -30,25 +30,13 @@ from spacerocks import SpaceRock, Units
 from astropy.time import Time
 import numpy as np
 
-units = Units()
-units.timescale = 'tdb'
-
-rock = SpaceRock(a=2.765985763166805, 
-                 e=0.07821081922804583, 
-                 inc=10.58793079235974, 
-                 node=80.27114319577151, 
-                 arg=73.73012101495385, 
-                 M=210.8992101403974, 
-                 epoch=2459225.5, 
-                 H=3.53,
-                 G=0.12,
-                 name='Ceres',
-                 origin='sun',
-                 units=units)
+rock = SpaceRock.from_horizons(name='Ceres')
 
 startdate = Time('2000-01-01', scale='utc', format='iso')
-testdates = Time(np.arange(startdate.jd, startdate.jd + 50 * 365.25, 30), scale='utc', format='jd')
+enddate   = Time('2050-01-01', scale='utc', format='iso')
+testdates = Time(np.arange(startdate.jd, enddate.jd, 30), scale='utc', format='jd')
 
+units = Units()
 units.timescale = 'utc'
 prop, planets, sim = rock.propagate(epochs=testdates.jd, model=2, units=units)
 obs = prop.observe(obscode='W84')

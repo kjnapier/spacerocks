@@ -13,7 +13,7 @@
 /.ipynb_checkpoints/
 /notebooks/.ipynb_checkpoints/
 /spacerocks/.ipynb_checkpoints/
-
+/spacerocks/test/__pycache__/
 dates.py
 prototypes.py
 
