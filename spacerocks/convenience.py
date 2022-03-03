@@ -54,17 +54,3 @@ class Convenience:
                 'Invalid input coordinates. Please see the documentation for accepted input.')
 
         return coords
-
-    def astropy_table(self):
-        '''
-        Write the rocks to an astropy table. This can handle units.
-        '''
-        return Table(self.__dict__)
-
-    def pandas_df(self):
-        '''
-        Write the rocks to a pandas dataframe. Pandas can't handle astropy
-        units, so if you want to keep units intact you'll have to use
-        an Astropy Table.
-        '''
-        return self.astropy_table().to_pandas()

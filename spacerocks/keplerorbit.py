@@ -567,9 +567,12 @@ class KeplerOrbit:
 
     @property
     def mass(self):
-       if not hasattr(self, '_mass'):
-           self.mass = 0
-       return self._mass
+        if not hasattr(self, '_mass'):
+            if hasattr(self, '_radius') and hasattr(self, '_density'):
+                self.mass = self.density * (4/3) * np.pi * self.radius**3
+            else:
+                raise ValueError('Insufficient information for calculating mass.')
+        return self._mass
 
     @mass.setter
     def mass(self, value):
@@ -578,10 +581,10 @@ class KeplerOrbit:
     @property
     def radius(self):
         if not hasattr(self, '_radius'):
-            if hasattr(self, 'mass') and hasattr(self, 'density'):
+            if hasattr(self, '_mass') and hasattr(self, '_density'):
                self.radius = Distance(np.cbrt((3 / (4 * np.pi * self.density)) * self.mass).to(u.km))
             else:
-                self.radius = [None] * len(self)
+                raise ValueError('Insufficient information for calculating radius.')
         return self._radius
 
     @radius.setter
@@ -590,9 +593,12 @@ class KeplerOrbit:
 
     @property
     def density(self):
-       if not hasattr(self, '_density'):
-           self.density = [None] * len(self)
-       return self._density
+        if not hasattr(self, '_density'):
+            if hasattr(self, '_mass') and hasattr(self, '_radius'):
+                self.density = (3 * self.mass) / (4 * np.pi * self.radius**3)
+            else:
+                raise ValueError('Insufficient information for calculating radius.')
+        return self._density
 
     @density.setter
     def density(self, value):

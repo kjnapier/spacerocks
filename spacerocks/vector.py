@@ -22,10 +22,8 @@ class Vector:
 
     def __eq__(self, other):
         if isinstance(other, Vector):
-            if self.x == other.x:
-                if self.y == other.y:
-                    if self.z == other.z:
-                        return True
+            if (self.x == other.x) and (self.y == other.y) and (self.z == other.z):
+                return True
         return False
 
     def __add__(self, other):

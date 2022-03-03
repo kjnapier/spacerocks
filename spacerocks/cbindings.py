@@ -97,7 +97,7 @@ clibspacerocks.py_calc_vovec_from_kep.restype = ctypes.POINTER(ctypes.c_double)
 def calc_vovec_from_kep(mu, a, e, r, E):
 
     N = len(a)
-    rock = clibspacerocks.py_calc_vovec_from_kep(N, mu, a, e, r, E)
+    rock = clibspacerocks.py_calc_vovec_from_kep(N, mu, a, e.astype(np.float64), r, E)
     arr = np.ctypeslib.as_array(rock, (3 * N,))
 
     vx, vy, vz = arr.reshape(N, 3).T
@@ -113,7 +113,7 @@ clibspacerocks.py_calc_E_from_M.restype = ctypes.POINTER(ctypes.c_double)
 def calc_E_from_M(e, M):
 
     N = len(e)
-    rock = clibspacerocks.py_calc_E_from_M(N, e, M)
+    rock = clibspacerocks.py_calc_E_from_M(N, e.astype(np.float64), M.astype(np.float64))
     E = np.ctypeslib.as_array(rock, (N,))
 
     return Angle(E, u.rad)
@@ -143,7 +143,7 @@ clibspacerocks.py_calc_E_from_f.restype = ctypes.POINTER(ctypes.c_double)
 def calc_E_from_f(e, f):
 
     N = len(e)
-    rock = clibspacerocks.py_calc_E_from_f(N, e, f)
+    rock = clibspacerocks.py_calc_E_from_f(N, e.astype(np.float64), f)
     E = np.ctypeslib.as_array(rock, (N,))
 
     return Angle(E, u.rad)
@@ -158,7 +158,7 @@ clibspacerocks.py_calc_f_from_E.restype = ctypes.POINTER(ctypes.c_double)
 def calc_f_from_E(e, E):
 
     N = len(e)
-    rock = clibspacerocks.py_calc_f_from_E(N, e, E)
+    rock = clibspacerocks.py_calc_f_from_E(N, e.astype(np.float64), E)
     f = np.ctypeslib.as_array(rock, (N,))
 
     return Angle(f, u.rad)

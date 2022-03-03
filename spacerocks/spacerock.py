@@ -199,8 +199,7 @@ class SpaceRock(KeplerOrbit, Convenience):
             else:
                 self.G = np.repeat(0.15, len(self))
 
-
-        if kwargs.get('mag') is not None:
+        elif kwargs.get('mag') is not None:
             curves = kwargs.get('mag')
             curve_funcs = []
             for curve in curves:
@@ -209,6 +208,11 @@ class SpaceRock(KeplerOrbit, Convenience):
                 else:
                     curve_funcs.append(lambda _, x=curve: x)
             self.mag_func = np.array(curve_funcs)
+
+            if kwargs.get('G') is not None:
+                self.G = kwargs.get('G')
+            else:
+                self.G = np.repeat(0.15, len(self))
 
         if kwargs.get('radius') is not None:
             self.radius = Distance(kwargs.get('radius'), units.size, allow_negative=False)
@@ -223,13 +227,9 @@ class SpaceRock(KeplerOrbit, Convenience):
     @classmethod
     def from_horizons(cls, name):
 
-        try:
-            from urllib.parse import urlencode
-            from urllib.request import urlopen
-        except ImportError:
-            from urllib import urlencode
-            from urllib2 import urlopen
-
+        from urllib.parse import urlencode
+        from urllib.request import urlopen
+       
 
         def quote(text):
             return "'{}'".format(text)
