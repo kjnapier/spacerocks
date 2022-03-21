@@ -21,6 +21,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Get OpenMP
+        uses: mstksg/get-package@v1
         with:
           brew: libomp
           apt-get: libomp-dev
