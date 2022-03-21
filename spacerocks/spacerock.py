@@ -371,13 +371,13 @@ class SpaceRock(KeplerOrbit, Convenience):
         self.vy
         self.vz
 
+        sim.move_to_com()
+
         for time in np.sort(np.unique(pickup_times)):
             ps = self[self.epoch.tdb.jd == time]
             for x, y, z, vx, vy, vz, name in zip(ps.x.value, ps.y.value, ps.z.value, ps.vx.value, ps.vy.value, ps.vz.value, ps.name):
                 sim.add(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, hash=name)
                 sim.integrate(time, exact_finish_time=1)
-
-        sim.move_to_com()
 
         Nx = len(epochs)
         x_values = np.zeros((Nx, sim.N))
@@ -670,6 +670,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                       M_ceres, M_vesta, M_pallas, M_interamnia, M_juno, M_camilla, M_iris, M_hygiea, M_eunomia, M_psyche, 
                              M_euphrosyne, M_europa, M_cybele, M_sylvia, M_thisbe, M_davida]
 
+
         else:
             raise ValueError('Model not recognized. Check the documentation.')
 
@@ -686,8 +687,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         ss['vy'] = [body.vy.value[0] for body in bodies]
         ss['vz'] = [body.vz.value[0] for body in bodies]
         ss['mass'] = masses
-        ss['a'] = 1 / (2 / np.sqrt(ss.x**2 + ss.y**2 + ss.z**2) - (ss.vx**2 + ss.vy**2 + ss.vz**2) / mu_bary.value)
-        ss['hill_radius'] = ss.a * pow(ss.mass / (3 * M_sun), 1/3)
         ss['name'] = names
 
         sim = rebound.Simulation()
@@ -698,20 +697,39 @@ class SpaceRock(KeplerOrbit, Convenience):
                     vx=p.vx, vy=p.vy, vz=p.vz,
                     m=p.mass, hash=p.name)
 
-        
-
         sim.N_active = len(ss)
-
-        #if gr == True:
-        #    rebx = reboundx.Extras(sim)
-        #    gr = rebx.load_force('gr_full')
-        #    gr.params["c"] = constants.C
-        #    rebx.add_force(gr)
 
         sim.testparticle_type = 0
         sim.integrator = 'ias15'
+        #sim.ri_ias15.epsilon = 1e-12
+        
+
+        #import reboundx
+        #rebx = reboundx.Extras(sim)
+        #gr = rebx.load_force('gr_full')
+        #gr.params["c"] = c.to(u.au / u.day).value
+        #rebx.add_force(gr)
         
         return sim, names
+
+    def analytic_propagate(self, epoch, units=Units()):
+        '''
+        analytically propagate all rocks to a common epoch
+        '''
+        epoch = self.detect_timescale(np.atleast_1d(epoch), units.timescale)
+        dt = (epoch.utc.jd - self.epoch.utc.jd) * u.day
+        dM = self.n * dt
+        return self.__class__(a=self.a.au, 
+                              e=self.e, 
+                              inc=self.inc.deg, 
+                              node=self.node.deg, 
+                              arg=self.arg.deg, 
+                              M=(self.M + dM).deg, 
+                              name=self.name, 
+                              epoch=np.repeat(epoch.utc.jd, len(self)), 
+                              origin=self.origin, 
+                              frame=self.frame)
+        
 
     def orbits(self, N=1000):
 

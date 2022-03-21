@@ -1,4 +1,5 @@
 ### 2.0.1
+- Parallelized the C++ backend with OpenMP
 - Added a `rich` progress bar to the `Simulation` `propagate` method.
 - Added more involved tests.
 - Added `from_horizons` instantiator for the SpaceRock class.

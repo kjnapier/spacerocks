@@ -158,7 +158,7 @@ clibspacerocks.py_calc_f_from_E.restype = ctypes.POINTER(ctypes.c_double)
 def calc_f_from_E(e, E):
 
     N = len(e)
-    rock = clibspacerocks.py_calc_f_from_E(N, e.astype(np.float64), E)
+    rock = clibspacerocks.py_calc_f_from_E(N, e.astype(np.float64), E.astype(np.float64))
     f = np.ctypeslib.as_array(rock, (N,))
 
     return Angle(f, u.rad)

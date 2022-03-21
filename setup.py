@@ -9,18 +9,22 @@ if suffix is None:
     suffix = ".so"
 
 extra_link_args = []
+extra_compile_args = ['-O3', '-fPIC', '-std=c++20', '-march=native', '-fopenmp']
+
 if sys.platform == 'darwin':
     from distutils import sysconfig
     vars = sysconfig.get_config_vars()
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
-    extra_link_args = ['-Wl,-install_name,@rpath/libspacerocks' + suffix]
+    extra_link_args = ['-Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
+    #extra_compile_args = ['-O3', '-fPIC', '-std=c++20', '-march=native', '-Xpreprocessor', '-fopenmp']
+    extra_compile_args = ['-O3', '-fPIC', '-std=c++20', '-march=native', '-Xclang', '-fopenmp']#, '-fopenmp-simd']
+    
 
 libspacerocksmodule = Extension('libspacerocks',
-                                sources=['src/speedy.c'],
+                                sources=['src/speedy.cpp'],
                                 include_dirs=['src'],
-                                language='c',
-                                extra_compile_args=[
-                                    '-O3', '-fPIC', '-std=c99'],#, '-march=native'],
+                                language='c++',
+                                extra_compile_args=extra_compile_args,
                                 extra_link_args=extra_link_args
                                 )
 

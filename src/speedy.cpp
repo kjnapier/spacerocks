@@ -1,6 +1,9 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <thread>
+#include <vector>
+#include <omp.h>
 
 const double EMIN           = 1e-8;
 const double IMIN           = 1e-8;
@@ -68,6 +71,9 @@ double calc_E_from_M(double e, double M){
 
         // Update E
         E += delta_i3;
+        if(fabs(delta_i3) < 1.e-16){
+          break;
+        }
       }
     }
 
@@ -401,12 +407,14 @@ struct KeplerOrbit calc_kep_from_xyz(double mu, double x, double y, double z, do
 
 }
 
+extern "C" {
 double* py_calc_kep_from_xyz(int N, double mu, double* xs, double* ys, double* zs, double* vxs, double* vys, double* vzs) {
   //struct KeplerOrbit* output = malloc(N * sizeof(struct KeplerOrbit));
-  double* output = malloc(N * 6 * sizeof(double));
+  double* output = (double*) malloc(N * 6 * sizeof(double));
   int dummy;
   struct KeplerOrbit kep;
 
+  #pragma omp parallel for  private(kep, dummy)
   for (int idx = 0; idx < N; idx++) {
     kep = calc_kep_from_xyz(mu, xs[idx], ys[idx], zs[idx], vxs[idx], vys[idx], vzs[idx]);
     dummy = idx * 6;
@@ -435,12 +443,14 @@ double calc_M_from_E(double e, double E) {
 
   return M;
 
-}
+}}
 
+extern "C" {
 double* py_calc_M_from_E(int N, double* es, double* Es) {
 
-  double* output = malloc(N * sizeof(double));
+  double* output = (double*) malloc(N * sizeof(double));
 
+  #pragma omp parallel for
   for (int idx = 0; idx < N; idx++) {
     output[idx] = calc_M_from_E(es[idx], Es[idx]);
   }
@@ -466,19 +476,21 @@ double calc_E_from_f(double e, double f) {
     }
   }
   return E;
-}
+}}
 
+extern "C" {
 double* py_calc_E_from_f(int N, double* es, double* fs) {
 
-  double* output = malloc(N * sizeof(double));
+  double* output = (double*) malloc(N * sizeof(double));
 
+  #pragma omp parallel for default(shared) schedule(dynamic)
   for (int idx = 0; idx < N; idx++) {
     output[idx] = calc_E_from_f(es[idx], fs[idx]);
   }
 
   return output;
 
-}
+}}
 
 
 double calc_f_from_E(double e, double E) {
@@ -498,27 +510,30 @@ double calc_f_from_E(double e, double E) {
 
 }
 
+extern "C" {
 double* py_calc_f_from_E(int N, double* es, double* Es) {
 
-  double* output = malloc(N * sizeof(double));
+  double* output = (double*) malloc(N * sizeof(double));
 
+  #pragma omp parallel for default(shared) schedule(dynamic)
   for (int idx = 0; idx < N; idx++) {
     output[idx] = calc_f_from_E(es[idx], Es[idx]);
   }
 
   return output;
 
-}
+}}
 
-
+extern "C" {
 double* py_kepM_to_xyz(int N, double *as, double *es, double *incs, double *args, double *nodes, double *Ms)
 {
 
-  double* output = malloc(N * 6 * sizeof(double));
+  double* output = (double*) malloc(N * 6 * sizeof(double));
   int dummy;
 
   struct StateVector rock;
 
+  #pragma omp parallel for  private(rock, dummy)
   for (int idx = 0; idx < N; idx++) {
 
     rock = kepM_to_xyz(as[idx], es[idx], incs[idx], args[idx], nodes[idx], Ms[idx]);
@@ -536,16 +551,18 @@ double* py_kepM_to_xyz(int N, double *as, double *es, double *incs, double *args
 
   return output;
 
-}
+}}
 
+extern "C" {
 double* py_kepE_to_xyz(int N, double *as, double *es, double *incs, double *args, double *nodes, double *Es)
 {
 
-  double* output = malloc(N * 6 * sizeof(double));
+  double* output = (double*) malloc(N * 6 * sizeof(double));
   int dummy;
 
   struct StateVector rock;
 
+  #pragma omp parallel for  private(rock, dummy)
   for (int idx = 0; idx < N; idx++) {
 
     rock = kepE_to_xyz(as[idx], es[idx], incs[idx], args[idx], nodes[idx], Es[idx]);
@@ -563,27 +580,30 @@ double* py_kepE_to_xyz(int N, double *as, double *es, double *incs, double *args
 
   return output;
 
-}
+}}
 
-
+extern "C" {
 double* py_calc_E_from_M(int N, double* es, double* Ms) {
 
-  double* output = malloc(N * sizeof(double));
+  double* output = (double*) malloc(N * sizeof(double));
 
+  #pragma omp parallel for default(shared) schedule(dynamic)
   for (int idx = 0; idx < N; idx++) {
     output[idx] = calc_E_from_M(es[idx], Ms[idx]);
   }
 
   return output;
 
-}
+}}
 
+extern "C" {
 double* py_calc_vovec_from_kep(int N, double mu, double* as, double* es, double* rs, double* Es){
 
-  double* output = malloc(N * 3 * sizeof(double));
+  double* output = (double*) malloc(N * 3 * sizeof(double));
   struct Vector3 vec;
   int dummy;
 
+  #pragma omp parallel for  private(vec, dummy)
   for (int idx = 0; idx < N; idx++) {
     vec = calc_vovec_from_kep(mu, as[idx], es[idx], rs[idx], Es[idx]);
 
@@ -596,7 +616,7 @@ double* py_calc_vovec_from_kep(int N, double mu, double* as, double* es, double*
 
   return output;
 
-}
+}}
 
 struct StateVector correct_for_ltt(double a, double e, double inc, double arg, double node, double M0, 
                                   double ox, double oy, double oz, double ovx, double ovy, double ovz) {
@@ -607,7 +627,6 @@ struct StateVector correct_for_ltt(double a, double e, double inc, double arg, d
  double dx, dy, dz, dvx, dvy, dvz;
  double x0, y0, z0;
  double delta, ltt, dltt;
- double M;
 
  rock = kepM_to_xyz(a, e, inc, arg, node, M0);
  double n = sqrt(mu_bary / fabs(a*a*a));
@@ -633,13 +652,12 @@ struct StateVector correct_for_ltt(double a, double e, double inc, double arg, d
    ltt = delta / speed_of_light;
    dltt = fabs(ltt - ltt0);
 
-   if (dltt < 1e-12) {
+   //if (dltt < 1e-12) {
+   if (dltt < 1e-6) {
      break;
    }
    else {
-     M = M0 - (ltt * n);
-     rock = kepM_to_xyz(a, e, inc, arg, node, M);
-
+     rock = kepM_to_xyz(a, e, inc, arg, node, M0 - (ltt * n));
      ltt0 = ltt;
    }
  }
@@ -727,13 +745,15 @@ struct StateVector correct_for_ltt(double a, double e, double inc, double arg, d
 
 // }
 
+extern "C" {
 double* py_correct_for_ltt(int N, double* as, double* es, double* incs, double* args, double* nodes, double* Ms, 
                            double* obsx, double* obsy, double* obsz, double* obsvx, double* obsvy, double* obsvz) {
 
-  double* output = malloc(N * sizeof(struct StateVector));
+  double* output = (double*) malloc(N * sizeof(struct StateVector));
   struct StateVector rock;
   int dummy;
 
+  #pragma omp parallel for private(rock, dummy)
   for (int idx = 0; idx < N; idx++) {
 
     double a    = as[idx];
@@ -762,6 +782,6 @@ double* py_correct_for_ltt(int N, double* as, double* es, double* incs, double* 
 
   }
 
-  return output;
+   return output;
 
-}
+ }}

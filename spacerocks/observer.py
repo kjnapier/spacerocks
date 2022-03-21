@@ -84,10 +84,13 @@ class Observer:
 
         unique_rocks_and_times = set(list(zip(self.spiceid, self.epoch)))
         unique_dict = {key:self.__state_from_spice(key) for key in unique_rocks_and_times}
-        x, y, z, vx, vy, vz = np.array([unique_dict[(body, time)] for body, time in zip(self.spiceid, self.epoch)]).T
+        #x, y, z, vx, vy, vz = np.array([unique_dict[(body, time)] for body, time in zip(self.spiceid, self.epoch)]).T
 
-        #print(x, y, z, vx, vy, vz)
-        #print(unique_dict)
+        arr = np.empty((len(self.spiceid), 6))
+        for key, value in unique_dict.items():
+            arr[(self.spiceid == key[0]) * (self.epoch == key[1])] = value
+        
+        x, y, z, vx, vy, vz = arr.T 
 
         if hasattr(self, 'obscode'):
             unique_locations_and_times = set(list(zip(self.lon.deg, self.lat.deg, self.elevation, self.epoch)))
