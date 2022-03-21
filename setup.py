@@ -9,7 +9,7 @@ if suffix is None:
     suffix = ".so"
 
 extra_link_args = []
-extra_compile_args = ['-O3', '-fPIC', '-std=c++20', '-march=native', '-fopenmp']
+extra_compile_args = ['-O3', '-fPIC', '-std=gnu++20', '-march=native', '-fopenmp']
 
 if sys.platform == 'darwin':
     from distutils import sysconfig
