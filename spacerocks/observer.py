@@ -31,26 +31,11 @@ class Observer:
             self.epoch = np.atleast_1d(kwargs.get('epoch'))
 
         if kwargs.get('obscode') is not None:
-            if len(np.atleast_1d(kwargs.get('obscode'))) < len(self.epoch):
-                self.obscode = np.repeat(kwargs.get('obscode'), len(self.epoch)) 
-            else:
-                self.obscode = np.atleast_1d(kwargs.get('obscode'))
-            self.spiceid = np.repeat('Earth', len(self.obscode))
-            
-            unique_codes = set(self.obscode)
-            unique_codes_dict = {key:self.__get_observatory_params(key) for key in unique_codes}
-
-            lats, lons, elevations = np.array([unique_codes_dict[obscode] for obscode in self.obscode]).T
-
-            self.lat = Angle(lats, u.deg)
-            self.lon = Angle(lons, u.deg)
-            self.elevation = elevations
+            self.obscode = np.atleast_1d(kwargs.get('obscode'))
+            self.spiceid = np.atleast_1d('Earth')
 
         elif kwargs.get('spiceid') is not None:
-            if len(np.atleast_1d(kwargs.get('spiceid'))) < len(self.epoch):
-                self.spiceid = np.repeat(kwargs.get('spiceid'), len(self.epoch))
-            else:
-                self.spiceid = np.atleast_1d(kwargs.get('spiceid'))
+            self.spiceid = np.atleast_1d(kwargs.get('spiceid'))
 
         else:
             raise ValueError('Must specify either a spiceid or an obscode')
@@ -82,21 +67,48 @@ class Observer:
         TODO: Allow for mixing between terrestrial and non-terrestrial observers 
         '''
 
-        unique_rocks_and_times = set(list(zip(self.spiceid, self.epoch)))
-        unique_dict = {key:self.__state_from_spice(key) for key in unique_rocks_and_times}
-        #x, y, z, vx, vy, vz = np.array([unique_dict[(body, time)] for body, time in zip(self.spiceid, self.epoch)]).T
-
-        arr = np.empty((len(self.spiceid), 6))
-        for key, value in unique_dict.items():
-            arr[(self.spiceid == key[0]) * (self.epoch == key[1])] = value
+        arr = np.empty((len(self.epoch), 6))
         
+        if len(self.spiceid) == 1:
+            unique_times = np.unique(self.epoch)
+            sid = self.spiceid[0]
+            unique_dict = {key:self.__state_from_spice((sid, key)) for key in unique_times}
+            for key, value in unique_dict.items():
+                arr[self.epoch == key] = value
+        else:
+            unique_rocks_and_times = set(list(zip(self.spiceid, self.epoch)))
+            unique_dict = {key:self.__state_from_spice(key) for key in unique_rocks_and_times}
+            for key, value in unique_dict.items():
+                arr[(self.spiceid == key[0]) * (self.epoch == key[1])] = value
+
         x, y, z, vx, vy, vz = arr.T 
 
         if hasattr(self, 'obscode'):
-            unique_locations_and_times = set(list(zip(self.lon.deg, self.lat.deg, self.elevation, self.epoch)))
-            unique_obs_dict = {key:self.__compute_topocentric_correction(key) for key in unique_locations_and_times}
-            dx_icrs, dy_icrs, dz_icrs = np.array([unique_obs_dict[(lon, lat, elev, time)] for lon, lat, elev, time in zip(self.lon.deg, self.lat.deg, self.elevation, self.epoch)]).T
+            
+            icrs_arr = np.empty((len(self.epoch), 3))
+            
+            if len(self.obscode) == 1:
+                lat, lon, elevation = self.__get_observatory_params(self.obscode[0])
+                unique_obs_dict = {key:self.__compute_topocentric_correction((lon, lat, elevation, key)) for key in unique_times}
+                for key, value in unique_obs_dict.items():
+                    icrs_arr[self.epoch == key] = value
+            else:
+                unique_codes = set(self.obscode)
+                unique_codes_dict = {key:self.__get_observatory_params(key) for key in unique_codes}
 
+                lats, lons, elevations = np.array([unique_codes_dict[obscode] for obscode in self.obscode]).T
+
+                self.lat = Angle(lats, u.deg)
+                self.lon = Angle(lons, u.deg)
+                self.elevation = elevations
+            
+                unique_locations_and_times = set(list(zip(self.lon.deg, self.lat.deg, self.elevation, self.epoch)))
+                unique_obs_dict = {key:self.__compute_topocentric_correction(key) for key in unique_locations_and_times}
+                for key, value in unique_dict.items():
+                    icrs_arr[(self.lon == key[0]) * (self.lat == key[1]) * (self.elevation == key[2]) * (self.epoch == key[3])] = value
+            
+
+            dx_icrs, dy_icrs, dz_icrs = icrs_arr.T
             # Transform from icrs to ecliptic
             dx = dx_icrs
             dy = dy_icrs * np.cos(epsilon) + dz_icrs * np.sin(epsilon)
