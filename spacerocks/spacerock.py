@@ -113,7 +113,8 @@ class SpaceRock(KeplerOrbit, Convenience):
             if kwargs.get('arg') is not None:
                 self.arg = Angle(kwargs.get('arg'), units.angle)
                 if np.any(self.arg.deg[self.e < 1e-8] != 0):
-                    raise ValueError('Cannot have e = 0 with arg != 0')
+                    self.arg[self.e < 1e-8] = 0
+                    #raise ValueError('Cannot have e = 0 with arg != 0')
 
             if kwargs.get('varpi') is not None:
                 self.varpi = Angle(kwargs.get('varpi'), units.angle)

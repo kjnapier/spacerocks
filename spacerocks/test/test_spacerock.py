@@ -245,8 +245,8 @@ class TestSpacerock(unittest.TestCase):
         rock.a.au
         rock.e
         
-        with self.assertRaises(ValueError): 
-            SpaceRock(a=40, e=0, inc=5, node=14, M=10, arg=100)
+        #with self.assertRaises(ValueError): 
+        SpaceRock(a=40, e=0, inc=5, node=14, M=10, arg=100)
         with self.assertRaises(ValueError): 
             SpaceRock(Q=-1, a=40, inc=5, node=14, M=10, arg=9)
         with self.assertRaises(ValueError): 
