@@ -459,6 +459,8 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         if hasattr(self, 'H_func'):
             rocks.H_func = np.tile(self.H_func, Nx)
+        elif hasattr(self, 'H'):
+            rocks.H = np.tile(self.H, Nx)
 
         if hasattr(self, 'mag_func'):
             rocks.mag_func = np.tile(self.mag_func, Nx)
