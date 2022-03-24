@@ -185,14 +185,17 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         
         if kwargs.get('H') is not None:
-            curves = kwargs.get('H')
-            curve_funcs = []
-            for curve in curves:
-                if callable(curve):
-                    curve_funcs.append(curve)
-                else:
-                    curve_funcs.append(lambda _, x=curve: x)
-            self.H_func = np.array(curve_funcs)
+            if units.rotation_curves == False:
+                self.H = kwargs.get('H')
+            else:
+                curves = kwargs.get('H')
+                curve_funcs = []
+                for curve in curves:
+                    if callable(curve):
+                        curve_funcs.append(curve)
+                    else:
+                        curve_funcs.append(lambda _, x=curve: x)
+                self.H_func = np.array(curve_funcs)
 
             if kwargs.get('G') is not None:
                 self.G = kwargs.get('G')
@@ -336,6 +339,12 @@ class SpaceRock(KeplerOrbit, Convenience):
     def H(self):
         if hasattr(self, 'H_func'):
             return np.array([func(epoch) for epoch, func in zip(self.epoch.jd, self.H_func)])
+        elif hasattr(self, '_H'):
+            return self._H
+
+    @H.setter
+    def H(self, value):
+        self._H = value
 
     @property
     def mag(self):
@@ -513,10 +522,13 @@ class SpaceRock(KeplerOrbit, Convenience):
         else:
             raise ValueError('Must pass either an obscode or spiceid.')
 
-        if not hasattr(self, 'H_func'):
+        if not (hasattr(self, 'H_func') or hasattr(self, 'H')):
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name)
         else:
-            return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, H=self.H_func, G=self.G)
+            if hasattr(self, 'H_func'):
+                return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, H_func=self.H_func, G=self.G)
+            else:
+                return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name, H=self.H, G=self.G)
 
 
     def xyz_to_tel(self, **kwargs):

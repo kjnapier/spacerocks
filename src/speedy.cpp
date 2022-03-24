@@ -14,6 +14,8 @@ const double speed_of_light = 173.14463267424034;
     #define M_PI 3.14159265358979323846
 #endif
 
+// const double ONE_SIXTH = 1.0 / 6.0;
+
 struct StateVector{
   double x;
   double y;
@@ -49,10 +51,14 @@ double calc_E_from_M(double e, double M){
 
       double k = 0.85;
       double f_E, fP_E, fPP_E, fPPP_E, delta_i1, delta_i2, delta_i3, esinE, ecosE;
+      //double f_E, fP_E, delta_i1, delta_i2, delta_i3, esinE, ecosE;
 
       // Define initial estimate
       if((sin(M)) < 0) E = M - k * e;
       else E = M + k * e;
+
+      //if(M > M_PI) E = M - k * e;
+      //else E = M + k * e;
 
       // Perform Newton-Raphson estimate
       for(int j = 0; j < 10; j++) {
@@ -68,6 +74,10 @@ double calc_E_from_M(double e, double M){
         delta_i1 = -f_E/fP_E;
         delta_i2 = -f_E/(fP_E+1./2.*delta_i1*fPP_E);
         delta_i3 = -f_E/(fP_E+1./2.*delta_i2*fPP_E+1./6.*fPPP_E*delta_i2*delta_i2);
+        // delta_i1 = -f_E / fP_E;
+        // delta_i2 = -f_E / (fP_E + 0.5 * delta_i1 * esinE);
+        // delta_i3 = -f_E/(fP_E + 0.5 * delta_i2 * esinE + ONE_SIXTH * ecosE * delta_i2 * delta_i2);
+
 
         // Update E
         E += delta_i3;
@@ -132,7 +142,6 @@ struct StateVector kepM_to_xyz(double a, double e, double inc, double arg, doubl
     cosE = cos(E);
     omece = 1 - e * cosE;
 
-    //f = acos((cosE - e) / omece);
     f = 2 * atan2(sqrt((1 + e)/(1 - e)) * sin(E / 2), cos(E / 2));
     r = a * omece;
 
@@ -562,7 +571,7 @@ double* py_kepE_to_xyz(int N, double *as, double *es, double *incs, double *args
 
   struct StateVector rock;
 
-  #pragma omp parallel for  private(rock, dummy)
+  #pragma omp parallel for private(rock, dummy)
   for (int idx = 0; idx < N; idx++) {
 
     rock = kepE_to_xyz(as[idx], es[idx], incs[idx], args[idx], nodes[idx], Es[idx]);
@@ -633,26 +642,19 @@ struct StateVector correct_for_ltt(double a, double e, double inc, double arg, d
 
  for (int idx = 0; idx < 5; idx++) {
 
-   x0   = rock.x;
-   y0   = rock.y;
-   z0   = rock.z;
-   //double vx0  = rock.vx;
-   //double vy0  = rock.vy;
-   //double vz0  = rock.vz;
+   x0 = rock.x;
+   y0 = rock.y;
+   z0 = rock.z;
 
-   dx  = x0 - ox;
-   dy  = y0 - oy;
-   dz  = z0 - oz;
-   //dvx  = vx0 - ovx;
-   //dvy  = vy0 - ovy;
-   //dvz  = vz0 - ovz;
-  
+   dx = x0 - ox;
+   dy = y0 - oy;
+   dz = z0 - oz;
+ 
    delta = sqrt(dx*dx + dy*dy + dz*dz);
 
    ltt = delta / speed_of_light;
    dltt = fabs(ltt - ltt0);
 
-   //if (dltt < 1e-12) {
    if (dltt < 1e-6) {
      break;
    }
@@ -711,7 +713,7 @@ struct StateVector correct_for_ltt(double a, double e, double inc, double arg, d
 //     double ltt = delta / speed_of_light;
 //     double dltt = fabs(ltt - ltt0);
 
-//     if (dltt < 1e-12) {
+//     if (dltt < 1e-6) {
 //       break;
 //     }
 //     else {

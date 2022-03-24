@@ -22,6 +22,8 @@ spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
 
 class Observer:
 
+    # might need to pass utc.jd?
+
     def __init__(self, origin='ssb', frame='ECLIPJ2000', **kwargs):
         
         self.origin = origin

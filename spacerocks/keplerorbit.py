@@ -718,7 +718,7 @@ class KeplerOrbit:
     @r.deleter
     def r(self):
         del self._r
-        
+
 
     #@property
     #def TisserandJ(self):

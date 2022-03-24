@@ -27,6 +27,8 @@ class Units:
         self.ra = u.deg
         self.dec = u.deg
 
+        self.rotation_curves = False
+
     def current(self):
         print("{:<20} {:<15}".format('Quantity', 'Unit'))
         print('---------------------------------------')

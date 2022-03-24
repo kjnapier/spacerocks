@@ -41,8 +41,11 @@ class Ephemerides(Convenience):
         self.epoch = kwargs.get('epoch')
         self.name = kwargs.get('name')
 
-        if kwargs.get('H') is not None:
-            self.H_func = kwargs.get('H')
+        if kwargs.get('H_func') is not None:
+            self.H_func = kwargs.get('H_func')
+            self.G = kwargs.get('G')
+        elif kwargs.get('H') is not None:
+            self.H = kwargs.get('H')
             self.G = kwargs.get('G')
 
         self.delta = Distance(sqrt(self.x**2 + self.y**2 + self.z**2), u.au)
@@ -124,7 +127,10 @@ class Ephemerides(Convenience):
 
     @property
     def H(self):
-        return array([func(epoch - ltt.value) for epoch, ltt, func in zip(self.epoch.jd, self.delta / c, self.H_func)])
+        if hasattr(self, 'H_func'):
+            return array([func(epoch - ltt.value) for epoch, ltt, func in zip(self.epoch.jd, self.delta / c, self.H_func)])
+        elif hasattr(self, '_H'):
+            return self._H
 
     @H.setter
     def H(self, value):

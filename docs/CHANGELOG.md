@@ -1,4 +1,5 @@
 ### 2.0.1
+- Added rotation curve hinting to the Units class. This speeds up the case of constant H.
 - Parallelized the C++ backend with OpenMP
 - Added a `rich` progress bar to the `Simulation` `propagate` method.
 - Added more involved tests.
