@@ -186,8 +186,15 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         
         if kwargs.get('H') is not None:
+            
+
             if units.rotation_curves == False:
                 self.H = kwargs.get('H')
+
+                if kwargs.get('G') is not None:
+                    self.G = kwargs.get('G')
+                else:
+                    self.G = np.repeat(0.15, len(self))
             else:
                 curves = kwargs.get('H')
                 curve_funcs = []
@@ -198,10 +205,12 @@ class SpaceRock(KeplerOrbit, Convenience):
                         curve_funcs.append(lambda _, x=curve: x)
                 self.H_func = np.array(curve_funcs)
 
-            if kwargs.get('G') is not None:
-                self.G = kwargs.get('G')
-            else:
-                self.G = np.repeat(0.15, len(self))
+                if kwargs.get('G') is not None:
+                    self.G = kwargs.get('G')
+                else:
+                    self.G = np.repeat(0.15, len(self))
+
+            
 
         elif kwargs.get('mag') is not None:
             curves = kwargs.get('mag')
