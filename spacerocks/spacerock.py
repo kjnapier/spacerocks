@@ -534,7 +534,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         else:
             raise ValueError('Must pass either an obscode or spiceid.')
 
-        if not (hasattr(self, 'H_func') or hasattr(self, 'H')):
+        if not (hasattr(self, 'H_func') or hasattr(self, '_H')):
             return Ephemerides(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=self.epoch, name=self.name)
         else:
             if hasattr(self, 'H_func'):
