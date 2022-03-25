@@ -187,7 +187,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         
         if kwargs.get('H') is not None:
             
-
             if units.rotation_curves == False:
                 self.H = kwargs.get('H')
 
@@ -468,7 +467,7 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         if hasattr(self, 'H_func'):
             rocks.H_func = np.tile(self.H_func, Nx)
-        elif hasattr(self, 'H'):
+        elif hasattr(self, '_H'):
             rocks.H = np.tile(self.H, Nx)
 
         if hasattr(self, 'mag_func'):
