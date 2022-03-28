@@ -423,7 +423,7 @@ double* py_calc_kep_from_xyz(int N, double mu, double* xs, double* ys, double* z
   int dummy;
   struct KeplerOrbit kep;
 
-  #pragma omp parallel for  private(kep, dummy)
+  #pragma omp parallel for private(kep, dummy) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
     kep = calc_kep_from_xyz(mu, xs[idx], ys[idx], zs[idx], vxs[idx], vys[idx], vzs[idx]);
     dummy = idx * 6;
@@ -459,7 +459,7 @@ double* py_calc_M_from_E(int N, double* es, double* Es) {
 
   double* output = (double*) malloc(N * sizeof(double));
 
-  #pragma omp parallel for
+  #pragma omp parallel for schedule(guided)
   for (int idx = 0; idx < N; idx++) {
     output[idx] = calc_M_from_E(es[idx], Es[idx]);
   }
@@ -492,7 +492,7 @@ double* py_calc_E_from_f(int N, double* es, double* fs) {
 
   double* output = (double*) malloc(N * sizeof(double));
 
-  #pragma omp parallel for default(shared) schedule(dynamic)
+  #pragma omp parallel for default(shared) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
     output[idx] = calc_E_from_f(es[idx], fs[idx]);
   }
@@ -524,7 +524,7 @@ double* py_calc_f_from_E(int N, double* es, double* Es) {
 
   double* output = (double*) malloc(N * sizeof(double));
 
-  #pragma omp parallel for default(shared) schedule(dynamic)
+  #pragma omp parallel for default(shared) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
     output[idx] = calc_f_from_E(es[idx], Es[idx]);
   }
@@ -542,7 +542,7 @@ double* py_kepM_to_xyz(int N, double *as, double *es, double *incs, double *args
 
   struct StateVector rock;
 
-  #pragma omp parallel for  private(rock, dummy)
+  #pragma omp parallel for private(rock, dummy) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
 
     rock = kepM_to_xyz(as[idx], es[idx], incs[idx], args[idx], nodes[idx], Ms[idx]);
@@ -571,7 +571,7 @@ double* py_kepE_to_xyz(int N, double *as, double *es, double *incs, double *args
 
   struct StateVector rock;
 
-  #pragma omp parallel for private(rock, dummy)
+  #pragma omp parallel for private(rock, dummy) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
 
     rock = kepE_to_xyz(as[idx], es[idx], incs[idx], args[idx], nodes[idx], Es[idx]);
@@ -596,7 +596,7 @@ double* py_calc_E_from_M(int N, double* es, double* Ms) {
 
   double* output = (double*) malloc(N * sizeof(double));
 
-  #pragma omp parallel for default(shared) schedule(dynamic)
+  #pragma omp parallel for default(shared) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
     output[idx] = calc_E_from_M(es[idx], Ms[idx]);
   }
@@ -612,7 +612,7 @@ double* py_calc_vovec_from_kep(int N, double mu, double* as, double* es, double*
   struct Vector3 vec;
   int dummy;
 
-  #pragma omp parallel for  private(vec, dummy)
+  #pragma omp parallel for private(vec, dummy) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
     vec = calc_vovec_from_kep(mu, as[idx], es[idx], rs[idx], Es[idx]);
 
@@ -755,7 +755,7 @@ double* py_correct_for_ltt(int N, double* as, double* es, double* incs, double* 
   struct StateVector rock;
   int dummy;
 
-  #pragma omp parallel for private(rock, dummy)
+  #pragma omp parallel for private(rock, dummy) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
 
     double a    = as[idx];
