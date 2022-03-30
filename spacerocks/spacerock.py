@@ -360,7 +360,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         if hasattr(self, 'mag_func'):
             return np.array([func(epoch) for epoch, func in zip(self.epoch.jd, self.mag_func)])
 
-    def propagate(self, epochs, model, units=Units()):
+    def propagate(self, epochs, model, units=Units(), gr=False):
         '''
         Numerically integrate all bodies to the desired date.
         This routine synchronizes the epochs.
@@ -378,7 +378,7 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         # Integrate all particles to the same obsdate
         pickup_times = self.epoch.tdb.jd
-        sim, planet_names = self.set_simulation(np.min(pickup_times), model=model)
+        sim, planet_names = self.set_simulation(np.min(pickup_times), model=model, gr=gr)
         sim.t = np.min(pickup_times)
 
         # need to ensure these are computed
@@ -585,7 +585,7 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         return dx, dy, dz, dvx, dvy, dvz
 
-    def set_simulation(self, startdate, model):
+    def set_simulation(self, startdate, model, gr):
 
         sun = SpiceBody(spiceid='Sun')
         mercury = SpiceBody(spiceid='Mercury Barycenter')
@@ -727,11 +727,12 @@ class SpaceRock(KeplerOrbit, Convenience):
         #sim.ri_ias15.epsilon = 1e-12
         
 
-        #import reboundx
-        #rebx = reboundx.Extras(sim)
-        #gr = rebx.load_force('gr_full')
-        #gr.params["c"] = c.to(u.au / u.day).value
-        #rebx.add_force(gr)
+        if gr == True:
+            import reboundx
+            rebx = reboundx.Extras(sim)
+            gr_force = rebx.load_force('gr_full')
+            gr_force.params["c"] = c.to(u.au / u.day).value
+            rebx.add_force(gr_force)
         
         return sim, names
 
