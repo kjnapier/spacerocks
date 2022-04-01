@@ -15,7 +15,7 @@ from .convenience import Convenience
 from astropy import units as u
 
 
-class Orbfit(Convenience):
+class Bernstein(Convenience):
     """Class for interface to orbit-fitting code"""
 
     def __init__(self, units=Units(), **kwargs):

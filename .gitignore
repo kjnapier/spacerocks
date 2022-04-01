@@ -5,6 +5,9 @@
 /*.egg-info
 *.so
 
+.DS_Store
+spacerocks/.DS_Store
+
 # Skyfield data
 /Skyfield-Data/
 /spacerocks/Skyfield-Data/
