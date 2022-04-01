@@ -394,7 +394,7 @@ class Bernstein(Convenience):
                          node=self.orbit_aei.lan,
                          M=self.mean_anomaly(),
                          epoch=orbfit.cvar.jd0,
-                         frame='barycentric',
+                         frame='eclipJ2000',
                          units=units)
         return rock
 
