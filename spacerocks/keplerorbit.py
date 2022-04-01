@@ -321,14 +321,12 @@ class KeplerOrbit:
 
             if hasattr(self, '_position') and hasattr(self, '_velocity'):
                 self.kep_from_xyz()
-                #self.e = self.evec.norm.value
 
             elif hasattr(self, '_a') and hasattr(self, '_q'):
                 self.e = 1 - self.q.au / self.a.au
 
             elif hasattr(self, '_Q') and hasattr(self, '_q'):
-                self.e = (1 - self.q.au / self.Q.au) / \
-                    (1 + self.q.au / self.Q.au)
+                self.e = (1 - self.q.au / self.Q.au) / (1 + self.q.au / self.Q.au)
 
             elif hasattr(self, '_b') and hasattr(self, '_v_inf'):
                 self.e = np.sqrt(1 + self.b.au**2 / self.a.au**2)
@@ -363,9 +361,6 @@ class KeplerOrbit:
     def node(self):
         if not hasattr(self, '_node'):
             if hasattr(self, '_varpi') and hasattr(self, '_arg'):
-                #self.node = Angle(
-                #    (self.varpi.rad - self.arg.rad) % (2 * np.pi), u.rad)
-
                 node = np.zeros(len(self))
                 prograde = self.inc.deg < 90
                 retrograde = ~prograde

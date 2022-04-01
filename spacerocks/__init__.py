@@ -1,6 +1,6 @@
 from ctypes import cdll
 import os
-__version__ = '2.0.1'
+__version__ = '2.1.0'
 __author__ = 'Kevin Napier'
 
 # Find suffix
@@ -12,8 +12,13 @@ if suffix is None:
 # Import shared libraries
 pymodulepath = os.path.dirname(__file__)
 
-__libpath__ = pymodulepath + "/../libspacerocks" + suffix
-clibspacerocks = cdll.LoadLibrary(__libpath__)
+__libspacerockspath__ = pymodulepath + "/../libspacerocks" + suffix
+clibspacerocks = cdll.LoadLibrary(__libspacerockspath__)
+
+import os
+pymodulepath = os.path.dirname(__file__)
+os.environ['ORBIT_EPHEMERIS'] = pymodulepath + '/data/binEphem.423'
+os.environ['ORBIT_OBSERVATORIES'] = pymodulepath + '/data/observatories.dat'
 
 from .spacerock import SpaceRock
 from .units import Units
