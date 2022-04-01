@@ -34,7 +34,7 @@ if sys.platform == 'darwin':
     from distutils import sysconfig
     vars = sysconfig.get_config_vars()
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
-    extra_link_args = ['-Wl,-install_name,@rpath/_pyOrbfit' + suffix]
+    extra_link_args = ['-w,-install_name,@rpath/_pyOrbfit' + suffix]
     extra_compile_args = ['-O3', '-fPIC', '-std=c99', '-march=native']
     
 
