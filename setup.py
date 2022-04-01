@@ -28,14 +28,14 @@ libspacerocksmodule = Extension('libspacerocks',
                                 extra_link_args=extra_link_args
                                 )
 
-extra_compile_args = ['-O3', '-fPIC', '-std=c99', '-march=native']
+extra_compile_args = ['-O3', '-fPIC', '-std=c99', '-march=native', '-w']
 extra_link_args = []
 if sys.platform == 'darwin':
     from distutils import sysconfig
     vars = sysconfig.get_config_vars()
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
-    extra_link_args = ['-w,-install_name,@rpath/_pyOrbfit' + suffix]
-    extra_compile_args = ['-O3', '-fPIC', '-std=c99', '-march=native']
+    extra_link_args = ['-Wl,-install_name,@rpath/_pyOrbfit' + suffix]
+    extra_compile_args = ['-O3', '-fPIC', '-std=c99', '-march=native', '-w']
     
 
 _pyOrbfit = Extension('_pyOrbfit',
