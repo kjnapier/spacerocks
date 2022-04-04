@@ -6,6 +6,7 @@ from functools import partial
 from threading import Event
 from typing import Iterable
 from urllib.request import urlopen
+import contextlib
 
 from rich.progress import (
     BarColumn,
@@ -36,16 +37,16 @@ def download(urls: Iterable[str], dest_dir: str):
 
     def copy_url(task_id: TaskID, url: str, path: str) -> None:
         """Copy data from a url to a local file."""
-        response = urlopen(url)
-        # This will break if the response doesn't contain content length
-        progress.update(task_id, total=int(response.info()["Content-length"]))
-        with open(path, "wb") as dest_file:
-            progress.start_task(task_id)
-            for data in iter(partial(response.read, 32768), b""):
-                dest_file.write(data)
-                progress.update(task_id, advance=len(data))
-                if done_event.is_set():
-                    return
+        with contextlib.closing(urlopen(url)) as response:
+            # This will break if the response doesn't contain content length
+            progress.update(task_id, total=int(response.info()["Content-length"]))
+            with open(path, "wb") as dest_file:
+                progress.start_task(task_id)
+                for data in iter(partial(response.read, 32768), b""):
+                    dest_file.write(data)
+                    progress.update(task_id, advance=len(data))
+                    if done_event.is_set():
+                        return
 
     with progress:
         dummy = []
