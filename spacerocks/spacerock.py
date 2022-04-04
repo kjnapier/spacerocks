@@ -30,8 +30,8 @@ import spiceypy as spice
 SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
 spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
 spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
-spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
-spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
+#spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
+#spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
 
 sun = SpiceBody(spiceid='Sun')
 earth = SpiceBody(spiceid='Earth')
@@ -91,7 +91,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                     if np.any((self.a.au < 0) * (self.e < 1)):
                         raise ValueError('Orbital elements mismatch. a must be positive for e < 1.') 
                     if np.any((self.a.au > 0) * (self.e > 1)):
-                        raise ValueError('Orbital elements mismatch. a must be negative for e < 1.') 
+                        raise ValueError('Orbital elements mismatch. a must be negative for e > 1.') 
 
             self.inc = Angle(kwargs.get('inc'), units.angle)
 
@@ -632,22 +632,23 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         elif model == 3:
 
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000001.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000002.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000003.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000004.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000007.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000010.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000015.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000016.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000031.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000052.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000065.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000087.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000088.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000107.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000511.bsp'))
-            spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000704.bsp'))
+            spice.furnsh(os.path.join(SPICE_PATH, 'sb441-n16s.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000001.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000002.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000003.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000004.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000007.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000010.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000015.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000016.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000031.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000052.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000065.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000087.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000088.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000107.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000511.bsp'))
+            # spice.furnsh(os.path.join(SPICE_PATH, 'asteroids', '2000704.bsp'))
 
             ceres = SpiceBody(spiceid='Ceres')
             vesta = SpiceBody(spiceid='Vesta')

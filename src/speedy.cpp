@@ -494,7 +494,7 @@ double* py_calc_kep_from_xyz(int N, double mu, double* xs, double* ys, double* z
 
   }
   return output;
-}
+}}
 
 double calc_M_from_E(double e, double E) {
 
@@ -509,7 +509,7 @@ double calc_M_from_E(double e, double E) {
 
   return M;
 
-}}
+}
 
 extern "C" {
 double* py_calc_M_from_E(int N, double* es, double* Es) {
@@ -523,7 +523,7 @@ double* py_calc_M_from_E(int N, double* es, double* Es) {
 
   return output;
 
-}
+}}
 
 // If inc > pi/2, varpi = node - arg
 
@@ -542,7 +542,7 @@ double calc_E_from_f(double e, double f) {
     }
   }
   return E;
-}}
+}
 
 extern "C" {
 double* py_calc_E_from_f(int N, double* es, double* fs) {

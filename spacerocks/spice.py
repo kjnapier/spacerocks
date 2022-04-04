@@ -16,8 +16,8 @@ import pkg_resources
 SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
 spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
 spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
-spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
-spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
+#spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
+#spice.furnsh(os.path.join(SPICE_PATH, 'nh.bsp'))
 #spice.furnsh(os.path.join(SPICE_PATH, 'gm_de431.tpc'))
 spice.furnsh(os.path.join(SPICE_PATH, 'gm_Horizons.pck'))
 

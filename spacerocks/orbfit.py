@@ -1,7 +1,6 @@
 from . import pyOrbfit as orbfit
 import numpy as np
 
-#from spacerocks import SpaceRock, Units
 from .spacerock import SpaceRock
 from .units import Units
 from .prediction import Prediction
