@@ -38,9 +38,9 @@ for filename, url in required_spice.items():
     if not p.joinpath(filename).exists():
         to_download.append(url)
 
-if len(to_download) > 0:
-    from .downloader import download
-    download(to_download, SPICE_PATH)
+#if len(to_download) > 0:
+#    from .downloader import download
+#    download(to_download, SPICE_PATH)
 
 from .spacerock import SpaceRock
 from .units import Units
