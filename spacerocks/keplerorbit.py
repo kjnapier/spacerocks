@@ -14,9 +14,12 @@ import os
 
 SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
 spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
-spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
+#spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
+
+#spice.furnsh(os.path.join(SPICE_PATH, 'de441.bsp'))
 #spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
 spice.furnsh(os.path.join(SPICE_PATH, 'nh_pred_alleph_od151.bsp'))
+spice.furnsh(os.path.join(SPICE_PATH, 'de423.bsp'))
 
 class KeplerOrbit:
 

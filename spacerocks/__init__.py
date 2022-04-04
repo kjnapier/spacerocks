@@ -27,12 +27,15 @@ SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
 p = pathlib.Path(SPICE_PATH)
 p.mkdir(parents=True, exist_ok=True)
 
-required_spice = {'de440s.bsp': 'https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de440s.bsp', 
+required_spice = {'de423.bsp': 'https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de423.bsp',
                   'sb441-n16s.bsp': 'https://ssd.jpl.nasa.gov/ftp/xfr/sb441-n16s.bsp',
                   'gm_Horizons.pck': 'https://ssd.jpl.nasa.gov/ftp/xfr/gm_Horizons.pck',
                   'latest_leapseconds.tls': 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/latest_leapseconds.tls',
                   'pck00010.tpc': 'https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00010.tpc',
                   'nh_pred_alleph_od151.bsp': 'https://naif.jpl.nasa.gov/pub/naif/NEWHORIZONS/misc/pds_rel0005/nh_pred_alleph_od151.bsp'}
+
+#'de440s.bsp': 'https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de440s.bsp',
+#'de441.bsp': 'https://ssd.jpl.nasa.gov/ftp/eph/planets/bsp/de441.bsp',
 
 to_download = []
 for filename, url in required_spice.items():

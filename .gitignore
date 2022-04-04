@@ -8,6 +8,8 @@
 .DS_Store
 spacerocks/.DS_Store
 
+/spacerocks/data/spice/
+
 # Skyfield data
 /Skyfield-Data/
 /spacerocks/Skyfield-Data/
