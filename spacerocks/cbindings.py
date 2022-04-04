@@ -112,7 +112,7 @@ clibspacerocks.py_calc_E_from_M.restype = ctypes.POINTER(ctypes.c_double)
 
 def calc_E_from_M(e, M):
 
-    N = len(np.atleast_1d(e))
+    N = len(e)
     rock = clibspacerocks.py_calc_E_from_M(N, e.astype(np.float64), M.astype(np.float64))
     E = np.ctypeslib.as_array(rock, (N,))
 
@@ -127,7 +127,7 @@ clibspacerocks.py_calc_M_from_E.restype = ctypes.POINTER(ctypes.c_double)
 
 def calc_M_from_E(e, E):
 
-    N = len(np.atleast_1d(e))
+    N = len(e)
     rock = clibspacerocks.py_calc_M_from_E(N, e, E)
     M = np.ctypeslib.as_array(rock, (N,))
 
@@ -142,7 +142,7 @@ clibspacerocks.py_calc_E_from_f.restype = ctypes.POINTER(ctypes.c_double)
 
 def calc_E_from_f(e, f):
 
-    N = len(np.atleast_1d(e))
+    N = len(e)
     rock = clibspacerocks.py_calc_E_from_f(N, e.astype(np.float64), f)
     E = np.ctypeslib.as_array(rock, (N,))
 
@@ -157,7 +157,7 @@ clibspacerocks.py_calc_f_from_E.restype = ctypes.POINTER(ctypes.c_double)
 
 def calc_f_from_E(e, E):
 
-    N = len(np.atleast_1d(e))
+    N = len(e)
     rock = clibspacerocks.py_calc_f_from_E(N, e.astype(np.float64), E.astype(np.float64))
     f = np.ctypeslib.as_array(rock, (N,))
 

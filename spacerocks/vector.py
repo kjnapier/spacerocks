@@ -1,4 +1,5 @@
 from numpy import sqrt, sin, cos
+import numpy as np
 import copy
 
 
@@ -16,7 +17,7 @@ class Vector:
         '''
         p = copy.copy(self)
         for attr in self.__dict__.keys():
-            setattr(p, attr, getattr(self, attr)[idx])
+            setattr(p, attr, np.atleast_1d(getattr(self, attr)[idx]))
 
         return p
 
