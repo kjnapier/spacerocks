@@ -66,12 +66,14 @@ class Simulation(rebound.Simulation, Convenience):
 
     def add_spacerocks(self, rocks):
         self.rocks = copy.copy(rocks)
-        self.testparticle_names = rocks.name
-        self.remaining_testparticles = copy.copy(rocks.name)
+        self.rocks.name = self.rocks.name.tolist()
+        self.testparticle_names = self.rocks.name
+        self.remaining_testparticles = copy.copy(self.rocks.name)
         self.rocks.to_bary()
         self.rocks.position
         self.rocks.velocity
-        for rock in self.rocks:
+
+        for rock, name in zip(self.rocks, self.testparticle_names):
             self.add(x=rock.x.au, 
                      y=rock.y.au, 
                      z=rock.z.au,
@@ -79,9 +81,9 @@ class Simulation(rebound.Simulation, Convenience):
                      vy=rock.vy.value, 
                      vz=rock.vz.value,
                      m=0, 
-                     hash=rock.name)
+                     hash=name)
         
-        for n in rocks.name:
+        for n in self.testparticle_names:
             h = self.particles[n].hash
             self.simdata[h.value] = []
 
