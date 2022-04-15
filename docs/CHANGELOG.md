@@ -1,3 +1,6 @@
+### 2.1.0
+- Reintroduced `PyOrbfit`, with the class now titled `Bernstein`
+- Fixed a memory leak caused by Numpy not taking ownership of C pointers, and thus being missed by garbage collection.
 ### 2.0.1
 - Added rotation curve hinting to the Units class. This speeds up the case of constant H.
 - Parallelized the C++ backend with OpenMP

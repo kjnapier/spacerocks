@@ -474,9 +474,16 @@ struct KeplerOrbit calc_kep_from_xyz(double mu, double x, double y, double z, do
 }
 
 extern "C" {
+void free_memory(double *ptr) {
+  free(ptr);
+}
+}
+
+extern "C" {
 double* py_calc_kep_from_xyz(int N, double mu, double* xs, double* ys, double* zs, double* vxs, double* vys, double* vzs) {
   //struct KeplerOrbit* output = malloc(N * sizeof(struct KeplerOrbit));
   double* output = (double*) malloc(N * 6 * sizeof(double));
+  //double* output = new double[N * 6];
   int dummy;
   struct KeplerOrbit kep;
 
@@ -515,6 +522,7 @@ extern "C" {
 double* py_calc_M_from_E(int N, double* es, double* Es) {
 
   double* output = (double*) malloc(N * sizeof(double));
+  //double* output = new double[N];
 
   #pragma omp parallel for schedule(guided)
   for (int idx = 0; idx < N; idx++) {
@@ -548,6 +556,7 @@ extern "C" {
 double* py_calc_E_from_f(int N, double* es, double* fs) {
 
   double* output = (double*) malloc(N * sizeof(double));
+  //double* output = new double[N];
 
   #pragma omp parallel for default(shared) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
@@ -580,6 +589,7 @@ extern "C" {
 double* py_calc_f_from_E(int N, double* es, double* Es) {
 
   double* output = (double*) malloc(N * sizeof(double));
+  //double* output = new double[N];
 
   #pragma omp parallel for default(shared) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
@@ -597,6 +607,7 @@ double* py_kepM_to_xyz(int N, double *as, double *es, double *incs, double *args
 {
 
   double* output = (double*) malloc(N * 6 * sizeof(double));
+  //double* output = new double[N * 6];
   int dummy;
 
   struct StateVector rock;
@@ -626,6 +637,7 @@ double* py_kepE_to_xyz(int N, double *as, double *es, double *incs, double *args
 {
 
   double* output = (double*) malloc(N * 6 * sizeof(double));
+  //double* output = new double[N * 6];
   int dummy;
 
   struct StateVector rock;
@@ -654,6 +666,7 @@ extern "C" {
 double* py_calc_E_from_M(int N, double* es, double* Ms) {
 
   double* output = (double*) malloc(N * sizeof(double));
+  //double* output = new double[N];
 
   #pragma omp parallel for default(shared) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
@@ -668,6 +681,7 @@ extern "C" {
 double* py_calc_vovec_from_kep(int N, double mu, double* as, double* es, double* rs, double* Es){
 
   double* output = (double*) malloc(N * 3 * sizeof(double));
+  //double* output = new double[N * 3];
   struct Vector3 vec;
   int dummy;
 
@@ -811,6 +825,7 @@ double* py_correct_for_ltt(int N, double* as, double* es, double* incs, double* 
                            double* obsx, double* obsy, double* obsz, double* obsvx, double* obsvy, double* obsvz) {
 
   double* output = (double*) malloc(N * sizeof(struct StateVector));
+  //double* output = new double[N * 6];
   struct StateVector rock;
   int dummy;
 
