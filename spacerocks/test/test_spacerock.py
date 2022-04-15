@@ -132,8 +132,8 @@ class TestSpacerock(unittest.TestCase):
         # sep = pos_pred.separation(pos_Horizons)
     
         # self.assertTrue(sep.arcsec.max() < 1)
-        self.assertTrue(obs.mag.max() < 10.5)
-        self.assertTrue(obs.mag.min() > 6)
+        self.assertTrue(obs.mag.max() < 11)
+        self.assertTrue(obs.mag.min() > 5)
 
 
     def test_multiple_constructors(self):
