@@ -561,6 +561,7 @@ earth3d(double t,	/* time is in years here */
   return;
 }
 
+
 /* Routine to give the t=0 position & velocity of KBO in
  * ecliptic system centered at SSBARY */
 void

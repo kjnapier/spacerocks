@@ -320,6 +320,7 @@ date_to_jd(struct date_time date);
 void
 aei_derivs( XVBASIS *xv,
 	    double **daei_dxv);
+
 double
 elongation(OBSERVATION *obs);
 double
