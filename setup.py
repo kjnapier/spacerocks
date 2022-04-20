@@ -28,7 +28,7 @@ libspacerocksmodule = Extension('libspacerocks',
                                 extra_link_args=extra_link_args
                                 )
 
-extra_compile_args = ['-O3', '-fPIC', '-std=c99', '-march=native', '-w']
+extra_compile_args = ['-O3', '-fPIC', '-std=c99', '-march=native', '-fno-stack-protector']
 extra_link_args = []
 if sys.platform == 'darwin':
     from distutils import sysconfig
