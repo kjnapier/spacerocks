@@ -64,3 +64,7 @@ cd spacerocks
 python setup.py build_ext -i
 pip install .
 ```
+
+You'll also need `OpenMP` and `swig`. On MacOS, you xan get these with `brew`
+`brew install libomp`
+`brew install swig`
