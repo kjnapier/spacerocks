@@ -65,6 +65,6 @@ python setup.py build_ext -i
 pip install .
 ```
 
-You'll also need `OpenMP` and `swig`. On MacOS, you xan get these with `brew`
+You'll also need `OpenMP` and `swig`. On MacOS, you can install these with `brew`
 `brew install libomp`
 `brew install swig`
