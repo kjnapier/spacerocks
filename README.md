@@ -67,6 +67,7 @@ pip install .
 
 You'll also need `OpenMP` and `swig`. On MacOS, you can install these with `brew`
 
-`brew install libomp`
-
-`brew install swig`
+```zsh
+brew install libomp
+brew install swig
+```
