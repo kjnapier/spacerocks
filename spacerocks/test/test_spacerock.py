@@ -119,7 +119,7 @@ class TestSpacerock(unittest.TestCase):
         units.timescale = 'utc'
 
         rock = SpaceRock.from_horizons(name='Ceres')
-        prop, _, _ = rock.propagate(epochs=testdates.jd, model=2, units=units)
+        prop, _, _ = rock.propagate(epochs=testdates.jd, model='PLANETS', units=units)
         obs = prop.observe(obscode='W84')
     
         # ephem_Horizons = Horizons(id='Ceres', location='W84',
@@ -148,15 +148,15 @@ class TestSpacerock(unittest.TestCase):
             return rock
 
         rock = gen_rock()
-        prop, planets, sim = rock.propagate(epochs='3 March 2022', model=0)
+        prop, planets, sim = rock.propagate(epochs='3 March 2022', model='SUN')
         self.assertEqual(len(planets), 1)
 
         rock = gen_rock()
-        prop, planets, sim = rock.propagate(epochs='3 March 2022', model=1)
+        prop, planets, sim = rock.propagate(epochs='3 March 2022', model='GIANTS')
         self.assertEqual(len(planets), 5)
 
         rock = SpaceRock(e=0, q=40, inc=5, node=14, M=10, arg=0, epoch='2 March 2022', frame='J2000')
-        prop, planets, sim = rock.propagate(epochs='3 March 2022', model=3)
+        prop, planets, sim = rock.propagate(epochs='3 March 2022', model='HORIZONS')
         self.assertEqual(len(planets), 27)
 
         rock = gen_rock()
