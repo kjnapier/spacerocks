@@ -627,4 +627,4 @@ class SpaceRock(KeplerOrbit, Convenience):
         af.write_to(path, all_array_compression=compression)
 
     def groupby(self, parameter):
-        return (self[getattr(self, parameter) == x] for x in sorted(set(getattr(self, parameter))))
+        return ([x, self[getattr(self, parameter) == x]] for x in sorted(set(getattr(self, parameter))))
