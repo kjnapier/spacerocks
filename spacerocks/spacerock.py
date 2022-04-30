@@ -625,3 +625,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         # Create the ASDF file object from our data tree
         af = asdf.AsdfFile(tree)
         af.write_to(path, all_array_compression=compression)
+
+    def groupby(self, parameter):
+        return (self[getattr(self, parameter) == x] for x in sorted(set(getattr(self, parameter))))
