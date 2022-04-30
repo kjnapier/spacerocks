@@ -194,7 +194,10 @@ class Simulation(rebound.Simulation, Convenience):
             vz     = []
             name   = []
             for n in self.testparticle_names:
-                ts, xs, ys, zs, vxs, vys, vzs = np.array(self.simdata[rebound.hash(n).value]).T
+                try:
+                    ts, xs, ys, zs, vxs, vys, vzs = np.array(self.simdata[rebound.hash(n).value]).T
+                except ValueError:
+                    continue
                 epoch.append(ts.tolist())
                 x.append(xs.tolist())
                 y.append(ys.tolist())
