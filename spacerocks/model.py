@@ -35,17 +35,7 @@ builtin_models = {'SUN': [['Sun'], SpiceKernel()],
                               'Saturn Barycenter', 
                               'Uranus Barycenter', 
                               'Neptune Barycenter', 'Pluto Barycenter'], SpiceKernel()],
-                  'HORIZONS': [['Sun', 
-                               'Mercury Barycenter',
-                               'Venus Barycenter',
-                               'Earth',
-                               'Moon',
-                               'Mars Barycenter',
-                               'Jupiter Barycenter', 
-                               'Saturn Barycenter', 
-                               'Uranus Barycenter', 
-                               'Neptune Barycenter', 
-                               'Pluto Barycenter'], SpiceKernel(spk=['de423.bsp', 'sb441-n16s.bsp'])]}
+                  'HORIZONS': [HORIZONS_PERTURBERS, SpiceKernel(spk=['de423.bsp', 'sb441-n16s.bsp'])]}
 
 class PerturberModel:
     
