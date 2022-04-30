@@ -15,6 +15,7 @@ class Units:
     def set_default(self):
         self.distance = u.au
         self.angle = u.deg
+        self.time = u.day
         
         self.timescale = 'utc'
         self.timeformat = None
@@ -22,7 +23,7 @@ class Units:
 
         self.size = u.km
         self.density = u.g / u.cm**3
-        self.mass = u.kg
+        self.mass = u.M_sun
 
         self.ra = u.deg
         self.dec = u.deg

@@ -1,3 +1,8 @@
+### 2.1.1
+- Consolidated `spice` logic into a `SpiceKernel` class
+- Created a `PerturberModel` class for managing the perturbers in simulations
+- Changed the `SpaceRock.propagate` method to use the new `Simulation` class
+- Added functionality to provide a pre-computed `Observer` to `SpaceRock.observe`
 ### 2.1.0
 - Reintroduced `PyOrbfit`, with the class now titled `Bernstein`
 - Fixed a memory leak caused by Numpy not taking ownership of C pointers, and thus being missed by garbage collection.

@@ -22,11 +22,12 @@ class Convenience:
         '''
         p = copy.copy(self)
         for attr in self.__dict__.keys():
-            if (attr != 'mu') and (attr != 'frame') and (attr != 'G') and (attr != 'origin'):# and (attr != '_x') and (attr != '_y') and (attr != '_z') and (attr != '_vx') and (attr != '_vy') and (attr != '_vz'):
+            if (attr != 'mu') and (attr != 'frame') and (attr != 'G') and (attr != 'origin') and (attr != 'units'):# and (attr != '_x') and (attr != '_y') and (attr != '_z') and (attr != '_vx') and (attr != '_vy') and (attr != '_vz'):
                 if isinstance(getattr(self, attr), Vector):
                     setattr(p, attr, getattr(self, attr)[idx])
                 else:
-                    setattr(p, attr, np.atleast_1d(getattr(self, attr)[idx]))
+                    #print(idx)
+                    setattr(p, attr, getattr(self, attr)[idx])
 
         return p
 

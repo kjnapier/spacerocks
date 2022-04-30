@@ -1,30 +1,19 @@
 from .convenience import Convenience
+from .spice import SpiceBody
+from .constants import c, epsilon
 
 from astropy import units as u
 from astropy.coordinates import Angle, Distance
 
 from healpy.pixelfunc import ang2pix
-
-
 from numpy import sin, cos, arctan2, sqrt, arcsin, tan, exp, log10, where, array, arccos, pi
 
-from .constants import c, epsilon
 import spiceypy as spice
 import pkg_resources
 import os
 
-from .spice import SpiceBody
 
 SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
-spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'de441.bsp'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
-spice.furnsh(os.path.join(SPICE_PATH, 'nh_pred_alleph_od151.bsp'))
-spice.furnsh(os.path.join(SPICE_PATH, 'de423.bsp'))
-
-sun = SpiceBody(spiceid='Sun')
-earth = SpiceBody(spiceid='Earth')
 
 class Ephemerides(Convenience):
 
@@ -174,6 +163,8 @@ class Ephemerides(Convenience):
         Estimate the apparent magnitude of a TNO
         https://iopscience.iop.org/article/10.3847/1538-3881/ab18a9/pdf for light curves
         '''
+        earth = SpiceBody(spiceid='Earth')
+        sun = SpiceBody(spiceid='Sun')
         e = earth.at(self.epoch)
         s = sun.at(self.epoch)
 

@@ -1,109 +1,139 @@
-import rebound
-import pkg_resources
-from astropy.time import Time
-import numpy as np
-import copy
-from rich.progress import track
-
+from .spacerock import SpaceRock
 from .spice import SpiceBody
+from .model import PerturberModel
 from .units import Units
 from .convenience import Convenience
-from .spacerock import SpaceRock
 
-SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
+import copy
+import numpy as np
+from rich.progress import track
 
-class Simulation(rebound.Simulation, Convenience):   
+import rebound
+from rebound.units import masses_SI, lengths_SI, times_SI
+from astropy import units as u
+from astropy.time import Time
+
+def get_rebound_unit_representation(unit, rebound_values) -> str:
+    if isinstance(unit, str):
+        return {unit}.intersection(set(rebound_values.keys())).pop()
+    return set([x.lower() for x in unit._names]).intersection(set(rebound_values.keys())).pop()
+
+def create_rebound_units(units: Units) -> tuple:
+    mass_units = get_rebound_unit_representation(units.mass, masses_SI)
+    length_units = get_rebound_unit_representation(units.distance, lengths_SI)
+    time_units = get_rebound_unit_representation(units.time, times_SI)
+    return (mass_units, length_units, time_units)
 
 
-    def __init__(self):
+class Simulation(rebound.Simulation, Convenience):
+
+    def __init__(self, model='GIANTS', units=Units(), **kwargs):
         super().__init__(self)
-        self.units = ('day', 'AU', 'Msun')
-        self.simdata = {}
-        self.perturber_names = []
-        self.N_active = 0
+        self.spacerocks_units = units
+        self.units = create_rebound_units(self.spacerocks_units)
 
-    def add_perturbers(self, epoch, **kwargs):
+        if isinstance(model, str):
+            self.model = PerturberModel.from_builtin(model)
+        elif isinstance(model, PerturberModel):
+            self.model = model
+
+        self.perturber_names = list(self.model.perturbers)
+        self.testparticle_names = []
+        self.remaining_testparticles = []
+        self.N_active = len(self.perturber_names)
         
-        epoch = Time(epoch, scale='tdb', format='jd')
-        self.t = epoch.jd
+        self.simdata = {}
+        
+        if kwargs.get('epoch') is not None:
+            self.epoch = Time(kwargs.get('epoch'), 
+                              format=self.spacerocks_units.timeformat, 
+                              scale=self.spacerocks_units.timescale)
 
-        if kwargs.get('spiceid') is not None:
-            names = np.atleast_1d(kwargs.get('spiceid'))
-            for name in names:
-                self.perturber_names.append(name)
-                self.N_active += 1
-                   
-                body = SpiceBody(spiceid=name)
-                b = body.at(epoch)
-                self.add(x=b.x.au, 
-                         y=b.y.au, 
-                         z=b.z.au,
-                         vx=b.vx.value, 
-                         vy=b.vy.value, 
-                         vz=b.vz.value,
-                         m=body.mass.value, 
+        self.t = copy.deepcopy(self.epoch.tdb.jd)
+        for name, perturber in self.model.perturbers.items():
+            if isinstance(perturber, SpaceRock):
+                if hasattr(perturber, 'epoch'):
+                    body = perturber.analytic_propagate(self.epoch)
+                    self.add(x=body.x.au[0], 
+                             y=body.y.au[0], 
+                             z=body.z.au[0],
+                             vx=body.vx.value[0], 
+                             vy=body.vy.value[0], 
+                             vz=body.vz.value[0],
+                             m=body.mass.to(self.spacerocks_units.mass).value[0], 
+                             hash=name)
+                else:
+                    self.add(x=body.x.au[0], 
+                             y=body.y.au[0], 
+                             z=body.z.au[0],
+                             vx=body.vx.value[0], 
+                             vy=body.vy.value[0], 
+                             vz=body.vz.value[0],
+                             m=body.mass.to(self.spacerocks_units.mass).value[0], 
+                             hash=name)
+                    
+            elif isinstance(perturber, SpiceBody):
+                body = perturber.at(self.epoch)
+                self.add(x=body.x.au[0], 
+                         y=body.y.au[0], 
+                         z=body.z.au[0],
+                         vx=body.vx.value[0], 
+                         vy=body.vy.value[0], 
+                         vz=body.vz.value[0],
+                         m=perturber.mass.to(self.spacerocks_units.mass).value, 
                          hash=name)
-
-        if kwargs.get('rocks') is not None:
-            rocks = kwargs.get('rocks')
-            for name in np.unique(rocks.name):
-                self.perturber_names.append(name)
-                self.N_active += 1
-                r = rocks[rocks.name == name]
-
-                self.add(x=r.x.au, 
-                         y=r.y.au, 
-                         z=r.z.au,
-                         vx=r.vx.value, 
-                         vy=r.vy.value, 
-                         vz=r.vz.value,
-                         m=r.mass.value, 
-                         hash=name)
-
+                
         for n in self.perturber_names:
             h = self.particles[n].hash
             self.simdata[h.value] = []
 
-    def add_spacerocks(self, rocks):
-        self.rocks = copy.copy(rocks)
-        self.rocks.name = self.rocks.name.tolist()
-        self.testparticle_names = self.rocks.name
-        self.remaining_testparticles = copy.copy(self.rocks.name)
-        self.rocks.to_bary()
-        self.rocks.position
-        self.rocks.velocity
-
-        for rock, name in zip(self.rocks, self.testparticle_names):
-            self.add(x=rock.x.au, 
-                     y=rock.y.au, 
-                     z=rock.z.au,
-                     vx=rock.vx.value, 
-                     vy=rock.vy.value, 
-                     vz=rock.vz.value,
-                     m=0, 
-                     hash=name)
+        self.move_to_com()
         
-        for n in self.testparticle_names:
+    def add_spacerocks(self, rocks):
+        r = copy.deepcopy(rocks)
+        self.testparticle_names += copy.deepcopy(r.name.tolist())
+        self.remaining_testparticles += copy.deepcopy(r.name.tolist())
+        r.to_bary()
+        r.change_frame('eclipJ2000')
+       
+        if hasattr(r, 'epoch'):       
+            # Integrate all particles to the same epoch
+            pickup_times = r.epoch.tdb.jd
+            
+            for time in np.sort(np.unique(pickup_times)):
+                self.integrate(time, exact_finish_time=1)
+                ps = r[r.epoch.tdb.jd == time]
+                for x, y, z, vx, vy, vz, name in zip(ps.x.value, ps.y.value, ps.z.value, ps.vx.value, ps.vy.value, ps.vz.value, ps.name):
+                    self.add(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, m=0, hash=name)
+                    
+        else:
+            for rock, name in zip(r, r.name):
+                self.add(x=rock.x.au, 
+                         y=rock.y.au, 
+                         z=rock.z.au,
+                         vx=rock.vx.value, 
+                         vy=rock.vy.value, 
+                         vz=rock.vz.value,
+                         m=0, 
+                         hash=name)
+        
+        for n in r.name:
             h = self.particles[n].hash
             self.simdata[h.value] = []
-
-    def propagate(self, epochs, units=Units(), progress=True, **kwargs):
+            
+    def propagate(self, epochs, units=Units(), progress=True, exact_finish_time=1, **kwargs):
         '''
         Numerically integrate all bodies to the desired date.
         This routine synchronizes the epochs.
         '''
 
-        if kwargs.get('func') is not None:
+        if kwargs.get('callback') is not None:
             f = True
-            func = kwargs.get('func')
+            callback = kwargs.get('callback')
         else:
             f = False
 
-        units.timescale = 'tdb'
-
         epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
-
-        self.move_to_com()
 
         if progress == True:
             iterator = track(np.sort(epochs.tdb.jd))
@@ -111,10 +141,10 @@ class Simulation(rebound.Simulation, Convenience):
             iterator = np.sort(epochs.tdb.jd)
         
         for time in iterator:
-            self.integrate(time, exact_finish_time=1)
+            self.integrate(time, exact_finish_time=exact_finish_time)
 
             if f == True:
-                func(self)
+                callback(self)
             
             for p in self.particles:
                 h = p.hash.value

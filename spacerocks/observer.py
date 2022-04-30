@@ -14,13 +14,6 @@ DATA_PATH = pkg_resources.resource_filename('spacerocks', 'data/observatories.cs
 observatories = pd.read_csv(DATA_PATH)
 
 SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
-spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'de441.bsp'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'nh_pred_alleph_od151.bsp'))
-spice.furnsh(os.path.join(SPICE_PATH, 'nh_pred_alleph_od151.bsp'))
-spice.furnsh(os.path.join(SPICE_PATH, 'de423.bsp'))
 
 class Observer:
 
@@ -118,6 +111,11 @@ class Observer:
             dy = dy_icrs * np.cos(epsilon) + dz_icrs * np.sin(epsilon)
             dz = -dy_icrs * np.sin(epsilon) + dz_icrs * np.cos(epsilon)
 
+            # eps = self.__compute_eps(self.epoch)
+            # dx = dx_icrs
+            # dy = dy_icrs * np.cos(eps) + dz_icrs * np.sin(eps)
+            # dz = -dy_icrs * np.sin(eps) + dz_icrs * np.cos(eps)
+
             x += (dx * u.m).to(u.km).value
             y += (dy * u.m).to(u.km).value
             z += (dz * u.m).to(u.km).value
@@ -156,6 +154,13 @@ class Observer:
         dy = C_geo * np.cos(observer_lat) * np.sin(lon)
         dz = S_geo * np.sin(observer_lat)
         return dx.value, dy.value, dz.value
+
+    def __compute_eps(self, epoch):
+        T = (epoch - 2451545.0) / 36525
+        correction = (46.815 * T - 0.00059 * T * T + 0.001813 * T * T * T)/206265
+        eps = Angle(epsilon + correction, u.rad)
+        return eps
+
 
     def __compute_local_sidereal_time(self, epoch, lon):
         T = (epoch - 2451545.0) / 36525

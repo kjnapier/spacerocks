@@ -13,13 +13,6 @@ import spiceypy as spice
 import os
 
 SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
-spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
-
-#spice.furnsh(os.path.join(SPICE_PATH, 'de441.bsp'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
-spice.furnsh(os.path.join(SPICE_PATH, 'nh_pred_alleph_od151.bsp'))
-spice.furnsh(os.path.join(SPICE_PATH, 'de423.bsp'))
 
 class KeplerOrbit:
 
@@ -61,18 +54,22 @@ class KeplerOrbit:
         
 
     def change_frame(self, new_frame: str):
+        '''
+        Method to convert coordinates to a new frame.
+        Modifies the SpaceRock object inplace.
+
+        new_frame: string of the spiceid of the new frame.
+        '''
 
         if self.frame != new_frame:
 
             rotation_matrix = frames[new_frame.upper()] @ np.linalg.inv(frames[self.frame.upper()])
-            xyz = [self.x, self.y, self.z]
-            vxyz = [self.vx, self.vy, self.vz]
 
             distance_units = self.x._unit
             velo_units = self.vx._unit
 
-            x, y, z = rotation_matrix.dot(xyz)
-            vx, vy, vz = rotation_matrix.dot(vxyz) * velo_units
+            x, y, z = rotation_matrix.dot([self.x, self.y, self.z])
+            vx, vy, vz = rotation_matrix.dot([self.vx, self.vy, self.vz]) * velo_units
 
             self.frame = new_frame
     
@@ -595,7 +592,7 @@ class KeplerOrbit:
             if hasattr(self, '_mass') and hasattr(self, '_radius'):
                 self.density = (3 * self.mass) / (4 * np.pi * self.radius**3)
             else:
-                raise ValueError('Insufficient information for calculating radius.')
+                raise ValueError('Insufficient information for calculating density.')
         return self._density
 
     @density.setter
@@ -716,9 +713,3 @@ class KeplerOrbit:
     @r.deleter
     def r(self):
         del self._r
-
-
-    #@property
-    #def TisserandJ(self):
-    #    aJ = 5.2 * u.au
-    #    return aJ / self.a * 2 * np.cos(self.inc) * np.sqrt(self.p / aJ)

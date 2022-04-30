@@ -1,6 +1,3 @@
-#import spacerocks.spacerock as sr
-#from .spacerock import SpaceRock
-
 from astropy import units as u
 from astropy.coordinates import Distance
 
@@ -14,15 +11,25 @@ import os
 import pkg_resources
 
 SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
-spice.furnsh(os.path.join(SPICE_PATH, 'latest_leapseconds.tls'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'de440s.bsp'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'de441.bsp'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'hst.bsp'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'nh_pred_alleph_od151.bsp'))
-#spice.furnsh(os.path.join(SPICE_PATH, 'gm_de431.tpc'))
-spice.furnsh(os.path.join(SPICE_PATH, 'gm_Horizons.pck'))
-spice.furnsh(os.path.join(SPICE_PATH, 'nh_pred_alleph_od151.bsp'))
-spice.furnsh(os.path.join(SPICE_PATH, 'de423.bsp'))
+
+class SpiceKernel:
+    
+    def __init__(self, lsk='latest_leapseconds.tls', pck='gm_Horizons.pck', spk='de423.bsp', spice_path=SPICE_PATH):
+        self.lsk = os.path.join(spice_path, lsk)
+        self.pck = os.path.join(spice_path, pck)
+        self.spk = [os.path.join(spice_path, x) for x in np.atleast_1d(spk)]
+        
+    def furnsh(self):
+        spice.furnsh(self.lsk)
+        spice.furnsh(self.pck)
+        for spk in self.spk:
+            spice.furnsh(spk)
+       
+    def unload(self):
+        spice.unload(self.lsk)
+        spice.unload(self.pck)
+        for spk in self.spk:
+            spice.unload(spk)
 
 class SpiceBody:
 
