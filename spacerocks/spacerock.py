@@ -387,7 +387,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         units = Units()
         units.timescale = 'tdb'
         units.timeformat = 'jd'
-        sim = Simulation(model=model, epoch=self.epoch.tdb.jd, units=units)
+        sim = Simulation(model=model, epoch=self.epoch.tdb.jd.min(), units=units)
         sim.add_spacerocks(self)
         sim.N_active = len(sim.model.perturbers)
         sim.testparticle_type = 0
