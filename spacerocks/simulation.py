@@ -66,13 +66,13 @@ class Simulation(rebound.Simulation, Convenience):
                              m=body.mass.to(self.spacerocks_units.mass).value[0], 
                              hash=name)
                 else:
-                    self.add(x=body.x.au[0], 
-                             y=body.y.au[0], 
-                             z=body.z.au[0],
-                             vx=body.vx.value[0], 
-                             vy=body.vy.value[0], 
-                             vz=body.vz.value[0],
-                             m=body.mass.to(self.spacerocks_units.mass).value[0], 
+                    self.add(x=perturber.x.au[0], 
+                             y=perturber.y.au[0], 
+                             z=perturber.z.au[0],
+                             vx=perturber.vx.value[0], 
+                             vy=perturber.vy.value[0], 
+                             vz=perturber.vz.value[0],
+                             m=perturber.mass.to(self.spacerocks_units.mass).value[0], 
                              hash=name)
                     
             elif isinstance(perturber, SpiceBody):

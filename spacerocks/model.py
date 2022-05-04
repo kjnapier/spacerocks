@@ -1,6 +1,7 @@
 from .spice import SpiceKernel, SpiceBody
 from .spacerock import SpaceRock
 
+import numpy as np
 import pkg_resources
 SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
 
@@ -50,8 +51,13 @@ class PerturberModel:
                 self.perturbers[spiceid] = SpiceBody(spiceid=spiceid)
                 
         if kwargs.get('rocks') is not None:
-            for rock in kwargs.get('rocks'):
-                self.perturbers[rock.name[0]] = rock
+            rocks = kwargs.get('rocks')
+            if len(rocks) == 1:
+                for rock in [rocks]:
+                    self.perturbers[np.atleast_1d(rock.name)[0]] = rock
+            else:
+                for rock in rocks:
+                    self.perturbers[np.atleast_1d(rock.name)[0]] = rock
 
     @classmethod
     def from_builtin(cls, model: str):

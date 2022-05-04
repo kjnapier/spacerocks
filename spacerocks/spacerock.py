@@ -136,8 +136,8 @@ class SpaceRock(KeplerOrbit, Convenience):
                     self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
                 else:
                     self.epoch = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
-            else:
-                self.epoch = Time(np.zeros(len(self.inc)), format='jd', scale='utc')
+            #else:
+            #    self.epoch = Time(np.zeros(len(self.inc)), format='jd', scale='utc')
 
             if kwargs.get('name') is not None:
                 self.name = np.atleast_1d(kwargs.get('name'))
@@ -164,8 +164,8 @@ class SpaceRock(KeplerOrbit, Convenience):
                     self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
                 else:
                     self.epoch = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
-            else:
-                self.epoch = Time(np.zeros(len(self.x)), format='jd', scale='utc')
+            #else:
+            #    self.epoch = Time(np.zeros(len(self.x)), format='jd', scale='utc')
 
             if kwargs.get('name') is not None:
                 self.name = np.atleast_1d(kwargs.get('name'))
@@ -227,8 +227,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         if kwargs.get('cov') is not None:
             self.cov = kwargs.get('cov')
 
-
-
     def clone(self, N: int):
         epochs = np.repeat(self.epoch.tdb.jd, N)
         names = [self.name[0] + f'-clone{idx}' for idx in range(N)]
@@ -240,17 +238,9 @@ class SpaceRock(KeplerOrbit, Convenience):
                 self.vy.value[0], 
                 self.vz.value[0]]
         xs, ys, zs, vxs, vys, vzs = np.random.multivariate_normal(mean, self.cov[0], N).T
-    
-        # units = Units()
-        # units.distance = u.au
-        # units.speed = u.au/u.day
-        # units.timescale = 'tdb'
 
         return SpaceRock(x=xs, y=ys, z=zs, vx=vxs, vy=vys, vz=vzs, name=names,
                          origin=self.origin, frame=self.frame, units=self.units, epoch=epochs)
-
-
-
 
     @classmethod
     def from_horizons(cls, name):

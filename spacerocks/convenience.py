@@ -26,7 +26,6 @@ class Convenience:
                 if isinstance(getattr(self, attr), Vector):
                     setattr(p, attr, getattr(self, attr)[idx])
                 else:
-                    #print(idx)
                     setattr(p, attr, getattr(self, attr)[idx])
 
         return p

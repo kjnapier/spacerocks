@@ -33,11 +33,13 @@ class SpiceKernel:
 
 class SpiceBody:
 
-    def __init__(self, spiceid, frame='ECLIPJ2000', origin='ssb'):
+    def __init__(self, spiceid, kernel=SpiceKernel(), frame='ECLIPJ2000', origin='ssb'):
 
         self.frame = frame
         self.origin = origin
         self.spiceid = spiceid
+        self.kernel = kernel
+        kernel.furnsh()
 
     
     def at(self, epoch):
