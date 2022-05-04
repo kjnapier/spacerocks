@@ -33,7 +33,7 @@ class SpiceKernel:
 
 class SpiceBody:
 
-    def __init__(self, spiceid, kernel=SpiceKernel(), frame='ECLIPJ2000', origin='ssb'):
+    def __init__(self, spiceid,kernel=SpiceKernel(),frame='ECLIPJ2000', origin='ssb'):
 
         self.frame = frame
         self.origin = origin
@@ -56,14 +56,24 @@ class SpiceBody:
         '''
         Return mass of the specified body.
         '''
-        return (spice.bodvrd(self.spiceid, 'GM', 1)[1][0] * u.km**3 * u.s**(-2) / GravitationalConstant).to(u.Msun)
+        if not hasattr(self, '_mass'):
+            return (spice.bodvrd(self.spiceid, 'GM', 1)[1][0] * u.km**3 * u.s**(-2) / GravitationalConstant).to(u.Msun)
+        else:
+            return self._mass
+            
+    @mass.setter
+    def mass(self, value):
+        self._mass = value
 
     @property
     def mu(self):
         '''
         Return GM of the specified body.
         '''
-        return (spice.bodvrd(self.spiceid, 'GM', 1)[1][0] * u.km**3 * u.s**(-2)).to(u.au**3 / u.day**2) * u.radian**2
+        if not hasattr(self, '_mass'):
+            return (spice.bodvrd(self.spiceid, 'GM', 1)[1][0] * u.km**3 * u.s**(-2)).to(u.au**3 / u.day**2) * u.radian**2
+        else:
+            return (self._mass * GravitationalConstant).to(u.au**3 / u.day**2) * u.radian**2
 
     
     def __get_all_state_vectors(self, epoch):
