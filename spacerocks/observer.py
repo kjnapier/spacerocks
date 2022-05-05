@@ -75,8 +75,10 @@ class Observer:
             unique_times = np.unique(self.epoch)
             sid = self.spiceid[0]
             unique_dict = {key:self.__state_from_spice((sid, key)) for key in unique_times}
-            for key, value in unique_dict.items():
-                arr[self.epoch == key] = value
+            for idx, k in enumerate(self.epoch):
+                arr[idx] = unique_dict[k]
+            # for key, value in unique_dict.items():
+            #     arr[self.epoch == key] = value
         else:
             unique_rocks_and_times = set(list(zip(self.spiceid, self.epoch)))
             unique_dict = {key:self.__state_from_spice(key) for key in unique_rocks_and_times}
@@ -92,8 +94,10 @@ class Observer:
             if len(self.obscode) == 1:
                 lat, lon, elevation = self.__get_observatory_params(self.obscode[0])
                 unique_obs_dict = {key:self.__compute_topocentric_correction((lon, lat, elevation, key)) for key in unique_times}
-                for key, value in unique_obs_dict.items():
-                    icrs_arr[self.epoch == key] = value
+                for idx, k in enumerate(self.epoch):
+                    icrs_arr[idx] = unique_obs_dict[k]
+                # for key, value in unique_obs_dict.items():
+                #     icrs_arr[self.epoch == key] = value
             else:
                 unique_codes = set(self.obscode)
                 unique_codes_dict = {key:self.__get_observatory_params(key) for key in unique_codes}
