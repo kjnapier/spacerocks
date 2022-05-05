@@ -15,6 +15,11 @@ observatories = pd.read_csv(DATA_PATH)
 
 SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
 
+EQUAT_RAD = 6378137
+FLATTEN = 1 / 298.257223563
+O_M_FLATTEN = 1 - FLATTEN
+DEG_TO_RAD = np.pi / 180
+
 class Observer:
 
     # might need to pass utc.jd?
@@ -134,26 +139,28 @@ class Observer:
 
     def __compute_topocentric_correction(self, x):
         observer_lon, observer_lat, observer_elevation, epoch = x
-
-        observer_lat = Angle(observer_lat, u.deg)
-        observer_lon = Angle(observer_lon, u.deg)
-
-        EQUAT_RAD = 6378137
-        FLATTEN = 1 / 298.257223563
+        
+        observer_lat *= DEG_TO_RAD
+        observer_lon *= DEG_TO_RAD
+        sin_lat = np.sin(observer_lat)
+        cos_lat = np.cos(observer_lat)
 
         lon = self.__compute_local_sidereal_time(epoch, observer_lon)
         
-        denom = (1 - FLATTEN) * np.sin(observer_lat)
-        denom = np.cos(observer_lat) * np.cos(observer_lat) + denom*denom
+        sin_lon = np.sin(lon)
+        cos_lon = np.cos(lon)
+        
+        denom = O_M_FLATTEN * sin_lat
+        denom = cos_lat * cos_lat + denom*denom
 
         C_geo = 1 / np.sqrt(denom)
-        S_geo = (1 - FLATTEN) * (1 - FLATTEN) * C_geo
+        S_geo = O_M_FLATTEN * O_M_FLATTEN * C_geo
         C_geo = C_geo * EQUAT_RAD + observer_elevation
         S_geo = S_geo * EQUAT_RAD + observer_elevation
-        dx = C_geo * np.cos(observer_lat) * np.cos(lon)
-        dy = C_geo * np.cos(observer_lat) * np.sin(lon)
-        dz = S_geo * np.sin(observer_lat)
-        return dx.value, dy.value, dz.value
+        dx = C_geo * cos_lat * cos_lon
+        dy = C_geo * cos_lat * sin_lon
+        dz = S_geo * sin_lat
+        return dx, dy, dz
 
     def __compute_eps(self, epoch):
         T = (epoch - 2451545.0) / 36525
@@ -164,7 +171,8 @@ class Observer:
 
     def __compute_local_sidereal_time(self, epoch, lon):
         T = (epoch - 2451545.0) / 36525
-        theta = Angle(280.46061837 + 360.98564736629 * (epoch - 2451545.0) + (0.000387933 * T * T) - (T * T * T / 38710000.0), u.deg)
+        theta = 280.46061837 + 360.98564736629 * (epoch - 2451545.0) + (0.000387933 * T * T) - (T * T * T / 38710000.0)
+        theta *= DEG_TO_RAD
         return theta + lon
     
 
