@@ -861,3 +861,45 @@ double* py_correct_for_ltt(int N, double* as, double* es, double* incs, double* 
    return output;
 
  }}
+
+extern "C" {
+double* py_correct_for_ltt_single_observer(int N, double* as, double* es, double* incs, double* args, double* nodes, double* Ms, 
+                           double* obsx, double* obsy, double* obsz, double* obsvx, double* obsvy, double* obsvz) {
+
+  double* output = (double*) malloc(N * sizeof(struct StateVector));
+  //double* output = new double[N * 6];
+  struct StateVector rock;
+  int dummy;
+
+  double ox  = obsx[0];
+  double oy  = obsy[0];
+  double oz  = obsz[0];
+  double ovx = obsvx[0];
+  double ovy = obsvy[0];
+  double ovz = obsvz[0];
+
+  #pragma omp parallel for private(rock, dummy) schedule(guided)
+  for (int idx = 0; idx < N; idx++) {
+
+    double a    = as[idx];
+    double e    = es[idx];
+    double inc  = incs[idx];
+    double arg  = args[idx];
+    double node = nodes[idx];
+    double M0   = Ms[idx];
+
+    rock = correct_for_ltt(a, e, inc, arg, node, M0, ox, oy, oz, ovx, ovy, ovz);
+
+    dummy = idx * 6;
+    output[dummy]     = rock.x;
+    output[dummy + 1] = rock.y;
+    output[dummy + 2] = rock.z;
+    output[dummy + 3] = rock.vx;
+    output[dummy + 4] = rock.vy;
+    output[dummy + 5] = rock.vz;
+
+  }
+
+   return output;
+
+ }}

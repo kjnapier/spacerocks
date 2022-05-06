@@ -19,7 +19,7 @@ from .units import Units
 from .vector import Vector
 from .ephemerides import Ephemerides 
 from .observer import Observer
-from .cbindings import kepM_to_xyz, correct_for_ltt
+from .cbindings import kepM_to_xyz, correct_for_ltt, correct_for_ltt_single_observer
 from .spice import SpiceBody, SpiceKernel
 #from .simulation import Simulation
 import pkg_resources
@@ -34,8 +34,8 @@ class SpaceRock(KeplerOrbit, Convenience):
     '''
     def __init__(self, origin='ssb', frame='eclipJ2000', units=Units(), *args, **kwargs):
 
-        kernel = SpiceKernel()
-        kernel.furnsh()
+        #kernel = SpiceKernel()
+        #kernel.furnsh()
 
         coords = self.detect_coords(kwargs)
         origin = origin.lower()
@@ -372,7 +372,7 @@ class SpaceRock(KeplerOrbit, Convenience):
             return np.array([func(epoch) for epoch, func in zip(self.epoch.jd, self.mag_func)])
 
 
-    def propagate(self, epochs, model='GIANTS', units=Units(), gr=False):
+    def propagate(self, epochs, model='GIANTS', units=Units(), gr=False, progress=True):
         from .simulation import Simulation
         epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
         origin = copy.copy(self.origin)
@@ -403,7 +403,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         units = Units()
         units.timescale = 'tdb'
         units.timeformat = 'jd'
-        prop, planets, sim = sim.propagate(epochs=epochs.tdb.jd, units=units)
+        prop, planets, sim = sim.propagate(epochs=epochs.tdb.jd, units=units, progress=progress)
 
         # be polite and return orbital parameters using the input origin.
         if origin != 'ssb':
@@ -523,7 +523,12 @@ class SpaceRock(KeplerOrbit, Convenience):
         in_frame = copy.copy(self.frame)
         self.change_frame('eclipJ2000') 
 
-        dx, dy, dz, dvx, dvy, dvz = correct_for_ltt(self, observer)
+        if len(observer.x) == 1:
+            dx, dy, dz, dvx, dvy, dvz = correct_for_ltt_single_observer(self, observer)
+        else:
+            dx, dy, dz, dvx, dvy, dvz = correct_for_ltt(self, observer)
+
+        
 
         # Be polite
         if in_origin != self.origin:
@@ -557,18 +562,31 @@ class SpaceRock(KeplerOrbit, Convenience):
         new_units = copy.deepcopy(self.units)
         new_units.distance = u.au
         new_units.angle = u.deg
-        return self.__class__(a=self.a.au, 
-                              e=self.e, 
-                              inc=self.inc.deg, 
-                              node=self.node.deg, 
-                              arg=self.arg.deg, 
-                              M=(self.M + dM).deg, 
-                              name=self.name, 
-                              mass=self.mass.value,
-                              epoch=np.repeat(epoch.utc.jd, len(self)), 
-                              origin=self.origin, 
-                              frame=self.frame, 
-                              units=new_units)
+        if hasattr(self, '_mass'):
+            return self.__class__(a=self.a.au, 
+                                  e=self.e, 
+                                  inc=self.inc.deg, 
+                                  node=self.node.deg, 
+                                  arg=self.arg.deg, 
+                                  M=(self.M + dM).deg, 
+                                  name=self.name, 
+                                  mass=self.mass.value,
+                                  epoch=np.repeat(epoch.utc.jd, len(self)), 
+                                  origin=self.origin, 
+                                  frame=self.frame, 
+                                  units=new_units)
+        else:
+            return self.__class__(a=self.a.au, 
+                                  e=self.e, 
+                                  inc=self.inc.deg, 
+                                  node=self.node.deg, 
+                                  arg=self.arg.deg, 
+                                  M=(self.M + dM).deg, 
+                                  name=self.name, 
+                                  epoch=np.repeat(epoch.utc.jd, len(self)), 
+                                  origin=self.origin, 
+                                  frame=self.frame, 
+                                  units=new_units)
         
 
     def orbits(self, N=1000):
