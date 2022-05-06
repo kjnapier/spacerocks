@@ -1087,19 +1087,19 @@ double* py_correct_for_ltt(int N, double* xs, double* ys, double* zs, double* vx
 
 extern "C" {
 double* py_correct_for_ltt_single_observer(int N, double* xs, double* ys, double* zs, double* vxs, double* vys, double* vzs, 
-                           double* obsx, double* obsy, double* obsz, double* obsvx, double* obsvy, double* obsvz) {
+                                           double obsx, double obsy, double obsz, double obsvx, double obsvy, double obsvz) {
 
   double* output = (double*) malloc(N * sizeof(struct StateVector));
   //double* output = new double[N * 6];
   struct StateVector rock;
   int dummy;
 
-  double ox  = obsx[0];
-  double oy  = obsy[0];
-  double oz  = obsz[0];
-  double ovx = obsvx[0];
-  double ovy = obsvy[0];
-  double ovz = obsvz[0];
+  // double ox  = obsx[0];
+  // double oy  = obsy[0];
+  // double oz  = obsz[0];
+  // double ovx = obsvx[0];
+  // double ovy = obsvy[0];
+  // double ovz = obsvz[0];
 
   #pragma omp parallel for private(rock, dummy) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
@@ -1111,7 +1111,7 @@ double* py_correct_for_ltt_single_observer(int N, double* xs, double* ys, double
     double vy   = vys[idx];
     double vz   = vzs[idx];
 
-    rock = correct_for_ltt(x, y, z, vx, vy, vz, ox, oy, oz, ovx, ovy, ovz);
+    rock = correct_for_ltt(x, y, z, vx, vy, vz, obsx, obsy, obsz, obsvx, obsvy, obsvz);
 
     dummy = idx * 6;
     output[dummy]     = rock.x;
@@ -1136,10 +1136,9 @@ double* py_correct_for_ltt_destnosim(int N, double* xs, double* ys, double* zs, 
   struct StateVector rock;
   int dummy;
 
-  
-  double ox  = obsx[0];
-  double oy  = obsy[0];
-  double oz  = obsz[0];
+  double ox = obsx[0];
+  double oy = obsy[0];
+  double oz = obsz[0];
   double ovx = obsvx[0];
   double ovy = obsvy[0];
   double ovz = obsvz[0];
