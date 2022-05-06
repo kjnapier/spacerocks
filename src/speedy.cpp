@@ -752,7 +752,75 @@ double* py_calc_vovec_from_kep(int N, double mu, double* as, double* es, double*
 
 // }
 
-struct StateVector correct_for_ltt(double a, double e, double inc, double arg, double node, double M0, 
+// struct StateVector correct_for_ltt(double a, double e, double inc, double arg, double node, double M0, 
+//                                    double ox, double oy, double oz, double ovx, double ovy, double ovz) {
+
+//   struct StateVector rock;
+//   struct StateVector temp;
+//   struct StateVector out;
+
+//   double ltt0 = 0;
+//   double dx, dy, dz, dvx, dvy, dvz;
+//   double acc;
+
+//   rock = kepM_to_xyz(a, e, inc, arg, node, M0);
+//   double r = sqrt(rock.x*rock.x + rock.y*rock.y + rock.z*rock.z);
+
+//   temp.x  = rock.x;
+//   temp.y  = rock.y;
+//   temp.z  = rock.z;
+//   temp.vx = rock.vx;
+//   temp.vy = rock.vy;
+//   temp.vz = rock.vz;
+
+//   double xi = mu_bary / (r * r * r);
+
+//   for (int idx = 0; idx < 3; idx++) {
+
+//     dx  = temp.x - ox;
+//     dy  = temp.y - oy;
+//     dz  = temp.z - oz;
+    
+//     double delta = sqrt(dx*dx + dy*dy + dz*dz);
+
+//     double ltt = delta / speed_of_light;
+//     double dltt = fabs(ltt - ltt0);
+
+//     if (dltt < 1e-6) {
+//       break;
+//     }
+//     else {
+      
+//       acc = xi * ltt;
+
+//       temp.x = rock.x - (0.5 * acc * rock.x + rock.vx) * ltt;
+//       temp.y = rock.y - (0.5 * acc * rock.y + rock.vy) * ltt;
+//       temp.z = rock.z - (0.5 * acc * rock.z + rock.vz) * ltt;
+
+//       ltt0 = ltt;
+//     }
+//   }
+
+//   temp.vx = rock.vx + acc * rock.x;
+//   temp.vy = rock.vy + acc * rock.y;
+//   temp.vz = rock.vz + acc * rock.z;
+
+//   dvx  = temp.vx - ovx;
+//   dvy  = temp.vy - ovy;
+//   dvz  = temp.vz - ovz;
+
+//   out.x  = dx;
+//   out.y  = dy;
+//   out.z  = dz;
+//   out.vx = dvx;
+//   out.vy = dvy;
+//   out.vz = dvz;
+
+//   return out;
+
+// }
+
+struct StateVector correct_for_ltt(double x, double y, double z, double vx, double vy, double vz, 
                                    double ox, double oy, double oz, double ovx, double ovy, double ovz) {
 
   struct StateVector rock;
@@ -763,7 +831,12 @@ struct StateVector correct_for_ltt(double a, double e, double inc, double arg, d
   double dx, dy, dz, dvx, dvy, dvz;
   double acc;
 
-  rock = kepM_to_xyz(a, e, inc, arg, node, M0);
+  rock.x = x;
+  rock.y = y;
+  rock.z = z;
+  rock.vx = vx;
+  rock.vy = vy;
+  rock.vz = vz;
   double r = sqrt(rock.x*rock.x + rock.y*rock.y + rock.z*rock.z);
 
   temp.x  = rock.x;
@@ -820,8 +893,158 @@ struct StateVector correct_for_ltt(double a, double e, double inc, double arg, d
 
 }
 
+// struct StateVector correct_for_ltt(double x, double y, double z, double vx, double vy, double vz, 
+//                                    double ox, double oy, double oz, double ovx, double ovy, double ovz) {
+
+//   struct StateVector temp;
+//   struct StateVector out;
+
+//   double ltt0 = 0;
+//   double dx, dy, dz, dvx, dvy, dvz;
+//   double acc;
+
+//   double r = sqrt(x*x + y*y + z*z);
+
+//   temp.x  = x;
+//   temp.y  = y;
+//   temp.z  = z;
+//   temp.vx = vx;
+//   temp.vy = vy;
+//   temp.vz = vz;
+
+//   double xi = mu_bary / (r * r * r);
+
+//   for (int idx = 0; idx < 3; idx++) {
+
+//     dx  = temp.x - ox;
+//     dy  = temp.y - oy;
+//     dz  = temp.z - oz;
+    
+//     double delta = sqrt(dx*dx + dy*dy + dz*dz);
+
+//     double ltt = delta / speed_of_light;
+//     double dltt = fabs(ltt - ltt0);
+
+//     if (dltt < 1e-6) {
+//       break;
+//     }
+//     else {
+      
+//       acc = xi * ltt;
+
+//       temp.x = x - (0.5 * acc * x + vx) * ltt;
+//       temp.y = y - (0.5 * acc * y + vy) * ltt;
+//       temp.z = z - (0.5 * acc * z + vz) * ltt;
+
+//       ltt0 = ltt;
+//     }
+//   }
+
+//   temp.vx = vx + acc * x;
+//   temp.vy = vy + acc * y;
+//   temp.vz = vz + acc * z;
+
+//   dvx  = temp.vx - ovx;
+//   dvy  = temp.vy - ovy;
+//   dvz  = temp.vz - ovz;
+
+//   out.x  = dx;
+//   out.y  = dy;
+//   out.z  = dz;
+//   out.vx = dvx;
+//   out.vy = dvy;
+//   out.vz = dvz;
+
+//   return out;
+
+// }
+
+// extern "C" {
+// double* py_correct_for_ltt(int N, double* as, double* es, double* incs, double* args, double* nodes, double* Ms, 
+//                            double* obsx, double* obsy, double* obsz, double* obsvx, double* obsvy, double* obsvz) {
+
+//   double* output = (double*) malloc(N * sizeof(struct StateVector));
+//   //double* output = new double[N * 6];
+//   struct StateVector rock;
+//   int dummy;
+
+//   #pragma omp parallel for private(rock, dummy) schedule(guided)
+//   for (int idx = 0; idx < N; idx++) {
+
+//     double a    = as[idx];
+//     double e    = es[idx];
+//     double inc  = incs[idx];
+//     double arg  = args[idx];
+//     double node = nodes[idx];
+//     double M0   = Ms[idx];
+
+//     double ox  = obsx[idx];
+//     double oy  = obsy[idx];
+//     double oz  = obsz[idx];
+//     double ovx = obsvx[idx];
+//     double ovy = obsvy[idx];
+//     double ovz = obsvz[idx];
+
+//     rock = correct_for_ltt(a, e, inc, arg, node, M0, ox, oy, oz, ovx, ovy, ovz);
+
+//     dummy = idx * 6;
+//     output[dummy]     = rock.x;
+//     output[dummy + 1] = rock.y;
+//     output[dummy + 2] = rock.z;
+//     output[dummy + 3] = rock.vx;
+//     output[dummy + 4] = rock.vy;
+//     output[dummy + 5] = rock.vz;
+
+//   }
+
+//    return output;
+
+//  }}
+
+// extern "C" {
+// double* py_correct_for_ltt_single_observer(int N, double* as, double* es, double* incs, double* args, double* nodes, double* Ms, 
+//                            double* obsx, double* obsy, double* obsz, double* obsvx, double* obsvy, double* obsvz) {
+
+//   double* output = (double*) malloc(N * sizeof(struct StateVector));
+//   //double* output = new double[N * 6];
+//   struct StateVector rock;
+//   int dummy;
+
+//   double ox  = obsx[0];
+//   double oy  = obsy[0];
+//   double oz  = obsz[0];
+//   double ovx = obsvx[0];
+//   double ovy = obsvy[0];
+//   double ovz = obsvz[0];
+
+//   #pragma omp parallel for private(rock, dummy) schedule(guided)
+//   for (int idx = 0; idx < N; idx++) {
+
+//     double a    = as[idx];
+//     double e    = es[idx];
+//     double inc  = incs[idx];
+//     double arg  = args[idx];
+//     double node = nodes[idx];
+//     double M0   = Ms[idx];
+
+//     rock = correct_for_ltt(a, e, inc, arg, node, M0, ox, oy, oz, ovx, ovy, ovz);
+
+//     dummy = idx * 6;
+//     output[dummy]     = rock.x;
+//     output[dummy + 1] = rock.y;
+//     output[dummy + 2] = rock.z;
+//     output[dummy + 3] = rock.vx;
+//     output[dummy + 4] = rock.vy;
+//     output[dummy + 5] = rock.vz;
+
+//   }
+
+//    return output;
+
+//  }}
+
 extern "C" {
-double* py_correct_for_ltt(int N, double* as, double* es, double* incs, double* args, double* nodes, double* Ms, 
+double* py_correct_for_ltt(int N, double* xs, double* ys, double* zs, double* vxs, double* vys, double* vzs, 
                            double* obsx, double* obsy, double* obsz, double* obsvx, double* obsvy, double* obsvz) {
 
   double* output = (double*) malloc(N * sizeof(struct StateVector));
@@ -832,12 +1055,12 @@ double* py_correct_for_ltt(int N, double* as, double* es, double* incs, double* 
   #pragma omp parallel for private(rock, dummy) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
 
-    double a    = as[idx];
-    double e    = es[idx];
-    double inc  = incs[idx];
-    double arg  = args[idx];
-    double node = nodes[idx];
-    double M0   = Ms[idx];
+    double x    = xs[idx];
+    double y    = ys[idx];
+    double z    = zs[idx];
+    double vx   = vxs[idx];
+    double vy   = vys[idx];
+    double vz   = vzs[idx];
 
     double ox  = obsx[idx];
     double oy  = obsy[idx];
@@ -846,7 +1069,7 @@ double* py_correct_for_ltt(int N, double* as, double* es, double* incs, double* 
     double ovy = obsvy[idx];
     double ovz = obsvz[idx];
 
-    rock = correct_for_ltt(a, e, inc, arg, node, M0, ox, oy, oz, ovx, ovy, ovz);
+    rock = correct_for_ltt(x, y, z, vx, vy, vz, ox, oy, oz, ovx, ovy, ovz);
 
     dummy = idx * 6;
     output[dummy]     = rock.x;
@@ -863,7 +1086,7 @@ double* py_correct_for_ltt(int N, double* as, double* es, double* incs, double* 
  }}
 
 extern "C" {
-double* py_correct_for_ltt_single_observer(int N, double* as, double* es, double* incs, double* args, double* nodes, double* Ms, 
+double* py_correct_for_ltt_single_observer(int N, double* xs, double* ys, double* zs, double* vxs, double* vys, double* vzs, 
                            double* obsx, double* obsy, double* obsz, double* obsvx, double* obsvy, double* obsvz) {
 
   double* output = (double*) malloc(N * sizeof(struct StateVector));
@@ -881,14 +1104,14 @@ double* py_correct_for_ltt_single_observer(int N, double* as, double* es, double
   #pragma omp parallel for private(rock, dummy) schedule(guided)
   for (int idx = 0; idx < N; idx++) {
 
-    double a    = as[idx];
-    double e    = es[idx];
-    double inc  = incs[idx];
-    double arg  = args[idx];
-    double node = nodes[idx];
-    double M0   = Ms[idx];
+    double x    = xs[idx];
+    double y    = ys[idx];
+    double z    = zs[idx];
+    double vx   = vxs[idx];
+    double vy   = vys[idx];
+    double vz   = vzs[idx];
 
-    rock = correct_for_ltt(a, e, inc, arg, node, M0, ox, oy, oz, ovx, ovy, ovz);
+    rock = correct_for_ltt(x, y, z, vx, vy, vz, ox, oy, oz, ovx, ovy, ovz);
 
     dummy = idx * 6;
     output[dummy]     = rock.x;
@@ -897,6 +1120,46 @@ double* py_correct_for_ltt_single_observer(int N, double* as, double* es, double
     output[dummy + 3] = rock.vx;
     output[dummy + 4] = rock.vy;
     output[dummy + 5] = rock.vz;
+
+  }
+
+   return output;
+
+ }}
+
+extern "C" {
+double* py_correct_for_ltt_destnosim(int N, double* xs, double* ys, double* zs, double* vxs, double* vys, double* vzs, 
+                                     double* obsx, double* obsy, double* obsz, double* obsvx, double* obsvy, double* obsvz) {
+
+  double* output = (double*) malloc(N * sizeof(struct Vector3));
+  //double* output = new double[N * 6];
+  struct StateVector rock;
+  int dummy;
+
+  
+  double ox  = obsx[0];
+  double oy  = obsy[0];
+  double oz  = obsz[0];
+  double ovx = obsvx[0];
+  double ovy = obsvy[0];
+  double ovz = obsvz[0];
+
+  #pragma omp parallel for private(rock, dummy) schedule(guided)
+  for (int idx = 0; idx < N; idx++) {
+
+    double x    = xs[idx];
+    double y    = ys[idx];
+    double z    = zs[idx];
+    double vx   = vxs[idx];
+    double vy   = vys[idx];
+    double vz   = vzs[idx];
+
+    rock = correct_for_ltt(x, y, z, vx, vy, vz, ox, oy, oz, ovx, ovy, ovz);
+
+    dummy = idx * 3;
+    output[dummy]     = rock.x;
+    output[dummy + 1] = rock.y;
+    output[dummy + 2] = rock.z;
 
   }
 
