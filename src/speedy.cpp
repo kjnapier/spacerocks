@@ -1111,7 +1111,7 @@ double* py_correct_for_ltt_single_observer(int N, double* xs, double* ys, double
     double vy   = vys[idx];
     double vz   = vzs[idx];
 
-    rock = correct_for_ltt(x, y, z, vx, vy, vz, obsx, obsy, obsz, obsvx, obsvy, obsvz);
+    rock = correct_for_ltt(x, y, z, vx, vy, vz, ox, oy, oz, ovx, ovy, ovz);
 
     dummy = idx * 6;
     output[dummy]     = rock.x;
