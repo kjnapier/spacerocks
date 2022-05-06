@@ -1,5 +1,6 @@
 import unittest
 from spacerocks import SpaceRock, Units
+from spacerocks.spice import SpiceKernel
 
 import numpy as np
 
@@ -8,6 +9,9 @@ from astroquery.jplhorizons import Horizons
 from astropy.time import Time
 from astropy import units as u
 from astropy.coordinates import SkyCoord
+
+kernel = SpiceKernel()
+kernel.furnsh()
 
 class TestSpacerock(unittest.TestCase):
 

@@ -191,6 +191,22 @@ clibspacerocks.py_correct_for_ltt.argtypes = [ctypes.c_int,
 
 clibspacerocks.py_correct_for_ltt.restype = ctypes.POINTER(ctypes.c_double)
 
+clibspacerocks.py_correct_for_ltt_single_observer.argtypes = [ctypes.c_int,
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'), 
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'), 
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'), 
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'), 
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'), 
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'), 
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'), 
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'), 
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'), 
+                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
+
+clibspacerocks.py_correct_for_ltt_single_observer.restype = ctypes.POINTER(ctypes.c_double)
+
 # def correct_for_ltt(rocks, observers):
 
 #     N = len(rocks)
