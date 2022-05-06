@@ -288,12 +288,12 @@ def correct_for_ltt_single_observer(rocks, observers):
     vy = rocks.vy.to(u.au/u.day).value.astype(np.double)
     vz = rocks.vz.to(u.au/u.day).value.astype(np.double)
 
-    ox = observers.x.au.astype(np.double)[0]
-    oy = observers.y.au.astype(np.double)[0]
-    oz = observers.z.au.astype(np.double)[0]
-    ovx = observers.vx.to(u.au/u.day).value.astype(np.double)[0]
-    ovy = observers.vy.to(u.au/u.day).value.astype(np.double)[0]
-    ovz = observers.vz.to(u.au/u.day).value.astype(np.double)[0]
+    ox = observers.x.au.astype(np.double)
+    oy = observers.y.au.astype(np.double)
+    oz = observers.z.au.astype(np.double)
+    ovx = observers.vx.to(u.au/u.day).value.astype(np.double)
+    ovy = observers.vy.to(u.au/u.day).value.astype(np.double)
+    ovz = observers.vz.to(u.au/u.day).value.astype(np.double)
 
     rock = clibspacerocks.py_correct_for_ltt_single_observer(N, x, y, z, vx, vy, vz, ox, oy, oz, ovx, ovy, ovz)
     arr = np.ctypeslib.as_array(rock, (6 * N,)).copy()
