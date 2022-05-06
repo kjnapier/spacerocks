@@ -209,13 +209,12 @@ def correct_for_ltt(rocks, observers):
 
     rock = clibspacerocks.py_correct_for_ltt(N, a, e, inc, arg, node, M, ox, oy, oz, ovx, ovy, ovz)
     arr = np.ctypeslib.as_array(rock, (6 * N,)).copy()
+    clibspacerocks.free_memory(rock)
   
     x, y, z, vx, vy, vz = arr.reshape(N, 6).T
 
     x = Distance(x, u.au, allow_negative=True)
     y = Distance(y, u.au, allow_negative=True)
     z = Distance(z, u.au, allow_negative=True)
-
-    clibspacerocks.free_memory(rock)
 
     return x, y, z, vx * u.au/u.day, vy * u.au/u.day, vz * u.au/u.day

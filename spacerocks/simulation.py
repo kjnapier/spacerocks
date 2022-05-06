@@ -184,7 +184,7 @@ class Simulation(rebound.Simulation, Convenience):
            
         planets = SpaceRock(x=px, y=py, z=pz, vx=pvx, vy=pvy, vz=pvz, name=pname, epoch=pepoch, origin='ssb', units=units)
 
-        if hasattr(self, 'testparticle_names'):
+        if len(self.testparticle_names) > 0:
             epoch  = []
             x      = []
             y      = []
