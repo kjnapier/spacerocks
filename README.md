@@ -38,7 +38,7 @@ testdates = Time(np.arange(startdate.jd, enddate.jd, 30), scale='utc', format='j
 
 units = Units()
 units.timescale = 'utc'
-prop, planets, sim = rock.propagate(epochs=testdates.jd, model=2, units=units)
+prop, planets, sim = rock.propagate(epochs=testdates.jd, model='PLANETS', units=units)
 obs = prop.observe(obscode='W84')
 ```
 ![Alt text](assets/ceres-residuals.png)
