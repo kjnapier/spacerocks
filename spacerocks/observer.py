@@ -2,6 +2,7 @@ from astropy import units as u
 from astropy.coordinates import Distance, Angle
 
 from .constants import epsilon
+from .spice import SpiceKernel
 
 import numpy as np
 import pandas as pd
@@ -24,10 +25,12 @@ class Observer:
 
     # might need to pass utc.jd?
 
-    def __init__(self, origin='ssb', frame='ECLIPJ2000', **kwargs):
+    def __init__(self, origin='ssb', frame='ECLIPJ2000', kernel=SpiceKernel(), **kwargs):
         
+        kernel.furnsh()
         self.origin = origin
         self.frame = frame
+        
 
         if kwargs.get('epoch') is not None:
             self.epoch = np.atleast_1d(kwargs.get('epoch'))

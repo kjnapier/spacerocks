@@ -34,12 +34,12 @@ def kepM_to_xyz(a, e, inc, arg, node, M):
     return x, y, z, vx * u.au/u.d, vy * u.au/u.d, vz * u.au/u.d
 
 clibspacerocks.py_kepE_to_xyz.argtypes = [ctypes.c_int,
-                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
-                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
-                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
-                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
-                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
-                                              ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
+                                          ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                          ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                          ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                          ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                          ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                          ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
 
 clibspacerocks.py_kepE_to_xyz.restype = ctypes.POINTER(ctypes.c_double)
 
@@ -188,7 +188,6 @@ clibspacerocks.py_correct_for_ltt.argtypes = [ctypes.c_int,
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'), 
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
-
 clibspacerocks.py_correct_for_ltt.restype = ctypes.POINTER(ctypes.c_double)
 
 clibspacerocks.py_correct_for_ltt_single_observer.argtypes = [ctypes.c_int,
@@ -204,7 +203,6 @@ clibspacerocks.py_correct_for_ltt_single_observer.argtypes = [ctypes.c_int,
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'), 
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
-
 clibspacerocks.py_correct_for_ltt_single_observer.restype = ctypes.POINTER(ctypes.c_double)
 
 # def correct_for_ltt(rocks, observers):
