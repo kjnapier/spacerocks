@@ -8,13 +8,9 @@ import numpy as np
 import pandas as pd
 import spiceypy as spice
 
-import os
-import pkg_resources
+from .paths import OBSERVATORIES_PATH
+observatories = pd.read_csv(OBSERVATORIES_PATH)
 
-DATA_PATH = pkg_resources.resource_filename('spacerocks', 'data/observatories.csv')
-observatories = pd.read_csv(DATA_PATH)
-
-SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
 
 EQUAT_RAD = 6378137
 FLATTEN = 1 / 298.257223563

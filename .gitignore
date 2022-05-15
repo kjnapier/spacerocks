@@ -9,11 +9,10 @@
 spacerocks/.DS_Store
 
 /spacerocks/data/spice/
+/spacerocks/data/mpc/
 
-# Skyfield data
-/Skyfield-Data/
-/spacerocks/Skyfield-Data/
-/spacerocks/tests/Skyfield-Data/
+/spacerocks/pyOrbfit.py
+
 # Ipython checkpoints
 /.ipynb_checkpoints/
 /notebooks/.ipynb_checkpoints/

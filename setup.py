@@ -66,11 +66,8 @@ _pyOrbfit = Extension('_pyOrbfit',
 
 data_files = []
 dirs = ['spacerocks/data/spice/*', 
-        'spacerocks/data/spice/asteroids/*', 
         'spacerocks/data/*']
-#dirs = ['spacerocks/data/binEphem.423', 
-#        'spacerocks/data/observatories.csv', 
-#        'spacerocks/data/observatories.dat']
+
 for dir in dirs:
    for filename in glob.glob(dir):
       if os.path.isfile(filename):
@@ -78,17 +75,15 @@ for dir in dirs:
 
 setup(
     name='spacerocks',
-    version='2.1.6',
+    version='2.1.7',
     description='A Python Package for Solar System Ephemerides and Dynamics.',
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
     url="https://github.com/kjnapier/spacerocks",
     packages=['spacerocks'],
     package_data={'spacerocks.data': ['*.csv'], 
-                 'spacerocks.data.spice': ['*'], 
-                 'spacerocks.data.spice.asteroids': ['*.bsp'], 
-                 'spacerocks.data': ['*']},
-    #package_data={'spacerocks.data': ['binEphem.423', 'observatories.csv', 'observatories.dat']},
+                  'spacerocks.data.spice': ['*'], 
+                  'spacerocks.data.pyOrbfit': ['*']},
     data_files=data_files,
     include_package_data=True,
     install_requires=['healpy',

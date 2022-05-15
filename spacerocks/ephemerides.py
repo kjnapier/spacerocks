@@ -8,12 +8,6 @@ from astropy.coordinates import Angle, Distance
 from healpy.pixelfunc import ang2pix
 from numpy import sin, cos, arctan2, sqrt, arcsin, tan, exp, log10, where, array, arccos, pi
 
-import spiceypy as spice
-import pkg_resources
-import os
-
-
-SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
 
 class Ephemerides(Convenience):
 

@@ -5,6 +5,7 @@ from astropy.coordinates import Angle, Distance
 from astropy.time import Time
 
 import datetime
+from charset_normalizer import detect
 
 import numpy as np
 import pandas as pd
@@ -21,11 +22,9 @@ from .ephemerides import Ephemerides
 from .observer import Observer
 from .cbindings import kepM_to_xyz, correct_for_ltt, correct_for_ltt_single_observer
 from .spice import SpiceBody, SpiceKernel
-#from .simulation import Simulation
-import pkg_resources
-SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
-DATA_PATH = pkg_resources.resource_filename('spacerocks', 'data/observatories.csv')
-observatories = pd.read_csv(DATA_PATH)
+from .paths import OBSERVATORIES_PATH
+
+observatories = pd.read_csv(OBSERVATORIES_PATH)
 
 
 class SpaceRock(KeplerOrbit, Convenience):
@@ -33,9 +32,6 @@ class SpaceRock(KeplerOrbit, Convenience):
     SpaceRock objects provide an interface to work with Keplerian orbits. 
     '''
     def __init__(self, origin='ssb', frame='eclipJ2000', units=Units(), *args, **kwargs):
-
-        #kernel = SpiceKernel()
-        #kernel.furnsh()
 
         coords = self.detect_coords(kwargs)
         origin = origin.lower()
@@ -53,7 +49,6 @@ class SpaceRock(KeplerOrbit, Convenience):
                     kwargs[key] = np.atleast_1d(k)
 
         self.frame = frame
-
         self.origin = origin
 
         if self.origin == 'ssb':
@@ -174,6 +169,8 @@ class SpaceRock(KeplerOrbit, Convenience):
                 self.name = np.array([uuid.uuid4().hex for _ in range(len(self.x))])
 
         
+        # brightness information
+
         if kwargs.get('H') is not None:
             
             if units.rotation_curves == False:
@@ -198,8 +195,6 @@ class SpaceRock(KeplerOrbit, Convenience):
                 else:
                     self.G = np.repeat(0.15, len(self))
 
-            
-
         elif kwargs.get('mag') is not None:
             curves = kwargs.get('mag')
             curve_funcs = []
@@ -215,6 +210,8 @@ class SpaceRock(KeplerOrbit, Convenience):
             else:
                 self.G = np.repeat(0.15, len(self))
 
+        # Physical properties
+
         if kwargs.get('radius') is not None:
             self.radius = Distance(kwargs.get('radius'), units.size, allow_negative=False)
 
@@ -224,6 +221,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         if kwargs.get('density') is not None:
             self.density = kwargs.get('density') * units.density
 
+        # Uncertainties
         if kwargs.get('cov') is not None:
             self.cov = kwargs.get('cov')
 
@@ -241,6 +239,67 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         return SpaceRock(x=xs, y=ys, z=zs, vx=vxs, vy=vys, vz=vzs, name=names,
                          origin=self.origin, frame=self.frame, units=self.units, epoch=epochs)
+
+    # @classmethod
+    # def from_spice(cls, spiceid: str, epoch=datetime.date.today(), kernel=SpiceKernel(), units=Units()):
+    #     body = SpiceBody(spiceid=spiceid, kernel=kernel)
+    #     if isinstance(epoch, datetime.date):
+    #         epoch = Time(datetime.date.today().isoformat(), format='iso', scale='utc')
+    #     else:
+    #         epoch = self.detect_timescale(epoch, units.timescale)
+    #     r = body.at(epoch)
+    #     rock = SpaceRock(x=r.x.au[0], 
+    #                      y=r.y.au[0], 
+    #                      z=r.z.au[0], 
+    #                      vx=r.vx.value[0], 
+    #                      vy=r.vy.value[0], 
+    #                      vz=r.vz.value[0], 
+    #                      epoch=epoch, 
+    #                      origin='ssb', 
+    #                      mass=r.mass,
+    #                      frame='ECLIPJ2000')
+    #     return rock
+
+    @classmethod
+    def from_mpc(cls, data: str, download_data=False, metadata='Orbit_type'):
+
+        metadata = np.atleast_1d(metadata)
+
+        from .paths import MPC_PATH
+        
+        if download_data == True:
+            from .downloader import download
+            datafile = ['https://minorplanetcenter.net/Extended_Files/' + data + '.json.gz']
+            download(datafile, MPC_PATH)
+
+        units = Units()
+        units.timescale = 'tt'
+        units.timeformat = 'jd'
+
+        path = MPC_PATH + f'/{data}.json.gz'
+        df = pd.read_json(path)
+
+        H = df.H
+        G = df.G
+        name = df.Principal_desig
+        epoch = df.Epoch
+        M = df.M
+        arg = df.Peri
+        node = df.Node
+        inc = df.i
+        e = df.e
+        a = df.a
+
+        rocks = cls(a=a, e=e, inc=inc, arg=arg, node=node, M=M, 
+                    epoch=epoch, name=name, H=H, G=G, units=units, origin='sun')
+
+        for data_item in metadata:
+            setattr(rocks, data_item, df[data_item].values)        
+
+        return rocks
+
+        
+        
 
     @classmethod
     def from_horizons(cls, name):
@@ -563,7 +622,7 @@ class SpaceRock(KeplerOrbit, Convenience):
         new_units.distance = u.au
         new_units.angle = u.deg
         if hasattr(self, '_mass'):
-            return self.__class__(a=self.a.au, 
+            rock =  self.__class__(a=self.a.au, 
                                   e=self.e, 
                                   inc=self.inc.deg, 
                                   node=self.node.deg, 
@@ -576,7 +635,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                                   frame=self.frame, 
                                   units=new_units)
         else:
-            return self.__class__(a=self.a.au, 
+            rock = self.__class__(a=self.a.au, 
                                   e=self.e, 
                                   inc=self.inc.deg, 
                                   node=self.node.deg, 
@@ -587,6 +646,20 @@ class SpaceRock(KeplerOrbit, Convenience):
                                   origin=self.origin, 
                                   frame=self.frame, 
                                   units=new_units)
+
+        N = 1
+        if hasattr(self, 'G'):
+            rock.G = np.tile(self.G, N)
+
+        if hasattr(self, 'H_func'):
+            rock.H_func = np.tile(self.H_func, N)
+        elif hasattr(self, '_H'):
+            rock.H = np.tile(self.H, N)
+
+        if hasattr(self, 'mag_func'):
+            rock.mag_func = np.tile(self.mag_func, N)
+
+        return rock
         
 
     def orbits(self, N=1000):

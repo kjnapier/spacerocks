@@ -8,12 +8,6 @@ from .vector import Vector
 from .cbindings import calc_kep_from_xyz, calc_vovec_from_kep, calc_M_from_E, calc_E_from_f, calc_E_from_M, calc_f_from_E
 from .spice import SpiceBody
 
-import pkg_resources
-import spiceypy as spice
-import os
-
-SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
-
 class KeplerOrbit:
 
     def change_origin(self, new_origin: str):

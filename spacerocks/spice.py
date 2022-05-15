@@ -8,9 +8,7 @@ from astropy.constants import G as GravitationalConstant
 import spiceypy as spice
 import os
 
-import pkg_resources
-
-SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
+from .paths import SPICE_PATH
 
 class SpiceKernel:
     
@@ -33,7 +31,7 @@ class SpiceKernel:
 
 class SpiceBody:
 
-    def __init__(self, spiceid,kernel=SpiceKernel(),frame='ECLIPJ2000', origin='ssb'):
+    def __init__(self, spiceid, kernel=SpiceKernel(), frame='ECLIPJ2000', origin='ssb'):
 
         self.frame = frame
         self.origin = origin

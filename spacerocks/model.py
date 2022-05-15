@@ -3,8 +3,6 @@ from .spacerock import SpaceRock
 from .orbitsppmasses import orbitspp_masses
 
 import numpy as np
-import pkg_resources
-SPICE_PATH = pkg_resources.resource_filename('spacerocks', 'data/spice')
 
 HORIZONS_PERTURBERS = ['Sun', 
                        'Mercury Barycenter',
