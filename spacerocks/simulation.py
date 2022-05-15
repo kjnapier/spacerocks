@@ -2,7 +2,7 @@ from .spacerock import SpaceRock
 from .spice import SpiceBody
 from .model import PerturberModel
 from .units import Units
-from .convenience import Convenience
+from .convenience import Convenience, time_handler
 
 import copy
 import numpy as np
@@ -45,12 +45,14 @@ class Simulation(rebound.Simulation, Convenience):
         self.simdata = {}
         
         if kwargs.get('epoch') is not None:
-            if isinstance(kwargs.get('epoch'), str):
-                self.epoch = self.detect_timescale([kwargs.get('epoch')], self.spacerocks_units.timescale)
-            else:
-                self.epoch = Time(kwargs.get('epoch'), 
-                                  format=self.spacerocks_units.timeformat, 
-                                  scale=self.spacerocks_units.timescale)
+            self.epoch = time_handler(kwargs.get('epoch'), units=self.spacerocks_units)
+            # if isinstance(kwargs.get('epoch'), str):
+            #     self.epoch = time_handler(kwargs.get('epoch'), units=self.spacerocks_units)
+            #     #self.epoch = self.detect_timescale([kwargs.get('epoch')], self.spacerocks_units.timescale)
+            # else:
+            #     self.epoch = Time(kwargs.get('epoch'), 
+            #                       format=self.spacerocks_units.timeformat, 
+            #                       scale=self.spacerocks_units.timescale)
 
         self.t = copy.deepcopy(self.epoch.tdb.jd)
         for name, perturber in self.model.perturbers.items():
@@ -136,7 +138,8 @@ class Simulation(rebound.Simulation, Convenience):
         else:
             f = False
 
-        epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
+        #epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
+        epochs = time_handler(epochs, units)
 
         if progress == True:
             iterator = track(np.sort(epochs.tdb.jd))

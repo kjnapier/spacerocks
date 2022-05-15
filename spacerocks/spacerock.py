@@ -15,7 +15,7 @@ import copy
 
 from .constants import mu_bary, c, epsilon
 from .keplerorbit import KeplerOrbit
-from .convenience import Convenience
+from .convenience import Convenience, time_handler
 from .units import Units
 from .vector import Vector
 from .ephemerides import Ephemerides 
@@ -106,10 +106,12 @@ class SpaceRock(KeplerOrbit, Convenience):
                 self.varpi = Angle(kwargs.get('varpi'), units.angle)
 
             if kwargs.get('t_peri') is not None:
-                if units.timeformat is None:
-                    self.t_peri = self.detect_timescale(kwargs.get('t_peri'), units.timescale)
-                else:
-                    self.t_peri = Time(kwargs.get('t_peri'), format=units.timeformat, scale=units.timescale)
+                self.t_peri = time_handler(kwargs.get('t_peri'), units)
+                # if units.timeformat is None:
+
+                #     self.t_peri = self.detect_timescale(kwargs.get('t_peri'), units.timescale)
+                # else:
+                #     self.t_peri = Time(kwargs.get('t_peri'), format=units.timeformat, scale=units.timescale)
 
             if kwargs.get('M') is not None:
                 self.M = Angle(kwargs.get('M'), units.angle)
@@ -126,11 +128,12 @@ class SpaceRock(KeplerOrbit, Convenience):
             if kwargs.get('mean_longitude') is not None:
                 self.mean_longitude = Angle(kwargs.get('mean_longitude'), units.angle)
 
-            if kwargs.get('epoch') is not None:
-                if units.timeformat is None:
-                    self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
-                else:
-                    self.epoch = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
+            # if kwargs.get('epoch') is not None:
+            #     self.epoch = time_handler(kwargs.get('epoch'), units)
+                # if units.timeformat is None:
+                #     self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
+                # else:
+                #     self.epoch = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
             #else:
             #    self.epoch = Time(np.zeros(len(self.inc)), format='jd', scale='utc')
 
@@ -153,12 +156,12 @@ class SpaceRock(KeplerOrbit, Convenience):
             self.position = Vector(x, y, z)
             self.velocity = Vector(vx, vy, vz)
 
-            if kwargs.get('epoch') is not None:
+            # if kwargs.get('epoch') is not None:
 
-                if units.timeformat is None:
-                    self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
-                else:
-                    self.epoch = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
+            #     if units.timeformat is None:
+            #         self.epoch = self.detect_timescale(kwargs.get('epoch'), units.timescale)
+            #     else:
+            #         self.epoch = Time(kwargs.get('epoch'), format=units.timeformat, scale=units.timescale)
             #else:
             #    self.epoch = Time(np.zeros(len(self.x)), format='jd', scale='utc')
 
@@ -168,7 +171,9 @@ class SpaceRock(KeplerOrbit, Convenience):
                 # produces random, non-repeting identifiers
                 self.name = np.array([uuid.uuid4().hex for _ in range(len(self.x))])
 
-        
+        if kwargs.get('epoch') is not None:
+            self.epoch = time_handler(kwargs.get('epoch'), units)
+
         # brightness information
 
         if kwargs.get('H') is not None:
@@ -433,7 +438,8 @@ class SpaceRock(KeplerOrbit, Convenience):
 
     def propagate(self, epochs, model='GIANTS', units=Units(), gr=False, progress=True):
         from .simulation import Simulation
-        epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
+        epochs = time_handler(epochs, units)
+        #epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
         origin = copy.copy(self.origin)
         frame = copy.copy(self.frame)
 
@@ -613,8 +619,9 @@ class SpaceRock(KeplerOrbit, Convenience):
         '''
         analytically propagate all rocks to a common epoch
         '''
-        if not isinstance(epoch, Time):
-            epoch = self.detect_timescale(np.atleast_1d(epoch), units.timescale)
+        epoch = time_handler(epoch, units)
+        #if not isinstance(epoch, Time):
+        #    epoch = self.detect_timescale(np.atleast_1d(epoch), units.timescale)
         dt = (epoch.utc.jd - self.epoch.utc.jd) * u.day
         dM = self.n * dt
 

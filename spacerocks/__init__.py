@@ -16,6 +16,23 @@ pymodulepath = os.path.dirname(__file__)
 __libspacerockspath__ = pymodulepath + "/../libspacerocks" + suffix
 clibspacerocks = cdll.LoadLibrary(__libspacerockspath__)
 
+import os
+
+pymodulepath = os.path.dirname(__file__)
+
+import imp
+fp, pathname, description = imp.find_module('_pyOrbfit', [pymodulepath + '/../'])
+_pyOrbfit = imp.load_module('_pyOrbfit', fp, pathname, description)
+
+import shutil
+if not os.path.exists(pymodulepath + '/pyOrbfit.py'):
+    shutil.copy(pymodulepath + '/../src/pyOrbfit/pyOrbfit.py', pymodulepath + '/pyOrbfit.py')
+
+import os
+pymodulepath = os.path.dirname(__file__)
+os.environ['ORBIT_EPHEMERIS'] = pymodulepath + '/data/pyOrbfit/binEphem.423'
+os.environ['ORBIT_OBSERVATORIES'] = pymodulepath + '/data/pyOrbfit/observatories.dat'
+
 from .paths import SPICE_PATH
 p = pathlib.Path(SPICE_PATH)
 p.mkdir(parents=True, exist_ok=True)
