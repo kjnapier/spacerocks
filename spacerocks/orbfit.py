@@ -13,6 +13,8 @@ import dateutil
 from .convenience import Convenience
 from astropy import units as u
 
+import os
+
 pymodulepath = os.path.dirname(__file__)
 
 import imp
