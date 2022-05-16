@@ -30,7 +30,7 @@ class MPChecker:
         obs = prop.observe(obscode=code)
         arc_dis = self.__Great_Circle_Distances(obs.ra, obs.dec, ra, dec)
         if radius.deg > 3:
-            warnings.warn('Exceeed maximum search radius, use radius = 3 degrees instead.')
+            warnings.warn('Exceed maximum search radius, using radius = 3 degrees instead.')
         in_field_radius = max([3*np.pi/180, 5*radius.radian, 1*np.pi/180])
         in_field = arc_dis < in_field_radius
         
