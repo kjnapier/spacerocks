@@ -27,6 +27,7 @@ class Units:
 
         self.ra = u.deg
         self.dec = u.deg
+        self.angular_separation = u.deg
 
         self.rotation_curves = False
 

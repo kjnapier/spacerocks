@@ -5,32 +5,6 @@ import copy
 from .vector import Vector
 from .units import Units
 
-import dateutil
-
-
-def infer_time_format(d, units):
-    if isinstance(d, Time):
-        epoch = d
-    elif isinstance(d[0], str):
-        dates = [dateutil.parser.parse(x, fuzzy_with_tokens=True)[0] for x in d]
-        epoch = Time(dates, format='datetime', scale=units.timescale)  
-    elif np.isscalar(d[0]):
-        if np.all(d > 100000):
-            epoch = Time(d, format='jd', scale=units.timescale)
-        else:
-            epoch = Time(d, format='mjd', scale=units.timescale)
-            
-    return epoch
-
-def time_handler(d, units=Units()):
-    d = np.atleast_1d(d)
-    if units.timeformat is not None:
-        epoch = Time(d, format=units.timeformat, scale=units.timescale)
-    else:
-        epoch = infer_time_format(d, units)
-    
-    return epoch
-
 
 class Convenience:
 

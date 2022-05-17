@@ -5,7 +5,6 @@ from astropy.coordinates import Angle, Distance
 from astropy.time import Time
 
 import datetime
-from charset_normalizer import detect
 
 import numpy as np
 import pandas as pd
@@ -15,7 +14,8 @@ import copy
 
 from .constants import mu_bary, c, epsilon
 from .keplerorbit import KeplerOrbit
-from .convenience import Convenience, time_handler
+from .convenience import Convenience
+from .utils import time_handler
 from .units import Units
 from .vector import Vector
 from .ephemerides import Ephemerides 
@@ -243,7 +243,7 @@ class SpaceRock(KeplerOrbit, Convenience):
     #     return rock
 
     @classmethod
-    def from_mpc(cls, data: str, download_data=False, metadata='Orbit_type'):
+    def from_mpc(cls, catalog: str, download_data=False, metadata='Orbit_type'):
 
         metadata = np.atleast_1d(metadata)
 
@@ -253,14 +253,14 @@ class SpaceRock(KeplerOrbit, Convenience):
         
         if download_data == True:
             from .downloader import download
-            datafile = ['https://minorplanetcenter.net/Extended_Files/' + data + '.json.gz']
+            datafile = ['https://minorplanetcenter.net/Extended_Files/' + catalog + '.json.gz']
             download(datafile, MPC_PATH)
 
         units = Units()
         units.timescale = 'tt'
         units.timeformat = 'jd'
 
-        path = MPC_PATH + f'/{data}.json.gz'
+        path = MPC_PATH + f'/{catalog}.json.gz'
         df = pd.read_json(path)
 
         H = df.H

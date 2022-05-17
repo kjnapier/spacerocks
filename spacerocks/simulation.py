@@ -2,7 +2,8 @@ from .spacerock import SpaceRock
 from .spice import SpiceBody
 from .model import PerturberModel
 from .units import Units
-from .convenience import Convenience, time_handler
+from .convenience import Convenience
+from .utils import time_handler
 
 import copy
 import numpy as np
