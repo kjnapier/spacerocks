@@ -187,6 +187,9 @@ class Ephemerides(Convenience):
 
         return mag
 
+    def groupby(self, parameter):
+        return ([x, self[getattr(self, parameter) == x]] for x in sorted(set(getattr(self, parameter))))
+
 
 #    def plot_radec(self, color='black', alpha=0.5, zoom=False, galactic_plane=False, ecliptic_plane=True):
 #        '''
