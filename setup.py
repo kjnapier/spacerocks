@@ -10,7 +10,7 @@ if suffix is None:
     suffix = ".so"
 
 extra_link_args = ['-lgomp']
-extra_compile_args = ['-O3', '-fPIC', '-std=gnu++17', '-march=native', '-fopenmp']
+extra_compile_args = ['-O3', '-fPIC', '-std=gnu++2a', '-march=native', '-fopenmp']
 
 if sys.platform == 'darwin':
     from distutils import sysconfig
@@ -66,7 +66,7 @@ _pyOrbfit = Extension('_pyOrbfit',
 
 data_files = []
 dirs = ['spacerocks/data/pyOrbfit/*', 
-        'spacerocks/data/observatories.csv']
+        'spacerocks/data/observatories.csv', 'src/pyOrbfit/*']
 
 for dir in dirs:
    for filename in glob.glob(dir):
@@ -75,7 +75,7 @@ for dir in dirs:
 
 setup(
     name='spacerocks',
-    version='2.1.9',
+    version='2.1.10',
     description='A Python Package for Solar System Ephemerides and Dynamics.',
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
