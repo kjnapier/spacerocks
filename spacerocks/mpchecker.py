@@ -3,6 +3,7 @@ from .units import Units
 from .utils import great_circle_distance, time_handler
 
 from astropy.coordinates import Angle
+from astropy import units as u
 import numpy as np
 import warnings
 
@@ -19,6 +20,9 @@ class MPChecker:
             rocks = SpaceRock.from_mpc(f'{catalog}', download_data=False, metadata='Orbit_type')
         else:
             rocks = SpaceRock.from_mpc(f'{catalog}', download_data=True, metadata='Orbit_type')
+        
+        rocks.H[np.isnan(rocks.H)] = 99
+        rocks.G[np.isnan(rocks.H)] = 0.15
         return rocks
     
     def check(self, ra, dec, radius, epoch, maglim, obscode, units=Units()):
@@ -33,7 +37,9 @@ class MPChecker:
         arc_dis = great_circle_distance(obs.ra, obs.dec, ra, dec)
         if radius.deg > 3:
             warnings.warn('Exceed maximum search radius, using radius = 3 degrees instead.')
-        in_field_radius = max([3*np.pi/180, 5*radius.rad])
+            radius = Angle(3, u.deg)
+        
+        in_field_radius = 3*radius.rad
         in_field = arc_dis < in_field_radius
         
         if in_field.sum() > 0:
