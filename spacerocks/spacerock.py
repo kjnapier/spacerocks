@@ -333,10 +333,20 @@ class SpaceRock(KeplerOrbit, Convenience):
                     body = f.read().decode()
 
                 lines = body.split("$$SOE")[-1].split("\n")
-                spl = [float(i) for i in lines[2].split(',')[2:-1]]
+                #spl = [float(i) for i in lines[2].split(',')[2:-1]]
+
+                spl_1 = [float(i) for i in lines[2].split(',')[2:-7]]
+                x, y, z, vx, vy, vz = spl_1[:6]
+                
+                try:
+                    spl_2 = [float(i) for i in lines[2].split(',')[9:-1]]
+                    dx, dy, dz, dvx, dvy, dvz = spl_2[6:]
+                except ValueError as e:
+                    dx, dy, dz, dvx, dvy, dvz = 0, 0, 0, 0, 0, 0
+                
                 epoch = float(lines[2].split(',')[0])
-                x, y, z, vx, vy, vz = spl[:6]
-                dx, dy, dz, dvx, dvy, dvz = spl[6:]
+                #x, y, z, vx, vy, vz = spl[:6]
+                #dx, dy, dz, dvx, dvy, dvz = spl[6:]
 
                 cov = np.diag([dx**2, dy**2, dz**2, dvx**2, dvy**2, dvz**2])
         
@@ -345,7 +355,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                     H = float(pps[1])
                     G = float(pps[3])
                 except Exception as E:
-                    print(f'Magnitude information not available for {name}. Is this a comet? Or a planet?')
+                    print(f'Magnitude information not available for {name}. Is this a comet? A planet? A moon?')
                     H = None
                     G = None
                     pass
@@ -363,7 +373,9 @@ class SpaceRock(KeplerOrbit, Convenience):
                 covs.append(cov)
 
             except Exception as E:
-                raise ValueError(f'Body {n} not found.')
+                #print(E)
+                #raise ValueError(f'Body {n} not found.')
+                raise ValueError(f'{E}')
             
         units = Units()
         units.distance = u.au
