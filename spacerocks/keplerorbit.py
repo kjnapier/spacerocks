@@ -36,7 +36,7 @@ class KeplerOrbit:
             if new_origin == 'ssb':
                 self.mu = mu_bary
             else:
-                self.mu = no.mu
+                self.mu = new.mu
 
             # clear the keplerian variables because they need to be recomputed
             self.clear_kep()
