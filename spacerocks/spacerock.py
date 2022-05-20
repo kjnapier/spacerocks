@@ -355,7 +355,7 @@ class SpaceRock(KeplerOrbit, Convenience):
                     H = float(pps[1])
                     G = float(pps[3])
                 except Exception as E:
-                    print(f'Magnitude information not available for {name}. Is this a comet? A planet? A moon?')
+                    print(f'Magnitude information not available for {n}. Is this a comet? A planet? A moon?')
                     H = None
                     G = None
                     pass
