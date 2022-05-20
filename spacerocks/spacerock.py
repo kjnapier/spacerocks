@@ -460,8 +460,8 @@ class SpaceRock(KeplerOrbit, Convenience):
         # be polite and return orbital parameters using the input origin.
         if origin != 'ssb':
             self.change_origin(origin)
-            prop.change_origin(origin)
-            planets.change_origin(origin)
+            #prop.change_origin(origin)
+            #planets.change_origin(origin)
 
         if frame != 'eclipJ2000':
             self.change_frame(frame)
