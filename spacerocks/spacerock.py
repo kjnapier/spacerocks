@@ -336,11 +336,11 @@ class SpaceRock(KeplerOrbit, Convenience):
                 #spl = [float(i) for i in lines[2].split(',')[2:-1]]
 
                 spl_1 = [float(i) for i in lines[2].split(',')[2:-7]]
-                x, y, z, vx, vy, vz = spl_1[:6]
+                x, y, z, vx, vy, vz = spl_1
                 
                 try:
-                    spl_2 = [float(i) for i in lines[2].split(',')[9:-1]]
-                    dx, dy, dz, dvx, dvy, dvz = spl_2[6:]
+                    spl_2 = [float(i) for i in lines[2].split(',')[8:-1]]
+                    dx, dy, dz, dvx, dvy, dvz = spl_2
                 except ValueError as e:
                     dx, dy, dz, dvx, dvy, dvz = 0, 0, 0, 0, 0, 0
                 
