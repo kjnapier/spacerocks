@@ -73,7 +73,6 @@ class SpiceBody:
         else:
             return (self._mass * GravitationalConstant).to(u.au**3 / u.day**2) * u.radian**2
 
-    
     def __get_all_state_vectors(self, epoch):
         '''
         Very optimized way to get all state vectors from spice.
@@ -95,14 +94,20 @@ class SpiceBody:
 
         4. Set attributes using the usual astropy units.
 
+        TODO: Allow for mixing between terrestrial and non-terrestrial observers 
         '''
 
-        epoch = np.atleast_1d(epoch)
-        spiceid = np.atleast_1d(self.spiceid)
+        arr = np.empty((len(epoch), 6))
+        
+        
+        unique_times = np.unique(epoch)
+        sid = self.spiceid
+        unique_dict = {key:self.__state_from_spice((sid, key)) for key in unique_times}
+        for idx, k in enumerate(epoch):
+            arr[idx] = unique_dict[k]
+      
+        x, y, z, vx, vy, vz = arr.T 
 
-        unique_rocks_and_times = set(list(zip(spiceid, epoch)))
-        unique_dict = {key:self.__state_from_spice(key) for key in unique_rocks_and_times}
-        x, y, z, vx, vy, vz = np.array([unique_dict[(body, time)] for body, time in zip(spiceid, epoch)]).T
        
         x = Distance(x, u.km, allow_negative=True).to(u.au)
         y = Distance(y, u.km, allow_negative=True).to(u.au)
@@ -113,6 +118,47 @@ class SpiceBody:
         vz = (vz * u.km/u.s).to(u.au / u.day)
 
         return x.au, y.au, z.au, vx.value, vy.value, vz.value
+
+    
+    # def __get_all_state_vectors(self, epoch):
+    #     '''
+    #     Very optimized way to get all state vectors from spice.
+
+    #     The code is sort of convoluted, but it works and is several 
+    #     times faster than any alternative without resorting to 
+    #     using CSpice directly (don't want to deal with that).
+
+    #     1. set(list(zip(...))) gets unique (body, time) pairs.
+
+    #     2. These pairs are used as the keys in a dictionary storing
+    #        the state vectors as numpy arrays. The key is also passed 
+    #        to the __state_from_spice function to calculate the state 
+    #        vector.
+
+    #     3. Use a list comprehension to populate a numpy array with 
+    #        all state vectors by reading from the dictionary. This is faster 
+    #        than numpy indexing. The time complexity is O(1).
+
+    #     4. Set attributes using the usual astropy units.
+
+    #     '''
+
+    #     epoch = np.atleast_1d(epoch)
+    #     spiceid = np.atleast_1d(self.spiceid)
+
+    #     unique_rocks_and_times = set(list(zip(spiceid, epoch)))
+    #     unique_dict = {key:self.__state_from_spice(key) for key in unique_rocks_and_times}
+    #     x, y, z, vx, vy, vz = np.array([unique_dict[(body, time)] for body, time in zip(spiceid, epoch)]).T
+       
+    #     x = Distance(x, u.km, allow_negative=True).to(u.au)
+    #     y = Distance(y, u.km, allow_negative=True).to(u.au)
+    #     z = Distance(z, u.km, allow_negative=True).to(u.au)
+
+    #     vx = (vx * u.km/u.s).to(u.au / u.day)
+    #     vy = (vy * u.km/u.s).to(u.au / u.day)
+    #     vz = (vz * u.km/u.s).to(u.au / u.day)
+
+    #     return x.au, y.au, z.au, vx.value, vy.value, vz.value
 
 
     def __compute_ephemeris_time(self, epoch):
