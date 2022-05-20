@@ -95,6 +95,23 @@ double calc_E_from_M(double e, double M){
     return E;
 }
 
+double calc_E_from_f(double e, double f) {
+
+  double E;
+
+  if (e < 1) {
+    E = 2 * atan2(sqrt(1 - e) * sin(f / 2), sqrt(1 + e) * cos(f / 2));
+  }
+  else {
+    double cta = cos(f);
+    E = acosh((cta + e) / (1 + e * cta));
+    if (f < 0) {
+      E *= -1;
+    }
+  }
+  return E;
+}
+
 struct Vector3 calc_vovec_from_kep(double mu, double a, double e, double r, double E){
 
   struct Vector3 vec;
@@ -213,6 +230,70 @@ struct StateVector kepE_to_xyz(double a, double e, double inc, double arg, doubl
   } else {
 
     f = 2 * atan2(sqrt(e + 1) * tanh(E / 2), sqrt(e - 1));
+    r = a * (1 - e*e) / (1 + e * cos(f));
+
+    c = sqrt(- mu_bary * a) / r;
+
+    ox = r * cos(f);
+    oy = r * sin(f);
+    vox = - c * sinh(E);
+    voy = c * sqrt(e*e - 1) * cosh(E);
+
+  }
+
+  sa = sin(arg);
+  si = sin(inc);
+  sn = sin(node);
+  ca = cos(arg);
+  ci = cos(inc);
+  cn = cos(node);
+
+  c1 = ca * cn - sa * sn * ci;
+  c2 = sa * cn + ca * sn * ci;
+  c3 = ca * sn + sa * cn * ci;
+  c4 = ca * cn * ci - sa * sn;
+  c5 = sa * si;
+  c6 = ca * si;
+
+  rock.x = ox * c1 - oy * c2;
+  rock.y = ox * c3 + oy * c4;
+  rock.z = ox * c5 + oy * c6;
+  rock.vx = vox * c1 - voy * c2;
+  rock.vy = vox * c3 + voy * c4;
+  rock.vz = vox * c5 + voy * c6;
+
+  return rock;
+
+}
+
+
+struct StateVector kepf_to_xyz(double a, double e, double inc, double arg, double node, double f) {
+
+  double r, c, ox, oy, vox, voy;
+  double si, sa, sn, ci, ca, cn;
+  double c1, c2, c3, c4, c5, c6;
+
+  struct StateVector rock;
+
+  double E = calc_E_from_f(e, f);
+
+  if (e < 1) {
+
+    
+    double cosE = cos(E);
+    double omece = 1 - e * cosE;
+    r = a * omece;
+
+    c = sqrt(mu_bary * a) / r;
+
+    ox = r * cos(f);
+    oy = r * sin(f);
+    vox = - c * sin(E);
+    voy = c * sqrt(1 - e * e) * cosE;
+
+  } else {
+
+    
     r = a * (1 - e*e) / (1 + e * cos(f));
 
     c = sqrt(- mu_bary * a) / r;
@@ -535,22 +616,7 @@ double* py_calc_M_from_E(int N, double* es, double* Es) {
 
 // If inc > pi/2, varpi = node - arg
 
-double calc_E_from_f(double e, double f) {
 
-  double E;
-
-  if (e < 1) {
-    E = 2 * atan2(sqrt(1 - e) * sin(f / 2), sqrt(1 + e) * cos(f / 2));
-  }
-  else {
-    double cta = cos(f);
-    E = acosh((cta + e) / (1 + e * cta));
-    if (f < 0) {
-      E *= -1;
-    }
-  }
-  return E;
-}
 
 extern "C" {
 double* py_calc_E_from_f(int N, double* es, double* fs) {
@@ -646,6 +712,36 @@ double* py_kepE_to_xyz(int N, double *as, double *es, double *incs, double *args
   for (int idx = 0; idx < N; idx++) {
 
     rock = kepE_to_xyz(as[idx], es[idx], incs[idx], args[idx], nodes[idx], Es[idx]);
+
+    dummy = idx * 6;
+
+    output[dummy] = rock.x;
+    output[dummy + 1] = rock.y;
+    output[dummy + 2] = rock.z;
+    output[dummy + 3] = rock.vx;
+    output[dummy + 4] = rock.vy;
+    output[dummy + 5] = rock.vz;
+
+  }
+
+  return output;
+
+}}
+
+extern "C" {
+double* py_kepf_to_xyz(int N, double *as, double *es, double *incs, double *args, double *nodes, double *fs)
+{
+
+  double* output = (double*) malloc(N * 6 * sizeof(double));
+  //double* output = new double[N * 6];
+  int dummy;
+
+  struct StateVector rock;
+
+  #pragma omp parallel for private(rock, dummy) schedule(guided)
+  for (int idx = 0; idx < N; idx++) {
+
+    rock = kepf_to_xyz(as[idx], es[idx], incs[idx], args[idx], nodes[idx], fs[idx]);
 
     dummy = idx * 6;
 

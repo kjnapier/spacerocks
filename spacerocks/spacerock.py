@@ -20,8 +20,8 @@ from .units import Units
 from .vector import Vector
 from .ephemerides import Ephemerides 
 from .observer import Observer
-from .cbindings import kepM_to_xyz, correct_for_ltt, correct_for_ltt_single_observer
-from .spice import SpiceBody, SpiceKernel
+from .cbindings import kepM_to_xyz, correct_for_ltt, correct_for_ltt_single_observer, kepf_to_xyz
+from .spice import SpiceBody
 from .paths import OBSERVATORIES_PATH
 
 observatories = pd.read_csv(OBSERVATORIES_PATH)
@@ -658,19 +658,19 @@ class SpaceRock(KeplerOrbit, Convenience):
 
     def orbits(self, N=1000):
 
-        M = Angle(np.linspace(0, 2*np.pi, N), u.rad)
+        f = Angle(np.linspace(0, 2*np.pi, N), u.rad)
 
         xs = []
         ys = []
         zs = []
 
         for r in self:
-            x, y, z, _, _, _ = kepM_to_xyz(np.repeat(r.a, N),
+            x, y, z, _, _, _ = kepf_to_xyz(np.repeat(r.a, N),
                                            np.repeat(r.e, N),
                                            np.repeat(r.inc.rad, N),
                                            np.repeat(r.arg.rad, N),
                                            np.repeat(r.node.rad, N),
-                                           M.rad)
+                                           f.rad)
             xs.append(x)
             ys.append(y)
             zs.append(z)

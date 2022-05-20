@@ -59,6 +59,32 @@ def kepE_to_xyz(a, e, inc, arg, node, E):
     
     return x, y, z, vx * u.au/u.d, vy * u.au/u.d, vz * u.au/u.d
 
+clibspacerocks.py_kepf_to_xyz.argtypes = [ctypes.c_int,
+                                          ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                          ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                          ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                          ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                          ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                          ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
+
+clibspacerocks.py_kepf_to_xyz.restype = ctypes.POINTER(ctypes.c_double)
+
+def kepf_to_xyz(a, e, inc, arg, node, f):
+
+    N = len(a)
+    rock = clibspacerocks.py_kepf_to_xyz(N, a, e, inc, arg, node, f)
+    arr = np.ctypeslib.as_array(rock, (6 * N,)).copy()
+    clibspacerocks.free_memory(rock)
+    
+    x, y, z, vx, vy, vz = arr.reshape(N, 6).T
+
+    x = Distance(x, u.au, allow_negative=True)
+    y = Distance(y, u.au, allow_negative=True)
+    z = Distance(z, u.au, allow_negative=True)
+  
+    
+    return x, y, z, vx * u.au/u.d, vy * u.au/u.d, vz * u.au/u.d
+
 
 clibspacerocks.py_calc_kep_from_xyz.argtypes = [ctypes.c_int,
                                                 ctypes.c_double,
