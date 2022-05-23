@@ -101,6 +101,8 @@ class Simulation(rebound.Simulation, Convenience):
         self.remaining_testparticles += copy.deepcopy(r.name.tolist())
         r.to_bary()
         r.change_frame('eclipJ2000')
+        r.position
+        r.velocity
        
         if hasattr(r, 'epoch'):       
             # Integrate all particles to the same epoch

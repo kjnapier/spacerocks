@@ -1,6 +1,8 @@
 from astropy import units as u
 from astropy.coordinates import Distance
 
+from .utils import time_handler
+from .units import Units
 import numpy as np
 
 from astropy.constants import G as GravitationalConstant
@@ -40,11 +42,13 @@ class SpiceBody:
         kernel.furnsh()
 
     
-    def at(self, epoch):
+    def at(self, epoch, units=Units()):
         '''
         Return a SpaceRock object at the specified epoch(s).
         '''
         from spacerocks.spacerock import SpaceRock
+        #epoch = epoch.utc.jd
+        epoch = time_handler(epoch, units)
         epoch = epoch.utc.jd
         x, y, z, vx, vy, vz = self.__get_all_state_vectors(epoch)
         return SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, epoch=epoch, name=self.spiceid)
