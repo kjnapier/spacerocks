@@ -20,7 +20,7 @@ def time_handler(d, units=Units()):
     return epoch
 
 def infer_time_format(d, units=Units()):
-    if isinstance(d, Time):
+    if isinstance(d[0], Time):
         epoch = d
     elif isinstance(d[0], str):
         dates = [dateutil.parser.parse(x, fuzzy_with_tokens=True)[0] for x in d]
