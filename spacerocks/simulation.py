@@ -72,7 +72,7 @@ class Simulation(rebound.Simulation, Convenience):
                              hash=name)
                     
             elif isinstance(perturber, SpiceBody):
-                body = perturber.at(self.epoch)
+                body = perturber.at(self.epoch.utc.jd)
                 self.add(x=body.x.au[0], 
                          y=body.y.au[0], 
                          z=body.z.au[0],

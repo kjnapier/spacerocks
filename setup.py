@@ -87,7 +87,7 @@ for dir in dirs:
 
 setup(
     name='spacerocks',
-    version='2.1.14',
+    version='2.1.15',
     description='A Python Package for Solar System Ephemerides and Dynamics.',
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
