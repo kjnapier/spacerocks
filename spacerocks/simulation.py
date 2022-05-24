@@ -47,13 +47,6 @@ class Simulation(rebound.Simulation, Convenience):
         
         if kwargs.get('epoch') is not None:
             self.epoch = time_handler(kwargs.get('epoch'), units=self.spacerocks_units)
-            # if isinstance(kwargs.get('epoch'), str):
-            #     self.epoch = time_handler(kwargs.get('epoch'), units=self.spacerocks_units)
-            #     #self.epoch = self.detect_timescale([kwargs.get('epoch')], self.spacerocks_units.timescale)
-            # else:
-            #     self.epoch = Time(kwargs.get('epoch'), 
-            #                       format=self.spacerocks_units.timeformat, 
-            #                       scale=self.spacerocks_units.timescale)
 
         self.t = copy.deepcopy(self.epoch.tdb.jd)
         for name, perturber in self.model.perturbers.items():
