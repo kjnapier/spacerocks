@@ -35,9 +35,9 @@ class MPChecker:
         prop = self.rocks.analytic_propagate(epoch=epoch)
         obs = prop.observe(obscode=obscode)
         arc_dis = great_circle_distance(obs.ra, obs.dec, ra, dec)
-        if radius.deg > 3:
-            warnings.warn('Exceed maximum search radius, using radius = 3 degrees instead.')
-            radius = Angle(3, u.deg)
+        if radius.deg > 7:
+            warnings.warn('Exceed maximum search radius, using radius = 7 degrees instead.')
+            radius = Angle(7, u.deg)
         
         in_field_radius = 3*radius.rad
         in_field = arc_dis < in_field_radius
