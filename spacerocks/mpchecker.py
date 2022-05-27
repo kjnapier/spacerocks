@@ -15,7 +15,7 @@ class MPChecker:
     def load_rocks(self, catalog, update):
         from .paths import MPC_PATH
         import pathlib
-        rocksfile = pathlib.Path(MPC_PATH + f'/{catalog}.json.gz')
+        rocksfile = pathlib.Path(MPC_PATH + f'/{catalog}.feather')
         if rocksfile.is_file() and update == False:
             rocks = SpaceRock.from_mpc(f'{catalog}', download_data=False, metadata='Orbit_type')
         else:
