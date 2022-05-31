@@ -470,15 +470,15 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         N = len(epochs)
         if hasattr(self, 'G'):
-            prop.G = np.tile(self.G, N)
+            prop.G = np.repeat(self.G, N)
 
         if hasattr(self, 'H_func'):
-            prop.H_func = np.tile(self.H_func, N)
+            prop.H_func = np.repeat(self.H_func, N)
         elif hasattr(self, '_H'):
-            prop.H = np.tile(self.H, N)
+            prop.H = np.repeat(self.H, N)
 
         if hasattr(self, 'mag_func'):
-            prop.mag_func = np.tile(self.mag_func, N)
+            prop.mag_func = np.repeat(self.mag_func, N)
 
         return prop, planets, sim
 
