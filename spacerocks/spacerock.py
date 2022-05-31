@@ -255,13 +255,18 @@ class SpaceRock(KeplerOrbit, Convenience):
             from .downloader import download
             datafile = ['https://minorplanetcenter.net/Extended_Files/' + catalog + '.json.gz']
             download(datafile, MPC_PATH)
+            path = MPC_PATH + f'/{catalog}.json.gz'
+            df = pd.read_json(path)
+            df.to_feather(f'{MPC_PATH}/{catalog}.feather')
+        else:
+            path = MPC_PATH + f'/{catalog}.feather'
+            df = pd.read_feather(path)
 
         units = Units()
         units.timescale = 'tt'
         units.timeformat = 'jd'
 
-        path = MPC_PATH + f'/{catalog}.json.gz'
-        df = pd.read_json(path)
+        
 
         H = df.H
         G = df.G
