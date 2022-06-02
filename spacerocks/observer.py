@@ -42,6 +42,7 @@ class Observer:
             raise ValueError('Must specify either a spiceid or an obscode')
 
         self.__get_all_state_vectors()
+        kernel.unload()
 
 
     def __get_all_state_vectors(self):
