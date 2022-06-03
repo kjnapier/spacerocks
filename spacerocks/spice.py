@@ -31,6 +31,9 @@ class SpiceKernel:
         for spk in self.spk:
             spice.unload(spk)
 
+    def __del__(self):
+        self.unload()
+
 class SpiceBody:
 
     def __init__(self, spiceid, kernel=SpiceKernel(), frame='ECLIPJ2000', origin='ssb'):
@@ -39,7 +42,7 @@ class SpiceBody:
         self.origin = origin
         self.spiceid = spiceid
         self.kernel = kernel
-        kernel.furnsh()
+        self.kernel.furnsh()
 
     
     def at(self, epoch, units=Units()):
