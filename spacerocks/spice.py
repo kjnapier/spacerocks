@@ -18,6 +18,7 @@ class SpiceKernel:
         self.lsk = os.path.join(spice_path, lsk)
         self.pck = os.path.join(spice_path, pck)
         self.spk = [os.path.join(spice_path, x) for x in np.atleast_1d(spk)]
+        self.furnsh()
         
     def furnsh(self):
         spice.furnsh(self.lsk)
@@ -42,7 +43,7 @@ class SpiceBody:
         self.origin = origin
         self.spiceid = spiceid
         self.kernel = kernel
-        self.kernel.furnsh()
+        #self.kernel.furnsh()
 
     
     def at(self, epoch, units=Units()):

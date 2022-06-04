@@ -52,7 +52,7 @@ class PerturberModel:
         self.kernel = kernel
         
         if kwargs.get('spiceids') is not None:
-            kernel.furnsh()
+            #kernel.furnsh()
             for spiceid in kwargs.get('spiceids'):
                 self.perturbers[spiceid] = SpiceBody(spiceid=spiceid)
                 

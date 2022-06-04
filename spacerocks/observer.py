@@ -23,7 +23,7 @@ class Observer:
 
     def __init__(self, origin='ssb', frame='ECLIPJ2000', kernel=SpiceKernel(), **kwargs):
         
-        kernel.furnsh()
+        #kernel.furnsh()
         self.origin = origin
         self.frame = frame
         
@@ -42,7 +42,6 @@ class Observer:
             raise ValueError('Must specify either a spiceid or an obscode')
 
         self.__get_all_state_vectors()
-        kernel.unload()
 
 
     def __get_all_state_vectors(self):

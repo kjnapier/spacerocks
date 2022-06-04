@@ -11,7 +11,7 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 
 kernel = SpiceKernel()
-kernel.furnsh()
+#kernel.furnsh()
 
 class TestSpacerock(unittest.TestCase):
 
