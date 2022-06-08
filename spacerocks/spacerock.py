@@ -250,17 +250,19 @@ class SpaceRock(KeplerOrbit, Convenience):
         from .paths import MPC_PATH
         import pathlib
         pathlib.Path(MPC_PATH).mkdir(exist_ok=True)
+        path = pathlib.Path(MPC_PATH + f'/{catalog}.feather')
         
-        if download_data == True:
+        if path.exists() and download_data == False:
+            df = pd.read_feather(path)
+        else: 
             from .downloader import download
             datafile = ['https://minorplanetcenter.net/Extended_Files/' + catalog + '.json.gz']
             download(datafile, MPC_PATH)
             path = MPC_PATH + f'/{catalog}.json.gz'
             df = pd.read_json(path)
             df.to_feather(f'{MPC_PATH}/{catalog}.feather')
-        else:
-            path = MPC_PATH + f'/{catalog}.feather'
-            df = pd.read_feather(path)
+
+         
 
         units = Units()
         units.timescale = 'tt'
