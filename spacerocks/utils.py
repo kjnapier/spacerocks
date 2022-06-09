@@ -2,6 +2,7 @@ from .units import Units
 
 import numpy as np
 import dateutil
+import datetime
 
 from astropy.time import Time
 from astropy.coordinates import Angle
@@ -22,6 +23,8 @@ def time_handler(d, units=Units()):
 def infer_time_format(d, units=Units()):
     if isinstance(d[0], Time):
         epoch = d
+    elif isinstance(d[0], datetime.datetime):
+        epoch = Time(d, format='datetime', scale=units.timescale)
     elif isinstance(d[0], str):
         dates = [dateutil.parser.parse(x, fuzzy_with_tokens=True)[0] for x in d]
         epoch = Time(dates, format='datetime', scale=units.timescale)  

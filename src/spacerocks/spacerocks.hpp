@@ -14,6 +14,11 @@ const double speed_of_light = 173.14463267424034;
     #define M_PI 3.14159265358979323846
 #endif
 
+const double EQUAT_RAD   = 6378137.0;
+const double FLATTEN     = 1 / 298.257223563;
+const double O_M_FLATTEN = 1 - FLATTEN;
+const double DEG_TO_RAD  = M_PI / 180.0;
+
 struct StateVector{
   double x;
   double y;
@@ -51,4 +56,7 @@ struct KeplerOrbit calc_kep_from_xyz(double mu, double x, double y, double z, do
 
 struct StateVector correct_for_ltt(double x, double y, double z, double vx, double vy, double vz, 
                                    double ox, double oy, double oz, double ovx, double ovy, double ovz);
+
+double compute_lst(double epoch, double lon);
+struct Vector3 compute_topocentric_correction(double earth_lat, double earth_lon, double elevation, double epoch);
 

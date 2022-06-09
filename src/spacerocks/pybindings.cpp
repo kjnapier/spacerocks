@@ -6,6 +6,27 @@ void free_memory(double *ptr) {
 }}
 
 extern "C" {
+double* py_compute_topocentric_correction(int N, double* lats, double* lons, double* elevations, double* epochs) {
+
+  double* output = (double*) malloc(N * 3 * sizeof(double));
+  struct Vector3 vec;
+  int dummy;
+
+  #pragma omp parallel for private(vec, dummy) schedule(guided)
+  for (int idx = 0; idx < N; idx++) {
+    vec = compute_topocentric_correction(lats[idx], lons[idx], elevations[idx], epochs[idx]);
+    dummy = idx * 3;
+
+    output[dummy] = vec.x;
+    output[dummy + 1] = vec.y;
+    output[dummy + 2] = vec.z;
+
+  }
+  return output;
+}}
+
+
+extern "C" {
 double* py_calc_kep_from_xyz(int N, double mu, double* xs, double* ys, double* zs, double* vxs, double* vys, double* vzs) {
   //struct KeplerOrbit* output = malloc(N * sizeof(struct KeplerOrbit));
   double* output = (double*) malloc(N * 6 * sizeof(double));

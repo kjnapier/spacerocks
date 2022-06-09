@@ -7,6 +7,38 @@ from astropy.coordinates import Angle, Distance
 
 from . import clibspacerocks
 
+M_TO_AU = (u.m).to(u.au)
+M_TO_KM = (u.m).to(u.km)
+
+clibspacerocks.py_compute_topocentric_correction.argtypes = [ctypes.c_int,
+                                                             ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                                             ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                                             ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                                             ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
+
+clibspacerocks.py_compute_topocentric_correction.restype = ctypes.POINTER(ctypes.c_double)
+
+def compute_topocentric_correction(lat, lon, elevation, epoch):
+
+    N = len(epoch)
+
+    lat = np.atleast_1d(lat).astype(np.float64)
+    lon = np.atleast_1d(lon).astype(np.float64)
+    elevation = np.atleast_1d(elevation).astype(np.float64)
+
+    if len(lat) < N:
+        lat = np.repeat(lat, N)
+        lon = np.repeat(lon, N)
+        elevation = np.repeat(elevation, N)
+
+    rock = clibspacerocks.py_compute_topocentric_correction(N, lat, lon, elevation, epoch)
+    arr = np.ctypeslib.as_array(rock, (3 * N,)).copy()
+    clibspacerocks.free_memory(rock)
+    
+    x, y, z = arr.reshape(N, 3).T
+    
+    return x * M_TO_KM, y * M_TO_KM, z * M_TO_KM
+
 clibspacerocks.py_kepM_to_xyz.argtypes = [ctypes.c_int,
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                               ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
