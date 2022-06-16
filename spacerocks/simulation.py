@@ -48,7 +48,8 @@ class Simulation(rebound.Simulation, Convenience):
         if kwargs.get('epoch') is not None:
             self.epoch = time_handler(kwargs.get('epoch'), units=self.spacerocks_units)
 
-        self.t = copy.deepcopy(self.epoch.tdb.jd)
+        #self.t = copy.deepcopy(self.epoch.tdb.jd)
+        self.t = copy.deepcopy(self.epoch.jd)
         for name, perturber in self.model.perturbers.items():
             if isinstance(perturber, SpaceRock):
                 if hasattr(perturber, 'epoch'):
@@ -99,11 +100,13 @@ class Simulation(rebound.Simulation, Convenience):
        
         if hasattr(r, 'epoch'):       
             # Integrate all particles to the same epoch
-            pickup_times = r.epoch.tdb.jd
+            #pickup_times = r.epoch.tdb.jd
+            pickup_times = r.epoch.jd
             
             for time in np.sort(np.unique(pickup_times)):
                 self.integrate(time, exact_finish_time=1)
-                ps = r[r.epoch.tdb.jd == time]
+                #ps = r[r.epoch.tdb.jd == time]
+                ps = r[r.epoch.jd == time]
                 for x, y, z, vx, vy, vz, name in zip(ps.x.value, ps.y.value, ps.z.value, ps.vx.value, ps.vy.value, ps.vz.value, ps.name):
                     self.add(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, m=0, hash=name)
                     
@@ -138,9 +141,11 @@ class Simulation(rebound.Simulation, Convenience):
         epochs = time_handler(epochs, units)
 
         if progress == True:
-            iterator = track(np.sort(epochs.tdb.jd))
+            #iterator = track(np.sort(epochs.tdb.jd))
+            iterator = track(np.sort(epochs.jd))
         else:
-            iterator = np.sort(epochs.tdb.jd)
+            #iterator = np.sort(epochs.tdb.jd)
+            iterator = np.sort(epochs.jd)
         
         for time in iterator:
             self.integrate(time, exact_finish_time=exact_finish_time)
