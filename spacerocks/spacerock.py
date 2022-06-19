@@ -431,7 +431,7 @@ class SpaceRock(KeplerOrbit, Convenience):
             return np.array([func(epoch) for epoch, func in zip(self.epoch.jd, self.mag_func)])
 
 
-    def propagate(self, epochs, model='GIANTS', units=Units(), gr=False, progress=True):
+    def propagate(self, epochs, model='GIANTS', units=Units(), gr=False, progress=True, in_memory=True, outfile=None, **kwargs):
         from .simulation import Simulation
         epochs = time_handler(epochs, units)
         origin = copy.copy(self.origin)
@@ -462,30 +462,33 @@ class SpaceRock(KeplerOrbit, Convenience):
         units = Units()
         units.timescale = 'tdb'
         units.timeformat = 'jd'
-        prop, planets, sim = sim.propagate(epochs=epochs.tdb.jd, units=units, progress=progress)
+        prop, planets, sim = sim.propagate(epochs=epochs.tdb.jd, units=units, progress=progress, 
+                                           in_memory=in_memory, outfile=outfile, **kwargs)
 
         # be polite and return orbital parameters using the input origin.
         if origin != 'ssb':
             self.change_origin(origin)
-            #prop.change_origin(origin)
-            #planets.change_origin(origin)
-
+           
         if frame != 'eclipJ2000':
             self.change_frame(frame)
-            prop.change_frame(frame)
-            planets.change_frame(frame)
 
-        N = len(epochs)
-        if hasattr(self, 'G'):
-            prop.G = np.repeat(self.G, N)
+        if in_memory == True:
 
-        if hasattr(self, 'H_func'):
-            prop.H_func = np.repeat(self.H_func, N)
-        elif hasattr(self, '_H'):
-            prop.H = np.repeat(self.H, N)
+            if frame != 'eclipJ2000':
+                prop.change_frame(frame)
+                planets.change_frame(frame)
 
-        if hasattr(self, 'mag_func'):
-            prop.mag_func = np.repeat(self.mag_func, N)
+            N = len(epochs)
+            if hasattr(self, 'G'):
+                prop.G = np.repeat(self.G, N)
+    
+            if hasattr(self, 'H_func'):
+                prop.H_func = np.repeat(self.H_func, N)
+            elif hasattr(self, '_H'):
+                prop.H = np.repeat(self.H, N)
+    
+            if hasattr(self, 'mag_func'):
+                prop.mag_func = np.repeat(self.mag_func, N)
 
         return prop, planets, sim
 

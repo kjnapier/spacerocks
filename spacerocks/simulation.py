@@ -100,12 +100,10 @@ class Simulation(rebound.Simulation, Convenience):
        
         if hasattr(r, 'epoch'):       
             # Integrate all particles to the same epoch
-            #pickup_times = r.epoch.tdb.jd
             pickup_times = r.epoch.jd
             
             for time in np.sort(np.unique(pickup_times)):
                 self.integrate(time, exact_finish_time=1)
-                #ps = r[r.epoch.tdb.jd == time]
                 ps = r[r.epoch.jd == time]
                 for x, y, z, vx, vy, vz, name in zip(ps.x.value, ps.y.value, ps.z.value, ps.vx.value, ps.vy.value, ps.vz.value, ps.name):
                     self.add(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, m=0, hash=name)
@@ -124,105 +122,158 @@ class Simulation(rebound.Simulation, Convenience):
         for n in r.name:
             h = self.particles[n].hash
             self.simdata[h.value] = []
-            
-    def propagate(self, epochs, units=Units(), progress=True, exact_finish_time=1, **kwargs):
+
+
+    def propagate(self, epochs, units=Units(), progress=True, exact_finish_time=1, in_memory=True, outfile=None, **kwargs):
         '''
-        Numerically integrate all bodies to the desired date.
+        Numerically integrate all bodies to the desired epochs.
         This routine synchronizes the epochs.
         '''
-
         if kwargs.get('callback') is not None:
             f = True
             callback = kwargs.get('callback')
         else:
             f = False
 
-        #epochs = self.detect_timescale(np.atleast_1d(epochs), units.timescale)
         epochs = time_handler(epochs, units)
 
         if progress == True:
-            #iterator = track(np.sort(epochs.tdb.jd))
             iterator = track(np.sort(epochs.jd))
         else:
-            #iterator = np.sort(epochs.tdb.jd)
             iterator = np.sort(epochs.jd)
         
-        for time in iterator:
-            self.integrate(time, exact_finish_time=exact_finish_time)
-
-            if f == True:
-                callback(self)
-            
-            for p in self.particles:
-                h = p.hash.value
-                arr = [time] + p.xyz + p.vxyz
-                self.simdata[h].append(arr)
-
-        pepoch  = []
-        px      = []
-        py      = []
-        pz      = []
-        pvx     = []
-        pvy     = []
-        pvz     = []
-        pname   = []
-        for n in self.perturber_names:
-            ts, xs, ys, zs, vxs, vys, vzs = np.array(self.simdata[rebound.hash(n).value]).T
-            pepoch.append(ts.tolist())
-            px.append(xs.tolist())
-            py.append(ys.tolist())
-            pz.append(zs.tolist())
-            pvx.append(vxs.tolist())
-            pvy.append(vys.tolist())
-            pvz.append(vzs.tolist())
-            pname.append([n for _ in range(len(ts))])
-
-        pepoch  = np.hstack(pepoch)
-        px      = np.hstack(px)
-        py      = np.hstack(py)
-        pz      = np.hstack(pz)
-        pvx     = np.hstack(pvx)
-        pvy     = np.hstack(pvy)
-        pvz     = np.hstack(pvz)
-        pname   = np.hstack(pname)
-           
-        planets = SpaceRock(x=px, y=py, z=pz, vx=pvx, vy=pvy, vz=pvz, name=pname, epoch=pepoch, origin='ssb', units=units)
-
-        if len(self.testparticle_names) > 0:
-            epoch  = []
-            x      = []
-            y      = []
-            z      = []
-            vx     = []
-            vy     = []
-            vz     = []
-            name   = []
-            for n in self.testparticle_names:
-                try:
-                    ts, xs, ys, zs, vxs, vys, vzs = np.array(self.simdata[rebound.hash(n).value]).T
-                except ValueError:
-                    continue
-                epoch.append(ts.tolist())
-                x.append(xs.tolist())
-                y.append(ys.tolist())
-                z.append(zs.tolist())
-                vx.append(vxs.tolist())
-                vy.append(vys.tolist())
-                vz.append(vzs.tolist())
-                name.append([n for _ in range(len(ts))])
-
-            epoch  = np.hstack(epoch)
-            x      = np.hstack(x)
-            y      = np.hstack(y)
-            z      = np.hstack(z)
-            vx     = np.hstack(vx)
-            vy     = np.hstack(vy)
-            vz     = np.hstack(vz)
-            name   = np.hstack(name)
-
-            rocks = SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, origin='ssb', units=units)
+        if outfile is None:
+            for time in iterator:
+                self.integrate(time, exact_finish_time=exact_finish_time)
+    
+                if f == True:
+                    callback(self)
+                
+                for p in self.particles:
+                    h = p.hash.value
+                    arr = [time] + p.xyz + p.vxyz
+    
+                    if in_memory == True:
+                        self.simdata[h].append(arr)
 
         else:
-            rocks = ()
+            with open(f'{outfile}', 'w') as out:
+                out.write(f'name, epoch, x, y, z, vx, vy, vz' + '\n')
+                name_map = {rebound.hash(n).value: n for n in self.perturber_names + self.testparticle_names}
+                for time in iterator:
+                    self.integrate(time, exact_finish_time=exact_finish_time)
+        
+                    if f == True:
+                        callback(self)
+                    
+                    for p in self.particles:
+                        h = p.hash.value
+                        arr = [time] + p.xyz + p.vxyz
+        
+                        if in_memory == True:
+                            self.simdata[h].append(arr)
+                        out.write(f'{name_map[p.hash.value]}, {time}, {p.x}, {p.y}, {p.z}, {p.vx}, {p.vy}, {p.vz}' + '\n')
+
+
+        if in_memory == True:
+            pepoch  = []
+            px      = []
+            py      = []
+            pz      = []
+            pvx     = []
+            pvy     = []
+            pvz     = []
+            pname   = []
+            for n in self.perturber_names:
+                ts, xs, ys, zs, vxs, vys, vzs = np.array(self.simdata[rebound.hash(n).value]).T
+                pepoch.append(ts.tolist())
+                px.append(xs.tolist())
+                py.append(ys.tolist())
+                pz.append(zs.tolist())
+                pvx.append(vxs.tolist())
+                pvy.append(vys.tolist())
+                pvz.append(vzs.tolist())
+                pname.append([n for _ in range(len(ts))])
+    
+            pepoch  = np.hstack(pepoch)
+            px      = np.hstack(px)
+            py      = np.hstack(py)
+            pz      = np.hstack(pz)
+            pvx     = np.hstack(pvx)
+            pvy     = np.hstack(pvy)
+            pvz     = np.hstack(pvz)
+            pname   = np.hstack(pname)
+               
+            planets = SpaceRock(x=px, y=py, z=pz, vx=pvx, vy=pvy, vz=pvz, name=pname, epoch=pepoch, origin='ssb', units=units)
+    
+            if len(self.testparticle_names) > 0:
+                epoch  = []
+                x      = []
+                y      = []
+                z      = []
+                vx     = []
+                vy     = []
+                vz     = []
+                name   = []
+                for n in self.testparticle_names:
+                    try:
+                        ts, xs, ys, zs, vxs, vys, vzs = np.array(self.simdata[rebound.hash(n).value]).T
+                    except ValueError:
+                        continue
+                    epoch.append(ts.tolist())
+                    x.append(xs.tolist())
+                    y.append(ys.tolist())
+                    z.append(zs.tolist())
+                    vx.append(vxs.tolist())
+                    vy.append(vys.tolist())
+                    vz.append(vzs.tolist())
+                    name.append([n for _ in range(len(ts))])
+    
+                epoch  = np.hstack(epoch)
+                x      = np.hstack(x)
+                y      = np.hstack(y)
+                z      = np.hstack(z)
+                vx     = np.hstack(vx)
+                vy     = np.hstack(vy)
+                vz     = np.hstack(vz)
+                name   = np.hstack(name)
+    
+                rocks = SpaceRock(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz, name=name, epoch=epoch, origin='ssb', units=units)
+    
+            else:
+                rocks = ()
+        else:
+            rocks = None
+            planets = None
         
         return rocks, planets, self
+
+    # def propagate(self, epochs, units=Units(), progress=True, exact_finish_time=1, **kwargs):
+    #     '''
+    #     Numerically integrate all bodies to the desired epochs.
+    #     This routine synchronizes the epochs.
+    #     '''
+    #     if kwargs.get('callback') is not None:
+    #         f = True
+    #         callback = kwargs.get('callback')
+    #     else:
+    #         f = False
+
+    #     epochs = time_handler(epochs, units)
+
+    #     if progress == True:
+    #         iterator = track(np.sort(epochs.jd))
+    #     else:
+    #         iterator = np.sort(epochs.jd)
+        
+    #     with open(f'test.tmp', 'w') as out:
+    #         for time in iterator:
+    #             self.integrate(time, exact_finish_time=exact_finish_time)
+    
+    #             if f == True:
+    #                 callback(self)
+                
+    #             for p in self.particles:
+    #                 out.write(f'{p.hash.value}, {time}, {p.x}, {p.y}, {p.z}, {p.vx}, {p.vy}, {p.vz}' + '\n')
+        
+    #     return None, None, None

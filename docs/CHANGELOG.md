@@ -1,3 +1,6 @@
+### 2.1.20
+- Add option to Simulation to dump data to file, and not keep in memory (not exclusive)
+
 ### 2.1.1
 - Consolidated `spice` logic into a `SpiceKernel` class
 - Created a `PerturberModel` class for managing the perturbers in simulations
