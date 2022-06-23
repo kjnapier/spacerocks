@@ -86,8 +86,6 @@ class Simulation(rebound.Simulation, Convenience):
         for n in self.perturber_names:
             h = self.particles[n].hash
             self.simdata[h.value] = []
-
-        self.move_to_com()
         
     def add_spacerocks(self, rocks):
         r = copy.deepcopy(rocks)
@@ -129,6 +127,9 @@ class Simulation(rebound.Simulation, Convenience):
         Numerically integrate all bodies to the desired epochs.
         This routine synchronizes the epochs.
         '''
+
+        self.move_to_com()
+        
         if kwargs.get('callback') is not None:
             f = True
             callback = kwargs.get('callback')
