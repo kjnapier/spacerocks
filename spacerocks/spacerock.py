@@ -690,7 +690,7 @@ class SpaceRock(KeplerOrbit, Convenience):
     def write_to(self, path, compression='zlib'):
         uniquenames = np.unique(self.name)
         if len(uniquenames) == 1:
-            name = uniquenames
+            name = uniquenames.tolist()
         else:
             name = self.name.tolist()
         tree = {
