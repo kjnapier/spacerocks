@@ -1,3 +1,6 @@
+### 2.1.23
+- Make Observer object indexable
+
 ### 2.1.20
 - Add option to Simulation to dump data to file, and not keep in memory (not exclusive)
 

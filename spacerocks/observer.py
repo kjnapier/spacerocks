@@ -3,10 +3,12 @@ from astropy.coordinates import Distance, Angle
 
 from .constants import epsilon
 from .spice import SpiceKernel
+from .vector import Vector
 
 import numpy as np
 import pandas as pd
 import spiceypy as spice
+import copy
 
 from .paths import OBSERVATORIES_PATH
 observatories = pd.read_csv(OBSERVATORIES_PATH)
@@ -42,7 +44,26 @@ class Observer:
             raise ValueError('Must specify either a spiceid or an obscode')
 
         self.__get_all_state_vectors()
+        
+    def __len__(self):
+        '''
+        This method allows you to use the len() function on a SpaceRocks object.
+        '''
+        return len(self.epoch)
 
+    def __getitem__(self, idx):
+        '''
+        This method allows you to index a SpaceRocks object.
+        '''
+        p = copy.copy(self)
+        for attr in self.__dict__.keys():
+            if (attr != 'mu') and (attr != 'frame') and (attr != 'origin') and (attr != 'units'):
+                if isinstance(getattr(self, attr), Vector):
+                    setattr(p, attr, getattr(self, attr)[idx])
+                else:
+                    setattr(p, attr, getattr(self, attr)[idx])
+
+        return p
 
     def __get_all_state_vectors(self):
         '''
