@@ -185,20 +185,36 @@ def calc_E_from_M(e, M):
     return Angle(E, u.rad)
 
 
+# clibspacerocks.py_calc_M_from_E.argtypes = [ctypes.c_int,
+#                                             ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+#                                             ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
+
+# clibspacerocks.py_calc_M_from_E.restype = ctypes.POINTER(ctypes.c_double)
+
+# def calc_M_from_E(e, E):
+
+#     N = len(e)
+#     rock = clibspacerocks.py_calc_M_from_E(N, e, E)
+#     # ptr = ctypes.cast(rock, ctypes.POINTER(ctypes.c_double * N))
+#     # M = np.asarray(ptr.contents).copy() #
+#     M = np.ctypeslib.as_array(rock, (N,)).copy()
+#     clibspacerocks.free_memory(rock)
+
+#     return Angle(M, u.rad)
+
 clibspacerocks.py_calc_M_from_E.argtypes = [ctypes.c_int,
                                             ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                            ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'), 
                                             ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
 
-clibspacerocks.py_calc_M_from_E.restype = ctypes.POINTER(ctypes.c_double)
+#clibspacerocks.py_calc_M_from_E.restype = ctypes.POINTER(ctypes.c_double)
 
 def calc_M_from_E(e, E):
 
     N = len(e)
-    rock = clibspacerocks.py_calc_M_from_E(N, e, E)
-    # ptr = ctypes.cast(rock, ctypes.POINTER(ctypes.c_double * N))
-    # M = np.asarray(ptr.contents).copy() #
-    M = np.ctypeslib.as_array(rock, (N,)).copy()
-    clibspacerocks.free_memory(rock)
+
+    M = np.empty(N)
+    clibspacerocks.py_calc_M_from_E(N, e, E, M)
 
     return Angle(M, u.rad)
 

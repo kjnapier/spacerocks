@@ -25,11 +25,9 @@ class Observer:
 
     def __init__(self, origin='ssb', frame='ECLIPJ2000', kernel=SpiceKernel(), **kwargs):
         
-        #kernel.furnsh()
         self.origin = origin
         self.frame = frame
         
-
         if kwargs.get('epoch') is not None:
             self.epoch = np.atleast_1d(kwargs.get('epoch'))
 

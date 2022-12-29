@@ -136,7 +136,11 @@ struct KeplerOrbit calc_kep_from_xyz(double mu, double x, double y, double z, do
     }
   }
   else {
-    double E = acosh((1 - r / a) / e);
+    double argument = (1 - r / a) / e;
+    if (abs(argument - 1) < 1e-10) {
+      argument = 1;
+    }
+    double E = acosh(argument);
     double rdotv = position.x*velocity.x + position.y*velocity.y + position.z*velocity.z;
     if(rdotv < 0) {
      E *= -1;

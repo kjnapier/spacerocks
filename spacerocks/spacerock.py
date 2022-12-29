@@ -670,9 +670,11 @@ class SpaceRock(KeplerOrbit, Convenience):
 
         f = Angle(np.linspace(0, 2*np.pi, N), u.rad)
 
-        xs = []
-        ys = []
-        zs = []
+        # xs = []
+        # ys = []
+        # zs = []
+
+        vectors = []
 
         for r in self:
             x, y, z, _, _, _ = kepf_to_xyz(np.repeat(r.a, N),
@@ -681,11 +683,12 @@ class SpaceRock(KeplerOrbit, Convenience):
                                            np.repeat(r.arg.rad, N),
                                            np.repeat(r.node.rad, N),
                                            f.rad)
-            xs.append(x)
-            ys.append(y)
-            zs.append(z)
+            vectors.append(Vector(x, y, z))
+            # xs.append(x)
+            # ys.append(y)
+            # zs.append(z)
 
-        return xs, ys, zs
+        return vectors
 
     def write_to(self, path, compression='zlib'):
         uniquenames = np.unique(self.name)

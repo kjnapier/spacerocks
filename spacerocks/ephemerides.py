@@ -70,7 +70,8 @@ class Ephemerides(Convenience):
     @property
     def ra_rate(self):
         if not hasattr(self, '_ra_rate'):
-            self.ra_rate = -cos(self.dec) * (self.y * self.vx - self.x * self.vy) / (self.x**2 + self.y**2) * u.rad
+            #self.ra_rate = -cos(self.dec) * (self.y * self.vx - self.x * self.vy) / (self.x**2 + self.y**2) * u.rad
+            self.ra_rate = - (self.y * self.vx - self.x * self.vy) / (self.x**2 + self.y**2) * u.rad
         return self._ra_rate
 
     @ra_rate.setter

@@ -18,7 +18,7 @@ if sys.platform == 'darwin':
     vars = sysconfig.get_config_vars()
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
     extra_link_args = ['-Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
-    extra_compile_args = ['-O3', '-fPIC', '-std=c++2a', '-march=native', '-Xclang', '-fopenmp']
+    extra_compile_args = ['-O3', '-fPIC', '-std=c++2a', '-Xclang', '-fopenmp']
     
 
 libspacerocksmodule = Extension('libspacerocks',
@@ -48,7 +48,7 @@ if sys.platform == 'darwin':
     vars = sysconfig.get_config_vars()
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
     extra_link_args = ['-Wl,-install_name,@rpath/_pyOrbfit' + suffix]
-    extra_compile_args = ['-O3', '-fPIC', '-std=c99', '-march=native', '-w', '-fno-stack-protector']
+    extra_compile_args = ['-O3', '-fPIC', '-std=c99', '-w', '-fno-stack-protector']
     
 
 _pyOrbfit = Extension('_pyOrbfit',

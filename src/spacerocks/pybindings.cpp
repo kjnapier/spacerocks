@@ -51,19 +51,29 @@ double* py_calc_kep_from_xyz(int N, double mu, double* xs, double* ys, double* z
 }}
 
 
-extern "C" {
-double* py_calc_M_from_E(int N, double* es, double* Es) {
+// extern "C" {
+// double* py_calc_M_from_E(int N, double* es, double* Es) {
 
-  double* output = (double*) malloc(N * sizeof(double));
-  //double* output = new double[N];
+//   double* output = (double*) malloc(N * sizeof(double));
+//   //double* output = new double[N];
+
+//   #pragma omp parallel for schedule(guided)
+//   for (int idx = 0; idx < N; idx++) {
+//     output[idx] = calc_M_from_E(es[idx], Es[idx]);
+//   }
+
+//   return output;
+
+// }}
+
+extern "C" {
+void py_calc_M_from_E(int N, double* es, double* Es, double* Ms) {
 
   #pragma omp parallel for schedule(guided)
   for (int idx = 0; idx < N; idx++) {
-    output[idx] = calc_M_from_E(es[idx], Es[idx]);
+    Ms[idx] = calc_M_from_E(es[idx], Es[idx]);
   }
-
-  return output;
-
+  return;
 }}
 
 // If inc > pi/2, varpi = node - arg

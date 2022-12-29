@@ -41,8 +41,13 @@ double calc_E_from_M(double e, double M){
 
     else {
 
-      E = M/fabs(M)*log(2.*fabs(M)/e + 1.8);
-
+      if (M != 0) {
+        E = M/fabs(M)*log(2.*fabs(M)/e + 1.8);
+      }
+      else {
+        E = 0;
+      }
+      
   		double F = E - e*sinh(E) + M;
   		for(int i=0; i < 100; i++){
   			E = E - F/(1.0 - e*cosh(E));
