@@ -1,7 +1,7 @@
 from ctypes import cdll
 import pathlib
 import os
-__version__ = '2.1.23'
+__version__ = '2.2.0'
 __author__ = 'Kevin Napier'
 
 # Find suffix

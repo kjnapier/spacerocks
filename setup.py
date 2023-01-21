@@ -89,7 +89,7 @@ for dir in dirs:
 
 setup(
     name='spacerocks',
-    version='2.1.23',
+    version='2.2.0',
     description='A Python Package for Solar System Ephemerides and Dynamics.',
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
@@ -106,7 +106,7 @@ setup(
                       'spiceypy',
                       'astropy',
                       'pandas',
-                      'rebound', 
+                      'rebound >= 3.19.2', 
                       'astroquery'],
     ext_modules=[libspacerocksmodule, _pyOrbfit],
     zip_safe=False
