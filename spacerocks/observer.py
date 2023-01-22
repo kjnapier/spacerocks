@@ -21,8 +21,6 @@ DEG_TO_RAD = np.pi / 180
 
 class Observer:
 
-    # might need to pass utc.jd?
-
     def __init__(self, origin='ssb', frame='ECLIPJ2000', kernel=SpiceKernel(), **kwargs):
         
         self.origin = origin
@@ -114,8 +112,7 @@ class Observer:
                 unique_obs_dict = {key:self.__compute_topocentric_correction((lon, lat, elevation, key)) for key in unique_times}
                 for idx, k in enumerate(self.epoch):
                     icrs_arr[idx] = unique_obs_dict[k]
-                # for key, value in unique_obs_dict.items():
-                #     icrs_arr[self.epoch == key] = value
+                
             else:
                 unique_codes = set(self.obscode)
                 unique_codes_dict = {key:self.__get_observatory_params(key) for key in unique_codes}
@@ -138,11 +135,6 @@ class Observer:
             dy = dy_icrs * np.cos(epsilon) + dz_icrs * np.sin(epsilon)
             dz = -dy_icrs * np.sin(epsilon) + dz_icrs * np.cos(epsilon)
 
-            # eps = self.__compute_eps(self.epoch)
-            # dx = dx_icrs
-            # dy = dy_icrs * np.cos(eps) + dz_icrs * np.sin(eps)
-            # dz = -dy_icrs * np.sin(eps) + dz_icrs * np.cos(eps)
-
             x += (dx * u.m).to(u.km).value
             y += (dy * u.m).to(u.km).value
             z += (dz * u.m).to(u.km).value
@@ -164,6 +156,8 @@ class Observer:
         
         observer_lat *= DEG_TO_RAD
         observer_lon *= DEG_TO_RAD
+
+        print(observer_lon)
         sin_lat = np.sin(observer_lat)
         cos_lat = np.cos(observer_lat)
 
@@ -184,20 +178,12 @@ class Observer:
         dz = S_geo * sin_lat
         return dx, dy, dz
 
-    def __compute_eps(self, epoch):
-        T = (epoch - 2451545.0) / 36525
-        correction = (46.815 * T - 0.00059 * T * T + 0.001813 * T * T * T)/206265
-        eps = Angle(epsilon + correction, u.rad)
-        return eps
-
-
     def __compute_local_sidereal_time(self, epoch, lon):
         T = (epoch - 2451545.0) / 36525
         theta = 280.46061837 + 360.98564736629 * (epoch - 2451545.0) + (0.000387933 * T * T) - (T * T * T / 38710000.0)
         theta *= DEG_TO_RAD
         return theta + lon
     
-
     def __compute_ephemeris_time(self, epoch):
         '''
         Wrapper for spiceypy's str2et function.
