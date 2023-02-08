@@ -157,7 +157,6 @@ class Observer:
         observer_lat *= DEG_TO_RAD
         observer_lon *= DEG_TO_RAD
 
-        print(observer_lon)
         sin_lat = np.sin(observer_lat)
         cos_lat = np.cos(observer_lat)
 

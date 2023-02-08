@@ -96,8 +96,6 @@ class Streak:
             rho = self.calculate_rho(r_guess)
             rho_rate = self.calculate_rho_rate(r_guess, r_rate_guess)
 
-            
-
             ltt = rho / speed_of_light.value
             
             x = self.observer.position.x + rho * self.pointing_vector.x

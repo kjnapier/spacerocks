@@ -98,10 +98,6 @@ class GroundObservatory:
 
             st = copy.deepcopy(state)
 
-            # dx = dx
-            # dy = dy * np.cos(epsilon) + dz * np.sin(epsilon)
-            # dz = -dy * np.sin(epsilon) + dz * np.cos(epsilon)
-
             st[0] += (dx * u.m).to(u.km).value
             st[1] += (dy * u.m).to(u.km).value
             st[2] += (dz * u.m).to(u.km).value
