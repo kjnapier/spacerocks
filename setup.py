@@ -4,6 +4,7 @@ import sys
 import sysconfig
 import glob
 import numpy
+import subprocess
 
 suffix = sysconfig.get_config_var('EXT_SUFFIX')
 if suffix is None:
@@ -19,7 +20,8 @@ if sys.platform == 'darwin':
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
     #extra_link_args = ['-Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
     extra_link_args = ['-Wl,-lgomp,-install_name,@rpath/libspacerocks' + suffix]
-    extra_compile_args = ['-O3', '-fPIC', '-std=c++2a', '-Xclang', '-fopenmp', '-I$(brew --prefix libomp)/include']
+    omp_path = subprocess.run(['brew', '--prefix', 'libomp'], stdout=subprocess.PIPE).stdout.decode("utf-8").split('\n')[0]
+    extra_compile_args = ['-O3', '-fPIC', '-std=c++2a', '-Xclang', '-fopenmp', f'{omp_path}/include']
     
 
 libspacerocksmodule = Extension('libspacerocks',
