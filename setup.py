@@ -9,8 +9,7 @@ suffix = sysconfig.get_config_var('EXT_SUFFIX')
 if suffix is None:
     suffix = ".so"
 
-#extra_link_args = ['-lgomp']
-extra_link_args = ['-fopenmp', '-lgomp']
+extra_link_args = ['-lgomp']
 #extra_compile_args = ['-O3', '-fPIC', '-std=gnu++2a', '-march=native', '-fopenmp']
 extra_compile_args = ['-O3', '-fPIC', '-march=native', '-fopenmp']
 
@@ -18,7 +17,8 @@ if sys.platform == 'darwin':
     from distutils import sysconfig
     vars = sysconfig.get_config_vars()
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
-    extra_link_args = ['-Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
+    #extra_link_args = ['-Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
+    extra_link_args = ['-Wl,-lgomp,-install_name,@rpath/libspacerocks' + suffix]
     extra_compile_args = ['-O3', '-fPIC', '-std=c++2a', '-Xclang', '-fopenmp']
     
 
