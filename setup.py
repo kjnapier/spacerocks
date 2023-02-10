@@ -10,7 +10,7 @@ if suffix is None:
     suffix = ".so"
 
 #extra_link_args = ['-lgomp']
-extra_link_args = ['-fopenmp']
+extra_link_args = ['-fopenmp', '-lgomp']
 #extra_compile_args = ['-O3', '-fPIC', '-std=gnu++2a', '-march=native', '-fopenmp']
 extra_compile_args = ['-O3', '-fPIC', '-march=native', '-fopenmp']
 
