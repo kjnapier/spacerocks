@@ -44,7 +44,7 @@ jobs:
 
       - name: Install spacerocks from source
         run: |
-          python setup.py build_ext -i -f
+          python setup.py build_ext -i
           pip install .
 
       #- name: Test with pytest

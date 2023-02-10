@@ -19,7 +19,8 @@ if sys.platform == 'darwin':
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
     #extra_link_args = ['-Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
     extra_link_args = ['-Wl,-lgomp,-install_name,@rpath/libspacerocks' + suffix]
-    extra_compile_args = ['-O3', '-fPIC', '-std=c++2a', '-Xclang', '-fopenmp']
+    #extra_compile_args = ['-O3', '-fPIC', '-std=c++2a', '-Xclang', '-fopenmp']
+    extra_compile_args = ['-O3', '-fPIC', '-Xclang', '-fopenmp']
     
 
 libspacerocksmodule = Extension('libspacerocks',
