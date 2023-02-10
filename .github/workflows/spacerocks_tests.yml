@@ -44,7 +44,7 @@ jobs:
 
       - name: Install spacerocks from source
         run: |
-          python setup.py build_ext -i --config-setting="--build-option=--with-openmp"
+          python setup.py build_ext -i --with-openmp
           pip install .
 
       #- name: Test with pytest
