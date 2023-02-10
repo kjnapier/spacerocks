@@ -23,7 +23,7 @@ jobs:
       - name: Get OpenMP
         uses: mstksg/get-package@v1
         with:
-          brew: libomp llvm
+          brew: libomp
           apt-get: libomp-dev
 
       - name: Install dependencies
@@ -44,7 +44,7 @@ jobs:
 
       - name: Install spacerocks from source
         run: |
-          python setup.py build_ext -i
+          python setup.py build_ext -i --config-setting="--build-option=--with-openmp"
           pip install .
 
       #- name: Test with pytest
