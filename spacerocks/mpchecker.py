@@ -21,6 +21,7 @@ class MPChecker:
         else:
             rocks = SpaceRock.from_mpc(f'{catalog}', download_data=True, metadata='Orbit_type')
         
+        #type can be ['Amor', 'Apollo', 'Distant Object', 'MBA', 'Object with perihelion distance < 1.665 AU']
         if Orbit_type:
             rocks = rocks[rocks.Orbit_type == Orbit_type]
 
