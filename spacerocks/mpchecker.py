@@ -9,10 +9,10 @@ import warnings
 
 class MPChecker:
 
-    def __init__(self, catalog='mpcorb_extended', update=False):
-        self.rocks = self.load_rocks(catalog=catalog, update=update)
+    def __init__(self, catalog='mpcorb_extended', update=False, Orbit_type=None):
+        self.rocks = self.load_rocks(catalog=catalog, update=update,  Orbit_type=Orbit_type) 
     
-    def load_rocks(self, catalog, update):
+    def load_rocks(self, catalog, update, Orbit_type):
         from .paths import MPC_PATH
         import pathlib
         rocksfile = pathlib.Path(MPC_PATH + f'/{catalog}.feather')
@@ -21,6 +21,10 @@ class MPChecker:
         else:
             rocks = SpaceRock.from_mpc(f'{catalog}', download_data=True, metadata='Orbit_type')
         
+        #type can be ['Amor', 'Apollo', 'Distant Object', 'MBA', 'Object with perihelion distance < 1.665 AU']
+        if Orbit_type:
+            rocks = rocks[rocks.Orbit_type == Orbit_type]
+
         rocks.H[np.isnan(rocks.H)] = 99
         rocks.G[np.isnan(rocks.H)] = 0.15
         return rocks
