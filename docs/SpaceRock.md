@@ -139,7 +139,7 @@ specifying the epochs to be in Barycentric Dynamical Time.
 units = Units()
 units.timescale = 'tdb'
 
-prop, planets, sim = rock.propagate(epochs=['2 December 2021', '4 December 2021'], model=2, units=units)
+prop, planets, sim = rock.propagate(epochs=['2 December 2021', '4 December 2021'], model='PLANETS', units=units)
 ```
 
 Here `prop` is a `SpaceRock` object containing the test particles at 
@@ -148,11 +148,11 @@ perturbers at all of the epochs, and `sim` is the rebound simulation
 object at the final epoch. The `model` argument sets the perturbers as follows.
 
 | model | Perturbers                                                                      |
-|:-----:|:--------------------------------------------------------------------------------|
-|   0   | Sun                                                                             |
-|   1   | Sun, Jupiter, Saturn, Uranus, Neptune                                           |
-|   2   | Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto |
-|   3   | Full set of JPL Horizons perturbers                                             |
+|:-----|:--------------------------------------------------------------------------------|
+|   `SUN`   | Sun                                                                             |
+|   `GIANTS`   | Sun, Jupiter, Saturn, Uranus, Neptune                                           |
+|   `PLANETS`   | Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto |
+|   `HORIZONS`   | Full set of JPL Horizons perturbers                                             |
 
 The perturbers' masses are from JPL Horizons, and their state vectors are computed using `spiceypy`.
 

@@ -93,12 +93,12 @@ for dir in dirs:
 
 setup(
     name='spacerocks',
-    version='2.2.0',
+    version='2.3.0',
     description='A Python Package for Solar System Ephemerides and Dynamics.',
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
     url="https://github.com/kjnapier/spacerocks",
-    packages=['spacerocks'],
+    packages=['spacerocks', 'spacerocks.durin', 'spacerocks.survey'],
     package_data={'spacerocks.data': ['observatories.csv'], 
                   'spacerocks.data.pyOrbfit': ['*']},
     data_files=data_files,

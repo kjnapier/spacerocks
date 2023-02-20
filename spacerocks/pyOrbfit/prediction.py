@@ -6,7 +6,7 @@ import numpy as np
 
 import dateutil
 
-from .convenience import Convenience
+from ..convenience import Convenience
 
 
 class Prediction(Convenience):

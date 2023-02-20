@@ -430,7 +430,6 @@ class SpaceRock(KeplerOrbit, Convenience):
         if hasattr(self, 'mag_func'):
             return np.array([func(epoch) for epoch, func in zip(self.epoch.jd, self.mag_func)])
 
-
     def propagate(self, epochs, model='GIANTS', units=Units(), gr=False, progress=True, in_memory=True, outfile=None, **kwargs):
         from .simulation import Simulation
         epochs = time_handler(epochs, units)

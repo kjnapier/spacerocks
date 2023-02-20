@@ -1,13 +1,10 @@
 from .paths import OBSERVATORIES_PATH
 from .units import Units
-from .spacerock import SpaceRock
 from .spice import SpiceKernel
-from .constants import epsilon
 
 import pandas as pd
 import spiceypy as spice
 import numpy as np
-from astropy.coordinates import Angle
 from astropy import units as u
 
 import copy
@@ -78,7 +75,7 @@ def get_earth_state(epoch):
 get_earth_state.cache = {}
 
 
-class GroundObservatory:
+class Observer:
 
     def __init__(self, lat, lon, elevation, kernel=SpiceKernel()):
         self.lat = lat
@@ -102,7 +99,8 @@ class GroundObservatory:
     def from_coordinates(cls, lat, lon, elevation):
         return cls(lat, lon, elevation)
 
-    def at(self, epochs) -> SpaceRock:
+    def at(self, epochs):
+        from spacerocks.spacerock import SpaceRock
         epochs = np.atleast_1d(epochs)
 
         states = []

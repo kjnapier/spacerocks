@@ -19,6 +19,7 @@ FLATTEN = 1 / 298.257223563
 O_M_FLATTEN = 1 - FLATTEN
 DEG_TO_RAD = np.pi / 180
 
+
 class Observer:
 
     def __init__(self, origin='ssb', frame='ECLIPJ2000', kernel=SpiceKernel(), **kwargs):
@@ -164,7 +165,7 @@ class Observer:
         
         sin_lon = np.sin(lon)
         cos_lon = np.cos(lon)
-        
+
         denom = O_M_FLATTEN * sin_lat
         denom = cos_lat * cos_lat + denom*denom
 
@@ -175,6 +176,7 @@ class Observer:
         dx = C_geo * cos_lat * cos_lon
         dy = C_geo * cos_lat * sin_lon
         dz = S_geo * sin_lat
+
         return dx, dy, dz
 
     def __compute_local_sidereal_time(self, epoch, lon):

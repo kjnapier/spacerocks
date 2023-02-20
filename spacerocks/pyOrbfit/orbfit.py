@@ -1,8 +1,8 @@
-from . import pyOrbfit as orbfit
+from .pyOrbfit import pyOrbfit as orbfit
 import numpy as np
 
-from .spacerock import SpaceRock
-from .units import Units
+from ..spacerock import SpaceRock
+from ..units import Units
 from .prediction import Prediction
 
 from astropy.coordinates import SkyCoord
@@ -10,10 +10,8 @@ from astropy.time import Time
 from matplotlib.patches import Ellipse
 import dateutil
 
-from .convenience import Convenience
+from ..convenience import Convenience
 from astropy import units as u
-
-
 
 
 class Bernstein(Convenience):
