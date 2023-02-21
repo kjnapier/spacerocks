@@ -25,6 +25,8 @@ if sys.platform == 'darwin':
     llvm_path = subprocess.run(['brew', '--prefix', 'llvm'], stdout=subprocess.PIPE).stdout.decode("utf-8").split('\n')[0]
     extra_compile_args = ['-O3', '-fPIC', '-std=c++2a']
 
+    extra_compile_args += [f'-I{llvm_path}/include', f'-I{omp_path}/include']
+    
     from sysconfig import get_config_vars
     compiler = get_config_vars('CXX')
     if compiler[0] == 'clang++':
@@ -32,7 +34,7 @@ if sys.platform == 'darwin':
     else:
         extra_compile_args += ['-fopenmp']
 
-    extra_compile_args += [f'-I{llvm_path}/include', f'-I{omp_path}/include']
+    
 
     
 
