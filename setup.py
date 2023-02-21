@@ -23,7 +23,7 @@ if sys.platform == 'darwin':
     
     omp_path = subprocess.run(['brew', '--prefix', 'libomp'], stdout=subprocess.PIPE).stdout.decode("utf-8").split('\n')[0]
     llvm_path = subprocess.run(['brew', '--prefix', 'llvm'], stdout=subprocess.PIPE).stdout.decode("utf-8").split('\n')[0]
-    extra_compile_args = ['-O3', '-fPIC', '-std=c++2a', f'-I{llvm_path}/include', f'-I{omp_path}/include']
+    extra_compile_args = ['-O3', '-fPIC', '-std=c++2a']
 
     from sysconfig import get_config_vars
     compiler = get_config_vars('CXX')
@@ -31,6 +31,8 @@ if sys.platform == 'darwin':
         extra_compile_args += ['-Xpreprocessor', '-fopenmp']
     else:
         extra_compile_args += ['-fopenmp']
+
+    extra_compile_args += [f'-I{llvm_path}/include', f'-I{omp_path}/include']
 
     
 
