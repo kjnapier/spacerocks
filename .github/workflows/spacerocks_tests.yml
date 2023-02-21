@@ -26,6 +26,11 @@ jobs:
           brew: libomp gcc
           apt-get: libomp-dev
 
+      runs-on: macos-latest
+      steps:
+        - name: xcode
+            run: xcode-select --install
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
