@@ -18,7 +18,7 @@ if sys.platform == 'darwin':
     from distutils import sysconfig
     vars = sysconfig.get_config_vars()
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
-    extra_link_args = ['-Wl,-lgomp,-install_name,@rpath/libspacerocks' + suffix]
+    extra_link_args = ['-Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
     #extra_link_args = ['-Wl,-install_name,@rpath/libspacerocks' + suffix]
     
     omp_path = subprocess.run(['brew', '--prefix', 'libomp'], stdout=subprocess.PIPE).stdout.decode("utf-8").split('\n')[0]
@@ -30,7 +30,7 @@ if sys.platform == 'darwin':
     if compiler[0] == 'clang++':
         extra_compile_args += ['-Xpreprocessor', '-fopenmp']
     else:
-        extra_compile_args += ['-Xpreprocessor', '-fopenmp']
+        extra_compile_args += ['-fopenmp']
 
     extra_compile_args += [f'-I{llvm_path}/include', f'-I{omp_path}/include']
 
