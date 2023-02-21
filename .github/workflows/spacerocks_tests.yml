@@ -27,19 +27,18 @@ jobs:
           apt-get: libomp-dev 
           # run: export CXX=/usr/local/opt/llvm/bin/clang;   
 
-      # compile using clang on macos
-      - name: Compile with clang
+      # compile using gcc on macos
+      - name: Compile with gcc
         if: matrix.os == 'macos-latest'
         run: |
-          export CXX=/usr/local/opt/llvm/bin/clang
-          export CC=/usr/local/opt/llvm/bin/clang
-          export LDFLAGS="-L/usr/local/opt/llvm/lib"
-          export CPPFLAGS="-I/usr/local/opt/llvm/include"
-          export CXXFLAGS="-I/usr/local/opt/llvm/include"
-          export CFLAGS="-I/usr/local/opt/llvm/include"
-          export DYLD_LIBRARY_PATH="/usr/local/opt/llvm/lib"
-          export PATH="/usr/local/opt/llvm/bin:$PATH"
-
+          export CXX=/usr/local/opt/gcc/bin/g++-10
+          export CC=/usr/local/opt/gcc/bin/gcc-10
+          export LDFLAGS="-L/usr/local/opt/gcc/lib/gcc/10"
+          export CPPFLAGS="-I/usr/local/opt/gcc/include"
+          export CXXFLAGS="-I/usr/local/opt/gcc/include"
+          export CFLAGS="-I/usr/local/opt/gcc/include"
+          export DYLD_LIBRARY_PATH="/usr/local/opt/gcc/lib/gcc/10"
+          export PATH="/usr/local/opt/gcc/bin:$PATH"
 
       - name: Install dependencies
         run: |
