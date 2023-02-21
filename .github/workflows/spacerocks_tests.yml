@@ -27,19 +27,19 @@ jobs:
           apt-get: libomp-dev 
           # run: export CXX=/usr/local/opt/llvm/bin/clang;   
 
-      # compile using gcc on macos
-      - name: Compile with gcc
+      # set the environment variable for the C++ compiler on macos to be clang
+      - name: Set environment variables
         if: matrix.os == 'macos-latest'
         run: |
-          export CXX=/usr/local/opt/gcc/bin/g++-10
-          export CPP=/usr/local/opt/gcc/bin/g++-10
-          export CC=/usr/local/opt/gcc/bin/gcc-10
-          export LDFLAGS="-L/usr/local/opt/gcc/lib/gcc/10"
-          export CPPFLAGS="-I/usr/local/opt/gcc/include"
-          export CXXFLAGS="-I/usr/local/opt/gcc/include"
-          export CFLAGS="-I/usr/local/opt/gcc/include"
-          export DYLD_LIBRARY_PATH="/usr/local/opt/gcc/lib/gcc/10"
-          export PATH="/usr/local/opt/gcc/bin:$PATH"
+          echo "CXX=/usr/local/opt/llvm/bin/clang" >> $GITHUB_ENV
+          echo "CC=/usr/local/opt/llvm/bin/clang" >> $GITHUB_ENV
+          echo "LDFLAGS=-L/usr/local/opt/llvm/lib" >> $GITHUB_ENV
+          echo "CPPFLAGS=-I/usr/local/opt/llvm/include" >> $GITHUB_ENV
+          echo "CXXFLAGS=-I/usr/local/opt/llvm/include" >> $GITHUB_ENV
+          echo "CFLAGS=-I/usr/local/opt/llvm/include" >> $GITHUB_ENV
+          echo "DYLD_LIBRARY_PATH=/usr/local/opt/llvm/lib" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=/usr/local/opt/llvm/lib" >> $GITHUB_ENV
+          echo "PATH=/usr/local/opt/llvm/bin:$PATH" >> $GITHUB_ENV
 
       - name: Install dependencies
         run: |
