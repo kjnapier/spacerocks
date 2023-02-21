@@ -1,7 +1,7 @@
 from ctypes import cdll
 import pathlib
 import os
-__version__ = '2.2.0'
+__version__ = '2.3.1'
 __author__ = 'Kevin Napier'
 
 # Find suffix
@@ -25,8 +25,8 @@ fp, pathname, description = imp.find_module('_pyOrbfit', [pymodulepath + '/../']
 _pyOrbfit = imp.load_module('_pyOrbfit', fp, pathname, description)
 
 import shutil
-if not os.path.exists(pymodulepath + '/pyOrbfit.py'):
-    shutil.copy(pymodulepath + '/../src/pyOrbfit/pyOrbfit.py', pymodulepath + '/pyOrbfit.py')
+if not os.path.exists(pymodulepath + '/pyOrbfit/pyOrbfit.py'):
+    shutil.copy(pymodulepath + '/../src/pyOrbfit/pyOrbfit.py', pymodulepath + '/pyOrbfit/pyOrbfit.py')
 
 import os
 pymodulepath = os.path.dirname(__file__)

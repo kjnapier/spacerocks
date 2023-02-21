@@ -1,4 +1,4 @@
-from .pyOrbfit import pyOrbfit as orbfit
+from . import pyOrbfit as orbfit
 import numpy as np
 
 from ..spacerock import SpaceRock

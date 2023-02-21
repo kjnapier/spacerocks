@@ -19,9 +19,10 @@ if sys.platform == 'darwin':
     vars = sysconfig.get_config_vars()
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
     #extra_link_args = ['-Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
-    extra_link_args = ['-Wl,-install_name,@rpath/libspacerocks' + suffix]
+    extra_link_args = ['-Wl,-lgomp,-install_name,@rpath/libspacerocks' + suffix]
     
     omp_path = subprocess.run(['brew', '--prefix', 'libomp'], stdout=subprocess.PIPE).stdout.decode("utf-8").split('\n')[0]
+    print(omp_path)
     extra_compile_args = ['-O3', '-fPIC', '-std=c++2a', '-Xclang', '-fopenmp', f'-I{omp_path}/include']
     
 
@@ -39,7 +40,8 @@ libspacerocksmodule = Extension('libspacerocks',
                                          'src/spacerocks/kepf_to_xyz.cpp', 
                                          'src/spacerocks/compute_topocentric_correction.cpp', 
                                          'src/spacerocks/compute_lst.cpp'],
-                                include_dirs=['src/spacerocks'],
+                                include_dirs=['src/spacerocks', f'{omp_path}/include'],
+                                #include_dirs=[f'{omp_path}/include'],
                                 language='c++',
                                 extra_compile_args=extra_compile_args,
                                 extra_link_args=extra_link_args
@@ -93,12 +95,12 @@ for dir in dirs:
 
 setup(
     name='spacerocks',
-    version='2.3.0',
+    version='2.3.1',
     description='A Python Package for Solar System Ephemerides and Dynamics.',
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
     url="https://github.com/kjnapier/spacerocks",
-    packages=['spacerocks', 'spacerocks.durin', 'spacerocks.survey'],
+    packages=['spacerocks', 'spacerocks.durin', 'spacerocks.survey', 'spacerocks.pyOrbfit'],
     package_data={'spacerocks.data': ['observatories.csv'], 
                   'spacerocks.data.pyOrbfit': ['*']},
     data_files=data_files,

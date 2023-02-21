@@ -87,3 +87,4 @@ class EfficiencyFunction:
         return functools.partial(self.form, params=res['x']), res, {l: x for l, x in zip(logit.labels, res['x'])}
 
 logit = EfficiencyFunction(detprob_logit, ['m_{50}', '\eta_0', '\sigma'])
+double = EfficiencyFunction(detprob_double, ['m_{25}', '\eta_0', 'k_1', 'k_2'])
