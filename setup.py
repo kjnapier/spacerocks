@@ -27,14 +27,14 @@ if sys.platform == 'darwin':
 
     extra_compile_args += [f'-I{llvm_path}/include', f'-I{omp_path}/include']
 
-    # from sysconfig import get_config_vars
-    # compiler = get_config_vars('CXX')
-    # if compiler[0] == 'clang++':
-    #     extra_compile_args += ['-Xpreprocessor', '-fopenmp']
-    # else:
-    #     extra_compile_args += ['-fopenmp']
+    from sysconfig import get_config_vars
+    compiler = get_config_vars('CXX')
+    if (compiler[0] == 'clang++') or (compiler[0] == 'clang'):
+        extra_compile_args += ['-Xpreprocessor', '-fopenmp']
+    else:
+        extra_compile_args += ['-fopenmp']
 
-    extra_compile_args += ['-Xpreprocessor', '-fopenmp']
+    #extra_compile_args += ['-Xpreprocessor', '-fopenmp']
 
     
 
