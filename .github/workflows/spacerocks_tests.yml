@@ -47,6 +47,7 @@ jobs:
           pip install flake8
           pip install pytest
           pip install wheel
+          pip install pytest
           pip install --upgrade setuptools
           pip3 install --upgrade cython numpy pyshp six
 
@@ -65,9 +66,9 @@ jobs:
       - name: Test with pytest
        run: python -m pytest
 
-      - name: Generate Report
-        run: |
-          pip install coverage
-          coverage run -m unittest
-      - name: Upload Coverage to Codecov
-        uses: codecov/codecov-action@v2
+      # - name: Generate Report
+      #   run: |
+      #     pip install coverage
+      #     coverage run -m unittest
+      # - name: Upload Coverage to Codecov
+      #   uses: codecov/codecov-action@v2
