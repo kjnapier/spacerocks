@@ -66,7 +66,7 @@ jobs:
       # run the suite of tests in the tests directory
       - name: Run tests
         run: |
-          pytest tests
+          pytest spacerocks/test
 
       # - name: Generate Report
       #   run: |
