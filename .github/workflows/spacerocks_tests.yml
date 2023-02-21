@@ -23,7 +23,7 @@ jobs:
       - name: Get OpenMP
         uses: mstksg/get-package@v1
         with:
-          brew: libomp
+          brew: libomp gcc
           apt-get: libomp-dev
 
       - name: Install dependencies
