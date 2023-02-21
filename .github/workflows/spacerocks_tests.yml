@@ -26,12 +26,6 @@ jobs:
           brew: libomp gcc
           apt-get: libomp-dev
 
-      # if running on macOS, install xcode-select
-      - name: Install xcode-select
-        if: matrix.os == 'macos-latest'
-        run: |
-          xcode-select --install
-
 
       - name: Install dependencies
         run: |

@@ -23,7 +23,7 @@ if sys.platform == 'darwin':
     
     omp_path = subprocess.run(['brew', '--prefix', 'libomp'], stdout=subprocess.PIPE).stdout.decode("utf-8").split('\n')[0]
     print(omp_path)
-    extra_compile_args = ['-O3', '-fPIC', '-std=c++2a', '-Xclang', '-fopenmp', f'-I{omp_path}/include']
+    extra_compile_args = ['-O3', '-fPIC', '-std=c++2a', '-Xclang', '-Xpreprocessor', '-fopenmp', f'-I{omp_path}/include']
     
 
 libspacerocksmodule = Extension('libspacerocks',
