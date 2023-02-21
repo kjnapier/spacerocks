@@ -27,8 +27,9 @@ jobs:
           apt-get: libomp-dev
 
       - name: Install Xcode Command Line Tools
-      if: matrix.os == 'macos-latest'
-        run: xcode-select --install
+      run:   |
+         if [ "$RUNNER_OS" == "MacOS" ]; then
+              xcode-select --install
 
       - name: Install dependencies
         run: |
