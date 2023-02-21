@@ -24,7 +24,8 @@ jobs:
         uses: mstksg/get-package@v1
         with:
           brew: libomp llvm
-          apt-get: libomp-dev      
+          apt-get: libomp-dev 
+          run: export CPP=/usr/local/opt/llvm/bin/clang;     
 
 
       - name: Install dependencies
