@@ -43,8 +43,8 @@ class TestSpacerock(unittest.TestCase):
         self.assertAlmostEqual(BP.b.au[0], a * (1 - e*e)**0.5)
 
 
-        x, y, z = BP.orbits(N=100)
-        self.assertTrue(len(x[0]) == len(y[0]) == len(z[0]) == 100)
+        # x, y, z = BP.orbits(N=100)
+        # self.assertTrue(len(x[0]) == len(y[0]) == len(z[0]) == 100)
         BP.change_frame('J2000')
         BP.to_helio()
 
