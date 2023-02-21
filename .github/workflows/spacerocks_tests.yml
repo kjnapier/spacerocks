@@ -26,10 +26,9 @@ jobs:
           brew: libomp gcc
           apt-get: libomp-dev
 
-      runs-on: macos-latest
-      steps:
-        - name: xcode
-            run: xcode-select --install
+      - name: Install Xcode Command Line Tools
+      if: matrix.os == 'macos-latest'
+        run: xcode-select --install
 
       - name: Install dependencies
         run: |
