@@ -23,7 +23,7 @@ jobs:
       - name: Get OpenMP
         uses: mstksg/get-package@v1
         with:
-          brew: libomp llvm gcc
+          brew: libomp llvm
           apt-get: libomp-dev 
           # run: export CXX=/usr/local/opt/llvm/bin/clang;   
 
@@ -62,12 +62,12 @@ jobs:
           python setup.py build_ext -i
           pip install .
 
-      #- name: Test with pytest
-      #  run: python -m pytest
+      - name: Test with pytest
+       run: python -m pytest
 
-      # - name: Generate Report
-      #   run: |
-      #     pip install coverage
-      #     coverage run -m unittest
-      # - name: Upload Coverage to Codecov
-      #   uses: codecov/codecov-action@v2
+      - name: Generate Report
+        run: |
+          pip install coverage
+          coverage run -m unittest
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v2
