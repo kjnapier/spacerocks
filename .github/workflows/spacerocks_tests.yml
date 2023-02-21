@@ -63,8 +63,10 @@ jobs:
           python setup.py build_ext -i
           pip install .
 
-      - name: Test with pytest
-       run: python -m pytest
+      # run the suite of tests in the tests directory
+      - name: Run tests
+        run: |
+          pytest tests
 
       # - name: Generate Report
       #   run: |
