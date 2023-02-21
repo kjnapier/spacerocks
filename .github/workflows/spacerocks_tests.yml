@@ -25,7 +25,20 @@ jobs:
         with:
           brew: libomp llvm gcc
           apt-get: libomp-dev 
-          # run: export CXX=/usr/local/opt/llvm/bin/clang;     
+          # run: export CXX=/usr/local/opt/llvm/bin/clang;   
+
+      # compile using clang on macos
+      - name: Compile with clang
+        if: matrix.os == 'macos-latest'
+        run: |
+          export CXX=/usr/local/opt/llvm/bin/clang
+          export CC=/usr/local/opt/llvm/bin/clang
+          export LDFLAGS="-L/usr/local/opt/llvm/lib"
+          export CPPFLAGS="-I/usr/local/opt/llvm/include"
+          export CXXFLAGS="-I/usr/local/opt/llvm/include"
+          export CFLAGS="-I/usr/local/opt/llvm/include"
+          export DYLD_LIBRARY_PATH="/usr/local/opt/llvm/lib"
+          export PATH="/usr/local/opt/llvm/bin:$PATH"
 
 
       - name: Install dependencies
