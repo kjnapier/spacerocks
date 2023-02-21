@@ -25,7 +25,7 @@ jobs:
         with:
           brew: libomp llvm
           apt-get: libomp-dev 
-          run: export CPP=/usr/local/opt/llvm/bin/clang;     
+          run: export CXX=/usr/local/opt/llvm/bin/clang;     
 
 
       - name: Install dependencies
