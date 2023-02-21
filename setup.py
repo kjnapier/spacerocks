@@ -124,7 +124,8 @@ setup(
                       'spiceypy',
                       'astropy',
                       'pandas',
-                      'rebound >= 3.19.2'],
+                      'rebound >= 3.19.2', 
+                      'astroquery'],
     ext_modules=[libspacerocksmodule, _pyOrbfit],
     zip_safe=False
 )
