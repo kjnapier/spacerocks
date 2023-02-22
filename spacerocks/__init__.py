@@ -1,7 +1,9 @@
 from ctypes import cdll
 import pathlib
 import os
-__version__ = '2.3.1'
+import shutil
+
+__version__ = '2.3.2'
 __author__ = 'Kevin Napier'
 
 # Find suffix
@@ -16,23 +18,9 @@ pymodulepath = os.path.dirname(__file__)
 __libspacerockspath__ = pymodulepath + "/../libspacerocks" + suffix
 clibspacerocks = cdll.LoadLibrary(__libspacerockspath__)
 
-import os
+if os.path.exists(pymodulepath + '/pyOrbfit.py'):
+    shutil.move(pymodulepath + '/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
 
-pymodulepath = os.path.dirname(__file__)
-
-# import imp
-# fp, pathname, description = imp.find_module('_pyOrbfit', [pymodulepath + '/../'])
-# _pyOrbfit = imp.load_module('_pyOrbfit', fp, pathname, description)
-
-import shutil
-# if not os.path.exists(pymodulepath + '/pyorbfit/pyOrbfit.py'):
-#     #shutil.copy(pymodulepath + '/../src/pyorbfit/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
-#     #shutil.copy(pymodulepath + '/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
-#     shutil.move(pymodulepath + '/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
-shutil.copy(pymodulepath + '/../src/pyorbfit/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
-
-import os
-pymodulepath = os.path.dirname(__file__)
 os.environ['ORBIT_EPHEMERIS'] = pymodulepath + '/data/pyOrbfit/binEphem.423'
 os.environ['ORBIT_OBSERVATORIES'] = pymodulepath + '/data/pyOrbfit/observatories.dat'
 
