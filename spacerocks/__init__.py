@@ -29,7 +29,7 @@ import shutil
 #     #shutil.copy(pymodulepath + '/../src/pyorbfit/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
 #     #shutil.copy(pymodulepath + '/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
 #     shutil.move(pymodulepath + '/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
-shutil.copy(pymodulepath + '/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
+shutil.copy(pymodulepath + '/../src/pyorbfit/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
 
 import os
 pymodulepath = os.path.dirname(__file__)
