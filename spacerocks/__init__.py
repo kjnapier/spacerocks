@@ -25,10 +25,11 @@ pymodulepath = os.path.dirname(__file__)
 # _pyOrbfit = imp.load_module('_pyOrbfit', fp, pathname, description)
 
 import shutil
-if not os.path.exists(pymodulepath + '/pyorbfit/pyOrbfit.py'):
-    #shutil.copy(pymodulepath + '/../src/pyorbfit/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
-    #shutil.copy(pymodulepath + 'pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
-    shutil.move(pymodulepath + 'pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
+# if not os.path.exists(pymodulepath + '/pyorbfit/pyOrbfit.py'):
+#     #shutil.copy(pymodulepath + '/../src/pyorbfit/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
+#     #shutil.copy(pymodulepath + '/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
+#     shutil.move(pymodulepath + '/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
+shutil.copy(pymodulepath + '/pyOrbfit.py', pymodulepath + '/pyorbfit/pyOrbfit.py')
 
 import os
 pymodulepath = os.path.dirname(__file__)
