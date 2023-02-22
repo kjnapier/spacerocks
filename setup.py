@@ -34,12 +34,6 @@ if sys.platform == 'darwin':
     else:
         extra_compile_args += ['-fopenmp']
 
-    #extra_compile_args += ['-Xpreprocessor', '-fopenmp']
-
-    
-
-    
-
 libspacerocksmodule = Extension('libspacerocks',
                                 sources=['src/spacerocks/pybindings.cpp', 
                                          'src/spacerocks/calc_E_from_M.cpp',
@@ -113,7 +107,7 @@ setup(
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
     url="https://github.com/kjnapier/spacerocks",
-    packages=['spacerocks', 'spacerocks.durin', 'spacerocks.survey', 'spacerocks.pyOrbfit'],
+    packages=['spacerocks', 'spacerocks.durin', 'spacerocks.survey', 'spacerocks.pyorbfit'],
     package_data={'spacerocks.data': ['observatories.csv'], 
                   'spacerocks.data.pyOrbfit': ['*']},
     data_files=data_files,
