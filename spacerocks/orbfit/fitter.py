@@ -1,14 +1,9 @@
-from typing import List
-
-class Detection:
-
-    def __init__(self):
-        pass
+from .detection import Detection
 
 
 class Link:
 
-    def __init__(self, detections: List[Detection]):
+    def __init__(self, detections: list[Detection]):
         self.detections = detections
 
 

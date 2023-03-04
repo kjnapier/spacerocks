@@ -61,7 +61,7 @@ if sys.platform == 'darwin':
     vars = sysconfig.get_config_vars()
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
     extra_link_args = ['-Wl,-lm,-install_name,@rpath/_pyOrbfit' + suffix]
-    extra_compile_args = ['-O3', '-fPIC', '-std=c99', '-w']#, '-fno-stack-protector']
+    extra_compile_args = ['-O', '-fPIC', '-std=c99', '-w']#, '-fno-stack-protector']
     
 
 _pyOrbfit = Extension('_pyOrbfit',
@@ -107,7 +107,7 @@ setup(
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',
     url="https://github.com/kjnapier/spacerocks",
-    packages=['spacerocks', 'spacerocks.durin', 'spacerocks.survey', 'spacerocks.pyorbfit'],
+    packages=['spacerocks', 'spacerocks.durin', 'spacerocks.survey', 'spacerocks.pyorbfit', 'spacerocks.orbfit'],
     package_data={'spacerocks.data': ['observatories.csv'], 
                   'spacerocks.data.pyOrbfit': ['*']},
     data_files=data_files,
