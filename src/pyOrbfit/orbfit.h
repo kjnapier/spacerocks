@@ -6,7 +6,7 @@
 #include <stdlib.h>
  
 /*maximum number of observations*/
-#define MAXOBS  40000  
+#define MAXOBS  4000
 
 /*Default name of binary DE423 ephemeris data:*/
 #define DEFAULT_EPHEM_FILE "binEphem.423" 
