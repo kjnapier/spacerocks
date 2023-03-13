@@ -1,11 +1,11 @@
-from .spacerock import SpaceRock
-from .units import Units
-from .observer import Observer
-from .vector import Vector
-from .utils import time_handler
-from .cbindings import kepM_to_xyz
-from .constants import c as speed_of_light
-from .constants import mu_bary
+from ..spacerock import SpaceRock
+from ..units import Units
+from ..observer import Observer
+from ..vector import Vector
+from ..utils import time_handler
+from ..cbindings import kepM_to_xyz
+from ..constants import c as speed_of_light
+from ..constants import mu_bary
 
 from astropy.coordinates import Angle
 from astropy.time import Time
@@ -91,6 +91,7 @@ class Streak:
         r_rate_guess = r_rate + mu_bary.value / r**3 * dt
 
         converged = False
+        N_iter = 0
         while not converged:    
     
             rho = self.calculate_rho(r_guess)
@@ -125,14 +126,19 @@ class Streak:
             dr = r - prop.r.au
             dr_rate = r_rate - prop.position.unit.dot(prop.velocity).value
 
+            
             if abs(max(dr)) < 1e-5 and abs(max(dr_rate)) < 1e-8:
                 converged = True
             else:
-                r_guess += dr
-                r_rate_guess += dr_rate
+                N_iter += 1
+                print(N_iter)
+                if N_iter > 10:
+                    return r_guess, r_rate_guess                    
+                else:
+                    r_guess += dr
+                    r_rate_guess += dr_rate
 
         return r_guess, r_rate_guess
-
 
     def generate_orbits(self, r: float, r_rate: float) -> SpaceRock:
 

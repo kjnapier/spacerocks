@@ -118,6 +118,17 @@ def kepf_to_xyz(a, e, inc, arg, node, f):
     return x, y, z, vx * u.au/u.d, vy * u.au/u.d, vz * u.au/u.d
 
 
+# clibspacerocks.py_calc_kep_from_xyz.argtypes = [ctypes.c_int,
+#                                                 ctypes.c_double,
+#                                                 ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+#                                                 ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+#                                                 ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+#                                                 ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+#                                                 ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+#                                                 ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
+
+# clibspacerocks.py_calc_kep_from_xyz.restype = ctypes.POINTER(ctypes.c_double)
+
 clibspacerocks.py_calc_kep_from_xyz.argtypes = [ctypes.c_int,
                                                 ctypes.c_double,
                                                 ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
@@ -125,16 +136,33 @@ clibspacerocks.py_calc_kep_from_xyz.argtypes = [ctypes.c_int,
                                                 ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                                 ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                                 ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
+                                                ndpointer(ctypes.c_double, flags='C_CONTIGUOUS'),
                                                 ndpointer(ctypes.c_double, flags='C_CONTIGUOUS')]
 
-clibspacerocks.py_calc_kep_from_xyz.restype = ctypes.POINTER(ctypes.c_double)
+clibspacerocks.py_calc_kep_from_xyz.restype = None
+
+# def calc_kep_from_xyz(mu, x, y, z, vx, vy, vz):
+
+#     N = len(x)
+#     rock = clibspacerocks.py_calc_kep_from_xyz(N, mu, x, y, z, vx, vy, vz)
+#     arr = np.ctypeslib.as_array(rock, (6 * N,)).copy()
+#     clibspacerocks.free_memory(rock)
+    
+#     a, e, inc, arg, node, f = arr.reshape(N, 6).T
+#     a = Distance(a, u.au, allow_negative=True)
+#     e = np.ascontiguousarray(e)
+#     inc = Angle(inc, u.rad)
+#     arg = Angle(arg, u.rad)
+#     node = Angle(node, u.rad)
+#     f = Angle(f, u.rad)
+
+#     return a, e, inc, arg, node, f
 
 def calc_kep_from_xyz(mu, x, y, z, vx, vy, vz):
 
     N = len(x)
-    rock = clibspacerocks.py_calc_kep_from_xyz(N, mu, x, y, z, vx, vy, vz)
-    arr = np.ctypeslib.as_array(rock, (6 * N,)).copy()
-    clibspacerocks.free_memory(rock)
+    arr = np.empty((6 * N,), dtype=np.float64)
+    clibspacerocks.py_calc_kep_from_xyz(N, mu, x, y, z, vx, vy, vz, arr)
     
     a, e, inc, arg, node, f = arr.reshape(N, 6).T
     a = Distance(a, u.au, allow_negative=True)

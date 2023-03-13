@@ -26,11 +26,33 @@ double* py_compute_topocentric_correction(int N, double* lats, double* lons, dou
 }}
 
 
+// extern "C" {
+// double* py_calc_kep_from_xyz(int N, double mu, double* xs, double* ys, double* zs, double* vxs, double* vys, double* vzs) {
+//   //struct KeplerOrbit* output = malloc(N * sizeof(struct KeplerOrbit));
+//   double* output = (double*) malloc(N * 6 * sizeof(double));
+//   //double* output = new double[N * 6];
+//   int dummy;
+//   struct KeplerOrbit kep;
+
+//   #pragma omp parallel for private(kep, dummy) schedule(guided)
+//   for (int idx = 0; idx < N; idx++) {
+//     kep = calc_kep_from_xyz(mu, xs[idx], ys[idx], zs[idx], vxs[idx], vys[idx], vzs[idx]);
+//     dummy = idx * 6;
+
+//     output[dummy] = kep.a;
+//     output[dummy + 1] = kep.e;
+//     output[dummy + 2] = kep.inc;
+//     output[dummy + 3] = kep.arg;
+//     output[dummy + 4] = kep.node;
+//     output[dummy + 5] = kep.f;
+
+//   }
+//   return output;
+// }}
+
 extern "C" {
-double* py_calc_kep_from_xyz(int N, double mu, double* xs, double* ys, double* zs, double* vxs, double* vys, double* vzs) {
-  //struct KeplerOrbit* output = malloc(N * sizeof(struct KeplerOrbit));
-  double* output = (double*) malloc(N * 6 * sizeof(double));
-  //double* output = new double[N * 6];
+void py_calc_kep_from_xyz(int N, double mu, double* xs, double* ys, double* zs, double* vxs, double* vys, double* vzs, double* output) {
+
   int dummy;
   struct KeplerOrbit kep;
 
@@ -47,7 +69,7 @@ double* py_calc_kep_from_xyz(int N, double mu, double* xs, double* ys, double* z
     output[dummy + 5] = kep.f;
 
   }
-  return output;
+  return;
 }}
 
 
