@@ -1,4 +1,4 @@
-from ..orbfit.detection import Detection
+from .detection import Detection
 
 
 class Link:

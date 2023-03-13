@@ -1,4 +1,4 @@
-from .detection import Detection
+from ..linking.detection import Detection
 
 
 class Link:

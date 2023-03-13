@@ -28,10 +28,18 @@ class Units:
         self.ra = u.deg
         self.dec = u.deg
         self.angular_separation = u.deg
+        self.ra_rate = u.arcsec/u.hour
+        self.dec_rate = u.arcsec/u.hour
 
         self.rotation_curves = False
 
     def current(self):
+        print("{:<20} {:<15}".format('Quantity', 'Unit'))
+        print('---------------------------------------')
+        for k, v in self.__dict__.items():
+            print("{:<20} {:<15}".format(k, str(v)))
+
+    def __str__(self):
         print("{:<20} {:<15}".format('Quantity', 'Unit'))
         print('---------------------------------------')
         for k, v in self.__dict__.items():

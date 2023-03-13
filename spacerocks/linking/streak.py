@@ -140,7 +140,6 @@ class Streak:
 
         return r_guess, r_rate_guess
 
-
     def generate_orbits(self, r: float, r_rate: float) -> SpaceRock:
 
         rho = self.calculate_rho(r)

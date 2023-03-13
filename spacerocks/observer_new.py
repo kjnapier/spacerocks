@@ -25,11 +25,11 @@ def compute_local_sidereal_time(epoch, lon):
     theta *= DEG_TO_RAD
     return theta + lon
 
-def compute_local_sidereal_rate(epoch, lon):
+def sidereal_rate(epoch, lon):
     T = (epoch - 2451545.0) / 36525
     theta = 360.98564736629 * 36525 + 2 * 0.000387933 * T - 3 * (T * T / 38710000.0)
     theta *= DEG_TO_RAD
-    return theta + lon
+    return theta# + lon
 
 def compute_topocentric_correction(lon, lat, elevation, epoch):
         
@@ -39,7 +39,7 @@ def compute_topocentric_correction(lon, lat, elevation, epoch):
     cos_lat = np.cos(observer_lat)
 
     phi = compute_local_sidereal_time(epoch, observer_lon)
-    phi_prime = compute_local_sidereal_rate(epoch, observer_lon)
+    phi_prime = sidereal_rate(epoch)
     
     sin_lon = np.sin(phi)
     cos_lon = np.cos(phi)
