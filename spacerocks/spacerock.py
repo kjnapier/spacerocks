@@ -336,6 +336,7 @@ class SpaceRock(KeplerOrbit, Convenience):
     
             try:
                 url = "https://ssd.jpl.nasa.gov/api/horizons.api?" + urlencode(params)
+                print(url)
                 with urlopen(url) as f:
                     body = f.read().decode()
 
