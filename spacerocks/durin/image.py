@@ -12,6 +12,7 @@ class Image:
     def __init__(self, file, hardware='CPU'):
         hdu = fits.open(file, memmap=False)
         if hardware == 'GPU':
+            import cupy as cp
             if len(hdu) == 2:
                 self.data = cp.array(hdu[1].data.copy())
                 self.header = hdu[1].header
