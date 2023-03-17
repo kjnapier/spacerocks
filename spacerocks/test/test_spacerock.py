@@ -237,10 +237,10 @@ class TestSpacerock(unittest.TestCase):
 
         rock = SpaceRock(a=80, e=0.1, inc=5, node=14, M=10, varpi=9, mag=23, epoch='2 March 2022')
         rock.calc_H(obscode='W84')
-        obs = rock.observe(spiceid='Earth')
+        obs = rock.observe(obscode='500')
 
         rock = SpaceRock(a=80, e=0.1, inc=5, node=14, M=10, varpi=9, H=4, epoch='2 March 2022')
-        obs = rock.observe(spiceid='Earth')
+        obs = rock.observe(obscode='500')
         
         units = Units()
         units.timeformat = 'mjd'
