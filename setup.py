@@ -100,7 +100,7 @@ for dir in dirs:
 
 setup(
     name='spacerocks',
-    version='2.3.3',
+    version='2.3.4',
     description='A Python Package for Solar System Ephemerides and Dynamics.',
     author='Kevin J. Napier',
     author_email='kjnapier@umich.edu',

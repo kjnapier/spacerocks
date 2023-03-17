@@ -336,7 +336,6 @@ class SpaceRock(KeplerOrbit, Convenience):
     
             try:
                 url = "https://ssd.jpl.nasa.gov/api/horizons.api?" + urlencode(params)
-                print(url)
                 with urlopen(url) as f:
                     body = f.read().decode()
 
@@ -571,9 +570,12 @@ class SpaceRock(KeplerOrbit, Convenience):
         Routine corrects iteratively for light travel time.
         '''
         if kwargs.get('obscode') is not None:
-            observer = Observer(obscode=kwargs.get('obscode'), epoch=self.epoch.utc.jd)
-        elif kwargs.get('spiceid') is not None:
-            observer = Observer(spiceid=kwargs.get('spiceid'), epoch=self.epoch.utc.jd)
+            # observer = Observer(obscode=kwargs.get('obscode'), epoch=self.epoch.utc.jd)
+            observer = Observer.from_obscode(obscode=kwargs.get('obscode'))
+            observer = observer.at(self.epoch.utc.jd)
+            observer.change_frame('eclipJ2000')
+        # elif kwargs.get('spiceid') is not None:
+        #     observer = Observer(spiceid=kwargs.get('spiceid'), epoch=self.epoch.utc.jd)
         elif kwargs.get('observer') is not None:
             observer = kwargs.get('observer')
         else:
