@@ -31,10 +31,6 @@ def sidereal_rate(epoch):
     theta_dot = 360.98564736629 + 2 * 0.000387933 * T * Tprime + 3 * T * T * Tprime / 38710000.0
     return theta_dot * DEG_TO_RAD
 
-# # compute the sidereal rate in radians per second
-# def sidereal_rate(epoch):
-#     return 2 * np.pi * 0.7790572732640 + 1.00273781191135448
-
 def compute_topocentric_correction(lon, lat, elevation, epoch):
         
     observer_lat = lat * DEG_TO_RAD

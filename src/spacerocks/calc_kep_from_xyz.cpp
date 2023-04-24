@@ -1,5 +1,17 @@
 #include "spacerocks.hpp"
 
+double nice_acos(double x) {
+  if (x > 1) {
+    return 0;
+  }
+  else if (x < -1) {
+    return M_PI;
+  }
+  else {
+    return acos(x);
+  }
+}
+
 struct KeplerOrbit calc_kep_from_xyz(double mu, double x, double y, double z, double vx, double vy, double vz) {
 
   struct KeplerOrbit kep;
@@ -70,11 +82,13 @@ struct KeplerOrbit calc_kep_from_xyz(double mu, double x, double y, double z, do
     arg = 0;
   }
   else if (inc < IMIN || inc > M_PI - IMIN) {
-    double theta = acos(position.x / r);
+    //double theta = acos(position.x / r);
+    double theta = nice_acos(position.x / r);
     if (position.y < 0) {
       theta = 2 * M_PI - theta;
     }
-    double varpi = acos(evec.x / e);
+    //double varpi = acos(evec.x / e);
+    double varpi = nice_acos(evec.x / e);
     if (evec.y < 0) {
       varpi = 2 * M_PI - varpi;
     }
@@ -86,7 +100,8 @@ struct KeplerOrbit calc_kep_from_xyz(double mu, double x, double y, double z, do
     }
   }
   else {
-    arg = acos((nvec.x*evec.x + nvec.y*evec.y) / (n * e));
+    //arg = acos((nvec.x*evec.x + nvec.y*evec.y) / (n * e));
+    arg = nice_acos((nvec.x*evec.x + nvec.y*evec.y) / (n * e));
     if (evec.z < 0) {
       arg = 2 * M_PI - arg;
     }
@@ -98,8 +113,10 @@ struct KeplerOrbit calc_kep_from_xyz(double mu, double x, double y, double z, do
       // Handling the near-planar case
       if (e > EMIN) {
         // Near-planar, elliptical
-        double theta = acos(position.x / r);
-        double varpi = acos(evec.x / e);
+        // double theta = acos(position.x / r);
+        // double varpi = acos(evec.x / e);
+        double theta = nice_acos(position.x / r);
+        double varpi = nice_acos(evec.x / e);
         if (inc < M_PI/2) {
           f = theta - varpi;
         }
@@ -109,7 +126,8 @@ struct KeplerOrbit calc_kep_from_xyz(double mu, double x, double y, double z, do
       }
       else {
         // Near-planar, near-circular
-        f = acos(position.x / r);
+        //f = acos(position.x / r);
+        f = nice_acos(position.x / r);
         if (velocity.x > 0) {
           f = 2 * M_PI - f;
         }
@@ -121,14 +139,16 @@ struct KeplerOrbit calc_kep_from_xyz(double mu, double x, double y, double z, do
         // Non-planar, elliptical
         double edotr = evec.x*position.x + evec.y*position.y + evec.z*position.z;
         double rdotv = position.x*velocity.x + position.y*velocity.y + position.z*velocity.z;
-        f = acos(edotr / (e * r));
+        //f = acos(edotr / (e * r));
+        f = nice_acos(edotr / (e * r));
         if (rdotv < 0) {
           f = 2 * M_PI - f;
         }
       }
       else {
         // Non-planar, circular
-        f = acos((nvec.x*position.x + nvec.y*position.y) / (n * r));
+        //f = acos((nvec.x*position.x + nvec.y*position.y) / (n * r));
+        f = nice_acos((nvec.x*position.x + nvec.y*position.y) / (n * r));
         if (position.z < 0) {
           f = 2 * M_PI - f;
         }

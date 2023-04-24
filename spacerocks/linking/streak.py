@@ -64,7 +64,9 @@ class Streak:
 
     @property
     def observer(self):
-        o = Observer(obscode=self.obscode, epoch=self.epoch.utc.jd, frame='J2000')
+        o = Observer.from_obscode(self.obscode)
+        o = o.at(self.epoch.utc.jd)
+        o.change_frame('J2000')
         o.position = Vector(o.x.au, o.y.au, o.z.au)
         o.velocity = Vector(o.vx.value, o.vy.value, o.vz.value)
         o.rdot = o.position.unit.dot(o.velocity)

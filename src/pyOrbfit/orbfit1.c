@@ -14,8 +14,12 @@ encounter in the future.
 
 
 #include <string.h> 
+#include <ctype.h>
 #include "orbfit.h"
 #include "ephem_types.h"
+
+int invert_matrix(double **in, double **out,int dim);
+void lubksb(double **a, int n, int *indx, double b[]);
 
 /* Create the variables which define the coordinate system */
 double	lat0, lon0;	/* ecliptic lat & lon of tangent point */
