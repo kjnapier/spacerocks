@@ -17,14 +17,14 @@ import copy
 
 class Streak:
  
-    def __init__(self, ra, dec, ra_rate, dec_rate, epoch, obscode, units: Units = Units()):
+    def __init__(self, ra, dec, ra_rate, dec_rate, epoch, observatory, units: Units = Units()):
  
         self.ra = Angle(np.atleast_1d(ra), units.ra).rad
         self.dec = Angle(np.atleast_1d(dec), units.dec).rad
         self.ra_rate = (np.atleast_1d(ra_rate) * units.ra_rate).to(u.rad/u.day).value
         self.dec_rate = (np.atleast_1d(dec_rate) * units.dec_rate).to(u.rad/u.day).value
         self.epoch = time_handler(epoch, units)
-        self.obscode = obscode
+        self.observatory = observatory
 
     def __getitem__(self, idx):
         '''
@@ -64,8 +64,8 @@ class Streak:
 
     @property
     def observer(self):
-        o = Observer.from_obscode(self.obscode)
-        o = o.at(self.epoch.utc.jd)
+        # o = Observer.from_obscode(self.obscode)
+        o = self.observatory.at(self.epoch.utc.jd)
         o.change_frame('J2000')
         o.position = Vector(o.x.au, o.y.au, o.z.au)
         o.velocity = Vector(o.vx.value, o.vy.value, o.vz.value)

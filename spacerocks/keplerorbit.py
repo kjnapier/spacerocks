@@ -70,18 +70,18 @@ class KeplerOrbit:
             # clear the keplerian variables because they need to be recomputed
             self.clear_kep()
 
-            self.x = Distance(x, distance_units, allow_negative=True)
-            self.y = Distance(y, distance_units, allow_negative=True)
-            self.z = Distance(z, distance_units, allow_negative=True)
-            self.vx = vx
-            self.vy = vy
-            self.vz = vz
+            # self.x = Distance(x, distance_units, allow_negative=True)
+            # self.y = Distance(y, distance_units, allow_negative=True)
+            # self.z = Distance(z, distance_units, allow_negative=True)
+            # self.vx = vx
+            # self.vy = vy
+            # self.vz = vz
 
     
-            # self.position = Vector(Distance(x, distance_units, allow_negative=True), 
-            #                        Distance(y, distance_units, allow_negative=True), 
-            #                        Distance(z, distance_units, allow_negative=True))
-            # self.velocity = Vector(vx, vy, vz)
+            self.position = Vector(Distance(x, distance_units, allow_negative=True), 
+                                   Distance(y, distance_units, allow_negative=True), 
+                                   Distance(z, distance_units, allow_negative=True))
+            self.velocity = Vector(vx, vy, vz)
 
         return self
 
