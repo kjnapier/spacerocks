@@ -21,6 +21,8 @@ if sys.platform == 'darwin':
     extra_link_args = ['-L/usr/local/opt/libomp/lib -Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
     #extra_link_args = ['-Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
     #extra_link_args = ['-Wl,-install_name,@rpath/libspacerocks' + suffix]
+
+    # 
     
     omp_path = subprocess.run(['brew', '--prefix', 'libomp'], stdout=subprocess.PIPE).stdout.decode("utf-8").split('\n')[0]
     llvm_path = subprocess.run(['brew', '--prefix', 'llvm'], stdout=subprocess.PIPE).stdout.decode("utf-8").split('\n')[0]
