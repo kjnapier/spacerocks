@@ -18,14 +18,16 @@ if sys.platform == 'darwin':
     from distutils import sysconfig
     vars = sysconfig.get_config_vars()
     vars['LDSHARED'] = vars['LDSHARED'].replace('-bundle', '-shared')
-    extra_link_args = ['-L/usr/local/opt/libomp/lib -Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
-    #extra_link_args = ['-Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
+    #extra_link_args = ['-L/usr/local/opt/libomp/lib -Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
+    extra_link_args = ['-Wl,-lomp,-install_name,@rpath/libspacerocks' + suffix]
     #extra_link_args = ['-Wl,-install_name,@rpath/libspacerocks' + suffix]
 
     # 
     
     omp_path = subprocess.run(['brew', '--prefix', 'libomp'], stdout=subprocess.PIPE).stdout.decode("utf-8").split('\n')[0]
     llvm_path = subprocess.run(['brew', '--prefix', 'llvm'], stdout=subprocess.PIPE).stdout.decode("utf-8").split('\n')[0]
+
+    extra_link_args += [f'-L{llvm_path}/lib', f'-L{omp_path}/lib']
     extra_compile_args = ['-O3', '-fPIC', '-std=c++2a']
 
     extra_compile_args += [f'-I{llvm_path}/include', f'-I{omp_path}/include']
