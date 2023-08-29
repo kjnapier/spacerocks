@@ -197,7 +197,7 @@ int Initialize_Ephemeris()
   int headerID;
   char fileName[FNAMESIZE];
   /*** gmb: don't duplicate this call */
-  static init=0;
+  static int init=0;
   if (init) return SUCCESS;
   init = 1;
 
