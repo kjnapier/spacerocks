@@ -1,0 +1,13 @@
+[build-system]
+requires = ["maturin"]
+build-backend = "maturin"
+
+[project]
+name = "spacerocks"
+version = "3.0.0-alpha.0"
+description = "A Python Package for Solar System Ephemerides and Dynamics."
+#authors = ["kjnapier@umich.edu"]
+license = "GPL-3.0"
+readme = "README.md"
+repository = "https://github.com/kjnapier/spacerocks"
+keywords = ["rust", "python", "binding"]

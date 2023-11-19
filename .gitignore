@@ -27,3 +27,8 @@ prototypes.py
 spacerocks_old
 *.json
 
+
+
+# Added by cargo
+
+/target
