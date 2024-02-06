@@ -66,7 +66,6 @@ pub fn calc_E_from_M(e: f64, M: f64) -> f64 {
     return E;
 }
 
-
 // imlement test for calc_E_from_M
 #[cfg(test)]
 mod tests {

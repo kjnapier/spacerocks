@@ -1,66 +1,27 @@
+use pyo3::prelude::*;
+use pyo3::types::PyType;
+
 use std::ops::{AddAssign, Add};
 use std::collections::HashMap;
 use chrono::{DateTime, TimeZone, Utc};
 use crate::time::leapseconds::LEAP_SECONDS;
 use lazy_static::lazy_static;
-use serde::{Serialize, Deserialize};
 
-// hash mapping integers to month name
-lazy_static! {
-    static ref MONTHS: HashMap<u32, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert(1, "Jan");
-        m.insert(2, "Feb");
-        m.insert(3, "Mar");
-        m.insert(4, "Apr");
-        m.insert(5, "May");
-        m.insert(6, "Jun");
-        m.insert(7, "Jul");
-        m.insert(8, "Aug");
-        m.insert(9, "Sep");
-        m.insert(10, "Oct");
-        m.insert(11, "Nov");
-        m.insert(12, "Dec");
-        m
-    };
-}
 
-fn jd_to_calendar(jd: &f64) -> String {
-    let jd = jd + 0.5;
-    let z = jd.trunc() as i32;
-    let a = if z < 2299161 {
-        z
-    } else {
-        let alpha = ((z as f64 - 1867216.25) / 36524.25).floor() as i32;
-        z + 1 + alpha - (alpha / 4)
-    };
-    let b = a + 1524;
-    let c = ((b as f64 - 122.1) / 365.25).floor() as i32;
-    let d = (365.25 * c as f64).floor() as i32;
-    let e = ((b as f64 - d as f64) / 30.6001).floor() as u32;
-    let day = b - d - ((30.6001 * e as f64) as i32);
-    let month = if e < 14 {
-        e - 1
-    } else {
-        e - 13
-    };
-    let year = if month > 2 {
-        c - 4716
-    } else {
-        c - 4715
-    };
-    format!("{} {} {}", day, MONTHS.get(&month).unwrap(), year)
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[pyclass]
 pub struct Time {
+    #[pyo3(get, set)]
     pub epoch: f64,
+    #[pyo3(get, set)]
     pub timescale: String,
+    #[pyo3(get, set)]
     pub format: String,
 }
 
+#[pymethods]
 impl Time {
 
+    #[new]
     pub fn new(epoch: f64, timescale: &str, format: &str) -> Self {
         Time {
             epoch: epoch,
@@ -69,7 +30,8 @@ impl Time {
         }
     }
     
-    pub fn now() -> Self {
+    #[classmethod]
+    pub fn now(cls: &PyType) -> Self {
         let now = Utc::now();
         let x = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
         Time {
@@ -175,4 +137,49 @@ fn isot_to_julian(isot: &str) -> f64 {
 }
 
 
+// hash mapping integers to month name
+lazy_static! {
+    static ref MONTHS: HashMap<u32, &'static str> = {
+        let mut m = HashMap::new();
+        m.insert(1, "Jan");
+        m.insert(2, "Feb");
+        m.insert(3, "Mar");
+        m.insert(4, "Apr");
+        m.insert(5, "May");
+        m.insert(6, "Jun");
+        m.insert(7, "Jul");
+        m.insert(8, "Aug");
+        m.insert(9, "Sep");
+        m.insert(10, "Oct");
+        m.insert(11, "Nov");
+        m.insert(12, "Dec");
+        m
+    };
+}
 
+fn jd_to_calendar(jd: &f64) -> String {
+    let jd = jd + 0.5;
+    let z = jd.trunc() as i32;
+    let a = if z < 2299161 {
+        z
+    } else {
+        let alpha = ((z as f64 - 1867216.25) / 36524.25).floor() as i32;
+        z + 1 + alpha - (alpha / 4)
+    };
+    let b = a + 1524;
+    let c = ((b as f64 - 122.1) / 365.25).floor() as i32;
+    let d = (365.25 * c as f64).floor() as i32;
+    let e = ((b as f64 - d as f64) / 30.6001).floor() as u32;
+    let day = b - d - ((30.6001 * e as f64) as i32);
+    let month = if e < 14 {
+        e - 1
+    } else {
+        e - 13
+    };
+    let year = if month > 2 {
+        c - 4716
+    } else {
+        c - 4715
+    };
+    format!("{} {} {}", day, MONTHS.get(&month).unwrap(), year)
+}
