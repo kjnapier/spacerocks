@@ -1,13 +1,15 @@
 use pyo3::prelude::*;
 
 pub mod spacerock;
+pub mod rockcollection;
 
 
 pub fn make_spacerock_submodule(py: Python, m: &PyModule) -> PyResult<()> {
     // Add the `spacerock` submodule
     let submodule = PyModule::new(py, "spacerock")?;
 
-    submodule.add_class::<spacerock::SpaceRock>()?;
+    submodule.add_class::<spacerock::PySpaceRock>()?;
+    // submodule.add_class::<rockcollection::RockCollection>()?;
 
     m.add_submodule(submodule)?;
     py.import("sys")?
