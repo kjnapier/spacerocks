@@ -1,8 +1,5 @@
 use pyo3::prelude::*;
 
-// pub mod calc_E_from_M;
-// pub use self::calc_E_from_M::calc_E_from_M;
-
 use spacerocks::transforms::calc_E_from_M;
 
 #[pyfunction]

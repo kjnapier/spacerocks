@@ -1,8 +1,6 @@
 use pyo3::prelude::*;
 
 pub mod spacerock;
-pub mod rockcollection;
-
 
 pub fn make_spacerock_submodule(py: Python, m: &PyModule) -> PyResult<()> {
     // Add the `spacerock` submodule
