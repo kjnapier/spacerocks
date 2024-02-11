@@ -1,24 +1,31 @@
-
 pub mod keplerorbit;
+pub use keplerorbit::KeplerOrbit;
+
 pub mod statevector;
-pub mod constants;
+pub use statevector::StateVector;
+
 pub mod spacerock;
+pub use spacerock::SpaceRock;
+
 pub mod observatory;
-pub mod detection;
+pub use observatory::Observatory;
+
 pub mod time;
+pub use time::Time;
+
+pub mod constants;
+
 pub mod properties;
+pub use properties::Properties;
+
 pub mod astrometry;
-pub mod sphericalstate;
+pub use astrometry::Astrometry;
+
+pub mod spice;
+pub use spice::SpiceKernel;
 
 pub mod transforms;
-pub mod nbody;
 
-pub use keplerorbit::KeplerOrbit;
-pub use statevector::StateVector;
-pub use spacerock::SpaceRock;
-pub use observatory::Observatory;
-pub use detection::Detection;
-pub use time::Time;
-pub use properties::Properties;
-pub use astrometry::Astrometry;
+pub mod nbody;
 pub use nbody::Simulation;
+

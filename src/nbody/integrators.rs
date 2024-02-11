@@ -1,4 +1,7 @@
 
-enum Integrators {
+
+enum Integrator {
     Leapfrog,
+    EulerCromer,
 }
+

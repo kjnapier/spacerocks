@@ -8,6 +8,8 @@ use crate::transforms::calc_M_from_E;
 
 use serde::{Serialize, Deserialize};
 
+// TODO: This should require mu as an argument
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct KeplerOrbit {
     pub a: f64,

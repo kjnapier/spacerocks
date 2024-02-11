@@ -6,8 +6,14 @@ use transforms::make_transforms_submodule;
 mod spacerock;
 use spacerock::make_spacerock_submodule;
 
-// mod time;
-// use time::make_time_submodule;
+mod spice;
+use spice::make_spice_submodule;
+
+mod time;
+use time::make_time_submodule;
+
+mod observer;
+use observer::make_observer_submodule;
 
 
 
@@ -20,8 +26,14 @@ pub fn spacerocks(py: Python, m: &PyModule) -> PyResult<()> {
     // Add the `spacerock` submodule
     make_spacerock_submodule(py, m)?;
 
+    // Add the `spice` submodule
+    make_spice_submodule(py, m)?;
+
     // // Add the `time` submodule
-    // make_time_submodule(py, m)?;
+    make_time_submodule(py, m)?;
+
+    // Add the `observing` submodule
+    make_observer_submodule(py, m)?;
 
     Ok(())
 }

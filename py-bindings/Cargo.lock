@@ -1602,6 +1602,7 @@ dependencies = [
  "nalgebra",
  "pyo3",
  "reqwest",
+ "rust-spice",
  "serde_json",
  "spacerocks 0.1.4",
  "tabled",

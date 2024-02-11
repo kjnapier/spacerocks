@@ -4,6 +4,11 @@ use pyo3::types::PyType;
 use nalgebra::Vector3;
 
 use spacerocks::spacerock::SpaceRock;
+use spacerocks::time::Time;
+
+use crate::time::time::PyTime;
+
+use spice;
 
 #[pyclass]
 #[pyo3(name = "SpaceRock")]
@@ -21,19 +26,91 @@ impl PySpaceRock {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to create SpaceRock from Horizons for name: {}", name)));
         }
         Ok(PySpaceRock { inner: rock.unwrap() })
+    }
 
-        // PySpaceRock { inner: SpaceRock::from_horizons(name) })
+    #[classmethod]
+    fn from_spice(cls: &PyType, name: &str, epoch: &PyTime) -> PyResult<Self> {
+
+        let ep = &epoch.inner;
+        let rock = SpaceRock::from_spice(name, &ep);
+        // if rock.is_err() {
+        //     return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to create SpaceRock from Spice for name: {}", name)));
+        // }
+
+        Ok(PySpaceRock { inner: rock })
+    }
+
+    #[classmethod]
+    fn random(cls: &PyType) -> Self {
+        PySpaceRock { inner: SpaceRock::random() }
     }
 
     fn __repr__(&self) -> String {
         format!("SpaceRock: {}", self.inner.name)
     }
 
-    // #[classmethod]
-    // fn from_state(cls: &PyType, name: &str, position: (f64, f64, f64), velocity: (f64, f64, f64)) -> Self {
-    //     PySpaceRock { inner: SpaceRock { name: name.to_string(), position: Vector3::new(position.0, position.1, position.2), velocity: Vector3::new(velocity.0, velocity.1, velocity.2) } }
-    // }
+    fn analytic_propagate(&mut self, t: &PyTime) {
+        // let ep = Time::new(t, "jd", "utc");
+        self.inner.analytic_propagate(&t.inner);
+    }
 
+    fn change_frame(&mut self, frame: &str) {
+        self.inner.change_frame(frame);
+    }
+
+    fn calculate_orbit(&mut self) {
+        self.inner.calculate_orbit();
+    }
+
+    #[getter]
+    fn epoch(&self) -> PyTime {
+        PyTime { inner: self.inner.epoch.clone() }
+    }
+
+    #[getter]
+    fn frame(&self) -> String {
+        self.inner.frame.clone()
+    }
+
+    #[getter]
+    fn r(&self) -> f64 {
+        self.inner.r()
+    }
+
+    #[getter]
+    fn e(&self) -> PyResult<f64> {
+        match self.inner.orbit.as_ref() {
+            Some(orbit) => Ok(orbit.e),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated")),
+        }
+    }
+
+    #[getter]
+    fn a(&self) -> PyResult<f64> {
+        match self.inner.orbit.as_ref() {
+            Some(orbit) => Ok(orbit.a),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated")),
+        }
+    }
+
+    #[getter]
+    fn inc(&self) -> PyResult<f64> {
+        match self.inner.orbit.as_ref() {
+            Some(orbit) => Ok(orbit.inc),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated")),
+        }
+    }
+
+    #[getter]
+    fn node(&self) -> PyResult<f64> {
+        match self.inner.orbit.as_ref() {
+            Some(orbit) => Ok(orbit.node),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated")),
+        }
+    }
+
+
+    #[getter]
     fn name(&self) -> String {
         self.inner.name.clone()
     }

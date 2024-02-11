@@ -13,4 +13,11 @@ impl StateVector {
             velocity: Vector3::new(vx, vy, vz),
         }
     }
+
+    pub fn from_vectors(position: Vector3<f64>, velocity: Vector3<f64>) -> Self {
+        StateVector {
+            position,
+            velocity,
+        }
+    }
 }

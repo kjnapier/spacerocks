@@ -1,8 +1,6 @@
-// access the constants from constants.rs in this directory
 use crate::constants::*;
 use crate::statevector::StateVector;
 use crate::observatory::Observatory;
-use crate::sphericalstate::SphericalState;
 use crate::keplerorbit::KeplerOrbit;
 use crate::properties::Properties;
 use crate::astrometry::Astrometry;
@@ -14,7 +12,6 @@ use crate::transforms::calc_kep_from_xyz;
 use crate::transforms::calc_xyz_from_kepM;
 use crate::transforms::calc_f_from_E;
 use crate::transforms::calc_E_from_M;
-use crate::transforms::calc_xyz_from_spherical;
 
 use reqwest::blocking::Client;
 use serde_json;
@@ -29,17 +26,20 @@ use rand::distributions::{Uniform};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SpaceRock {
+
     pub name: String,
     pub epoch: Time,
+
     pub frame: String,
     pub origin: String,
 
     pub position: Vector3<f64>,
     pub velocity: Vector3<f64>,
 
-    pub orbit: KeplerOrbit,
+    pub orbit: Option<KeplerOrbit>,
     pub mass: Option<f64>,
     pub properties: Option<Properties>,
+
 }
 
 #[allow(dead_code)]
@@ -61,7 +61,7 @@ impl SpaceRock {
             epoch: epoch.clone(),
             frame: "J2000".to_string(),
             origin: "SSB".to_string(),
-            orbit: KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity}),
+            orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: MASSES.get(name).copied(),
             properties: None,
         }
@@ -77,7 +77,7 @@ impl SpaceRock {
             epoch: epoch,
             frame: frame.to_string(),
             origin: origin.to_string(),
-            orbit: KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity}),
+            orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: None,
             properties: None,
         }
@@ -93,7 +93,7 @@ impl SpaceRock {
             epoch: epoch,
             frame: frame.to_string(),
             origin: origin.to_string(),
-            orbit: KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity}),
+            orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: None,
             properties: None,
         }
@@ -108,26 +108,26 @@ impl SpaceRock {
             epoch: epoch,
             frame: frame.to_string(),
             origin: origin.to_string(),
-            orbit: orbit,
+            orbit: Some(orbit),
             mass: None,
             properties: None,
         }
     }
 
-    pub fn from_spherical(name: &str, state: SphericalState, epoch: Time, frame: &str, origin: &str) -> Self {
-        let s = calc_xyz_from_spherical(state);
-        SpaceRock {
-            name: name.to_string(),
-            position: s.position,
-            velocity: s.velocity,
-            epoch: epoch,
-            frame: frame.to_string(),
-            origin: origin.to_string(),
-            orbit: KeplerOrbit::from_xyz(StateVector {position: s.position, velocity: s.velocity}),
-            mass: None,
-            properties: None,
-        }
-    }
+    // pub fn from_spherical(name: &str, state: SphericalState, epoch: Time, frame: &str, origin: &str) -> Self {
+    //     let s = calc_xyz_from_spherical(state);
+    //     SpaceRock {
+    //         name: name.to_string(),
+    //         position: s.position,
+    //         velocity: s.velocity,
+    //         epoch: epoch,
+    //         frame: frame.to_string(),
+    //         origin: origin.to_string(),
+    //         orbit: Some(KeplerOrbit::from_xyz(StateVector {position: s.position, velocity: s.velocity})),
+    //         mass: None,
+    //         properties: None,
+    //     }
+    // }
 
     pub fn from_horizons(name: &str) -> Result<Self, Box<dyn std::error::Error>> {
 
@@ -180,7 +180,7 @@ impl SpaceRock {
             epoch: epoch,
             frame: "ECLIPJ2000".to_string(),
             origin: "SSB".to_string(),
-            orbit: KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity}),
+            orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: None,
             properties: None,
         };
@@ -203,28 +203,41 @@ impl SpaceRock {
     // Operations
 
     pub fn calculate_kepler(&mut self) {
-        self.orbit = KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity});
+        self.orbit = Some(KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity}));
     }
 
     pub fn analytic_propagate(&mut self, epoch: &Time) {
+
         let timescale = &self.epoch.timescale;
         let mut epoch = epoch.clone();
 
         epoch.change_timescale(timescale);
         let dt = epoch.epoch - self.epoch.epoch;
-        let dM = self.orbit.n() * dt;
 
-        let M_new = self.orbit.M() + dM;
+        // check that self.orbit is not None
+        if let Some(orbit) = &self.orbit {
+            let dM = orbit.n() * dt;
+            let M_new = orbit.M() + dM;
+            let new_state = calc_xyz_from_kepM(orbit.a, orbit.e, orbit.inc, orbit.arg, orbit.node, M_new);
+            self.position = Vector3::new(new_state.position[0], new_state.position[1], new_state.position[2]);
+            self.velocity = Vector3::new(new_state.velocity[0], new_state.velocity[1], new_state.velocity[2]);
+            self.epoch = epoch;
+            self.calculate_orbit();
+        }
 
-        let new_state = calc_xyz_from_kepM(self.orbit.a, self.orbit.e, self.orbit.inc, self.orbit.arg, self.orbit.node, M_new);
+        // let dM = self.orbit.n() * dt;
 
-        self.position = Vector3::new(new_state.position[0], new_state.position[1], new_state.position[2]);
-        self.velocity = Vector3::new(new_state.velocity[0], new_state.velocity[1], new_state.velocity[2]);
-        self.epoch = epoch;
-        self.calculate_orbit();
+        // let M_new = self.orbit.M() + dM;
 
-        //self.orbit = KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity});
+        // let new_state = calc_xyz_from_kepM(self.orbit.a, self.orbit.e, self.orbit.inc, self.orbit.arg, self.orbit.node, M_new);
+
+        // self.position = Vector3::new(new_state.position[0], new_state.position[1], new_state.position[2]);
+        // self.velocity = Vector3::new(new_state.velocity[0], new_state.velocity[1], new_state.velocity[2]);
+        // self.epoch = epoch;
+        // self.calculate_orbit();
+        
     }
+
 
     pub fn observe(&mut self, observer: &SpaceRock) -> Astrometry {
 
@@ -280,7 +293,7 @@ impl SpaceRock {
             self.position = rot * self.position;
             self.velocity = rot * self.velocity;
             self.frame = frame.to_string();
-            self.orbit = KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity});
+            self.orbit = Some(KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity}));
         }
     }
 
@@ -291,7 +304,7 @@ impl SpaceRock {
     }
 
     pub fn calculate_orbit(&mut self) {
-        self.orbit = KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity});
+        self.orbit = Some(KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity}));
     }
 
     fn r_squared(&self) -> f64 {
@@ -309,6 +322,14 @@ impl SpaceRock {
     fn v(&self) -> f64 {
         self.velocity.norm()
     }
+
+    pub fn hvec(&self) -> Vector3<f64> {
+        self.position.cross(&self.velocity)
+    }
+
+    pub fn h(&self) -> f64 {
+        self.hvec().norm()
+    }    
 
 }
 

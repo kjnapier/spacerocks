@@ -17,13 +17,11 @@ pub struct Astrometry {
 
 impl Astrometry {
 
-    pub fn mag(&self, sun: &SpaceRock) -> f64 {
+    pub fn mag(&self, sun: &SpaceRock) -> Option<f64> {
        
-        if self.H.is_none() {
-            return 99.0;
-        }
-
         let H = self.H.unwrap();
+        
+
         let Gslope = self.Gslope.unwrap();
 
         let delta = self.topocentric_state.position.norm();
@@ -44,12 +42,12 @@ impl Astrometry {
         let mut mag = H + 5.0 * (sun_dist * delta).log10();
     
         if psi_1 == 0.0 && psi_2 == 0.0 {
-            return mag;
+            return Some(mag);
         }
     
         mag -= 2.5 * ((1.0 - Gslope) * psi_1 + Gslope * psi_2).log10();
     
-        return mag;
+        return Some(mag);
     }
 
 }

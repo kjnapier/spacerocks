@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use crate::spacerock::SpaceRock;
-use crate::nbody::euler_cromer::euler_cromer_step;
 use crate::nbody::leapfrog::leapfrog_step;
 use crate::nbody::simparticle::SimParticle;
 use crate::constants::G;

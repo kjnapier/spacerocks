@@ -6,9 +6,9 @@ use spice;
 use nalgebra::Vector3;
 
 pub struct Observatory {
-    lat: f64,
-    lon: f64,
-    elevation: f64
+    pub lat: f64,
+    pub lon: f64,
+    pub elevation: f64
 }
 
 impl Observatory {
@@ -21,18 +21,6 @@ impl Observatory {
         }
     }
 
-    // pub fn from_obscode(obscode: &str) -> Self {
-    //     let mut lat: f64 = 0.0;
-    //     let mut lon: f64 = 0.0;
-    //     let mut elevation: f64 = 0.0;
-    //     spice::get_obs_info(obscode, &mut lat, &mut lon, &mut elevation);
-    //     Observatory {
-    //         lat: lat,
-    //         lon: lon,
-    //         elevation: elevation
-    //     }
-    // }
-
     pub fn at(&self, epoch: &Time) -> SpaceRock {
 
         let mut earth = SpaceRock::from_spice("Earth", epoch);
@@ -44,6 +32,11 @@ impl Observatory {
         
         return earth
     }
+
+    pub fn local_sidereal_time(&self, epoch: f64) -> f64 {
+        return compute_local_sidereal_time(epoch, self.lon)
+    }
+
 }
 
 fn compute_local_sidereal_time(epoch: f64, lon: f64) -> f64 {
