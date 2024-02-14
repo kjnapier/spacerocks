@@ -1,8 +1,10 @@
 use crate::constants::*;
 use crate::statevector::StateVector;
 use crate::spacerock::SpaceRock;
+use crate::observing::Observer;
 
-pub fn correct_for_ltt(rock: &SpaceRock, observer: &SpaceRock) -> StateVector {
+pub fn correct_for_ltt(rock: &SpaceRock, observer: &Observer) -> StateVector {
+    // calculates the observer-centric state vector of a rock, accounting for light-time travel
 
     let mut temp = StateVector::new(rock.position.x, rock.position.y, rock.position.z, 
                                     rock.velocity.x, rock.velocity.y, rock.velocity.z);

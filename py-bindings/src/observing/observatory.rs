@@ -4,6 +4,7 @@ use pyo3::types::PyType;
 use spacerocks::Observatory;
 
 use crate::spacerock::spacerock::PySpaceRock;
+use crate::observing::observer::PyObserver;
 use crate::time::time::PyTime;
 
 #[pyclass]
@@ -25,10 +26,16 @@ impl PyObservatory {
         PyObservatory { inner: Observatory::from_coordinates(lat, lon, elevation) }
     }
 
-    fn at(&self, epoch: &PyTime) -> PySpaceRock {
+    // #[classmethod]
+    // pub fn from_parallax(_cls: &PyType, lon: f64, rho_sin: f64, rho_cos: f64, elevation: f64) -> Self {
+    //     PyObservatory { inner: Observatory::from_parallax(lat, lon, elevation) }
+    // }
+
+    fn at(&self, epoch: &PyTime) -> PyObserver {
         let ep = &epoch.inner;
-        let rock = self.inner.at(&ep);
-        PySpaceRock { inner: rock }
+        let observer = self.inner.at(&ep);
+
+        PyObserver { inner: observer }
     }
 
     #[getter]

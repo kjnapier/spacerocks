@@ -1,9 +1,10 @@
 use crate::constants::*;
 use crate::statevector::StateVector;
-use crate::observatory::Observatory;
 use crate::keplerorbit::KeplerOrbit;
 use crate::properties::Properties;
-use crate::astrometry::Astrometry;
+use crate::observing::Observer;
+
+use crate::observing::{Detection, Observatory};
 
 use crate::time::Time;
 
@@ -187,17 +188,36 @@ impl SpaceRock {
         return Ok(rock);
     }
 
+    // pub fn random() -> Self {
+    //     let mut rng = rand::thread_rng();
+    //     let a = rng.gen_range(0.5..100.0);
+    //     let e = rng.gen_range(0.0..1.0);
+    //     let inc = rng.gen_range(0.0..std::f64::consts::PI);
+    //     let arg = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
+    //     let node = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
+    //     let f = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
+    //     // get today's julian date
+
+    //     // uuid for name
+    //     let name = format!("{}", uuid::Uuid::new_v4().simple());
+
+    //     SpaceRock::from_kepler(&name, KeplerOrbit::new(a, e, inc, arg, node, f), Time::now(), "ECLIPJ2000", "SSB")
+    // }
+
     pub fn random() -> Self {
         let mut rng = rand::thread_rng();
-        let a = rng.gen_range(0.5..100.0);
-        let e = rng.gen_range(0.0..1.0);
-        let inc = rng.gen_range(0.0..std::f64::consts::PI);
+        let a = rng.gen_range(40.0..50.0);
+        let e = rng.gen_range(0.0..0.3);
+        let inc = rng.gen_range(0.0..std::f64::consts::PI/3.0);
         let arg = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
         let node = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
         let f = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
         // get today's julian date
 
-        SpaceRock::from_kepler("random", KeplerOrbit::new(a, e, inc, arg, node, f), Time::now(), "ECLIPJ2000", "SSB")
+        // uuid for name
+        let name = format!("{}", uuid::Uuid::new_v4().simple());
+
+        SpaceRock::from_kepler(&name, KeplerOrbit::new(a, e, inc, arg, node, f), Time::now(), "ECLIPJ2000", "SSB")
     }
 
     // Operations
@@ -222,6 +242,7 @@ impl SpaceRock {
             self.position = Vector3::new(new_state.position[0], new_state.position[1], new_state.position[2]);
             self.velocity = Vector3::new(new_state.velocity[0], new_state.velocity[1], new_state.velocity[2]);
             self.epoch = epoch;
+            // self.orbit = None;
             self.calculate_orbit();
         }
 
@@ -239,51 +260,63 @@ impl SpaceRock {
     }
 
 
-    pub fn observe(&mut self, observer: &SpaceRock) -> Astrometry {
+    pub fn observe(&mut self, observer: &Observer) -> Detection {
 
+        // Make sure the observer is in the J2000 frame
+        // observer.change_frame("J2000");
+
+        // Make sure the rock is in the J2000 frame
+        let original_frame = self.frame.clone();
         self.change_frame("J2000");
+
+        // Calculate the topocentric state, correct for light travel time
         let cr = correct_for_ltt(&self, observer);
+
+        // Calaculate the ra, and dec
         let mut ra = cr.position.y.atan2(cr.position.x);
         if ra < 0.0 {
             ra += 2.0 * std::f64::consts::PI;
         }
         let dec = (cr.position.z / cr.position.norm()).asin();
 
+        // Calculate the ra and dec rates
         let xi = cr.position.x.powi(2) + cr.position.y.powi(2);
         let ra_rate = - (cr.position.y * cr.velocity.x - cr.position.x * cr.velocity.y) / xi;
         let num = -cr.position.z * (cr.position.x * cr.velocity.x + cr.position.y * cr.velocity.y) + xi * cr.velocity.z;
         let denom = xi.sqrt() * cr.position.norm_squared();
         let dec_rate = num / denom;
 
-        let mut H = None;
-        let mut Gslope = None;
-        let mut properties;
-        
-        if self.properties.is_some() {
-            properties = self.properties.clone().unwrap();
+        // calculate the topocentric range and range rate
+        let rho = cr.position.norm();
+        let rho_rate = cr.position.dot(&cr.velocity) / rho;
 
-            if properties.H.is_some() {
-                H = properties.H;
-            }
-            if properties.Gslope.is_some() {
-                Gslope = properties.Gslope;
-            }
-        }
-
-        let astro = Astrometry {
+        // construct the detection
+        let obs = Detection {
             ra: ra,
             dec: dec,
-            ra_rate: ra_rate,
-            dec_rate: dec_rate,
+            ra_rate: Some(ra_rate),
+            dec_rate: Some(dec_rate),
+            rho: Some(rho),
+            rho_rate: Some(rho_rate),
             epoch: self.epoch.clone(),
-            topocentric_state: cr,
             observer: observer.clone(),
             name: self.name.clone(),
-            H: H,
-            Gslope: Gslope,
+
+            mag: None,
+            filter: None,
+            ra_uncertainty: None,
+            dec_uncertainty: None,
+            ra_rate_uncertainty: None,
+            dec_rate_uncertainty: None,
+            rho_uncertainty: None,
+            rho_rate_uncertainty: None,
+            mag_uncertainty: None,
         };
+
+        // Change the frame back to the original frame
+        self.change_frame(&original_frame);
         
-        return astro;
+        return obs;
     }
 
     pub fn change_frame(&mut self, frame: &str) {
@@ -297,11 +330,9 @@ impl SpaceRock {
         }
     }
 
-    pub fn change_origin(&mut self, origin: &SpaceRock) {
-        if origin.name == self.origin {
-            return;
-        }
-    }
+    // pub fn change_origin(&mut self, origin: &SpaceRock) {
+    //     // unimplemented
+    // }
 
     pub fn calculate_orbit(&mut self) {
         self.orbit = Some(KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity}));

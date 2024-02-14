@@ -1,4 +1,5 @@
 use crate::spacerock::SpaceRock;
+use crate::observing::observer::Observer;
 use crate::constants::*;
 use crate::time::Time;
 
@@ -21,7 +22,7 @@ impl Observatory {
         }
     }
 
-    pub fn at(&self, epoch: &Time) -> SpaceRock {
+    pub fn at(&self, epoch: &Time) -> Observer {
 
         let mut earth = SpaceRock::from_spice("Earth", epoch);
 
@@ -29,8 +30,10 @@ impl Observatory {
         let [d_pos, d_vel] = compute_topocentric_correction(self.lon, self.lat, self.elevation, epoch.epoch);
         earth.position += d_pos;
         earth.velocity += d_vel;
+
+        let observer = Observer::from_ground(earth.position, earth.velocity, earth.epoch, &earth.frame, self.lat, self.lon, self.elevation);
         
-        return earth
+        return observer
     }
 
     pub fn local_sidereal_time(&self, epoch: f64) -> f64 {

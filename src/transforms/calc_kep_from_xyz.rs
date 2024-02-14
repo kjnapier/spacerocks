@@ -17,6 +17,12 @@ fn acos_safe(x: f64) -> f64 {
   }
 }
 
+// enum OrbitType {
+//   Ellipse,
+//   Parabola,
+//   Hyperbola,
+// }
+
 pub fn calc_kep_from_xyz(state: StateVector) -> KeplerOrbit {
 
     let EMIN = 1e-10;
@@ -28,10 +34,21 @@ pub fn calc_kep_from_xyz(state: StateVector) -> KeplerOrbit {
     let vsq = state.velocity.dot(&state.velocity);
 
     let hvec = state.position.cross(&state.velocity);
-    let evec = state.velocity.cross(&hvec) / MU_BARY - state.position / r;  
+    let evec = state.velocity.cross(&hvec) / MU_BARY - state.position / r;
 
     let nvec = Vector3::new(-hvec.y, hvec.x, 0.0);
     let n = nvec.norm();
+
+    // let specific_energy = vsq / 2.0 - MU_BARY / r;
+
+    // cases depending on the specific energy
+    // < 0: ellipse, 0: parabola, > 0: hyperbola
+    // orbit_type = match specific_energy {
+    //   e if e < 0.0 => OrbitType::Ellipse,
+    //   e if e == 0.0 => OrbitType::Parabola,
+    //   e if e > 0.0 => OrbitType::Hyperbola,
+    //   _ => panic!("Invalid specific energy"),
+    // };
 
     a = 1.0 / (2.0 / r - vsq / MU_BARY);
     e = evec.norm();

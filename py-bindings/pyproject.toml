@@ -5,9 +5,18 @@ build-backend = "maturin"
 [project]
 name = "spacerocks"
 version = "3.0.0-alpha.0"
+
+authors = [{name = "Kevin J Napier", email = "kjnapier@umich.edu"},]
+maintainers = [{name = "Kevin J Napier", email = "kjnapier@umich.edu"},]
+
 description = "A Python Package for Solar System Ephemerides and Dynamics."
-# authors = ["Kevin J Napier"]
 license = "GPL-3.0"
 readme = "README.md"
-repository = "https://github.com/kjnapier/spacerocks"
 keywords = ["rust", "python", "binding"]
+
+
+[project.urls]
+# Documentation = "https://readthedocs.org"
+Repository = "https://github.com/kjnapier/spacerocks/tree/v3"
+# Issues = "https://github.com/me/spam/issues"
+# Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"

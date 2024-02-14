@@ -12,8 +12,8 @@ use spice::make_spice_submodule;
 mod time;
 use time::make_time_submodule;
 
-mod observer;
-use observer::make_observer_submodule;
+mod observing;
+use observing::make_observing_submodule;
 
 
 
@@ -33,7 +33,7 @@ pub fn spacerocks(py: Python, m: &PyModule) -> PyResult<()> {
     make_time_submodule(py, m)?;
 
     // Add the `observing` submodule
-    make_observer_submodule(py, m)?;
+    make_observing_submodule(py, m)?;
 
     Ok(())
 }

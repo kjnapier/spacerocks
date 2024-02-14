@@ -7,6 +7,8 @@ use spacerocks::spacerock::SpaceRock;
 use spacerocks::time::Time;
 
 use crate::time::time::PyTime;
+use crate::observing::detection::PyDetection;
+use crate::observing::observer::PyObserver;
 
 use spice;
 
@@ -29,14 +31,16 @@ impl PySpaceRock {
     }
 
     #[classmethod]
-    fn from_spice(cls: &PyType, name: &str, epoch: &PyTime) -> PyResult<Self> {
+    fn from_xyz(cls: &PyType, name: &str, x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
+        let ep = &epoch.inner;
+        let rock = SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, ep.clone(), frame, origin);
+        Ok(PySpaceRock { inner: rock })
+    }
 
+    #[classmethod]
+    fn from_spice(cls: &PyType, name: &str, epoch: &PyTime) -> PyResult<Self> {
         let ep = &epoch.inner;
         let rock = SpaceRock::from_spice(name, &ep);
-        // if rock.is_err() {
-        //     return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to create SpaceRock from Spice for name: {}", name)));
-        // }
-
         Ok(PySpaceRock { inner: rock })
     }
 
@@ -50,8 +54,17 @@ impl PySpaceRock {
     }
 
     fn analytic_propagate(&mut self, t: &PyTime) {
-        // let ep = Time::new(t, "jd", "utc");
         self.inner.analytic_propagate(&t.inner);
+    }
+
+    fn observe(&mut self, observer: &PyObserver) -> PyResult<PyDetection> {
+        if observer.inner.frame != "J2000" {
+            // return an error
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Observer frame is not J2000. Cannot observe rocks.")));
+        }
+
+        let obs = self.inner.observe(&observer.inner);
+        Ok(PyDetection { inner: obs })
     }
 
     fn change_frame(&mut self, frame: &str) {
