@@ -15,7 +15,7 @@ pub const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
 pub const MU_BARY: f64 = 0.00029630927493457475;
 pub const SPEED_OF_LIGHT: f64 = 173.14463268466926; // speed of light in au/day
 
-pub const G: f64 = 0.00029591220828559104;
+pub const gravitational_constant: f64 = 0.00029591220828559104;
 
 pub const ROTATION_J2000: Matrix3<f64> = Matrix3::new(1.0, 0.0, 0.0,
                                                       0.0, 1.0, 0.0,
@@ -53,16 +53,16 @@ lazy_static! {
 lazy_static! {
     pub static ref MASSES: HashMap<String, f64> = {
         let mut m = HashMap::new();
-        m.insert("Sun".to_string(), 1.0000000003110439);
-        m.insert("Mercury Barycenter".to_string(), 0.00000016601);
-        m.insert("Venus Barycenter".to_string(), 0.0000024478383);
-        m.insert("Earth".to_string(), 0.00000300348959632);
-        m.insert("Moon".to_string(), 0.00000000007342);
-        m.insert("Mars Barycenter".to_string(), 0.000000333020);
-        m.insert("Jupiter Barycenter".to_string(), 0.0009547918932199791); 
-        m.insert("Saturn Barycenter".to_string(), 0.000285885670706712);
-        m.insert("Uranus Barycenter".to_string(), 0.00004366249614580214);
-        m.insert("Neptune Barycenter".to_string(), 0.000051513871954469416);
+        m.insert("sun".to_string(), 1.0000000003110439);
+        m.insert("mercury barycenter".to_string(), 0.00000016601);
+        m.insert("venus barycenter".to_string(), 0.0000024478383);
+        m.insert("earth".to_string(), 0.00000300348959632);
+        m.insert("moon".to_string(), 0.00000000007342);
+        m.insert("mars barycenter".to_string(), 0.000000333020);
+        m.insert("jupiter barycenter".to_string(), 0.0009547918932199791); 
+        m.insert("saturn barycenter".to_string(), 0.000285885670706712);
+        m.insert("uranus barycenter".to_string(), 0.00004366249614580214);
+        m.insert("neptune barycenter".to_string(), 0.000051513871954469416);
         m
     };
 }

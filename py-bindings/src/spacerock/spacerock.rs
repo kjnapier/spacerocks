@@ -86,6 +86,11 @@ impl PySpaceRock {
     }
 
     #[getter]
+    fn origin(&self) -> String {
+        self.inner.origin.clone()
+    }
+
+    #[getter]
     fn r(&self) -> f64 {
         self.inner.r()
     }
@@ -166,6 +171,16 @@ impl PySpaceRock {
     #[getter]
     fn vz(&self) -> f64 {
         self.inner.velocity.z
+    }
+
+    #[getter]
+    fn mass(&self) -> f64 {
+        self.inner.mass
+    }
+
+    fn set_mass(&mut self, mass: f64) -> PyResult<()> {
+        self.inner.mass = mass;
+        Ok(())
     }
 
 

@@ -4,30 +4,12 @@ use crate::spacerock::SpaceRock;
 use crate::observing::observer::Observer;
 
 
-// #[derive(Debug, Clone, PartialEq)]
-// pub struct Detection {
-
-//     pub ra: f64,
-//     pub dec: f64,
-//     pub epoch: Time,
-
-//     pub ra_rate: f64,
-//     pub dec_rate: f64,
-
-//     pub topocentric_state: StateVector,
-//     pub observer: Observer,
-
-//     pub name: String,
-//     pub H: Option<f64>,
-//     pub Gslope: Option<f64>,
-// }
-
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Detection {
 
     pub name: String,
     pub epoch: Time,
+    pub observer: Observer,
 
     pub ra: f64,
     pub dec: f64,
@@ -40,8 +22,6 @@ pub struct Detection {
     
     pub mag: Option<f64>,
     pub filter: Option<String>,
-
-    pub observer: Observer,
 
     pub ra_uncertainty: Option<f64>,
     pub dec_uncertainty: Option<f64>,

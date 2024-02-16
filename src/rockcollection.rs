@@ -5,6 +5,7 @@ struct RockCollection {
 }
 
 impl RockCollection {
+
     pub fn new() -> Self {
         RockCollection {
             rocks: Vec::new(),
@@ -26,4 +27,5 @@ impl RockCollection {
     pub fn get_mut(&mut self, name: &str) -> Option<&mut SpaceRock> {
         self.rocks.iter_mut().find(|rock| rock.name == name)
     }
+    
 }

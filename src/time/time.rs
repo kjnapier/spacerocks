@@ -1,4 +1,4 @@
-use std::ops::{AddAssign, Add};
+use std::ops::{AddAssign, Add, Sub};
 use std::collections::HashMap;
 use chrono::{DateTime, TimeZone, Utc};
 use crate::time::leapseconds::LEAP_SECONDS;
@@ -108,7 +108,86 @@ impl Time {
     pub fn calendar(&self) -> String {
         return jd_to_calendar(&self.epoch);
     }
+
 }
+
+impl Sub<&Time> for &Time {
+    type Output = f64;
+
+    fn sub(self, other: &Time) -> f64 {
+        if self.timescale != other.timescale {
+            panic!("Cannot subtract timescales: {} and {}", self.timescale, other.timescale);
+        }
+        self.epoch - other.epoch
+    }
+}
+
+impl Sub<f64> for &Time {
+    type Output = Time;
+
+    fn sub(self, dt: f64) -> Time {
+        Time {
+            epoch: self.epoch - dt,
+            timescale: self.timescale.clone(),
+            format: self.format.clone(),
+        }
+    }
+
+}
+
+impl Add<f64> for &Time {
+    type Output = Time;
+
+    fn add(self, dt: f64) -> Time {
+        Time {
+            epoch: self.epoch + dt,
+            timescale: self.timescale.clone(),
+            format: self.format.clone(),
+        }
+    }
+
+}
+
+impl Add<f64> for Time {
+    type Output = Time;
+
+    fn add(self, dt: f64) -> Time {
+        Time {
+            epoch: self.epoch + dt,
+            timescale: self.timescale,
+            format: self.format,
+        }
+    }
+
+}
+
+
+// impl Sub<f64> for &Time {
+//     type Output = Time;
+
+//     fn sub(self, dt: f64) -> Time {
+//         Time {
+//             epoch: self.epoch - dt,
+//             timescale: self.timescale,
+//             format: self.format,
+//         }
+//     }
+// }
+
+
+
+// impl Add<f64> for &Time {
+//     type Output = Time;
+
+//     fn add(&self, dt: f64) -> Time {
+//         Time {
+//             epoch: self.epoch + dt,
+//             timescale: self.timescale,
+//             format: self.format,
+//         }
+//     }
+
+// }
 
 impl AddAssign<f64> for Time {
     fn add_assign(&mut self, dt: f64) {

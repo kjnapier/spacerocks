@@ -95,6 +95,12 @@ impl RockCollection {
         self.rocks.par_iter_mut().for_each(|rock| rock.change_frame(frame));
     }
 
+    #[getter]
+    pub fn frame(&self) -> Vec<String> {
+        let frames = self.rocks.par_iter().map(|rock| rock.frame.clone()).collect::<Vec<String>>();
+        frames
+    }
+
     pub fn len(&self) -> usize {
         self.rocks.len()
     }

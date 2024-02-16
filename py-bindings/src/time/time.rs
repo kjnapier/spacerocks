@@ -50,5 +50,18 @@ impl PyTime {
         &self.inner.format
     }
 
+    // define __add__ and __sub__ here
+    fn __add__(&self, dt: f64) -> PyTime {
+        PyTime { inner: &self.inner + dt }
+    }
+
+    fn __sub__(&self, dt: f64) -> PyTime {
+        PyTime { inner: &self.inner - dt }
+    }
+
+    // fn __sub__(&self, other: &PyTime) -> f64 {
+    //     self.inner - other.inner
+    // }
+
 }
 
