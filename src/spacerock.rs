@@ -308,6 +308,9 @@ impl SpaceRock {
     }
 
     pub fn change_origin(&mut self, name: &str, position: &Vector3<f64>, velocity: &Vector3<f64>, mu: &f64) {
+
+        // Change the origin to a new body, and set the new mu.
+
         let origin_position = position;
         let origin_velocity = velocity;
 
@@ -347,12 +350,4 @@ impl SpaceRock {
         self.hvec().norm()
     }    
 
-}
-
-
-
-#[allow(dead_code)]
-fn separation(body1: &SpaceRock, body2: &SpaceRock) -> f64 {
-    let d_pos = body1.position - body2.position;
-    return d_pos.norm();
 }

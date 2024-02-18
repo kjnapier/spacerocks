@@ -5,6 +5,7 @@ use crate::constants::gravitational_constant;
 use crate::time::Time;
 use crate::nbody::integrators::Integrator;
 use crate::nbody::leapfrog::Leapfrog;
+use crate::nbody::freezer::Freezer;
 
 use nalgebra::Vector3;
 
@@ -33,14 +34,15 @@ impl Simulation {
                     frame: None,
                     origin: None,
                     mass: 0.0,
-                    integrator: Integrator::Leapfrog(Leapfrog::new(20.0)),
+                    // integrator: Integrator::Leapfrog(Leapfrog::new(20.0)),
+                    integrator: Integrator::Freezer(Freezer::new(20.0)),
                     particle_index_map: HashMap::new(),
                     perturber_index_map: HashMap::new()}
     }
 
     pub fn add(&mut self, mut particle: SpaceRock) -> Result<(), String> {
 
-        // if the origin is None, sett it to be the origin of the first rock
+        // if the origin is None, set it to be the origin of the first rock
         if self.origin.is_none() {
             self.origin = Some(particle.origin.clone());
             println!("Setting origin to {}", particle.origin.clone());
@@ -59,6 +61,7 @@ impl Simulation {
             if !self.perturber_index_map.contains_key(&particle.origin.clone()) {
                 return Err(format!("The origin of the particle ({}) did not match the simulation origin, and was not found in perturbers", particle.origin.clone()));
             }
+
             let origin = &self.perturbers[self.perturber_index_map[&particle.origin.clone()]];
             particle.change_origin(origin.name.as_str(), &origin.position, &origin.velocity, &(origin.mass * gravitational_constant));
             // log the change of origin to console
@@ -66,6 +69,7 @@ impl Simulation {
         }
 
         particle.change_frame(self.frame.clone().unwrap().as_str());
+        particle.orbit = None;
 
         if particle.mass > 0.0 {
             self.mass += particle.mass;

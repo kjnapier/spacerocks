@@ -1,5 +1,6 @@
 pub mod simulation;
 pub mod leapfrog;
+pub mod freezer;
 pub mod acceleration;
 pub mod integrators;
 

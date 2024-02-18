@@ -99,7 +99,7 @@ impl PySpaceRock {
     fn e(&self) -> PyResult<f64> {
         match self.inner.orbit.as_ref() {
             Some(orbit) => Ok(orbit.e),
-            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated")),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated. Use the calculate_orbit() method to calculate the orbit.")),
         }
     }
 
@@ -107,7 +107,7 @@ impl PySpaceRock {
     fn a(&self) -> PyResult<f64> {
         match self.inner.orbit.as_ref() {
             Some(orbit) => Ok(orbit.a),
-            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated")),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated. Use the calculate_orbit() method to calculate the orbit.")),
         }
     }
 
@@ -115,7 +115,7 @@ impl PySpaceRock {
     fn inc(&self) -> PyResult<f64> {
         match self.inner.orbit.as_ref() {
             Some(orbit) => Ok(orbit.inc),
-            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated")),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated. Use the calculate_orbit() method to calculate the orbit.")),
         }
     }
 
@@ -123,10 +123,9 @@ impl PySpaceRock {
     fn node(&self) -> PyResult<f64> {
         match self.inner.orbit.as_ref() {
             Some(orbit) => Ok(orbit.node),
-            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated")),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated. Use the calculate_orbit() method to calculate the orbit.")),
         }
     }
-
 
     #[getter]
     fn name(&self) -> String {
