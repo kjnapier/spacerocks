@@ -1,6 +1,6 @@
 use crate::time::Time;
-use crate::statevector::StateVector;
-use crate::spacerock::SpaceRock;
+use crate::StateVector;
+use crate::SpaceRock;
 use crate::observing::observer::Observer;
 
 

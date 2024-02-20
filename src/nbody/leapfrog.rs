@@ -1,5 +1,5 @@
 
-use crate::spacerock::SpaceRock;
+use crate::SpaceRock;
 use crate::nbody::acceleration::{calculate_and_set_test_particle_accelerations, calculate_and_set_perturber_accelerations};
 
 use rayon::prelude::*;
@@ -18,6 +18,7 @@ impl Leapfrog {
         // drift
         for particle in &mut *particles {
             particle.position += particle.velocity * 0.5 * self.timestep;
+            particle.epoch += 0.5 * self.timestep;
         }
 
         // kick + drift
@@ -25,12 +26,13 @@ impl Leapfrog {
         for particle in &mut *particles {
             particle.velocity += self.timestep * particle.acceleration;
             particle.position += particle.velocity * 0.5 * self.timestep;
-            particle.epoch += self.timestep;
+            particle.epoch += 0.5 * self.timestep;
         }
         
         // drift
         for mut perturber in &mut *perturbers {
             perturber.position += perturber.velocity * 0.5 * self.timestep;
+            perturber.epoch += 0.5 * self.timestep;
         }
 
         // kick + drift
@@ -38,7 +40,7 @@ impl Leapfrog {
         for mut perturber in &mut *perturbers {
             perturber.velocity += self.timestep * perturber.acceleration;
             perturber.position += perturber.velocity * 0.5 * self.timestep;
-            perturber.epoch += self.timestep;
+            perturber.epoch += 0.5 * self.timestep;
         }
        
     }
@@ -47,6 +49,7 @@ impl Leapfrog {
         // drift
         particles.par_iter_mut().for_each(|particle| {
             particle.position += particle.velocity * 0.5 * self.timestep;
+            particle.epoch += 0.5 * self.timestep;
         });
 
         // kick + drift
@@ -54,12 +57,13 @@ impl Leapfrog {
         particles.par_iter_mut().for_each(|particle| {
             particle.velocity += self.timestep * particle.acceleration;
             particle.position += particle.velocity * 0.5 * self.timestep;
-            particle.epoch += self.timestep;
+            particle.epoch += 0.5 * self.timestep;
         });
 
         // drift
         perturbers.par_iter_mut().for_each(|perturber| {
             perturber.position += perturber.velocity * 0.5 * self.timestep;
+            perturber.epoch += 0.5 * self.timestep;
         });
 
         // kick + drift
@@ -67,7 +71,7 @@ impl Leapfrog {
         perturbers.par_iter_mut().for_each(|perturber| {
             perturber.velocity += self.timestep * perturber.acceleration;
             perturber.position += perturber.velocity * 0.5 * self.timestep;
-            perturber.epoch += self.timestep;
+            perturber.epoch += 0.5 * self.timestep;
         });
     }
 

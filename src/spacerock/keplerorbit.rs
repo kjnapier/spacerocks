@@ -1,5 +1,5 @@
 use crate::constants::MU_BARY;
-use crate::statevector::StateVector;
+use crate::StateVector;
 
 use crate::transforms::calc_kep_from_xyz;
 use crate::transforms::calc_E_from_f;

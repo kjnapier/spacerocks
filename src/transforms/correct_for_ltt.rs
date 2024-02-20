@@ -1,6 +1,6 @@
 use crate::constants::*;
-use crate::statevector::StateVector;
-use crate::spacerock::SpaceRock;
+use crate::StateVector;
+use crate::SpaceRock;
 use crate::observing::Observer;
 
 pub fn correct_for_ltt(rock: &SpaceRock, observer: &Observer) -> StateVector {

@@ -22,8 +22,10 @@ pub struct PySpaceRock {
 impl PySpaceRock {
 
     #[classmethod]
-    fn from_horizons(cls: &PyType, name: &str) -> PyResult<Self> {
-        let rock = SpaceRock::from_horizons(name);
+    #[pyo3(signature = (name, epoch, frame="J2000", origin="SSB"))]
+    fn from_horizons(cls: &PyType, name: &str, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
+        let ep = &epoch.inner;
+        let rock = SpaceRock::from_horizons(name, ep, frame, origin);
         if rock.is_err() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to create SpaceRock from Horizons for name: {}", name)));
         }
@@ -31,16 +33,10 @@ impl PySpaceRock {
     }
 
     #[classmethod]
-    fn from_xyz(cls: &PyType, name: &str, x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
+    #[pyo3(signature = (name, epoch, frame="J2000", origin="SSB"))]
+    fn from_spice(cls: &PyType, name: &str, epoch: &PyTime, frame: &str, origin: &str) -> PyResult<Self> {
         let ep = &epoch.inner;
-        let rock = SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, ep.clone(), frame, origin);
-        Ok(PySpaceRock { inner: rock })
-    }
-
-    #[classmethod]
-    fn from_spice(cls: &PyType, name: &str, epoch: &PyTime) -> PyResult<Self> {
-        let ep = &epoch.inner;
-        let rock = SpaceRock::from_spice(name, &ep);
+        let rock = SpaceRock::from_spice(name, &ep, frame, origin);
         Ok(PySpaceRock { inner: rock })
     }
 
@@ -49,6 +45,13 @@ impl PySpaceRock {
         PySpaceRock { inner: SpaceRock::random() }
     }
 
+    #[classmethod]
+    fn from_xyz(cls: &PyType, name: &str, x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
+        let ep = &epoch.inner;
+        let rock = SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, ep.clone(), frame, origin);
+        Ok(PySpaceRock { inner: rock })
+    }
+    
     fn __repr__(&self) -> String {
         format!("SpaceRock: {}", self.inner.name)
     }
@@ -181,7 +184,6 @@ impl PySpaceRock {
         self.inner.mass = mass;
         Ok(())
     }
-
 
 }
 

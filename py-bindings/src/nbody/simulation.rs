@@ -5,6 +5,7 @@ use spacerocks::spacerock::SpaceRock;
 use crate::spacerock::spacerock::PySpaceRock;
 use crate::spacerock::rockcollection::RockCollection;
 use crate::time::time::PyTime;
+use crate::nbody::integrator::PyIntegrator;
 
 use std::collections::HashMap;
 
@@ -64,8 +65,21 @@ impl PySimulation {
         self.inner.origin = Some(origin.to_string());
     }
 
+    pub fn set_integrator(&mut self, integrator: PyIntegrator) {
+        self.inner.integrator = integrator.inner;
+    }
+
     pub fn energy(&self) -> f64 {
         self.inner.energy()
+    }
+
+    pub fn get_particle(&self, name: &str) -> PyResult<PySpaceRock> {
+        let rock = self.inner.get_particle(name);
+        match rock {
+            Ok(r) => Ok(PySpaceRock { inner: r.clone() }),
+            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+        }
+       
     }
 
 
@@ -102,6 +116,11 @@ impl PySimulation {
     #[getter]
     pub fn origin(&self) -> Option<String> {
         self.inner.origin.clone()
+    }
+
+    #[getter]
+    pub fn integrator(&self) -> PyIntegrator {
+        PyIntegrator { inner: self.inner.integrator.clone() }
     }
 
 }

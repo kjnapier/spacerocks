@@ -1,4 +1,4 @@
-use crate::spacerock::SpaceRock;
+use crate::SpaceRock;
 use crate::observing::observer::Observer;
 use crate::constants::*;
 use crate::time::Time;
@@ -24,7 +24,7 @@ impl Observatory {
 
     pub fn at(&self, epoch: &Time) -> Observer {
 
-        let mut earth = SpaceRock::from_spice("Earth", epoch);
+        let mut earth = SpaceRock::from_spice("Earth", epoch, "J2000", "SSB");
 
         // compute the topocentric correction to the position of the observatory using the local sidereal time
         let [d_pos, d_vel] = compute_topocentric_correction(self.lon, self.lat, self.elevation, epoch.epoch);

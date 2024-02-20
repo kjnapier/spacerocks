@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use crate::spacerock::SpaceRock;
+use crate::SpaceRock;
 use crate::constants::gravitational_constant;
 use crate::time::Time;
-use crate::nbody::integrators::Integrator;
+use crate::nbody::integrator::Integrator;
 use crate::nbody::leapfrog::Leapfrog;
 use crate::nbody::freezer::Freezer;
 
@@ -34,8 +34,7 @@ impl Simulation {
                     frame: None,
                     origin: None,
                     mass: 0.0,
-                    // integrator: Integrator::Leapfrog(Leapfrog::new(20.0)),
-                    integrator: Integrator::Freezer(Freezer::new(20.0)),
+                    integrator: Integrator::Leapfrog(Leapfrog::new(20.0)),
                     particle_index_map: HashMap::new(),
                     perturber_index_map: HashMap::new()}
     }
@@ -63,7 +62,8 @@ impl Simulation {
             }
 
             let origin = &self.perturbers[self.perturber_index_map[&particle.origin.clone()]];
-            particle.change_origin(origin.name.as_str(), &origin.position, &origin.velocity, &(origin.mass * gravitational_constant));
+            particle.change_origin(&origin);
+
             // log the change of origin to console
             println!("Changing origin of {} from {} to {}", particle.name, particle.origin, origin.name);
         }
@@ -83,7 +83,8 @@ impl Simulation {
         Ok(())
     }
 
-    pub fn remove(&mut self, name: &str) {
+    pub fn remove(&mut self, name: &str) -> Result<(), String> {
+
         if self.perturber_index_map.contains_key(name) {
             let idx = self.perturber_index_map[name];
             self.perturbers.remove(idx);
@@ -93,7 +94,12 @@ impl Simulation {
             self.mass -= self.particles[idx].mass;
             self.particles.remove(idx);
             self.particle_index_map.remove(name);
+        } else {
+            return Err(format!("No particle found with name {}", name));
         }
+
+        Ok(())
+
     }
 
     pub fn step(&mut self) {
@@ -119,16 +125,29 @@ impl Simulation {
         center_of_mass /= self.mass;
         center_of_mass_velocity /= self.mass;
 
-        let origin = "ssb";
-        let mu = self.mass * gravitational_constant;
+        let x = center_of_mass.x;
+        let y = center_of_mass.y;
+        let z = center_of_mass.z;
+        let vx = center_of_mass_velocity.x;
+        let vy = center_of_mass_velocity.y;
+        let vz = center_of_mass_velocity.z;
+
+        let mut origin = SpaceRock::from_xyz("ssb", 
+                                             x, y, z, vx, vy, vz, 
+                                             self.epoch.clone(), 
+                                             self.frame.clone().unwrap().as_str(), 
+                                             self.origin.clone().unwrap().as_str());
+        origin.mass = self.mass;
 
         for perturber in &mut self.perturbers {
-            perturber.change_origin(origin, &center_of_mass, &center_of_mass_velocity, &mu);
+            perturber.change_origin(&origin);
         }
 
         for particle in &mut self.particles {
-            particle.change_origin(origin, &center_of_mass, &center_of_mass_velocity, &mu);
+            particle.change_origin(&origin);
         }
+
+        self.origin = Some("ssb".to_string());
     }
 
     pub fn change_origin(&mut self, origin: &str) -> Result<(), String> {
@@ -160,7 +179,7 @@ impl Simulation {
         let mut epoch = epoch.clone();
         epoch.change_timescale(self.epoch.timescale.as_str());
 
-        let old_timestep = self.integrator.timestep();
+        
         let dt = &epoch - &self.epoch;
 
         if dt == 0.0 {
@@ -176,6 +195,7 @@ impl Simulation {
         }       
 
         // create an exact match for the epoch
+        let old_timestep = self.integrator.timestep();
         self.integrator.set_timestep(&epoch - &self.epoch);
         self.step();
 
@@ -184,30 +204,23 @@ impl Simulation {
 
     }
 
-    //pub fn get_particle(&mut self, name: &str) -> Option<&SpaceRock> {
-    // pub fn get_particle(&self, name: &str) -> Option<SpaceRock> {
-    //     if self.test_particle_index_map.contains_key(name) { 
-    //         let idx = self.test_particle_index_map[name];
-    //         let p = &self.test_particles[idx];
-    //         let mut rock = self.test_spacerocks[idx].clone();
-    //         rock.position = p.position;
-    //         rock.velocity = p.velocity;
-    //         rock.epoch.epoch = self.time;
-    //         rock.calculate_kepler();
-    //         return Some(rock);
-    //     }
-    //     if self.perturber_index_map.contains_key(name) {
-    //         let idx = self.perturber_index_map[name];
-    //         let p = &self.perturbers[idx];
-    //         let mut rock = self.perturber_spacerocks[idx].clone();
-    //         rock.position = p.position;
-    //         rock.velocity = p.velocity;
-    //         rock.epoch.epoch = self.time;
-    //         rock.calculate_kepler();
-    //         return Some(rock);
-    //     }
-    //     return None;
-    // }
+    pub fn get_particle(&self, name: &str) -> Result<&SpaceRock, Box<dyn std::error::Error>> {
+
+        if self.particle_index_map.contains_key(name) { 
+            let idx = self.particle_index_map[name];
+            let p = &self.particles[idx];
+            return Ok(p);
+        }
+
+        if self.perturber_index_map.contains_key(name) {
+            let idx = self.perturber_index_map[name];
+            let p = &self.perturbers[idx];
+            return Ok(p);
+        }
+
+        return Err(format!("{} not found in simulation", name).into());
+
+    }
 
     pub fn energy(&self) -> f64 {
         let mut kinetic_energy = 0.0;

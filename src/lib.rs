@@ -1,19 +1,11 @@
-pub mod keplerorbit;
-pub use keplerorbit::KeplerOrbit;
-
-pub mod statevector;
-pub use statevector::StateVector;
 
 pub mod spacerock;
-pub use spacerock::SpaceRock;
+pub use spacerock::{SpaceRock, StateVector, KeplerOrbit, Properties};
 
 pub mod time;
 pub use time::Time;
 
 pub mod constants;
-
-pub mod properties;
-pub use properties::Properties;
 
 pub mod observing;
 pub use observing::Detection;

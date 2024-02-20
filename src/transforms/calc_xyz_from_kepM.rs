@@ -1,4 +1,4 @@
-use crate::statevector::StateVector;
+use crate::StateVector;
 use crate::constants::MU_BARY;
 
 use crate::transforms::calc_E_from_M;

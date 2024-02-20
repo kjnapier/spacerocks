@@ -1,7 +1,7 @@
 use crate::constants::*;
-use crate::statevector::StateVector;
-use crate::keplerorbit::KeplerOrbit;
-use crate::properties::Properties;
+use crate::StateVector;
+use crate::KeplerOrbit;
+use crate::Properties;
 use crate::observing::Observer;
 
 use crate::observing::{Detection, Observatory};
@@ -49,11 +49,11 @@ pub struct SpaceRock {
 impl SpaceRock {
 
     // Instantiation Methods
-    pub fn from_spice(name: &str, epoch: &Time) -> Self {
+    pub fn from_spice(name: &str, epoch: &Time, frame: &str, origin: &str) -> Self {
         let mut ep = epoch.clone();
         ep.to_utc();
         let et = spice::str2et(&format!("JD{epoch} UTC", epoch=ep.epoch));
-        let (state, _) = spice::spkezr(name, et, "J2000", "NONE", "SSB");
+        let (state, _) = spice::spkezr(name, et, frame, "NONE", origin);
         let position = Vector3::new(state[0], state[1], state[2]) * KM_TO_AU;
         let velocity = Vector3::new(state[3], state[4], state[5]) * KM_TO_AU * SECONDS_PER_DAY;
         let acceleration = Vector3::new(0.0, 0.0, 0.0);
@@ -64,6 +64,10 @@ impl SpaceRock {
             None => 0.0,
         };
 
+        if mass == 0.0 {
+            println!("Could not find mass for {}. Setting mass to 0.", name);
+        }
+
         SpaceRock {
             name: name.to_string(), 
             position: position,
@@ -71,8 +75,8 @@ impl SpaceRock {
             acceleration: acceleration,
             mu: mu,
             epoch: epoch.clone(),
-            frame: "J2000".to_string(),
-            origin: "SSB".to_string(),
+            frame: frame.to_string(),
+            origin: origin.to_string(),
             orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: mass,
             properties: None,
@@ -135,7 +139,7 @@ impl SpaceRock {
         }
     }
 
-    pub fn from_horizons(name: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_horizons(name: &str, epoch: &Time, frame: &str, origin: &str) -> Result<Self, Box<dyn std::error::Error>> {
 
         let client = reqwest::blocking::Client::new();
 
@@ -144,15 +148,37 @@ impl SpaceRock {
 
         let command_str = format!("'{}'", name);
 
+        let mut ep = epoch.clone();
+        ep.to_tdb();
+
         params.insert("command", command_str.as_str());
-        params.insert("start_time", "'2023-03-14'");
-        params.insert("stop_time", "'2023-03-15'");
+        let start_time = format!("'JD {}TDB'", ep.epoch);
+        let stop_time = format!("'JD {}'", ep.epoch + 1.0);
+
+        match frame {
+            "J2000" => {
+                params.insert("ref_system", "'J2000'");
+                params.insert("ref_plane", "'frame'");
+            },
+            "ECLIPJ2000" => {
+                params.insert("ref_system", "'J2000'");
+                params.insert("ref_plane", "'ecliptic'");
+            },
+            _ => {
+                return Err("Frame not recognized".into());
+            }
+        }
+
+        let center = format!("'@{}'", origin);
+
+        params.insert("start_time", start_time.as_str());
+        params.insert("stop_time", stop_time.as_str());
+        params.insert("step_size", "'1d'");
+
         params.insert("make_ephem", "'yes'");
         params.insert("ephem_type", "'vectors'");
-        params.insert("center", "'@ssb'");
-        params.insert("ref_plane", "'ecliptic'");
-        params.insert("step_size", "'1d'");
-        params.insert("ref_system", "'J2000'");
+        params.insert("center", center.as_str());
+
         params.insert("vec_corr", "'None'");
         params.insert("out_units", "'AU-D'");
         params.insert("csv_format", "'yes'");
@@ -187,8 +213,8 @@ impl SpaceRock {
             acceleration: acceleration,
             mu: Some(MU_BARY),
             epoch: epoch,
-            frame: "ECLIPJ2000".to_string(),
-            origin: "SSB".to_string(),
+            frame: frame.to_string(),
+            origin: origin.to_string(),
             orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: 0.0,
             properties: None,
@@ -204,7 +230,6 @@ impl SpaceRock {
         let arg = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
         let node = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
         let f = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
-        // get today's julian date
 
         // uuid for name
         let name = format!("{}", uuid::Uuid::new_v4().simple());
@@ -212,7 +237,7 @@ impl SpaceRock {
         SpaceRock::from_kepler(&name, KeplerOrbit::new(a, e, inc, arg, node, f), Time::now(), "ECLIPJ2000", "SSB")
     }
 
-    // Operations
+    // Methods
 
     pub fn calculate_kepler(&mut self) {
         self.orbit = Some(KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity}));
@@ -307,19 +332,32 @@ impl SpaceRock {
         }
     }
 
-    pub fn change_origin(&mut self, name: &str, position: &Vector3<f64>, velocity: &Vector3<f64>, mu: &f64) {
+    pub fn change_origin(&mut self, origin: &SpaceRock) {
 
         // Change the origin to a new body, and set the new mu.
 
-        let origin_position = position;
-        let origin_velocity = velocity;
+        let origin_position = origin.position;
+        let origin_velocity = origin.velocity;
 
         self.position -= origin_position;
         self.velocity -= origin_velocity;
 
-        self.mu = Some(*mu);
-        self.origin = name.to_string();
+        self.mu = Some(origin.mass * gravitational_constant);
+        self.origin = origin.name.to_string();
         self.orbit = Some(KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity}));
+    }
+
+    pub fn to_ssb(&mut self) {
+        // get the ssb from spice
+        let mut ssb = SpaceRock::from_spice("ssb", &self.epoch, self.frame.as_str(), self.origin.as_str());
+        ssb.mass = MU_BARY / gravitational_constant;
+        self.change_origin(&ssb);
+    }
+
+    pub fn to_helio(&mut self) {
+        // get the sun from spice
+        let sun = SpaceRock::from_spice("sun", &self.epoch, self.frame.as_str(), self.origin.as_str());
+        self.change_origin(&sun);
     }
 
     pub fn calculate_orbit(&mut self) {

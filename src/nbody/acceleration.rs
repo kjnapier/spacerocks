@@ -1,5 +1,5 @@
 use crate::constants::gravitational_constant;
-use crate::spacerock::SpaceRock;
+use crate::SpaceRock;
 use nalgebra::Vector3;
 use rayon::prelude::*;
 

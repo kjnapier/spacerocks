@@ -1,6 +1,6 @@
 use crate::constants::MU_BARY;
-use crate::statevector::StateVector;
-use crate::keplerorbit::KeplerOrbit;
+use crate::StateVector;
+use crate::KeplerOrbit;
 use nalgebra::Vector3;
 
 fn acos_safe(x: f64) -> f64 {

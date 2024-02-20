@@ -1,5 +1,5 @@
 
-use crate::spacerock::SpaceRock;
+use crate::SpaceRock;
 use crate::nbody::acceleration::{calculate_and_set_test_particle_accelerations, calculate_and_set_perturber_accelerations};
 
 use rayon::prelude::*;
@@ -15,8 +15,13 @@ impl Freezer {
     }
 
     pub fn step(&self, perturbers: &mut Vec<SpaceRock>, particles: &mut Vec<SpaceRock>) {
-        // do nothing
-        let _ = perturbers;
+        for particle in &mut *particles {
+            particle.epoch += self.timestep;
+        }
+
+        for mut perturber in &mut *perturbers {
+            perturber.epoch += self.timestep;
+        }
     }
 
 }
