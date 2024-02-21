@@ -4,6 +4,7 @@ use pyo3::types::PyType;
 use spacerocks::nbody::integrator::Integrator;
 use spacerocks::nbody::freezer::Freezer;
 use spacerocks::nbody::leapfrog::Leapfrog;
+use spacerocks::nbody::rk4::RK4;
 use spacerocks::SpaceRock;
 
 #[pyclass]
@@ -19,6 +20,11 @@ impl PyIntegrator {
     #[classmethod]
     pub fn leapfrog(cls: &PyType, timestep: f64) -> PyResult<Self> {
         Ok(PyIntegrator { inner: Integrator::Leapfrog(Leapfrog::new(timestep)) })
+    }
+
+    #[classmethod]
+    pub fn rk4(cls: &PyType, timestep: f64) -> PyResult<Self> {
+        Ok(PyIntegrator { inner: Integrator::RK4(RK4::new(timestep)) })
     }
 
     #[classmethod]

@@ -6,6 +6,7 @@ use spacerocks::time::Time;
 
 #[pyclass]
 #[pyo3(name = "Time")]
+#[derive(Clone)]
 pub struct PyTime {
     pub inner: Time,
 }

@@ -8,6 +8,7 @@ use numpy::{PyArray1, IntoPyArray};
 
 #[pyclass]
 #[pyo3(name = "Observer")]
+#[derive(Clone)]
 pub struct PyObserver {
     pub inner: Observer,
 }

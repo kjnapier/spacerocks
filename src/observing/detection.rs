@@ -2,7 +2,7 @@ use crate::time::Time;
 use crate::StateVector;
 use crate::SpaceRock;
 use crate::observing::observer::Observer;
-
+use nalgebra::Vector3;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Detection {
@@ -69,6 +69,13 @@ impl Detection {
 
         let eta = (ra_rate.powi(2) * (self.dec.cos()).powi(2) + dec_rate.powi(2)).sqrt();
         Some(eta)
+    }
+
+    pub fn pointing(&self) -> Vector3<f64> {
+        let x = self.ra.cos() * self.dec.cos();
+        let y = self.ra.sin() * self.dec.cos();
+        let z = self.dec.sin();
+        Vector3::new(x, y, z)
     }
 
     // pub fn mag(&self, sun: &SpaceRock) -> Option<f64> {

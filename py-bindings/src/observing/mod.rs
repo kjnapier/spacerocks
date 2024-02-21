@@ -11,6 +11,7 @@ pub fn make_observing_submodule(py: Python, m: &PyModule) -> PyResult<()> {
     submodule.add_class::<observatory::PyObservatory>()?;
     submodule.add_class::<detectioncatalog::DetectionCatalog>()?;
     submodule.add_class::<observer::PyObserver>()?;
+    submodule.add_class::<detection::PyDetection>()?;
 
     m.add_submodule(submodule)?;
     py.import("sys")?

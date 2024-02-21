@@ -5,9 +5,11 @@ use pyo3::exceptions::PyValueError;
 use nalgebra::Vector3;
 use spacerocks::observing::Detection;
 use crate::observing::observer::PyObserver;
+use crate::time::time::PyTime;
 
 #[pyclass]
 #[pyo3(name = "Detection")]
+#[derive(Clone)]
 pub struct PyDetection {
     pub inner: Detection,
 }
@@ -15,8 +17,67 @@ pub struct PyDetection {
 #[pymethods]
 impl PyDetection {
 
+    #[new]
+    pub fn new(name: String, ra: f64, dec: f64, epoch: PyRef<PyTime>, observer: PyRef<PyObserver>, mag: Option<f64>, 
+               filter: Option<String>, ra_uncertainty: Option<f64>, dec_uncertainty: Option<f64>) -> Self {
+        let inner = Detection {
+            name,
+            epoch: epoch.inner.clone(),
+            observer: observer.inner.clone(),
+            ra,
+            dec,
+            ra_rate: None,
+            dec_rate: None,
+            rho: None,
+            rho_rate: None,
+            mag,
+            filter,
+            ra_uncertainty: None,
+            dec_uncertainty: None,
+            ra_rate_uncertainty: None,
+            dec_rate_uncertainty: None,
+            rho_uncertainty: None,
+            rho_rate_uncertainty: None,
+            mag_uncertainty: None,
+        };
+
+        PyDetection { inner }
+    }
+
+
+    #[classmethod]
+    pub fn streak(_cls: &PyType, name: String, ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, epoch: PyRef<PyTime>, observer: PyRef<PyObserver>, mag: Option<f64>, filter: Option<String>) -> Self {
+        let inner = Detection {
+            name,
+            epoch: epoch.inner.clone(),
+            observer: observer.inner.clone(),
+            ra,
+            dec,
+            ra_rate: Some(ra_rate),
+            dec_rate: Some(dec_rate),
+            rho: None,
+            rho_rate: None,
+            mag,
+            filter,
+            ra_uncertainty: None,
+            dec_uncertainty: None,
+            ra_rate_uncertainty: None,
+            dec_rate_uncertainty: None,
+            rho_uncertainty: None,
+            rho_rate_uncertainty: None,
+            mag_uncertainty: None,
+        };
+
+        PyDetection { inner }
+    }
+
     fn __repr__(&self) -> String {
         format!("Detection: {} at time: {:?}", self.inner.name, self.inner.epoch)
+    }
+
+    #[getter]
+    fn name(&self) -> &str {
+        &self.inner.name
     }
 
     #[getter]
@@ -66,6 +127,41 @@ impl PyDetection {
     #[getter]
     fn observer(&self) -> PyResult<PyObserver> {
         Ok(PyObserver { inner: self.inner.observer.clone() })
+    }
+
+    #[getter]
+    fn epoch(&self) -> PyResult<PyTime> {
+        Ok(PyTime { inner: self.inner.epoch.clone() })
+    }
+
+    #[getter]
+    fn ra_uncertainty(&self) -> Option<f64> {
+        self.inner.ra_uncertainty
+    }
+
+    #[getter]
+    fn dec_uncertainty(&self) -> Option<f64> {
+        self.inner.dec_uncertainty
+    }
+
+    #[getter]
+    fn ra_rate_uncertainty(&self) -> Option<f64> {
+        self.inner.ra_rate_uncertainty
+    }
+
+    #[getter]
+    fn dec_rate_uncertainty(&self) -> Option<f64> {
+        self.inner.dec_rate_uncertainty
+    }
+
+    #[getter]
+    fn rho_uncertainty(&self) -> Option<f64> {
+        self.inner.rho_uncertainty
+    }
+
+    #[getter]
+    fn rho_rate_uncertainty(&self) -> Option<f64> {
+        self.inner.rho_rate_uncertainty
     }
 
     fn calc_altaz(&self) -> PyResult<(f64, f64)> {
