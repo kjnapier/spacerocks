@@ -1,18 +1,13 @@
 use pyo3::prelude::*;
-use pyo3::types::PyList;
 
 use rayon::prelude::*;
 
-use spacerocks::spacerock::SpaceRock;
 use spacerocks::Detection;
 
 use pyo3::exceptions::PyIndexError;
-use pyo3::types::PyString;
 
 use numpy::{PyArray1, IntoPyArray};
 
-use crate::time::time::PyTime;
-use crate::spacerock::spacerock::PySpaceRock;
 use crate::observing::detection::PyDetection;
 
 pub fn create_mixed_array<T: pyo3::ToPyObject>(data: Vec<Option<T>>, py: Python) -> PyResult<Py<PyArray1<PyObject>>> {
@@ -103,8 +98,10 @@ impl DetectionCatalog {
         
         // process the altaz in parallel, but hanfle errors
         let altaz: Vec<_> = self.observations.par_iter().map(|obs| obs.calc_altaz().unwrap()).collect();
-        let mut alts = altaz.par_iter().map(|(alt, az)| *alt).collect::<Vec<f64>>();
-        let mut azs = altaz.par_iter().map(|(alt, az)| *az).collect::<Vec<f64>>();
+        // let mut alts = altaz.par_iter().map(|(alt, az)| *alt).collect::<Vec<f64>>();
+        // let mut azs = altaz.par_iter().map(|(alt, az)| *az).collect::<Vec<f64>>();
+        let alts: Vec<_> = altaz.par_iter().map(|(alt, _az)| *alt).collect();
+        let azs: Vec<_> = altaz.par_iter().map(|(_alt, az)| *az).collect();
         
         Ok((alts.into_pyarray(py).to_owned(), azs.into_pyarray(py).to_owned()))
     }

@@ -1,16 +1,12 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use nalgebra::Vector3;
-
 use spacerocks::spacerock::SpaceRock;
-use spacerocks::time::Time;
 
 use crate::time::time::PyTime;
 use crate::observing::detection::PyDetection;
 use crate::observing::observer::PyObserver;
 
-use spice;
 
 #[pyclass]
 #[pyo3(name = "SpaceRock")]
@@ -23,7 +19,7 @@ impl PySpaceRock {
 
     #[classmethod]
     #[pyo3(signature = (name, epoch, frame="J2000", origin="SSB"))]
-    fn from_horizons(cls: &PyType, name: &str, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
+    fn from_horizons(_cls: &PyType, name: &str, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
         let ep = &epoch.inner;
         let rock = SpaceRock::from_horizons(name, ep, frame, origin);
         if rock.is_err() {
@@ -34,19 +30,19 @@ impl PySpaceRock {
 
     #[classmethod]
     #[pyo3(signature = (name, epoch, frame="J2000", origin="SSB"))]
-    fn from_spice(cls: &PyType, name: &str, epoch: &PyTime, frame: &str, origin: &str) -> PyResult<Self> {
+    fn from_spice(_cls: &PyType, name: &str, epoch: &PyTime, frame: &str, origin: &str) -> PyResult<Self> {
         let ep = &epoch.inner;
         let rock = SpaceRock::from_spice(name, &ep, frame, origin);
         Ok(PySpaceRock { inner: rock })
     }
 
     #[classmethod]
-    fn random(cls: &PyType) -> Self {
+    fn random(_cls: &PyType) -> Self {
         PySpaceRock { inner: SpaceRock::random() }
     }
 
     #[classmethod]
-    fn from_xyz(cls: &PyType, name: &str, x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
+    fn from_xyz(_cls: &PyType, name: &str, x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
         let ep = &epoch.inner;
         let rock = SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, ep.clone(), frame, origin);
         Ok(PySpaceRock { inner: rock })
@@ -131,6 +127,22 @@ impl PySpaceRock {
     }
 
     #[getter]
+    fn arg(&self) -> PyResult<f64> {
+        match self.inner.orbit.as_ref() {
+            Some(orbit) => Ok(orbit.arg),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated. Use the calculate_orbit() method to calculate the orbit.")),
+        }
+    }
+
+    #[getter]
+    fn varpi(&self) -> PyResult<f64> {
+        match self.inner.orbit.as_ref() {
+            Some(orbit) => Ok(orbit.varpi()),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated. Use the calculate_orbit() method to calculate the orbit.")),
+        }
+    }
+
+    #[getter]
     fn name(&self) -> String {
         self.inner.name.clone()
     }
@@ -183,6 +195,17 @@ impl PySpaceRock {
     fn set_mass(&mut self, mass: f64) -> PyResult<()> {
         self.inner.mass = mass;
         Ok(())
+    }
+
+    #[getter]
+    fn evec(&self) -> (f64, f64, f64) {
+        let e = self.inner.evec();
+        (e.x, e.y, e.z)
+    }
+
+    #[getter]
+    fn mu(&self) -> f64 {
+        self.inner.mu.unwrap()
     }
 
 }

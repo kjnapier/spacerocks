@@ -1,5 +1,5 @@
 
-  
+#![allow(non_snake_case)]
 pub fn calc_E_from_f(e: f64, f: f64) -> f64 {
     let mut E;
 

@@ -1,13 +1,12 @@
 use pyo3::prelude::*;
 use spacerocks::nbody::Simulation;
 
-use spacerocks::spacerock::SpaceRock;
 use crate::spacerock::spacerock::PySpaceRock;
 use crate::spacerock::rockcollection::RockCollection;
 use crate::time::time::PyTime;
 use crate::nbody::integrator::PyIntegrator;
 
-use std::collections::HashMap;
+use std::sync::Arc;
 
 #[pyclass]
 #[pyo3(name = "Simulation")]
@@ -38,10 +37,6 @@ impl PySimulation {
         self.inner.step();
     }
 
-    pub fn threaded_step(&mut self) {
-        self.inner.threaded_step();
-    }
-
     pub fn move_to_center_of_mass(&mut self) {
         self.inner.move_to_center_of_mass();
     }
@@ -65,9 +60,9 @@ impl PySimulation {
         self.inner.origin = Some(origin.to_string());
     }
 
-    pub fn set_integrator(&mut self, integrator: PyIntegrator) {
-        self.inner.integrator = integrator.inner;
-    }
+    // pub fn set_integrator(&mut self, integrator: PyRef<PyIntegrator>) {
+    //     self.inner.integrator = integrator.inner;
+    // }
 
     pub fn energy(&self) -> f64 {
         self.inner.energy()
@@ -103,10 +98,6 @@ impl PySimulation {
         self.inner.frame.clone()
     }
 
-    #[getter]
-    pub fn mass(&self) -> f64 {
-        self.inner.mass
-    }
 
     #[getter]
     pub fn timestep(&self) -> f64 {
@@ -118,9 +109,9 @@ impl PySimulation {
         self.inner.origin.clone()
     }
 
-    #[getter]
-    pub fn integrator(&self) -> PyIntegrator {
-        PyIntegrator { inner: self.inner.integrator.clone() }
-    }
+    // #[getter]
+    // pub fn integrator(&self) -> PyIntegrator {
+    //     PyIntegrator { inner: self.inner.integrator.clone() }
+    // }
 
 }

@@ -6,15 +6,15 @@ use crate::transforms::calc_f_from_E;
 
 use nalgebra::Vector3;
 
+#[allow(non_snake_case)]
 pub fn calc_xyz_from_kepM(a: f64, e: f64, inc: f64, arg: f64, node: f64, M: f64) -> StateVector {
 
     let E = calc_E_from_M(e, M);
-    
-    let mut ox;
-    let mut oy;
-    let mut vox;
-    let mut voy;
 
+    let ox;
+    let oy;
+    let vox;
+    let voy;
 
     if e < 1.0 {        
     

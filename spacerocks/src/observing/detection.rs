@@ -2,7 +2,6 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 use pyo3::exceptions::PyValueError;
 
-use nalgebra::Vector3;
 use spacerocks::observing::Detection;
 use crate::observing::observer::PyObserver;
 use crate::time::time::PyTime;
@@ -32,8 +31,8 @@ impl PyDetection {
             rho_rate: None,
             mag,
             filter,
-            ra_uncertainty: None,
-            dec_uncertainty: None,
+            ra_uncertainty: ra_uncertainty,
+            dec_uncertainty: dec_uncertainty,
             ra_rate_uncertainty: None,
             dec_rate_uncertainty: None,
             rho_uncertainty: None,
@@ -165,10 +164,11 @@ impl PyDetection {
     }
 
     fn calc_altaz(&self) -> PyResult<(f64, f64)> {
-        let altaz = self.inner.calc_altaz();
+        // let altaz = self.inner.calc_altaz();
         let altaz = match self.inner.calc_altaz() {
             Ok(altaz) => altaz,
-            Err(e) => return Err(PyValueError::new_err("Could not calculate altaz")),
+            // Err(e) => return Err(PyValueError::new_err("Could not calculate altaz")),
+            Err(e) => return Err(PyValueError::new_err(e.to_string())),
         };
         Ok(altaz)
     }

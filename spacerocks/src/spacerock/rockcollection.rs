@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
+use pyo3::exceptions::PyIndexError;
 
 use rayon::prelude::*;
 
@@ -10,13 +11,8 @@ use crate::spacerock::spacerock::PySpaceRock;
 use crate::observing::observer::PyObserver;
 use crate::observing::detectioncatalog::DetectionCatalog;
 
-use std::sync::{Arc, Mutex};
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::collections::HashMap;
 
-use pyo3::exceptions::PyIndexError;
-use pyo3::types::PyString;
 
 use numpy::{PyArray1, IntoPyArray};
 
@@ -35,7 +31,7 @@ impl RockCollection {
     }
 
     #[classmethod]
-    pub fn random(cls: &PyType, n: usize) -> Self {
+    pub fn random(_cls: &PyType, n: usize) -> Self {
         let rocks: Vec<SpaceRock> = (0..n).into_par_iter().map(|_| SpaceRock::random()).collect();
         let mut name_hash_map = HashMap::new();
         for (i, rock) in rocks.iter().enumerate() {
@@ -77,7 +73,7 @@ impl RockCollection {
     }
 
     pub fn observe(&mut self, observer: PyRef<PyObserver>) -> PyResult<DetectionCatalog> {
-        let mut o = observer.inner.clone();
+        let o = observer.inner.clone();
         if o.frame != "J2000" {
             // return an error
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Observer frame is not J2000. Cannot observe rocks.")));
@@ -170,5 +166,14 @@ impl RockCollection {
         self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().a).collect()
     }
 
+    #[getter]
+    pub fn arg(&self) -> Vec<f64> {
+        self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().arg).collect()
+    }
+
+    #[getter]
+    pub fn varpi(&self) -> Vec<f64> {
+        self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().varpi()).collect()
+    }
 
 }

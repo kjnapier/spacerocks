@@ -3,30 +3,32 @@ use std::collections::HashMap;
 use crate::SpaceRock;
 use crate::constants::GRAVITATIONAL_CONSTANT;
 use crate::time::Time;
+use crate::nbody::integrator::Integrator;
+use crate::nbody::leapfrog::Leapfrog;
 
-
-use crate::nbody::forces::{Force, NewtonianGravity, Drag, SolarGR};
-use crate::nbody::integrators::{Integrator, Leapfrog, RK4, IAS15};
-
+use std::cell::RefCell;
 
 use nalgebra::Vector3;
 
-use rayon::prelude::*;
+#[derive(Debug, Clone, PartialEq)]
+pub enum Force {
+    NewtonianGravity,
+}
 
-//#[derive(Debug)]
+#[derive(Debug)]
 pub struct Simulation {
     pub perturbers: Vec<SpaceRock>,
     pub particles: Vec<SpaceRock>,
     pub epoch: Time,
-    
+    // pub integrator: Integrator,
+    // make integrator be a trait object
+    // pub integrator: Box<dyn Integrator>,
     pub particle_index_map: HashMap<String, usize>,
     pub perturber_index_map: HashMap<String, usize>,
+    pub forces: Vec<Force>,
 
     pub frame: Option<String>,
     pub origin: Option<String>,
-
-    pub integrator: Box<dyn Integrator + Send + Sync>,
-    pub forces: Vec<Box<dyn Force + Send + Sync>>,
 }
 
 impl Simulation {
@@ -35,12 +37,10 @@ impl Simulation {
         Simulation {perturbers: Vec::new(), 
                     particles: Vec::new(), 
                     epoch: Time::now(), 
-                    forces: vec![Box::new(NewtonianGravity)],//, Box::new(SolarGR)],
+                    forces: vec![Force::NewtonianGravity],
                     frame: None,
                     origin: None,
-                    // integrator: Box::new(Leapfrog::new(0.1)),
-                    // integrator: Box::new(RK4::new(0.1)),
-                    integrator: Box::new(IAS15::new(50.0, 0.1)),
+                    integrator: Box::new(Leapfrog::new(20.0)),
                     particle_index_map: HashMap::new(),
                     perturber_index_map: HashMap::new()}
     }
@@ -101,9 +101,45 @@ impl Simulation {
         } else {
             return Err(format!("No particle found with name {}", name));
         }
+
+        Ok(())
+
+    }
+
+    pub fn apply_forces(&mut self) -> Result<(), String> {
+        self.zero_accelerations();
+        for force in &self.forces.clone() {
+            match force {
+                Force::NewtonianGravity => self.apply_newtonian_gravity(),
+                _ => Err(format!("Force {:?} not implemented", force))?,
+            }
+        }
         Ok(())
     }
    
+    pub fn apply_newtonian_gravity(&mut self) {
+        let n_perturbers = self.perturbers.len();
+        for idx in 0..self.perturbers.len() {
+            for jdx in (idx + 1)..self.perturbers.len() {
+                let r_vec = self.perturbers[idx].position - self.perturbers[jdx].position;
+                let r = r_vec.norm();
+
+                let xi = -GRAVITATIONAL_CONSTANT * r_vec / (r * r * r);
+                let idx_acceleration = xi * self.perturbers[jdx].mass;
+                let jdx_acceleration = -xi * self.perturbers[idx].mass;
+                self.perturbers[idx].acceleration += idx_acceleration;
+                self.perturbers[jdx].acceleration += jdx_acceleration;
+            }
+
+            for particle in self.particles.iter_mut() {
+                let r_vec = particle.position - self.perturbers[idx].position;
+                let r = r_vec.norm();
+                let xi = -GRAVITATIONAL_CONSTANT * r_vec / (r * r * r);
+                let a = xi * self.perturbers[idx].mass;
+                particle.acceleration += a;
+            }
+        }
+    }
 
     pub fn zero_accelerations(&mut self) {
         for perturber in &mut self.perturbers {
@@ -114,16 +150,10 @@ impl Simulation {
         }
     }
 
-    pub fn step(&mut self) {
-
-        // Zero the accelerations of each particle
-        self.zero_accelerations();
-
-        // Step
-        self.integrator.step(&mut self.particles, &mut self.perturbers, &self.forces);
-
-        // Update the epoch
-        self.epoch += self.integrator.timestep();
+    pub fn step(&mut self, integrator: &dyn Integrator) {
+        // use Option to take the integrator out of the box
+        
+        integrator.step(self);      
     }
 
     pub fn move_to_center_of_mass(&mut self) {
@@ -131,7 +161,6 @@ impl Simulation {
         let mut center_of_mass = Vector3::new(0.0, 0.0, 0.0);
         let mut center_of_mass_velocity = Vector3::new(0.0, 0.0, 0.0);
 
-        // calculate the acceleration of the center of mass
         for perturber in &self.perturbers {
             center_of_mass += perturber.mass * perturber.position;
             center_of_mass_velocity += perturber.mass * perturber.velocity;
@@ -147,7 +176,6 @@ impl Simulation {
         let vx = center_of_mass_velocity.x;
         let vy = center_of_mass_velocity.y;
         let vz = center_of_mass_velocity.z;
-       
 
         let mut origin = SpaceRock::from_xyz("ssb", 
                                              x, y, z, vx, vy, vz, 
@@ -165,7 +193,6 @@ impl Simulation {
         }
 
         self.origin = Some("ssb".to_string());
-
     }
 
     pub fn change_origin(&mut self, origin: &str) -> Result<(), String> {
@@ -192,7 +219,7 @@ impl Simulation {
 
     }
 
-    pub fn integrate(&mut self, epoch: &Time) {
+    pub fn integrate(&mut self, epoch: &Time, integrator: &dyn Integrator) {
 
         let mut epoch = epoch.clone();
         epoch.change_timescale(self.epoch.timescale.as_str());

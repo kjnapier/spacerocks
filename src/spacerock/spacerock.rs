@@ -3,18 +3,13 @@ use crate::StateVector;
 use crate::KeplerOrbit;
 use crate::Properties;
 use crate::observing::Observer;
-
-use crate::observing::{Detection, Observatory};
+use crate::observing::Detection;
 
 use crate::time::Time;
 
 use crate::transforms::correct_for_ltt;
-use crate::transforms::calc_kep_from_xyz;
 use crate::transforms::calc_xyz_from_kepM;
-use crate::transforms::calc_f_from_E;
-use crate::transforms::calc_E_from_M;
 
-use reqwest::blocking::Client;
 use serde_json;
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
@@ -23,7 +18,6 @@ use nalgebra::Vector3;
 
 use rand;
 use rand::Rng;
-use rand::distributions::{Uniform};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SpaceRock {
@@ -342,7 +336,7 @@ impl SpaceRock {
         self.position -= origin_position;
         self.velocity -= origin_velocity;
 
-        self.mu = Some(origin.mass * gravitational_constant);
+        self.mu = Some(origin.mass * GRAVITATIONAL_CONSTANT);
         self.origin = origin.name.to_string();
         self.orbit = Some(KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity}));
     }
@@ -350,7 +344,7 @@ impl SpaceRock {
     pub fn to_ssb(&mut self) {
         // get the ssb from spice
         let mut ssb = SpaceRock::from_spice("ssb", &self.epoch, self.frame.as_str(), self.origin.as_str());
-        ssb.mass = MU_BARY / gravitational_constant;
+        ssb.mass = MU_BARY / GRAVITATIONAL_CONSTANT;
         self.change_origin(&ssb);
     }
 
@@ -387,5 +381,12 @@ impl SpaceRock {
     pub fn h(&self) -> f64 {
         self.hvec().norm()
     }    
+
+    pub fn evec(&self) -> Vector3<f64> {
+
+        let hvec = self.hvec();
+        let e = self.velocity.cross(&hvec) / self.mu.unwrap() - self.position / self.r();
+        e
+    }
 
 }

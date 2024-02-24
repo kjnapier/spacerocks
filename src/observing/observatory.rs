@@ -3,7 +3,6 @@ use crate::observing::observer::Observer;
 use crate::constants::*;
 use crate::time::Time;
 
-use spice;
 use nalgebra::Vector3;
 
 pub struct Observatory {

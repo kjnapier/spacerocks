@@ -14,11 +14,11 @@ use crate::observing::detection::PyDetection;
 
 #[pyfunction]
 pub fn gauss_fit(dets: Vec<PyRef<PyDetection>>, min_distance: f64) -> PyResult<Vec<PySpaceRock>> {
+    
     let mut detections: Vec<Detection> = Vec::new();
     for det in dets {
         detections.push(det.inner.clone());
     }
-
 
     let mut dets: Vec<&Detection> = Vec::new();
     for det in detections.iter() {

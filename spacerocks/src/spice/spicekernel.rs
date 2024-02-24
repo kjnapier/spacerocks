@@ -1,7 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::PyType;
 
-use spice;
 use spacerocks::spice::SpiceKernel;
 
 #[pyclass]

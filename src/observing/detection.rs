@@ -1,6 +1,4 @@
 use crate::time::Time;
-use crate::StateVector;
-use crate::SpaceRock;
 use crate::observing::observer::Observer;
 use nalgebra::Vector3;
 
@@ -42,9 +40,14 @@ impl Detection {
             None => return Err("Observer latitude not set. Cannot compute altaz".into()),
         };
 
-        let lon = match self.observer.lon {
-            Some(lon) => lon,
+        // let lon = match self.observer.lon {
+        //     Some(lon) => lon,
+        //     None => return Err("Observer longitude not set. Cannot compute altaz".into()),
+        // };
+
+        match self.observer.lon {
             None => return Err("Observer longitude not set. Cannot compute altaz".into()),
+            _ => (),
         };
 
         let local_sidereal_time = self.observer.local_sidereal_time()?;

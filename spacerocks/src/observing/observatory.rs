@@ -3,7 +3,6 @@ use pyo3::types::PyType;
 
 use spacerocks::Observatory;
 
-use crate::spacerock::spacerock::PySpaceRock;
 use crate::observing::observer::PyObserver;
 use crate::time::time::PyTime;
 

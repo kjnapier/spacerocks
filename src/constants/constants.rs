@@ -15,7 +15,8 @@ pub const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
 pub const MU_BARY: f64 = 0.00029630927493457475;
 pub const SPEED_OF_LIGHT: f64 = 173.14463268466926; // speed of light in au/day
 
-pub const gravitational_constant: f64 = 0.00029591220828559104;
+pub const GRAVITATIONAL_CONSTANT: f64 = 0.00029591220828559104;
+// pub const GRAVITATIONAL_CONSTANT: f64 = 0.00029591220819207774;
 
 pub const ROTATION_J2000: Matrix3<f64> = Matrix3::new(1.0, 0.0, 0.0,
                                                       0.0, 1.0, 0.0,

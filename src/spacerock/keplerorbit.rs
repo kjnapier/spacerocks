@@ -59,4 +59,8 @@ impl KeplerOrbit {
         return E;
     }
 
+    pub fn varpi(&self) -> f64 {
+        return (self.arg + self.node) % (2.0 * std::f64::consts::PI);
+    }
+
 }

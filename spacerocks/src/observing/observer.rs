@@ -1,7 +1,5 @@
 use pyo3::prelude::*;
-use pyo3::types::PyType;
 
-use nalgebra::Vector3;
 use spacerocks::observing::Observer;
 
 use numpy::{PyArray1, IntoPyArray};
