@@ -2,6 +2,8 @@ use crate::nbody::integrators::Integrator;
 use crate::nbody::forces::Force;
 use crate::SpaceRock;
 
+use rayon::prelude::*;
+
 use nalgebra::Vector3;
 
 // Copilot filled these in. Check that they're correct later
@@ -62,9 +64,14 @@ impl Integrator for IAS15 {
             force.apply(particles, perturbers);
         }
 
-
         // Clone the perturbers so we can reset to the initial state if we need to.
-        let mut perturbers_clone = perturbers.clone();
+        // let mut perturbers_clone = perturbers.clone();
+        // let mut perturbers_clone = &mut perturbers;
+
+        // We don't want to clone the original SpaceRock objects because some of the contents are heap allocated, making the clone operation expensive.
+        let initial_positions: Vec<Vector3<f64>> = perturbers.iter().map(|p| p.position.clone()).collect();
+        let initial_velocities: Vec<Vector3<f64>> = perturbers.iter().map(|p| p.velocity.clone()).collect();
+        let initial_accelerations: Vec<Vector3<f64>> = perturbers.iter().map(|p| p.acceleration.clone()).collect();
 
         // Number of perturbers
         let n = perturbers.len();
@@ -108,40 +115,40 @@ impl Integrator for IAS15 {
 
             for substep in 1..8 {
                 for idx in 0..n {
-                    let a0 = perturbers[idx].acceleration;
-                    let v0 = perturbers[idx].velocity;
+                    let a0 = initial_accelerations[idx];
+                    let v0 = initial_velocities[idx];
+
                     let b = &self.bs[idx];
                     let g = &self.gs[idx];
                     let hh = h[substep];
 
                     // Calculate the position
                     let d_position = ((((((((b.p6 * 7.0 * hh / 9.0 + b.p5) * 3.0 * hh / 4.0 + b.p4) * 5.0 * hh / 7.0 + b.p3) * 2.0 * hh / 3.0 + b.p2) * 3.0 * hh / 5.0 + b.p1) * hh / 2.0 + b.p0) * hh / 3.0 + a0) * self.timestep * hh / 2.0 + v0) * self.timestep * hh;
-                    perturbers_clone[idx].position = perturbers[idx].position + d_position;
+                    perturbers[idx].position = initial_positions[idx] + d_position;
 
                     // Calculate the velocity
-                    // let d_velocity = (((((((b.p6 * 7.0 * hh / 8.0 + b.p5) * 6.0 * hh / 7.0 + b.p4) * 5.0 * hh / 6.0 + b.p3) * 4.0 * hh / 5.0 + b.p2) * 3.0 * hh / 4.0 + b.p1) * 2.0 * hh / 3.0 + b.p0) * hh / 2.0 + a0) * self.timestep * hh;
-                    // perturbers_clone[idx].velocity = perturbers[idx].velocity + d_velocity;
+                    let d_velocity = (((((((b.p6 * 7.0 * hh / 8.0 + b.p5) * 6.0 * hh / 7.0 + b.p4) * 5.0 * hh / 6.0 + b.p3) * 4.0 * hh / 5.0 + b.p2) * 3.0 * hh / 4.0 + b.p1) * 2.0 * hh / 3.0 + b.p0) * hh / 2.0 + a0) * self.timestep * hh;
+                    perturbers[idx].velocity = initial_velocities[idx] + d_velocity;
 
-                    perturbers_clone[idx].epoch = perturbers[idx].epoch.clone() + self.timestep * hh;
+                    perturbers[idx].epoch += self.timestep * hh;
                 }
 
-                // Calculate the accelerations
-                // zero out the accelerations
-                for perturber in perturbers_clone.iter_mut() {
+
+                for perturber in perturbers.iter_mut() {
                     perturber.acceleration = Vector3::zeros();
                 }
                 for particle in particles.iter_mut() {
                     particle.acceleration = Vector3::zeros();
                 }
                 for force in forces {
-                    force.apply(particles, &mut perturbers_clone);
+                    force.apply(particles, perturbers);
                 }
 
                 match substep {
                     1 => {
                         for idx in 0..n {
-                            let a_old = perturbers[idx].acceleration;
-                            let a_new = perturbers_clone[idx].acceleration;
+                            let a_old = initial_accelerations[idx];
+                            let a_new = perturbers[idx].acceleration;
 
                             let temp = self.gs[idx].p0.clone();
 
@@ -151,8 +158,8 @@ impl Integrator for IAS15 {
                     },
                     2 => {
                         for idx in 0..n {
-                            let a_old = perturbers[idx].acceleration;
-                            let a_new = perturbers_clone[idx].acceleration;
+                            let a_old = initial_accelerations[idx];
+                            let a_new = perturbers[idx].acceleration;
 
                             let mut temp = self.gs[idx].p1.clone();
                             self.gs[idx].p1 = ((a_new - a_old) / rr[1] - self.gs[idx].p0) / rr[2];
@@ -164,8 +171,8 @@ impl Integrator for IAS15 {
                     },
                     3 => {
                         for idx in 0..n {
-                            let a_old = perturbers[idx].acceleration;
-                            let a_new = perturbers_clone[idx].acceleration;
+                            let a_old = initial_accelerations[idx];
+                            let a_new = perturbers[idx].acceleration;
 
                             let mut temp = self.gs[idx].p2.clone();
                             self.gs[idx].p2 = (((a_new - a_old) / rr[3] - self.gs[idx].p0) / rr[4] - self.gs[idx].p1) / rr[5];
@@ -178,8 +185,8 @@ impl Integrator for IAS15 {
                     },
                     4 => {
                         for idx in 0..n {
-                            let a_old = perturbers[idx].acceleration;
-                            let a_new = perturbers_clone[idx].acceleration;
+                            let a_old = initial_accelerations[idx];
+                            let a_new = perturbers[idx].acceleration;
 
                             let mut temp = self.gs[idx].p3.clone();
                             self.gs[idx].p3 = ((((a_new - a_old) / rr[6] - self.gs[idx].p0) / rr[7] - self.gs[idx].p1) / rr[8] - self.gs[idx].p2) / rr[9];
@@ -193,8 +200,8 @@ impl Integrator for IAS15 {
                     },
                     5 => {
                         for idx in 0..n {
-                            let a_old = perturbers[idx].acceleration;
-                            let a_new = perturbers_clone[idx].acceleration;
+                            let a_old = initial_accelerations[idx];
+                            let a_new = perturbers[idx].acceleration;
 
                             let mut temp = self.gs[idx].p4.clone();
                             self.gs[idx].p4 = (((((a_new - a_old) / rr[10] - self.gs[idx].p0) / rr[11] - self.gs[idx].p1) / rr[12] - self.gs[idx].p2) / rr[13] - self.gs[idx].p3) / rr[14];
@@ -209,8 +216,8 @@ impl Integrator for IAS15 {
                     },
                     6 => {
                         for idx in 0..n {
-                            let a_old = perturbers[idx].acceleration;
-                            let a_new = perturbers_clone[idx].acceleration;
+                            let a_old = initial_accelerations[idx];
+                            let a_new = perturbers[idx].acceleration;
 
                             let mut temp = self.gs[idx].p5.clone();
                             self.gs[idx].p5 = ((((((a_new - a_old) / rr[15] - self.gs[idx].p0) / rr[16] - self.gs[idx].p1) / rr[17] - self.gs[idx].p2) / rr[18] - self.gs[idx].p3) / rr[19] - self.gs[idx].p4) / rr[20];
@@ -229,8 +236,8 @@ impl Integrator for IAS15 {
                         let mut max_acceleration = 0.0;
                         let mut max_b6_temp = 0.0;
                         for idx in 0..n {
-                            let a_old = perturbers[idx].acceleration;
-                            let a_new = perturbers_clone[idx].acceleration;
+                            let a_old = initial_accelerations[idx];
+                            let a_new = perturbers[idx].acceleration;
 
                             let mut temp = self.gs[idx].p6.clone();
                             self.gs[idx].p6 = (((((((a_new - a_old) / rr[21] - self.gs[idx].p0) / rr[22] - self.gs[idx].p1) / rr[23] - self.gs[idx].p2) / rr[24] - self.gs[idx].p3) / rr[25] - self.gs[idx].p4) / rr[26] - self.gs[idx].p5) / rr[27];
@@ -273,13 +280,12 @@ impl Integrator for IAS15 {
             let g = &self.gs[idx];
             let mut perturber = &mut perturbers[idx];
 
-            perturber.position += self.timestep * perturber.velocity + self.timestep.powi(2) * (perturber.acceleration / 2.0 + b.p0 / 6.0 + b.p1 / 12.0 + b.p2 / 20.0 + b.p3 / 30.0 + b.p4 / 42.0 + b.p5 / 56.0 + b.p6 / 72.0);
-            perturber.velocity += self.timestep * (perturber.acceleration + b.p0 / 2.0 + b.p1 / 3.0 + b.p2 / 4.0 + b.p3 / 5.0 + b.p4 / 6.0 + b.p5 / 7.0 + b.p6 / 8.0);
             perturber.epoch += self.timestep;
+            perturber.position = initial_positions[idx] + self.timestep * initial_velocities[idx] + self.timestep.powi(2) * (initial_accelerations[idx] / 2.0 + b.p0 / 6.0 + b.p1 / 12.0 + b.p2 / 20.0 + b.p3 / 30.0 + b.p4 / 42.0 + b.p5 / 56.0 + b.p6 / 72.0);
+            perturber.velocity = initial_velocities[idx] + self.timestep * (initial_accelerations[idx] + b.p0 / 2.0 + b.p1 / 3.0 + b.p2 / 4.0 + b.p3 / 5.0 + b.p4 / 6.0 + b.p5 / 7.0 + b.p6 / 8.0);
         }
 
-        println!("Predictor-corrector loop iterations: {}", iterations);
-
+        // Predict b for the next step
     }
 
     fn timestep(&self) -> f64 {

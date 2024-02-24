@@ -33,8 +33,8 @@ impl Force for SolarGR {
             let s2 = 4.0 * (r_vec.dot(&v_vec)) * v_vec;
 
             let xi = s0 * (s1 + s2);
-            let idx_acceleration = xi * perturber.mass;
-            // let idx_acceleration = xi;
+            // let idx_acceleration = xi * perturber.mass;
+            let idx_acceleration = xi;
             perturber.acceleration += idx_acceleration;
         }
 

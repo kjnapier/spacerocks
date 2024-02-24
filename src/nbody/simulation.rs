@@ -35,12 +35,12 @@ impl Simulation {
         Simulation {perturbers: Vec::new(), 
                     particles: Vec::new(), 
                     epoch: Time::now(), 
-                    forces: vec![Box::new(NewtonianGravity)],//, Box::new(SolarGR)],
+                    forces: vec![Box::new(NewtonianGravity), Box::new(SolarGR)],
                     frame: None,
                     origin: None,
                     // integrator: Box::new(Leapfrog::new(0.1)),
                     // integrator: Box::new(RK4::new(0.1)),
-                    integrator: Box::new(IAS15::new(50.0, 0.1)),
+                    integrator: Box::new(IAS15::new(1.0, 0.1)),
                     particle_index_map: HashMap::new(),
                     perturber_index_map: HashMap::new()}
     }
