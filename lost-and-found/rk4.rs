@@ -1,134 +1,94 @@
 
-// // implementing the Runge-Kutta 4th order method for the n-body problem
-// use crate::nbody::acceleration::{calculate_and_set_test_particle_accelerations, calculate_and_set_perturber_accelerations};
-// use crate::spacerock::SpaceRock;
+use crate::SpaceRock;
+use crate::Simulation;
+use crate::nbody::integrators::Integrator;
+use crate::nbody::forces::Force;
+
+use rayon::prelude::*;
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub struct RK4 {
+    pub timestep: f64,
+}
+
+impl RK4 {
+    pub fn new(timestep: f64) -> RK4 {
+        RK4 { timestep }
+    }
+}
+
+impl Integrator for RK4 {
+
+    fn step(&mut self, particles: &mut Vec<SpaceRock>, perturbers: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>) {
+
+        let mut k1 = particles.clone();
+        let mut l1 = perturbers.clone();
+        for force in forces {
+            force.apply(&mut k1, &mut l1);
+        }
+
+        let mut k2 = particles.clone();
+        let mut l2 = perturbers.clone();
+        for idx in 0..particles.len() {
+            k2[idx].position += 0.5 * self.timestep * k1[idx].velocity;
+            k2[idx].velocity += 0.5 * self.timestep * k1[idx].acceleration;
+        }
+        for idx in 0..perturbers.len() {
+            l2[idx].position += 0.5 * self.timestep * l1[idx].velocity;
+            l2[idx].velocity += 0.5 * self.timestep * l1[idx].acceleration;
+        }
+        for force in forces {
+            force.apply(&mut k2, &mut l2);
+        }
+
+        let mut k3 = particles.clone();
+        let mut l3 = perturbers.clone();
+        for idx in 0..particles.len() {
+            k3[idx].position += 0.5 * self.timestep * k2[idx].velocity;
+            k3[idx].velocity += 0.5 * self.timestep * k2[idx].acceleration;
+        }
+        for idx in 0..perturbers.len() {
+            l3[idx].position += 0.5 * self.timestep * l2[idx].velocity;
+            l3[idx].velocity += 0.5 * self.timestep * l2[idx].acceleration;
+        }
+        for force in forces {
+            force.apply(&mut k3, &mut l3);
+        }
+
+        let mut k4 = particles.clone();
+        let mut l4 = perturbers.clone();
+        for idx in 0..particles.len() {
+            k4[idx].position += self.timestep * k3[idx].velocity;
+            k4[idx].velocity += self.timestep * k3[idx].acceleration;
+        }
+        for idx in 0..perturbers.len() {
+            l4[idx].position += self.timestep * l3[idx].velocity;
+            l4[idx].velocity += self.timestep * l3[idx].acceleration;
+        }
+        for force in forces {
+            force.apply(&mut k4, &mut l4);
+        }
+
+        // update positions and velocities
+        for idx in 0..particles.len() {
+            particles[idx].position += self.timestep / 6.0 * (k1[idx].velocity + 2.0 * k2[idx].velocity + 2.0 * k3[idx].velocity + k4[idx].velocity);
+            particles[idx].velocity += self.timestep / 6.0 * (k1[idx].acceleration + 2.0 * k2[idx].acceleration + 2.0 * k3[idx].acceleration + k4[idx].acceleration);
+            particles[idx].epoch += self.timestep;
+        }
+        for idx in 0..perturbers.len() {
+            perturbers[idx].position += self.timestep / 6.0 * (l1[idx].velocity + 2.0 * l2[idx].velocity + 2.0 * l3[idx].velocity + l4[idx].velocity);
+            perturbers[idx].velocity += self.timestep / 6.0 * (l1[idx].acceleration + 2.0 * l2[idx].acceleration + 2.0 * l3[idx].acceleration + l4[idx].acceleration);
+            perturbers[idx].epoch += self.timestep;
+        }
 
 
-// pub fn rk4_step(perturbers: &mut Vec<SpaceRock>, test_particles: &mut Vec<SpaceRock>, timestep: f64) {
-//     let mut K1x_test = Vec::new();
-//     let mut K2x_test = Vec::new();
-//     let mut K3x_test = Vec::new();
-//     let mut K4x_test = Vec::new();
+    }
 
-//     let mut K1v_test = Vec::new();
-//     let mut K2v_test = Vec::new();
-//     let mut K3v_test = Vec::new();
-//     let mut K4v_test = Vec::new();
+    fn timestep(&self) -> f64 {
+        self.timestep
+    }
 
-//     let mut K1x_perturber = Vec::new();
-//     let mut K2x_perturber = Vec::new();
-//     let mut K3x_perturber = Vec::new();
-//     let mut K4x_perturber = Vec::new();
-    
-//     let mut K1v_perturber = Vec::new();
-//     let mut K2v_perturber = Vec::new();
-//     let mut K3v_perturber = Vec::new();
-//     let mut K4v_perturber = Vec::new();
-
-//     // get the initial positions of the test particles
-//     let mut x0_test = Vec::new();
-//     for particle in &*test_particles {
-//         x0_test.push(particle.position);
-//     }
-
-//     // get the initial positions of the perturbers
-//     let mut x0_perturber = Vec::new();
-//     for particle in &*perturbers {
-//         x0_perturber.push(particle.position);
-//     }
-
-//     // calculate the K1 values
-//     calculate_and_set_perturber_accelerations(perturbers);
-//     calculate_and_set_test_particle_accelerations(perturbers, test_particles);
-//     for particle in &mut *test_particles {
-//         K1x_test.push(particle.velocity);
-//         K1v_test.push(particle.acceleration);
-//     }
-//     for particle in &mut *perturbers {
-//         K1x_perturber.push(particle.velocity);
-//         K1v_perturber.push(particle.acceleration);
-//     }
-
-//     // calculate the K2 values
-//     for (i, particle) in test_particles.iter_mut().enumerate() {
-//         particle.position += 0.5 * timestep * K1x_test[i];
-//         particle.velocity += 0.5 * timestep * K1v_test[i];
-//     }
-//     for (i, perturber) in perturbers.iter_mut().enumerate() {
-//         perturber.position += 0.5 * timestep * K1x_perturber[i];
-//         perturber.velocity += 0.5 * timestep * K1v_perturber[i];
-//     }
-//     calculate_and_set_perturber_accelerations(perturbers);
-//     calculate_and_set_test_particle_accelerations(perturbers, test_particles);
-//     for particle in &mut *test_particles {
-//         K2x_test.push(particle.velocity);
-//         K2v_test.push(particle.acceleration);
-//     }
-//     for particle in &mut *perturbers {
-//         K2x_perturber.push(particle.velocity);
-//         K2v_perturber.push(particle.acceleration);
-//     }
-
-//     // calculate the K3 values
-//     for (i, particle) in test_particles.iter_mut().enumerate() {
-//         particle.position += 0.5 * timestep * K2x_test[i];
-//         particle.velocity += 0.5 * timestep * K2v_test[i];
-//     }
-//     for (i, perturber) in perturbers.iter_mut().enumerate() {
-//         perturber.position += 0.5 * timestep * K2x_perturber[i];
-//         perturber.velocity += 0.5 * timestep * K2v_perturber[i];
-//     }
-//     calculate_and_set_perturber_accelerations(perturbers);
-//     calculate_and_set_test_particle_accelerations(perturbers, test_particles);
-
-//     for particle in &mut *test_particles {
-//         K3x_test.push(particle.velocity);
-//         K3v_test.push(particle.acceleration);
-//     }
-//     for particle in &mut *perturbers {
-//         K3x_perturber.push(particle.velocity);
-//         K3v_perturber.push(particle.acceleration);
-//     }
-
-//     // calculate the K4 values
-//     for (i, particle) in test_particles.iter_mut().enumerate() {
-//         particle.position += timestep * K3x_test[i];
-//         particle.velocity += timestep * K3v_test[i];
-//     }
-//     for (i, perturber) in perturbers.iter_mut().enumerate() {
-//         perturber.position += timestep * K3x_perturber[i];
-//         perturber.velocity += timestep * K3v_perturber[i];
-//     }
-//     calculate_and_set_perturber_accelerations(perturbers);
-//     calculate_and_set_test_particle_accelerations(perturbers, test_particles);
-//     for particle in &mut *test_particles {
-//         K4x_test.push(particle.velocity);
-//         K4v_test.push(particle.acceleration);
-//     }
-//     for particle in &mut *perturbers {
-//         K4x_perturber.push(particle.velocity);
-//         K4v_perturber.push(particle.acceleration);
-//     }
-
-//     // // calculate the new positions and velocities
-//     // for (i, particle) in test_particles.iter_mut().enumerate() {
-//     //     particle.position += timestep * (K1x_test[i] + 2.0 * K2x_test[i] + 2.0 * K3x_test[i] + K4x_test[i]) / 6.0;
-//     //     particle.velocity += timestep * (K1v_test[i] + 2.0 * K2v_test[i] + 2.0 * K3v_test[i] + K4v_test[i]) / 6.0;
-//     // }
-//     // for (i, perturber) in perturbers.iter_mut().enumerate() {
-//     //     perturber.position += timestep * (K1x_perturber[i] + 2.0 * K2x_perturber[i] + 2.0 * K3x_perturber[i] + K4x_perturber[i]) / 6.0;
-//     //     perturber.velocity += timestep * (K1v_perturber[i] + 2.0 * K2v_perturber[i] + 2.0 * K3v_perturber[i] + K4v_perturber[i]) / 6.0;
-//     // }
-
-//     // calculate the new positions and velocities
-//     for (i, particle) in test_particles.iter_mut().enumerate() {
-//         particle.position = x0_test[i] + timestep * (K1x_test[i] + 2.0 * K2x_test[i] + 2.0 * K3x_test[i] + K4x_test[i]) / 6.0;
-//         particle.velocity = K1x_test[i] + timestep * (K1v_test[i] + 2.0 * K2v_test[i] + 2.0 * K3v_test[i] + K4v_test[i]) / 6.0;
-//     }
-
-//     for (i, perturber) in perturbers.iter_mut().enumerate() {
-//         perturber.position = x0_perturber[i] + timestep * (K1x_perturber[i] + 2.0 * K2x_perturber[i] + 2.0 * K3x_perturber[i] + K4x_perturber[i]) / 6.0;
-//         perturber.velocity = K1x_perturber[i] + timestep * (K1v_perturber[i] + 2.0 * K2v_perturber[i] + 2.0 * K3v_perturber[i] + K4v_perturber[i]) / 6.0;
-//     }
-   
-// }
+    fn set_timestep(&mut self, timestep: f64) {
+        self.timestep = timestep;
+    }
+}

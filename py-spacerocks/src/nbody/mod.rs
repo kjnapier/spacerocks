@@ -2,7 +2,10 @@ use pyo3::prelude::*;
 
 pub mod simulation;
 pub mod integrator;
+pub mod force;
+
 use crate::nbody::integrator::PyIntegrator;
+use crate::nbody::force::PyForce;
 
 
 pub fn make_nbody_submodule(py: Python, m: &PyModule) -> PyResult<()> {
@@ -10,6 +13,7 @@ pub fn make_nbody_submodule(py: Python, m: &PyModule) -> PyResult<()> {
 
     submodule.add_class::<simulation::PySimulation>()?;
     submodule.add_class::<PyIntegrator>()?;
+    submodule.add_class::<PyForce>()?;
 
     m.add_submodule(submodule)?;
     py.import("sys")?

@@ -1,5 +1,6 @@
 
 use crate::SpaceRock;
+use crate::time::Time;
 use crate::Simulation;
 use crate::nbody::integrators::Integrator;
 use crate::nbody::forces::Force;
@@ -19,19 +20,16 @@ impl Leapfrog {
 
 impl Integrator for Leapfrog {
 
-    fn step(&mut self, particles: &mut Vec<SpaceRock>, perturbers: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>) {
+    fn step(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>) {
         // drift
         for particle in &mut *particles {
             particle.position += particle.velocity * 0.5 * self.timestep;
             particle.epoch += 0.5 * self.timestep;
         }
-        for perturber in &mut *perturbers {
-            perturber.position += perturber.velocity * 0.5 * self.timestep;
-            perturber.epoch += 0.5 * self.timestep;
-        }
+      
 
         for force in forces {
-            force.apply(particles, perturbers);
+            force.apply(particles);
         }
 
         for particle in &mut *particles {
@@ -40,11 +38,7 @@ impl Integrator for Leapfrog {
             particle.epoch += 0.5 * self.timestep;
         }
 
-        for perturber in &mut *perturbers {
-            perturber.velocity += self.timestep * perturber.acceleration;
-            perturber.position += perturber.velocity * 0.5 * self.timestep;
-            perturber.epoch += 0.5 * self.timestep;
-        }
+        *epoch += self.timestep;
 
     }
 

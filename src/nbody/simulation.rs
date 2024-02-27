@@ -6,21 +6,17 @@ use crate::time::Time;
 
 
 use crate::nbody::forces::{Force, NewtonianGravity, Drag, SolarGR};
-use crate::nbody::integrators::{Integrator, Leapfrog, RK4, IAS15};
+use crate::nbody::integrators::{Integrator, Leapfrog, IAS15};
 
 
 use nalgebra::Vector3;
 
 use rayon::prelude::*;
 
-//#[derive(Debug)]
 pub struct Simulation {
-    pub perturbers: Vec<SpaceRock>,
     pub particles: Vec<SpaceRock>,
     pub epoch: Time,
-    
     pub particle_index_map: HashMap<String, usize>,
-    pub perturber_index_map: HashMap<String, usize>,
 
     pub frame: Option<String>,
     pub origin: Option<String>,
@@ -32,17 +28,13 @@ pub struct Simulation {
 impl Simulation {
 
     pub fn new() -> Simulation {
-        Simulation {perturbers: Vec::new(), 
-                    particles: Vec::new(), 
+        Simulation {particles: Vec::new(), 
                     epoch: Time::now(), 
-                    forces: vec![Box::new(NewtonianGravity), Box::new(SolarGR)],
+                    forces: vec![],
                     frame: None,
                     origin: None,
-                    // integrator: Box::new(Leapfrog::new(0.1)),
-                    // integrator: Box::new(RK4::new(0.1)),
-                    integrator: Box::new(IAS15::new(1.0, 0.1)),
-                    particle_index_map: HashMap::new(),
-                    perturber_index_map: HashMap::new()}
+                    integrator: Box::new(IAS15::new(1.0)),
+                    particle_index_map: HashMap::new()}
     }
 
     pub fn add(&mut self, mut particle: SpaceRock) -> Result<(), String> {
@@ -63,11 +55,11 @@ impl Simulation {
         }
 
         if Some(particle.origin.clone()) != self.origin {
-            if !self.perturber_index_map.contains_key(&particle.origin.clone()) {
+            if !self.particle_index_map.contains_key(&particle.origin.clone()) {
                 return Err(format!("The origin of the particle ({}) did not match the simulation origin, and was not found in perturbers", particle.origin.clone()));
             }
 
-            let origin = &self.perturbers[self.perturber_index_map[&particle.origin.clone()]];
+            let origin = &self.particles[self.particle_index_map[&particle.origin.clone()]];
             particle.change_origin(&origin);
 
             // log the change of origin to console
@@ -77,24 +69,14 @@ impl Simulation {
         particle.change_frame(self.frame.clone().unwrap().as_str());
         particle.orbit = None;
 
-        if particle.mass > 0.0 {
-            self.perturber_index_map.insert(particle.name.clone(), self.perturbers.len());
-            self.perturbers.push(particle);
-        } else {
-            self.particle_index_map.insert(particle.name.clone(), self.particles.len());
-            self.particles.push(particle);
-        }
+        self.particle_index_map.insert(particle.name.clone(), self.particles.len());
+        self.particles.push(particle);
 
         Ok(())
     }
 
     pub fn remove(&mut self, name: &str) -> Result<(), String> {
-
-        if self.perturber_index_map.contains_key(name) {
-            let idx = self.perturber_index_map[name];
-            self.perturbers.remove(idx);
-            self.perturber_index_map.remove(name);
-        } else if self.particle_index_map.contains_key(name) {
+        if self.particle_index_map.contains_key(name) {
             let idx = self.particle_index_map[name];
             self.particles.remove(idx);
             self.particle_index_map.remove(name);
@@ -106,24 +88,15 @@ impl Simulation {
    
 
     pub fn zero_accelerations(&mut self) {
-        for perturber in &mut self.perturbers {
-            perturber.acceleration = Vector3::new(0.0, 0.0, 0.0);
-        }
         for particle in &mut self.particles {
             particle.acceleration = Vector3::new(0.0, 0.0, 0.0);
         }
     }
 
     pub fn step(&mut self) {
-
         // Zero the accelerations of each particle
         self.zero_accelerations();
-
-        // Step
-        self.integrator.step(&mut self.particles, &mut self.perturbers, &self.forces);
-
-        // Update the epoch
-        self.epoch += self.integrator.timestep();
+        self.integrator.step(&mut self.particles, &mut self.epoch, &self.forces);
     }
 
     pub fn move_to_center_of_mass(&mut self) {
@@ -131,11 +104,13 @@ impl Simulation {
         let mut center_of_mass = Vector3::new(0.0, 0.0, 0.0);
         let mut center_of_mass_velocity = Vector3::new(0.0, 0.0, 0.0);
 
-        // calculate the acceleration of the center of mass
-        for perturber in &self.perturbers {
-            center_of_mass += perturber.mass * perturber.position;
-            center_of_mass_velocity += perturber.mass * perturber.velocity;
-            total_mass += perturber.mass;
+        for particle in &self.particles {
+            if particle.mass == 0.0 {
+                continue;
+            }
+            center_of_mass += particle.mass * particle.position;
+            center_of_mass_velocity += particle.mass * particle.velocity;
+            total_mass += particle.mass;
         }
 
         center_of_mass /= total_mass;
@@ -148,7 +123,6 @@ impl Simulation {
         let vy = center_of_mass_velocity.y;
         let vz = center_of_mass_velocity.z;
        
-
         let mut origin = SpaceRock::from_xyz("ssb", 
                                              x, y, z, vx, vy, vz, 
                                              self.epoch.clone(), 
@@ -156,32 +130,23 @@ impl Simulation {
                                              self.origin.clone().unwrap().as_str());
         origin.mass = total_mass;
 
-        for perturber in &mut self.perturbers {
-            perturber.change_origin(&origin);
-        }
-
         for particle in &mut self.particles {
             particle.change_origin(&origin);
         }
 
         self.origin = Some("ssb".to_string());
-
     }
 
     pub fn change_origin(&mut self, origin: &str) -> Result<(), String> {
 
-        if !self.perturber_index_map.contains_key(origin) {
+        if !self.particle_index_map.contains_key(origin) {
            return Err(format!("Origin {} not found in perturbers", origin));
         }
 
         self.origin = Some(origin.to_string());
-        let origin_position = self.perturbers[self.perturber_index_map[origin]].position;
-        let origin_velocity = self.perturbers[self.perturber_index_map[origin]].velocity;
 
-        for perturber in &mut self.perturbers {
-            perturber.position -= origin_position;
-            perturber.velocity -= origin_velocity;
-        }
+        let origin_position = self.particles[self.particle_index_map[origin]].position;
+        let origin_velocity = self.particles[self.particle_index_map[origin]].velocity;
 
         for particle in &mut self.particles {
             particle.position -= origin_position;
@@ -189,7 +154,6 @@ impl Simulation {
         }
 
         Ok(())
-
     }
 
     pub fn integrate(&mut self, epoch: &Time) {
@@ -197,7 +161,6 @@ impl Simulation {
         let mut epoch = epoch.clone();
         epoch.change_timescale(self.epoch.timescale.as_str());
 
-        
         let dt = &epoch - &self.epoch;
 
         if dt == 0.0 {
@@ -219,23 +182,14 @@ impl Simulation {
 
         // reset the timestep
         self.integrator.set_timestep(old_timestep);
-
     }
 
     pub fn get_particle(&self, name: &str) -> Result<&SpaceRock, Box<dyn std::error::Error>> {
-
         if self.particle_index_map.contains_key(name) { 
             let idx = self.particle_index_map[name];
             let p = &self.particles[idx];
             return Ok(p);
         }
-
-        if self.perturber_index_map.contains_key(name) {
-            let idx = self.perturber_index_map[name];
-            let p = &self.perturbers[idx];
-            return Ok(p);
-        }
-
         return Err(format!("{} not found in simulation", name).into());
     }
 
@@ -243,14 +197,18 @@ impl Simulation {
         let mut kinetic_energy = 0.0;
         let mut potential_energy = 0.0;
 
-        for idx in 0..self.perturbers.len() {
-            kinetic_energy += 0.5 * self.perturbers[idx].mass * self.perturbers[idx].velocity.norm_squared();
-            for jdx in (idx + 1)..self.perturbers.len() {
-                let r = (self.perturbers[idx].position - self.perturbers[jdx].position).norm();
-                potential_energy -= GRAVITATIONAL_CONSTANT * self.perturbers[idx].mass * self.perturbers[jdx].mass / r;
+        for idx in 0..self.particles.len() {
+            kinetic_energy += 0.5 * self.particles[idx].mass * self.particles[idx].velocity.norm_squared();
+            for jdx in (idx + 1)..self.particles.len() {
+                let r = (self.particles[idx].position - self.particles[jdx].position).norm();
+                potential_energy -= GRAVITATIONAL_CONSTANT * self.particles[idx].mass * self.particles[jdx].mass / r;
             }
         }
         return kinetic_energy + potential_energy;
+    }
+
+    pub fn add_force(&mut self, force: Box<dyn Force + Send + Sync>) {
+        self.forces.push(force);
     }
 
 }

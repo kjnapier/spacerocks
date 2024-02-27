@@ -31,6 +31,7 @@ pub struct Detection {
 
 }
 
+
 impl Detection {
 
     pub fn calc_altaz(&self) -> Result<(f64, f64), Box<dyn std::error::Error>> {

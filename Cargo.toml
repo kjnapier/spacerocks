@@ -4,7 +4,7 @@ version = "0.1.4"
 edition = "2021"
 authors = ["Kevin Napier"]
 description = "Software for solar system calculations."
-repository = "https://github.com/kjnapier/spacerocks-rust"
+repository = "https://github.com/kjnapier/spacerocks"
 license = "GPL-3.0"
 include = ["/src"]
 

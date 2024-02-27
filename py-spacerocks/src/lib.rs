@@ -18,8 +18,8 @@ use observing::make_observing_submodule;
 mod nbody;
 use nbody::make_nbody_submodule;
 
-mod orbfit;
-use orbfit::make_orbfit_submodule;
+// mod orbfit;
+// use orbfit::make_orbfit_submodule;
 
 #[pymodule]
 pub fn spacerocks(py: Python, m: &PyModule) -> PyResult<()> {
@@ -42,8 +42,8 @@ pub fn spacerocks(py: Python, m: &PyModule) -> PyResult<()> {
     // Add the `nbody` submodule
     make_nbody_submodule(py, m)?;
 
-    // Add the `orbfit` submodule
-    make_orbfit_submodule(py, m)?;
+    // // Add the `orbfit` submodule
+    // make_orbfit_submodule(py, m)?;
 
     Ok(())
 }

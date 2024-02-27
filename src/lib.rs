@@ -20,7 +20,7 @@ pub mod transforms;
 pub mod nbody;
     pub use nbody::Simulation;
 
-pub mod orbfit;
-    pub use orbfit::gauss;
-    pub use orbfit::fitter;
+// pub mod orbfit;
+//     pub use orbfit::gauss;
+//     pub use orbfit::fitter;
 

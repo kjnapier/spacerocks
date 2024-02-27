@@ -8,7 +8,7 @@ use crate::observing::Detection;
 use crate::time::Time;
 
 use crate::transforms::correct_for_ltt;
-use crate::transforms::calc_xyz_from_kepM;
+use crate::transforms::{calc_xyz_from_kepM, calc_E_from_M, calc_f_from_E};
 
 use serde_json;
 use std::collections::HashMap;
@@ -19,7 +19,7 @@ use nalgebra::Vector3;
 use rand;
 use rand::Rng;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SpaceRock {
 
     pub name: String,
@@ -246,6 +246,24 @@ impl SpaceRock {
         let dt = epoch.epoch - self.epoch.epoch;
 
         // check that self.orbit is not None
+        match &self.orbit {
+            None => self.calculate_orbit(),
+            _ => (),
+        }
+
+        // if let Some(orbit) = &mut self.orbit {
+        //     let dM = orbit.n() * dt;
+        //     let M_new = orbit.M() + dM;
+        //     let new_state = calc_xyz_from_kepM(orbit.a, orbit.e, orbit.inc, orbit.arg, orbit.node, M_new);
+        //     self.position = Vector3::new(new_state.position[0], new_state.position[1], new_state.position[2]);
+        //     self.velocity = Vector3::new(new_state.velocity[0], new_state.velocity[1], new_state.velocity[2]);
+        //     self.epoch = epoch;
+
+        //     let new_eccentric_anomaly = calc_E_from_M(orbit.e, M_new);
+        //     let new_true_anomaly = calc_f_from_E(orbit.e, new_eccentric_anomaly);
+        //     orbit.f = new_true_anomaly;
+        // }        
+
         if let Some(orbit) = &self.orbit {
             let dM = orbit.n() * dt;
             let M_new = orbit.M() + dM;
@@ -253,11 +271,9 @@ impl SpaceRock {
             self.position = Vector3::new(new_state.position[0], new_state.position[1], new_state.position[2]);
             self.velocity = Vector3::new(new_state.velocity[0], new_state.velocity[1], new_state.velocity[2]);
             self.epoch = epoch;
-            // self.orbit = None;
             self.calculate_orbit();
         }        
     }
-
 
     pub fn observe(&mut self, observer: &Observer) -> Detection {
 
@@ -314,6 +330,63 @@ impl SpaceRock {
         
         return obs;
     }
+
+
+    // pub fn observe(&mut self, observer: &Observer) -> Detection {
+
+    //     // Make sure the rock is in the J2000 frame
+    //     let original_frame = self.frame.clone();
+    //     self.change_frame("J2000");
+
+    //     // Calculate the topocentric state, correct for light travel time
+    //     let cr = correct_for_ltt(&self, observer);
+
+    //     // Calaculate the ra, and dec
+    //     let mut ra = cr.position.y.atan2(cr.position.x);
+    //     if ra < 0.0 {
+    //         ra += 2.0 * std::f64::consts::PI;
+    //     }
+    //     let dec = (cr.position.z / cr.position.norm()).asin();
+
+    //     // Calculate the ra and dec rates
+    //     let xi = cr.position.x.powi(2) + cr.position.y.powi(2);
+    //     let ra_rate = - (cr.position.y * cr.velocity.x - cr.position.x * cr.velocity.y) / xi;
+    //     let num = -cr.position.z * (cr.position.x * cr.velocity.x + cr.position.y * cr.velocity.y) + xi * cr.velocity.z;
+    //     let denom = xi.sqrt() * cr.position.norm_squared();
+    //     let dec_rate = num / denom;
+
+    //     // calculate the topocentric range and range rate
+    //     let rho = cr.position.norm();
+    //     let rho_rate = cr.position.dot(&cr.velocity) / rho;
+
+    //     // construct the detection
+    //     let obs = Detection {
+    //         ra: ra,
+    //         dec: dec,
+    //         ra_rate: Some(ra_rate),
+    //         dec_rate: Some(dec_rate),
+    //         rho: Some(rho),
+    //         rho_rate: Some(rho_rate),
+    //         epoch: self.epoch.clone(),
+    //         observer: observer.clone(),
+    //         name: self.name.clone(),
+
+    //         mag: None,
+    //         filter: None,
+    //         ra_uncertainty: None,
+    //         dec_uncertainty: None,
+    //         ra_rate_uncertainty: None,
+    //         dec_rate_uncertainty: None,
+    //         rho_uncertainty: None,
+    //         rho_rate_uncertainty: None,
+    //         mag_uncertainty: None,
+    //     };
+
+    //     // Change the frame back to the original frame
+    //     self.change_frame(&original_frame);
+        
+    //     return obs;
+    // }
 
     pub fn change_frame(&mut self, frame: &str) {
         if frame != self.frame {

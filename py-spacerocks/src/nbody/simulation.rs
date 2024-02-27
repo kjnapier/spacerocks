@@ -5,6 +5,7 @@ use crate::spacerock::spacerock::PySpaceRock;
 use crate::spacerock::rockcollection::RockCollection;
 use crate::time::time::PyTime;
 use crate::nbody::integrator::PyIntegrator;
+use crate::nbody::force::PyForce;
 
 use std::sync::Arc;
 
@@ -60,9 +61,13 @@ impl PySimulation {
         self.inner.origin = Some(origin.to_string());
     }
 
-    // pub fn set_integrator(&mut self, integrator: PyRef<PyIntegrator>) {
-    //     self.inner.integrator = integrator.inner;
-    // }
+    pub fn set_integrator(&mut self, integrator: PyRef<PyIntegrator>) {
+        self.inner.integrator = integrator.inner.clone();
+    }
+
+    pub fn add_force(&mut self, force: PyRef<PyForce>) {
+        self.inner.add_force(force.inner.clone());
+    }
 
     pub fn energy(&self) -> f64 {
         self.inner.energy()
@@ -83,10 +88,10 @@ impl PySimulation {
         RockCollection { rocks: self.inner.particles.clone(), name_hash_map: self.inner.particle_index_map.clone() }
     }
 
-    #[getter]
-    pub fn perturbers(&self) -> RockCollection {
-        RockCollection { rocks: self.inner.perturbers.clone(), name_hash_map: self.inner.perturber_index_map.clone() }
-    }
+    // #[getter]
+    // pub fn perturbers(&self) -> RockCollection {
+    //     RockCollection { rocks: self.inner.perturbers.clone(), name_hash_map: self.inner.perturber_index_map.clone() }
+    // }
 
     #[getter]
     pub fn epoch(&self) -> PyTime {

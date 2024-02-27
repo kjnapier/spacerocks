@@ -2,6 +2,8 @@ use crate::time::Time;
 use nalgebra::Vector3;
 use crate::constants::ROTATION_MATRICES;
 
+use crate::spacerock::SpaceRock;
+
 const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
 
 #[derive(PartialEq, Clone, Debug)]
@@ -38,6 +40,18 @@ impl Observer {
             lat: Some(lat),
             lon: Some(lon),
             elevation: Some(elevation),
+        }
+    }
+
+    pub fn from_spacerock(rock: &SpaceRock) -> Self {
+        Observer {
+            position: rock.position.clone(),
+            velocity: rock.velocity.clone(),
+            epoch: rock.epoch.clone(),
+            frame: rock.frame.clone(),
+            lat: None,
+            lon: None,
+            elevation: None,
         }
     }
 

@@ -3,30 +3,24 @@ use crate::StateVector;
 use crate::KeplerOrbit;
 use nalgebra::Vector3;
 
+const EMIN: f64 = 1e-10;
+const IMIN: f64 = 1e-10;
+
+
 fn acos_safe(x: f64) -> f64 {
-  if x.abs() > 1.0 {
-    if x > 0.0 {
-      return 0.0;
+    if x.abs() > 1.0 {
+        if x > 0.0 {
+            return 0.0;
+        } else {
+        return std::f64::consts::PI;
     }
-    else {
-      return std::f64::consts::PI;
-    }
-  }
-  else {
+  } else {
     return x.acos();
   }
 }
 
-// enum OrbitType {
-//   Ellipse,
-//   Parabola,
-//   Hyperbola,
-// }
 
 pub fn calc_kep_from_xyz(state: StateVector) -> KeplerOrbit {
-
-    let EMIN = 1e-10;
-    let IMIN = 1e-10;
 
     let (a, e, inc, mut arg, mut node, mut f);
 

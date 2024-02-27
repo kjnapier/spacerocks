@@ -20,6 +20,7 @@ spacerocks/.DS_Store
 /spacerocks/test/__pycache__/
 
 /spacerocks/target/
+/py-spacerocks/target/
 dates.py
 prototypes.py
 
