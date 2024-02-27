@@ -13,9 +13,8 @@ pub struct NewtonianGravity;
 impl Force for NewtonianGravity {
    
     fn apply(&self, entities: &mut Vec<SpaceRock>) {
-
-        // let positions: Vec<Vector3<f64>> = entities.iter().map(|entity| entity.position).collect();
-        // let masses: Vec<f64> = entities.iter().map(|entity| entity.mass).collect();
+        // Naive implementation of Newtonian gravity. O(0.5 * n^2) complexity.
+        // Speed it up if you want!
 
         let n_entities = entities.len();
         for idx in 0..n_entities {
@@ -36,31 +35,4 @@ impl Force for NewtonianGravity {
             }
         }
     }
-
-    //     // calculate the acceleration for each entity in parallel
-    //     let acceleration: Vec<Mutex<Vector3<f64>>> = entities.par_iter().map(|entity| {
-    //         let acceleration = Mutex::new(Vector3::new(0.0, 0.0, 0.0));
-    //         for other_entity in entities.iter() {
-    //             if entity.name != other_entity.name {
-
-    //                 if (entity.mass == 0.0) & (other_entity.mass == 0.0) {
-    //                     continue;
-    //                 }
-
-    //                 let r_vec = entity.position - other_entity.position;
-    //                 let r = r_vec.norm();
-    //                 let xi = -GRAVITATIONAL_CONSTANT * r_vec / (r * r * r);
-    //                 let mut acceleration = acceleration.lock().unwrap();
-    //                 *acceleration += xi * other_entity.mass;
-    //             }
-    //         }
-    //         acceleration
-    //     }).collect();     
-
-    //     // apply the acceleration to each entity
-    //     entities.par_iter_mut().enumerate().for_each(|(idx, entity)| {
-    //         let mut acceleration = acceleration[idx].lock().unwrap();
-    //         entity.acceleration += *acceleration;
-    //     });
-    // }
 }
