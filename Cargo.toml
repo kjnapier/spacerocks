@@ -11,7 +11,8 @@ include = ["/src"]
 
 [dependencies]
 nalgebra = "0.32.2"
-rust-spice = "0.7.4"
+#rust-spice = "0.7.4"
+rust-spice = {version = "*", default-features = false, features = ["noclang"] }
 
 lazy_static = "1.4.0"
 phf = {version = "*", features = ["macros"]}
