@@ -53,7 +53,7 @@ impl SpaceRock {
         let acceleration = Vector3::new(0.0, 0.0, 0.0);
         let mu = Some(MU_BARY);
 
-        let mass = match MASSES.get(name) {
+        let mass = match MASSES.get(name.to_lowercase().as_str()) {
             Some(m) => *m,
             None => 0.0,
         };
@@ -331,76 +331,19 @@ impl SpaceRock {
         return obs;
     }
 
-
-    // pub fn observe(&mut self, observer: &Observer) -> Detection {
-
-    //     // Make sure the rock is in the J2000 frame
-    //     let original_frame = self.frame.clone();
-    //     self.change_frame("J2000");
-
-    //     // Calculate the topocentric state, correct for light travel time
-    //     let cr = correct_for_ltt(&self, observer);
-
-    //     // Calaculate the ra, and dec
-    //     let mut ra = cr.position.y.atan2(cr.position.x);
-    //     if ra < 0.0 {
-    //         ra += 2.0 * std::f64::consts::PI;
-    //     }
-    //     let dec = (cr.position.z / cr.position.norm()).asin();
-
-    //     // Calculate the ra and dec rates
-    //     let xi = cr.position.x.powi(2) + cr.position.y.powi(2);
-    //     let ra_rate = - (cr.position.y * cr.velocity.x - cr.position.x * cr.velocity.y) / xi;
-    //     let num = -cr.position.z * (cr.position.x * cr.velocity.x + cr.position.y * cr.velocity.y) + xi * cr.velocity.z;
-    //     let denom = xi.sqrt() * cr.position.norm_squared();
-    //     let dec_rate = num / denom;
-
-    //     // calculate the topocentric range and range rate
-    //     let rho = cr.position.norm();
-    //     let rho_rate = cr.position.dot(&cr.velocity) / rho;
-
-    //     // construct the detection
-    //     let obs = Detection {
-    //         ra: ra,
-    //         dec: dec,
-    //         ra_rate: Some(ra_rate),
-    //         dec_rate: Some(dec_rate),
-    //         rho: Some(rho),
-    //         rho_rate: Some(rho_rate),
-    //         epoch: self.epoch.clone(),
-    //         observer: observer.clone(),
-    //         name: self.name.clone(),
-
-    //         mag: None,
-    //         filter: None,
-    //         ra_uncertainty: None,
-    //         dec_uncertainty: None,
-    //         ra_rate_uncertainty: None,
-    //         dec_rate_uncertainty: None,
-    //         rho_uncertainty: None,
-    //         rho_rate_uncertainty: None,
-    //         mag_uncertainty: None,
-    //     };
-
-    //     // Change the frame back to the original frame
-    //     self.change_frame(&original_frame);
-        
-    //     return obs;
-    // }
-
-    pub fn change_frame(&mut self, frame: &str) {
+    pub fn change_frame(&mut self, frame: &str) -> Result<(), Box<dyn std::error::Error>> {
         if frame != self.frame {
-            let inv = ROTATION_MATRICES[&self.frame].try_inverse().unwrap();
+            let inv = ROTATION_MATRICES[&self.frame].try_inverse().ok_or("Could not invert rotation matrix")?;
             let rot = ROTATION_MATRICES[frame] * inv;
             self.position = rot * self.position;
             self.velocity = rot * self.velocity;
             self.frame = frame.to_string();
             self.orbit = Some(KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity}));
         }
+        Ok(())
     }
 
     pub fn change_origin(&mut self, origin: &SpaceRock) {
-
         // Change the origin to a new body, and set the new mu.
 
         let origin_position = origin.position;

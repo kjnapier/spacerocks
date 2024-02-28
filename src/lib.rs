@@ -6,6 +6,7 @@ pub mod time;
     pub use time::Time;
 
 pub mod constants;
+    pub use constants::OBSERVATORIES;
 
 pub mod observing;
     pub use observing::Detection;

@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
+use pyo3::exceptions::PyValueError;
 
 use spacerocks::Observatory;
 
@@ -16,19 +17,28 @@ pub struct PyObservatory {
 impl PyObservatory {
 
     // #[classmethod]
-    // fn from_obscode(name: &str, obscode: &str) -> Self {
-    //     PyObservatory { inner: Observatory::new(name, code) }
+    // fn from_obscode(_cls: &PyType, obscode: &str) -> Self {
+    //     PyObservatory { inner: Observatory::from_obscode(obscode) }
     // }
 
+
     #[classmethod]
-    pub fn from_coordinates(_cls: &PyType, lat: f64, lon: f64, elevation: f64) -> Self {
-        PyObservatory { inner: Observatory::from_coordinates(lat, lon, elevation) }
+    fn from_obscode(_cls: &PyType, obscode: &str) -> PyResult<Self> {
+        match Observatory::from_obscode(obscode) {
+            Ok(o) => Ok(PyObservatory { inner: o }),
+            Err(e) => Err(PyValueError::new_err(e))
+        }
     }
 
     // #[classmethod]
-    // pub fn from_parallax(_cls: &PyType, lon: f64, rho_sin: f64, rho_cos: f64, elevation: f64) -> Self {
-    //     PyObservatory { inner: Observatory::from_parallax(lat, lon, elevation) }
+    // pub fn from_coordinates(_cls: &PyType, lat: f64, lon: f64, elevation: f64) -> Self {
+    //     PyObservatory { inner: Observatory::from_coordinates(lat, lon, elevation) }
     // }
+
+    #[classmethod]
+    pub fn from_parallax(_cls: &PyType, lon: f64, rho_sin: f64, rho_cos: f64) -> Self {
+        PyObservatory { inner: Observatory::from_parallax(lon, rho_sin, rho_cos) }
+    }
 
     fn at(&self, epoch: &PyTime) -> PyObserver {
         let ep = &epoch.inner;
@@ -39,7 +49,7 @@ impl PyObservatory {
 
     #[getter]
     fn lat(&self) -> f64 {
-        self.inner.lat
+        self.inner.lat()
     }
 
     #[getter]
@@ -48,8 +58,8 @@ impl PyObservatory {
     }
 
     #[getter]
-    fn elevation(&self) -> f64 {
-        self.inner.elevation
+    fn rho(&self) -> f64 {
+        self.inner.rho()
     }
 
 

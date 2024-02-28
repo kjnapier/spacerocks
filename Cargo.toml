@@ -12,7 +12,11 @@ include = ["/src"]
 [dependencies]
 nalgebra = "0.32.2"
 rust-spice = "0.7.4"
+
 lazy_static = "1.4.0"
+phf = {version = "*", features = ["macros"]}
+
+
 reqwest = { version = "0.11.4", features = ["json", "blocking"] }
 
 rayon = "1.5.1"
@@ -22,6 +26,7 @@ rand = "0.8.5"
 
 serde_json = "1.0.68"
 serde = { version = "*", features = ["derive"] }
+
 
 # argmin = { git = "https://github.com/argmin-rs/argmin" }
 # argmin-math = { git = "https://github.com/argmin-rs/argmin", features = ["nalgebra_latest-serde"] }

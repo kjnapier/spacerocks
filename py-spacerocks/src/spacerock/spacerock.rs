@@ -66,8 +66,9 @@ impl PySpaceRock {
         Ok(PyDetection { inner: obs })
     }
 
-    fn change_frame(&mut self, frame: &str) {
+    fn change_frame(&mut self, frame: &str) -> PyResult<()> {
         self.inner.change_frame(frame);
+        Ok(())
     }
 
     fn calculate_orbit(&mut self) {

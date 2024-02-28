@@ -50,6 +50,10 @@ impl PyTime {
         &self.inner.format
     }
 
+    fn calendar(&self) -> String {
+        self.inner.calendar()
+    }
+
     // define __add__ and __sub__ here
     fn __add__(&self, dt: f64) -> PyTime {
         PyTime { inner: &self.inner + dt }

@@ -14,7 +14,7 @@ pub struct Observer {
     pub frame: String,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
-    pub elevation: Option<f64>,
+    pub rho: Option<f64>,
 }
 
 impl Observer {
@@ -27,11 +27,11 @@ impl Observer {
             frame: "J2000".to_string(),
             lat: None,
             lon: None,
-            elevation: None,
+            rho: None,
         }
     }
 
-    pub fn from_ground(position: Vector3<f64>, velocity: Vector3<f64>, epoch: Time, frame: &str, lat: f64, lon: f64, elevation: f64) -> Self {
+    pub fn from_ground(position: Vector3<f64>, velocity: Vector3<f64>, epoch: Time, frame: &str, lat: f64, lon: f64, rho: f64) -> Self {
         Observer {
             position: position,
             velocity: velocity,
@@ -39,7 +39,7 @@ impl Observer {
             frame: frame.to_string(),
             lat: Some(lat),
             lon: Some(lon),
-            elevation: Some(elevation),
+            rho: Some(rho),
         }
     }
 
@@ -51,7 +51,7 @@ impl Observer {
             frame: rock.frame.clone(),
             lat: None,
             lon: None,
-            elevation: None,
+            rho: None,
         }
     }
 

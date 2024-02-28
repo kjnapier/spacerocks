@@ -88,7 +88,7 @@ impl RockCollection {
     }
 
     pub fn change_frame(&mut self, frame: &str) {
-        self.rocks.par_iter_mut().for_each(|rock| rock.change_frame(frame));
+        self.rocks.par_iter_mut().for_each(|rock| rock.change_frame(frame).expect("Failed to change frame"));
     }
 
     #[getter]

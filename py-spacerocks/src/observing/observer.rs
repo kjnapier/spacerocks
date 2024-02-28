@@ -43,8 +43,8 @@ impl PyObserver {
     }
 
     #[getter]
-    fn elevation(&self) -> Option<f64> {
-        self.inner.elevation
+    fn rho(&self) -> Option<f64> {
+        self.inner.rho
     }
     
 }
