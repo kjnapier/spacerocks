@@ -302,6 +302,34 @@ impl SpaceRock {
         let rho = cr.position.norm();
         let rho_rate = cr.position.dot(&cr.velocity) / rho;
 
+        // if self has properties, calculate the magnitude
+        let mut mag = None;
+        if let Some(properties) = &self.properties {
+
+            let H = properties.H.unwrap();
+            let Gslope = properties.Gslope.unwrap();
+
+            let delta = cr.position.norm();
+            let sun_dist = (cr.position + observer.position).norm();
+            let earth_dist = observer.position.norm();
+            let q = (sun_dist.powi(2) + delta.powi(2) - earth_dist) / (2.0 * sun_dist * delta);
+            let mut beta = 0.0;
+            match q {
+                q if q <= -1.0 => beta = std::f64::consts::PI,
+                q if q >= 1.0 => beta = 0.0,
+                _ => beta = q.acos(),
+            };
+            let psi_1 = (-3.332 * ((beta / 2.0).tan()).powf(0.631)).exp();
+            let psi_2 = (-1.862 * ((beta / 2.0).tan()).powf(1.218)).exp();
+            mag = Some(H + 5.0 * (sun_dist * delta).log10());
+            if psi_1 == 0.0 && psi_2 == 0.0 {
+                mag = mag;
+            } else {
+                let mm = mag.unwrap() - 2.5 * ((1.0 - Gslope) * psi_1 + Gslope * psi_2).log10();
+                mag = Some(mm);
+            }
+        }
+
         // construct the detection
         let obs = Detection {
             ra: ra,
@@ -314,7 +342,7 @@ impl SpaceRock {
             observer: observer.clone(),
             name: self.name.clone(),
 
-            mag: None,
+            mag: mag,
             filter: None,
             ra_uncertainty: None,
             dec_uncertainty: None,
