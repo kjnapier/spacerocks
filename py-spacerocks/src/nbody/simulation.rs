@@ -1,5 +1,8 @@
 use pyo3::prelude::*;
+use pyo3::types::PyType;
+
 use spacerocks::nbody::Simulation;
+use spacerocks::spacerock::CoordinateFrame;
 
 use crate::spacerock::spacerock::PySpaceRock;
 use crate::spacerock::rockcollection::RockCollection;
@@ -21,6 +24,33 @@ impl PySimulation {
     #[new]
     pub fn new() -> Self {
         PySimulation { inner: Simulation::new() }
+    }
+
+    #[classmethod]
+    pub fn giants(_cls: &PyType, epoch: &PyTime, frame: &str, origin: &str) -> PyResult<Self> {
+        let ep = &epoch.inner;
+
+        let frame = CoordinateFrame::from_str(frame).unwrap();
+        let sim = Simulation::giants(ep, &frame, origin);
+        Ok(PySimulation { inner: sim.unwrap() })
+    }
+
+    #[classmethod]
+    pub fn planets(_cls: &PyType, epoch: &PyTime, frame: &str, origin: &str) -> PyResult<Self> {
+        let ep = &epoch.inner;
+
+        let frame = CoordinateFrame::from_str(frame).unwrap();
+        let sim = Simulation::planets(ep, &frame, origin);
+        Ok(PySimulation { inner: sim.unwrap() })
+    }
+
+    #[classmethod]
+    pub fn horizons(_cls: &PyType, epoch: &PyTime, frame: &str, origin: &str) -> PyResult<Self> {
+        let ep = &epoch.inner;
+
+        let frame = CoordinateFrame::from_str(frame).unwrap();
+        let sim = Simulation::horizons(ep, &frame, origin);
+        Ok(PySimulation { inner: sim.unwrap() })
     }
 
     pub fn add(&mut self, rock: &PySpaceRock) -> PyResult<()> {
@@ -54,7 +84,8 @@ impl PySimulation {
     }
 
     pub fn set_frame(&mut self, frame: &str) {
-        self.inner.frame = Some(frame.to_string());
+        let frame = CoordinateFrame::from_str(frame).unwrap();
+        self.inner.frame = Some(frame);
     }
 
     pub fn set_origin(&mut self, origin: &str) {
@@ -100,7 +131,11 @@ impl PySimulation {
 
     #[getter]
     pub fn frame(&self) -> Option<String> {
-        self.inner.frame.clone()
+        let f = self.inner.frame.clone();
+        match f {
+            Some(frame) => Some(frame.to_string()),
+            None => None
+        }
     }
 
 

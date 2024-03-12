@@ -34,7 +34,7 @@ const d: [f64; 21] = [0.0562625605369221464656522, 0.0031654757181708292499905, 
                       0.0002762930909826476593130, 0.0360285539837364596003871, 0.5767330002770787313544596, 2.2485887607691597933926895, 
                       2.7558127197720458314421588];
 
-const SAFETY_FACTOR: f64 = 0.25;
+const SAFETY_FACTOR: f64 = 0.1;
 
 #[derive(Debug, Clone)]
 pub struct IAS15 {
@@ -75,9 +75,6 @@ impl Integrator for IAS15 {
         let initial_velocities: Vec<Vector3<f64>> = particles.iter().map(|p| p.velocity).collect();
         let initial_accelerations: Vec<Vector3<f64>> = particles.iter().map(|p| p.acceleration).collect();
 
-        // let 
-
-
         // Number of particles
         let n = particles.len();
 
@@ -109,9 +106,9 @@ impl Integrator for IAS15 {
                 break;
             }
             if iterations >= 10 {
-                //println!("At least 10 predictor corrector loops in IAS15 did not converge. This is typically an indication of the timestep being too large.");
+                println!("At least 10 predictor corrector loops in IAS15 did not converge. This is typically an indication of the timestep being too large.");
                 self.timestep /= 2.0;
-                // println!("Reducing the timestep to {}", self.timestep);
+                println!("Reducing the timestep to {}", self.timestep);
                 self.step(particles, epoch, forces);
             }
 
@@ -331,10 +328,12 @@ impl Integrator for IAS15 {
         self.last_timestep = self.timestep.clone();
         self.timestep = new_timestep;
         let ratio = self.timestep / self.last_timestep;
+
+
         self.es_last = self.es.clone();
         self.bs_last = self.bs.clone();
 
-        predict_next_coefficients(&ratio, &self.es_last, &self.bs_last, &mut self.es, &mut self.bs);
+        predict_next_coefficients(&ratio, &self.es_last, &self.bs_last, &mut self.es, &mut self.bs);        
 
     }
 
@@ -465,10 +464,15 @@ pub fn calculate_new_timestep(particles: &Vec<SpaceRock>, bs: &Vec<CoefficientSe
         let y3 = (b.p0 + 2.0 * b.p1 + 3.0 * b.p2 + 4.0 * b.p3 + 5.0 * b.p4 + 6.0 * b.p5 + 7.0 * b.p6).norm_squared();
         let y4 = (2.0 * b.p1 + 6.0 * b.p2 + 12.0 * b.p3 + 20.0 * b.p4 + 30.0 * b.p5 + 42.0 * b.p6).norm_squared();
 
+        if !a0.is_normal() {
+            continue;
+        }
+
         let timescale2 = 2.0 * y2 / (y3 + (y4 * y2).sqrt());
-        if timescale2 < min_timescale2 {
+        if (timescale2 < min_timescale2) & timescale2.is_normal() {
             min_timescale2 = timescale2;
         }
+
     }
 
     if min_timescale2.is_normal() {

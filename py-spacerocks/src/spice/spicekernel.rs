@@ -16,8 +16,11 @@ impl PySpiceKernel {
         PySpiceKernel { inner: SpiceKernel::new() }
     }
 
-    fn load(&mut self, path: &str) {
-        self.inner.load(path);
+    fn load(&mut self, path: &str) -> PyResult<()> {
+        match self.inner.load(path) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+        }
     }
 
     fn unload(&mut self) {

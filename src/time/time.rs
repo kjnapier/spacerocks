@@ -2,6 +2,8 @@ use std::ops::{AddAssign, Add, Sub};
 use std::collections::HashMap;
 use chrono::{DateTime, TimeZone, Utc};
 use crate::time::leapseconds::LEAP_SECONDS;
+use crate::time::timescale::TimeScale;
+use crate::time::timeformat::TimeFormat;
 use lazy_static::lazy_static;
 use serde::{Serialize, Deserialize};
 
@@ -52,20 +54,33 @@ fn jd_to_calendar(jd: &f64) -> String {
     format!("{} {} {}", day, MONTHS.get(&month).unwrap(), year)
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+
+
+
+
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Time {
     pub epoch: f64,
-    pub timescale: String,
-    pub format: String,
+    pub timescale: TimeScale,
+    pub format: TimeFormat,
 }
 
 impl Time {
 
     pub fn new(epoch: f64, timescale: &str, format: &str) -> Self {
+        let timescale = match timescale {
+            "utc" => TimeScale::UTC,
+            "tdb" => TimeScale::TDB,
+            _ => panic!("Invalid timescale: {}", timescale),
+        };
+        let format = match format {
+            "jd" => TimeFormat::JD,
+            _ => panic!("Invalid format: {}", format),
+        };
         Time {
             epoch: epoch,
-            timescale: timescale.to_string(),
-            format: format.to_string(),
+            timescale: timescale,
+            format: format,
         }
     }
     
@@ -74,34 +89,46 @@ impl Time {
         let x = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
         Time {
             epoch: isot_to_julian(&x),
-            timescale: "utc".to_string(),
-            format: "jd".to_string(),
+            timescale: TimeScale::UTC,
+            format: TimeFormat::JD,
         }
     }
 
+    // pub fn from_fuzzy_str(s: &str) -> Self {
+    //     let s = s.to_lowercase();
+    //     if s == "now" {
+    //         return Time::now();
+    //     }
+    //     let mut parts = s.split_whitespace();
+    //     let epoch = parts.next().unwrap().parse::<f64>().unwrap();
+    //     let timescale = parts.next().unwrap();
+    //     let format = parts.next().unwrap();
+    //     Time::new(epoch, timescale, format)
+    // }
+
     pub fn to_utc(&mut self) {
-        if self.timescale == "utc" {
+        if self.timescale == TimeScale::UTC {
             return;
         }
         self.epoch = tdb_to_utc(self.epoch);
-        self.timescale = "utc".to_string();
+        self.timescale = TimeScale::UTC;
     }
 
     pub fn to_tdb(&mut self) {
-        if self.timescale == "tdb" {
+        if self.timescale == TimeScale::TDB {
             return;
         }
         self.epoch = utc_to_tdb(self.epoch);
-        self.timescale = "tdb".to_string();
+        self.timescale = TimeScale::TDB;
     }
 
-    pub fn change_timescale(&mut self, timescale: &str) {
-        if timescale == "utc" {
+    pub fn change_timescale(&mut self, timescale: TimeScale) {
+        if timescale == TimeScale::UTC {
             self.to_utc();
-        } else if timescale == "tdb" {
+        } else if timescale == TimeScale::TDB {
             self.to_tdb();
         } else {
-            panic!("Invalid timescale: {}", timescale);
+            panic!("Invalid timescale: {:?}", timescale);
         }
     }
 
@@ -110,6 +137,7 @@ impl Time {
     }
 
 }
+
 
 impl Sub<&Time> for &Time {
     type Output = f64;
@@ -154,40 +182,13 @@ impl Add<f64> for Time {
     fn add(self, dt: f64) -> Time {
         Time {
             epoch: self.epoch + dt,
-            timescale: self.timescale,
-            format: self.format,
+            timescale: self.timescale.clone(),
+            format: self.format.clone(),
         }
     }
 
 }
 
-
-// impl Sub<f64> for &Time {
-//     type Output = Time;
-
-//     fn sub(self, dt: f64) -> Time {
-//         Time {
-//             epoch: self.epoch - dt,
-//             timescale: self.timescale,
-//             format: self.format,
-//         }
-//     }
-// }
-
-
-
-// impl Add<f64> for &Time {
-//     type Output = Time;
-
-//     fn add(&self, dt: f64) -> Time {
-//         Time {
-//             epoch: self.epoch + dt,
-//             timescale: self.timescale,
-//             format: self.format,
-//         }
-//     }
-
-// }
 
 impl AddAssign<f64> for Time {
     fn add_assign(&mut self, dt: f64) {

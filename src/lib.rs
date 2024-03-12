@@ -1,6 +1,6 @@
 
 pub mod spacerock;
-    pub use spacerock::{SpaceRock, StateVector, KeplerOrbit, Properties};
+    pub use spacerock::{SpaceRock, StateVector, KeplerOrbit, Properties, CoordinateFrame};
 
 pub mod time;
     pub use time::Time;
@@ -9,9 +9,7 @@ pub mod constants;
     pub use constants::OBSERVATORIES;
 
 pub mod observing;
-    pub use observing::Detection;
-    pub use observing::Observatory;
-    pub use observing::Observer;
+    pub use observing::{Detection, Observatory, Observer};
 
 pub mod spice;
     pub use spice::SpiceKernel;

@@ -94,6 +94,12 @@ impl DetectionCatalog {
         create_mixed_array(rho_rates, py)
     }
 
+    #[getter]
+    pub fn mag(&self, py: Python) -> PyResult<Py<PyArray1<PyObject>>> {
+        let mags: Vec<Option<f64>> = self.observations.par_iter().map(|obs| obs.mag).collect();
+        create_mixed_array(mags, py)
+    }
+
     pub fn calc_altaz(&self, py: Python) -> PyResult<(Py<PyArray1<f64>>, Py<PyArray1<f64>>)> {
         
         // process the altaz in parallel, but hanfle errors

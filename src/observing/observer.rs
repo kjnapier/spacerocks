@@ -3,15 +3,18 @@ use nalgebra::Vector3;
 use crate::constants::ROTATION_MATRICES;
 
 use crate::spacerock::SpaceRock;
+use crate::spacerock::CoordinateFrame;
+
+use std::sync::Arc;
 
 const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Default)]
 pub struct Observer {
     pub position: Vector3<f64>,
     pub velocity: Vector3<f64>,
     pub epoch: Time,
-    pub frame: String,
+    pub frame: CoordinateFrame,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
     pub rho: Option<f64>,
@@ -24,19 +27,20 @@ impl Observer {
             position: position,
             velocity: velocity,
             epoch: epoch,
-            frame: "J2000".to_string(),
+            frame: CoordinateFrame::J2000,
             lat: None,
             lon: None,
             rho: None,
         }
     }
 
-    pub fn from_ground(position: Vector3<f64>, velocity: Vector3<f64>, epoch: Time, frame: &str, lat: f64, lon: f64, rho: f64) -> Self {
+    pub fn from_ground(position: Vector3<f64>, velocity: Vector3<f64>, epoch: Time, frame: &CoordinateFrame, lat: f64, lon: f64, rho: f64) -> Self {
+
         Observer {
             position: position,
             velocity: velocity,
             epoch: epoch,
-            frame: frame.to_string(),
+            frame: frame.clone(),
             lat: Some(lat),
             lon: Some(lon),
             rho: Some(rho),
@@ -68,14 +72,20 @@ impl Observer {
         return Ok(theta + lon)
     }
 
-    pub fn change_frame(&mut self, frame: &str) {
-        if frame != self.frame {
-            let inv = ROTATION_MATRICES[&self.frame].try_inverse().unwrap();
-            let rot = ROTATION_MATRICES[frame] * inv;
-            self.position = rot * self.position;
-            self.velocity = rot * self.velocity;
-            self.frame = frame.to_string();
+    pub fn change_frame(&mut self, frame: &CoordinateFrame) -> Result<(), Box<dyn std::error::Error>> {
+
+        if frame == &self.frame {
+            return Ok(());
         }
+
+        let inv = frame.get_rotation_matrix().try_inverse().ok_or("Could not invert rotation matrix")?;
+        let rot = &self.frame.get_rotation_matrix() * inv;
+
+        self.position = rot * self.position;
+        self.velocity = rot * self.velocity;
+        self.frame = frame.clone();
+        
+        Ok(())
     }
 
 }

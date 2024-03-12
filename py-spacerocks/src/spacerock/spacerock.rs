@@ -2,6 +2,14 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 
 use spacerocks::spacerock::SpaceRock;
+use spacerocks::spacerock::CoordinateFrame;
+
+use spacerocks::KeplerOrbit;
+use spacerocks::Properties;
+use spacerocks::constants::MU_BARY;
+use spacerocks::transforms::calc_xyz_from_kepM;
+
+use nalgebra::Vector3;
 
 use crate::time::time::PyTime;
 use crate::observing::detection::PyDetection;
@@ -21,7 +29,9 @@ impl PySpaceRock {
     #[pyo3(signature = (name, epoch, frame="J2000", origin="SSB"))]
     fn from_horizons(_cls: &PyType, name: &str, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
         let ep = &epoch.inner;
-        let rock = SpaceRock::from_horizons(name, ep, frame, origin);
+
+        let frame = CoordinateFrame::from_str(frame).unwrap();
+        let rock = SpaceRock::from_horizons(name, ep, &frame, origin);
         if rock.is_err() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to create SpaceRock from Horizons for name: {}", name)));
         }
@@ -32,7 +42,9 @@ impl PySpaceRock {
     #[pyo3(signature = (name, epoch, frame="J2000", origin="SSB"))]
     fn from_spice(_cls: &PyType, name: &str, epoch: &PyTime, frame: &str, origin: &str) -> PyResult<Self> {
         let ep = &epoch.inner;
-        let rock = SpaceRock::from_spice(name, &ep, frame, origin);
+
+        let frame = CoordinateFrame::from_str(frame).unwrap();
+        let rock = SpaceRock::from_spice(name, &ep, &frame, origin);
         Ok(PySpaceRock { inner: rock })
     }
 
@@ -44,8 +56,46 @@ impl PySpaceRock {
     #[classmethod]
     fn from_xyz(_cls: &PyType, name: &str, x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
         let ep = &epoch.inner;
-        let rock = SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, ep.clone(), frame, origin);
+
+        let frame = CoordinateFrame::from_str(frame).unwrap();
+        let rock = SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, ep.clone(), &frame, origin);
         Ok(PySpaceRock { inner: rock })
+    }
+
+    #[classmethod]
+    #[pyo3(signature = (name, a, e, inc, arg, node, M, epoch, frame="ECLIPJ2000", origin="SSB"))]
+    fn from_kepler(_cls: &PyType, name: &str, a: f64, e: f64, inc: f64, arg: f64, node: f64, M: f64, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
+        let ep = &epoch.inner;
+        let state = calc_xyz_from_kepM(a, e, inc, arg, node, M);
+        let acceleration = Vector3::new(0.0, 0.0, 0.0);
+
+        // let frame = CoordinateFrame::from_str(frame).unwrap();
+        let frame = CoordinateFrame::from_str(frame).unwrap();
+
+        let rock = SpaceRock {
+            name: name.to_string().into(),
+            position: state.position,
+            velocity: state.velocity,
+            acceleration: acceleration,
+            epoch: ep.clone(),
+            mu: Some(MU_BARY),
+            frame: frame,
+            origin: origin.to_string().into(),
+            orbit: None,
+            mass: 0.0,
+            properties: None,
+        };
+        Ok(PySpaceRock { inner: rock })
+    }
+
+    fn set_absolute_magnitude(&mut self, H: f64) {
+        let properties = Properties {
+            H: Some(H),
+            Gslope: Some(0.15),
+            radius: None,
+            albedo: None,
+        };
+        self.inner.properties = Some(properties);
     }
     
     fn __repr__(&self) -> String {
@@ -57,11 +107,9 @@ impl PySpaceRock {
     }
 
     fn observe(&mut self, observer: &PyObserver) -> PyResult<PyDetection> {
-        if observer.inner.frame != "J2000" {
-            // return an error
+        if observer.inner.frame != CoordinateFrame::J2000 {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Observer frame is not J2000. Cannot observe rocks.")));
         }
-
         let obs = self.inner.observe(&observer.inner);
         Ok(PyDetection { inner: obs })
     }
@@ -82,12 +130,12 @@ impl PySpaceRock {
 
     #[getter]
     fn frame(&self) -> String {
-        self.inner.frame.clone()
+        self.inner.frame.to_string()
     }
 
     #[getter]
     fn origin(&self) -> String {
-        self.inner.origin.clone()
+        self.inner.origin.to_string()   
     }
 
     #[getter]
@@ -145,7 +193,7 @@ impl PySpaceRock {
 
     #[getter]
     fn name(&self) -> String {
-        self.inner.name.clone()
+        (*self.inner.name).clone()
     }
 
     #[getter]

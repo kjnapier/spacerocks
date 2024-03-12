@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::SpaceRock;
 use crate::constants::GRAVITATIONAL_CONSTANT;
 use crate::time::Time;
+use crate::spacerock::CoordinateFrame;
 
 
 use crate::nbody::forces::{Force, NewtonianGravity, Drag, SolarGR};
@@ -12,13 +13,14 @@ use crate::nbody::integrators::{Integrator, Leapfrog, IAS15};
 use nalgebra::Vector3;
 
 use rayon::prelude::*;
+use std::sync::Arc;
 
 pub struct Simulation {
     pub particles: Vec<SpaceRock>,
     pub epoch: Time,
     pub particle_index_map: HashMap<String, usize>,
 
-    pub frame: Option<String>,
+    pub frame: Option<CoordinateFrame>,
     pub origin: Option<String>,
 
     pub integrator: Box<dyn Integrator + Send + Sync>,
@@ -37,16 +39,75 @@ impl Simulation {
                     particle_index_map: HashMap::new()}
     }
 
+    pub fn giants(epoch: &Time, frame: &CoordinateFrame, origin: &str) -> Result<Simulation, String> {
+        let mut sim = Simulation::new();
+        sim.epoch = epoch.clone();
+        sim.frame = Some(frame.clone());
+        sim.origin = Some("SSB".to_string());
+        sim.integrator = Box::new(IAS15::new(1.0));
+        sim.add_force(Box::new(NewtonianGravity));
+
+        // add sun, jupiter barycenter, saturn barycenter, uranus barycenter, neptune barycenter.
+        for name in ["sun", "jupiter barycenter", "saturn barycenter", "uranus barycenter", "neptune barycenter"].iter() {
+            let mut particle = SpaceRock::from_spice(name, epoch, frame, origin);
+            sim.add(particle)?;
+        }
+        Ok(sim)
+    }
+
+    pub fn planets(epoch: &Time, frame: &CoordinateFrame, origin: &str) -> Result<Simulation, String> {
+        let mut sim = Simulation::new();
+        sim.epoch = epoch.clone();
+        sim.frame = Some(frame.clone());
+        sim.origin = Some("SSB".to_string());
+        sim.integrator = Box::new(IAS15::new(1.0));
+        sim.add_force(Box::new(NewtonianGravity));
+
+        let names = ["sun", "mercury barycenter", "venus barycenter", "earth", "moon", "mars barycenter", "jupiter barycenter", 
+                     "saturn barycenter", "uranus barycenter", "neptune barycenter"];
+        for name in names.iter() {
+            let mut particle = SpaceRock::from_spice(name, epoch, frame, origin);
+            sim.add(particle)?;
+        }
+        Ok(sim)
+    }
+
+    pub fn horizons(epoch: &Time, frame: &CoordinateFrame, origin: &str) -> Result<Simulation, String> {
+        let mut sim = Simulation::new();
+        sim.epoch = epoch.clone();
+        sim.frame = Some(frame.clone());
+        sim.origin = Some("SSB".to_string());
+        sim.integrator = Box::new(IAS15::new(1.0));
+        sim.add_force(Box::new(NewtonianGravity));
+
+        // let names = ["sun", "mercury barycenter", "venus barycenter", "earth", "moon", "mars barycenter", "jupiter barycenter", 
+        //              "saturn barycenter", "uranus barycenter", "neptune barycenter", "pluto barycenter", "2000001", "2000002", 
+        //                 "2000003", "2000004", "2000007", "2000010", "2000015", "2000016", "2000031", "2000052", "2000065", "2000087",
+        //                 "2000088", "2000107", "2000433", "2000511", "2000704"];
+
+        let names = ["sun", "mercury barycenter", "venus barycenter", "earth", "moon", "mars barycenter", "jupiter barycenter", 
+                     "saturn barycenter", "uranus barycenter", "neptune barycenter", "pluto barycenter", "2000001", "2000002", 
+                        "2000003", "2000004", "2000007", "2000010", "2000015", "2000016", "2000031", "2000052", "2000065", "2000087",
+                        "2000088", "2000107", "2000511", "2000704"];
+        for name in names.iter() {
+            let mut particle = SpaceRock::from_spice(name, epoch, frame, origin);
+            sim.add(particle)?;
+        }
+        Ok(sim)
+    }
+
     pub fn add(&mut self, mut particle: SpaceRock) -> Result<(), String> {
 
         // if the origin is None, set it to be the origin of the first rock
         if self.origin.is_none() {
-            self.origin = Some(particle.origin.clone());
+            // self.origin = Some(particle.origin.clone());
+            self.origin = Some((*particle.origin).clone());
             println!("Setting origin to {}", particle.origin.clone());
         }
 
         if self.frame.is_none() {
             self.frame = Some(particle.frame.clone());
+            // self.frame = Some((*particle.frame).clone());
             println!("Setting frame to {}", particle.frame);
         }
 
@@ -54,12 +115,13 @@ impl Simulation {
             return Err(format!("The epoch of {} particle ({:?}) did not match the simulation epoch", particle.name, particle.epoch));
         }
 
-        if Some(particle.origin.clone()) != self.origin {
-            if !self.particle_index_map.contains_key(&particle.origin.clone()) {
+        // if Some(particle.origin.clone()) != self.origin {
+        if Some((*particle.origin).clone()) != self.origin {
+            if !self.particle_index_map.contains_key(&(*particle.origin).clone()) {
                 return Err(format!("The origin of the particle ({}) did not match the simulation origin, and was not found in perturbers", particle.origin.clone()));
             }
 
-            let origin = &self.particles[self.particle_index_map[&particle.origin.clone()]];
+            let origin = &self.particles[self.particle_index_map[&(*particle.origin).clone()]];
             particle.change_origin(&origin);
 
             // log the change of origin to console
@@ -69,7 +131,9 @@ impl Simulation {
         particle.change_frame(self.frame.clone().unwrap().as_str());
         particle.orbit = None;
 
-        self.particle_index_map.insert(particle.name.clone(), self.particles.len());
+        // self.particle_index_map.insert(particle.name.clone(), self.particles.len());
+
+        self.particle_index_map.insert((*particle.name).clone(), self.particles.len());
         self.particles.push(particle);
 
         Ok(())
@@ -126,7 +190,7 @@ impl Simulation {
         let mut origin = SpaceRock::from_xyz("ssb", 
                                              x, y, z, vx, vy, vz, 
                                              self.epoch.clone(), 
-                                             self.frame.clone().unwrap().as_str(), 
+                                             &self.frame.clone().unwrap(),
                                              self.origin.clone().unwrap().as_str());
         origin.mass = total_mass;
 
@@ -159,21 +223,60 @@ impl Simulation {
     pub fn integrate(&mut self, epoch: &Time) {
 
         let mut epoch = epoch.clone();
-        epoch.change_timescale(self.epoch.timescale.as_str());
+        epoch.change_timescale(self.epoch.timescale.clone());
 
         let dt = &epoch - &self.epoch;
+        
 
-        if dt == 0.0 {
+        if dt.abs() < 1e-16 {
             return;
         }
 
         if dt < 0.0 {
-            self.integrator.set_timestep(-self.integrator.timestep());
+            if self.integrator.timestep() > 0.0 {
+                self.integrator.set_timestep(-self.integrator.timestep());
+            }
         }
 
-        while (&self.epoch - &epoch).abs() >= self.integrator.timestep().abs() {
+        while true {
+            let dt = &epoch - &self.epoch;
+
+            if dt.abs() < self.integrator.timestep().abs() {
+                break;
+            }
+
+            if dt < 0.0 {
+                if self.integrator.timestep() > 0.0 {
+                    self.integrator.set_timestep(-self.integrator.timestep());
+                }
+            } else {
+                if self.integrator.timestep() < 0.0 {
+                    self.integrator.set_timestep(-self.integrator.timestep());
+                }
+            }
+
             self.step();
-        }       
+        }
+
+        
+
+        // while (&self.epoch - &epoch).abs() > self.integrator.timestep().abs() {
+        //     println!("dt = {}", dt);
+        //     println!("diff = {}", &self.epoch - &epoch);
+        //     println!("timestep = {}", self.integrator.timestep());
+        //     println!("epoch is {}", self.epoch.epoch);
+
+        //     // sleep for a bit
+        //     std::thread::sleep(std::time::Duration::from_millis(1000));
+
+        //     self.step();
+        // }      
+        
+        let dt = &epoch - &self.epoch;
+        if dt.abs() < 1e-16 {
+            return;
+        }
+
 
         // create an exact match for the epoch
         let old_timestep = self.integrator.timestep();

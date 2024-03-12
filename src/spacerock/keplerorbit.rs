@@ -63,4 +63,8 @@ impl KeplerOrbit {
         return (self.arg + self.node) % (2.0 * std::f64::consts::PI);
     }
 
+    pub fn q(&self) -> f64 {
+        return self.a * (1.0 - self.e);
+    }
+
 }

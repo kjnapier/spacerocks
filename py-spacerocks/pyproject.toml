@@ -18,5 +18,3 @@ keywords = ["rust", "python", "binding"]
 [project.urls]
 # Documentation = "https://readthedocs.org"
 Repository = "https://github.com/kjnapier/spacerocks/tree/v3"
-# Issues = "https://github.com/me/spam/issues"
-# Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"

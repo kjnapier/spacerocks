@@ -5,6 +5,8 @@ use pyo3::exceptions::PyIndexError;
 use rayon::prelude::*;
 
 use spacerocks::spacerock::SpaceRock;
+use spacerocks::spacerock::CoordinateFrame;
+use spacerocks::Detection;
 
 use crate::time::time::PyTime;
 use crate::spacerock::spacerock::PySpaceRock;
@@ -12,9 +14,22 @@ use crate::observing::observer::PyObserver;
 use crate::observing::detectioncatalog::DetectionCatalog;
 
 use std::collections::HashMap;
-
+use std::sync::Arc;
 
 use numpy::{PyArray1, IntoPyArray};
+
+pub fn create_mixed_array<T: pyo3::ToPyObject>(data: Vec<Option<T>>, py: Python) -> PyResult<Py<PyArray1<PyObject>>> {
+
+    let numpy_array: Vec<_> = data.into_iter()
+            .map(|opt| match opt {
+                    Some(value) => value.to_object(py),
+                    None => py.None(),
+                }
+            ).collect();
+
+    Ok(numpy_array.into_pyarray(py).to_owned())
+    
+}
 
 
 #[pyclass]
@@ -35,17 +50,19 @@ impl RockCollection {
         let rocks: Vec<SpaceRock> = (0..n).into_par_iter().map(|_| SpaceRock::random()).collect();
         let mut name_hash_map = HashMap::new();
         for (i, rock) in rocks.iter().enumerate() {
-            name_hash_map.insert(rock.name.clone(), i);
+            // name_hash_map.insert((*rock.name).clone(), i);
+            name_hash_map.insert(rock.name.to_string(), i);
         }
         RockCollection { rocks: rocks, name_hash_map: name_hash_map }
     }
 
     pub fn add(&mut self, rock: PyRef<PySpaceRock>) -> Result<(), PyErr> {
         // if the name is already in the hashmap, return an error
-        if self.name_hash_map.contains_key(&rock.inner.name) {
+        if self.name_hash_map.contains_key(&rock.inner.name.to_string()) {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("There is already a rock with name {} in the RockCollection", rock.inner.name)));
         }
-        self.name_hash_map.insert(rock.inner.name.clone(), self.rocks.len());
+        // self.name_hash_map.insert((*rock.inner.name).clone(), self.rocks.len());
+        self.name_hash_map.insert(rock.inner.name.to_string(), self.rocks.len());
         self.rocks.push(rock.inner.clone());
         Ok(())
     }
@@ -74,12 +91,14 @@ impl RockCollection {
 
     pub fn observe(&mut self, observer: PyRef<PyObserver>) -> PyResult<DetectionCatalog> {
         let o = observer.inner.clone();
-        if o.frame != "J2000" {
-            // return an error
+
+        if o.frame != CoordinateFrame::J2000 {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Observer frame is not J2000. Cannot observe rocks.")));
         }
-        let observations: Vec<_> = self.rocks.par_iter_mut().map(|rock| rock.observe(&o)).collect();
-        Ok(DetectionCatalog { observations: observations })        
+
+        let observations: Vec<_> = self.rocks.par_iter_mut().map(|rock| rock.observe(&o)).collect();      
+        Ok(DetectionCatalog { observations: observations })     
+        
     }
 
     pub fn analytic_propagate(&mut self, t: PyRef<PyTime>) {
@@ -93,7 +112,7 @@ impl RockCollection {
 
     #[getter]
     pub fn frame(&self) -> Vec<String> {
-        let frames = self.rocks.par_iter().map(|rock| rock.frame.clone()).collect::<Vec<String>>();
+        let frames = self.rocks.par_iter().map(|rock| rock.frame.to_string()).collect::<Vec<String>>();
         frames
     }
 
@@ -142,9 +161,21 @@ impl RockCollection {
     }
 
     #[getter]
-    pub fn name(&self) -> Vec<String> {
-        self.rocks.par_iter().map(|rock| rock.name.clone()).collect()
+    pub fn r(&self, py: Python) -> Py<PyArray1<f64>> {
+        let r: Vec<f64> = self.rocks.par_iter().map(|rock| rock.r()).collect();
+        r.into_pyarray(py).to_owned()
     }
+
+    // #[getter]
+    // pub fn name(&self) -> Vec<String> {
+    //     self.rocks.par_iter().map(|rock| rock.name.clone()).collect()
+    // }
+    #[getter] 
+    pub fn name(&self, py: Python) -> PyResult<Py<PyArray1<PyObject>>> {
+        let names: Vec<Option<String>> = self.rocks.par_iter().map(|rock| Some((*rock.name).clone())).collect();
+        create_mixed_array(names, py)
+    }
+
 
     #[getter]
     pub fn node(&self) -> Vec<f64> {

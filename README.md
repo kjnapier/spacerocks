@@ -9,7 +9,7 @@
 
 `spacerocks` is a software package that puts the solar system at your fingertips. 
 
-The whole package is written in `Rust` and is exposed to `Python` using [PyO3](https://github.com/PyO3/pyo3).
+The package is written in `Rust` and is exposed to `Python` using [PyO3](https://github.com/PyO3/pyo3).
 
 
 ## Python Installation

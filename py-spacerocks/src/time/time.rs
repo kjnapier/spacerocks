@@ -32,7 +32,7 @@ impl PyTime {
     }
 
     fn __repr__(&self) -> String {
-        format!("Time: {} {} {}", self.inner.epoch, self.inner.timescale, self.inner.format)
+        format!("Time: {} {:?} {:?}", self.inner.epoch, self.inner.timescale, self.inner.format)
     }
 
     #[getter]
@@ -42,12 +42,19 @@ impl PyTime {
 
     #[getter]
     fn timescale(&self) -> &str {
-        &self.inner.timescale
+        // &self.inner.timescale
+        match self.inner.timescale {
+            spacerocks::time::TimeScale::TDB => "TDB",
+            spacerocks::time::TimeScale::UTC => "UTC",
+        }
     }
 
     #[getter]
     fn format(&self) -> &str {
-        &self.inner.format
+        // &self.inner.format
+        match self.inner.format {
+            spacerocks::time::TimeFormat::JD => "JD",
+        }
     }
 
     fn calendar(&self) -> String {

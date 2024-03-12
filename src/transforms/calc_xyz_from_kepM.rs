@@ -43,10 +43,12 @@ pub fn calc_xyz_from_kepM(a: f64, e: f64, inc: f64, arg: f64, node: f64, M: f64)
     }
 
     let sa = arg.sin();
-    let si = inc.sin();
-    let sn = node.sin();
     let ca = arg.cos();
+
+    let si = inc.sin();
     let ci = inc.cos();
+    
+    let sn = node.sin();
     let cn = node.cos();
 
     let c1 = ca * cn - sa * sn * ci;

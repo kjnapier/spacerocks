@@ -20,7 +20,7 @@ impl PyDetection {
     pub fn new(name: String, ra: f64, dec: f64, epoch: PyRef<PyTime>, observer: PyRef<PyObserver>, mag: Option<f64>, 
                filter: Option<String>, ra_uncertainty: Option<f64>, dec_uncertainty: Option<f64>) -> Self {
         let inner = Detection {
-            name,
+            name: name.into(),
             epoch: epoch.inner.clone(),
             observer: observer.inner.clone(),
             ra,
@@ -47,7 +47,7 @@ impl PyDetection {
     #[classmethod]
     pub fn streak(_cls: &PyType, name: String, ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, epoch: PyRef<PyTime>, observer: PyRef<PyObserver>, mag: Option<f64>, filter: Option<String>) -> Self {
         let inner = Detection {
-            name,
+            name: name.into(),
             epoch: epoch.inner.clone(),
             observer: observer.inner.clone(),
             ra,

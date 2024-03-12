@@ -16,3 +16,17 @@ pub fn calc_E_from_f(e: f64, f: f64) -> f64 {
     }
     return E;
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calc_E_from_f() {
+        let e = 0.0;
+        let f = 0.0;
+        let result = calc_E_from_f(e, f);
+        assert_eq!(result, 0.0);
+    }
+}

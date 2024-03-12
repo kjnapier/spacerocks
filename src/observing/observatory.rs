@@ -1,4 +1,6 @@
 use crate::SpaceRock;
+use crate::CoordinateFrame;
+
 use crate::observing::observer::Observer;
 use crate::constants::{DEG_TO_RAD, M_TO_AU, EQUAT_RAD};
 use crate::constants::OBSERVATORIES;
@@ -41,13 +43,6 @@ impl Observatory {
         }
     }
 
-    // pub fn from_coordinates(lat: f64, lon: f64, elevation: f64) -> Self {
-    //     Observatory {
-    //         lat: lat,
-    //         lon: lon,
-    //         elevation: elevation
-    //     }
-    // }
 
     pub fn lat(&self) -> f64 {
         return self.rho_sin_lat.atan2(self.rho_cos_lat)
@@ -59,7 +54,7 @@ impl Observatory {
 
     pub fn at(&self, epoch: &Time) -> Observer {
 
-        let mut earth = SpaceRock::from_spice("earth", epoch, "J2000", "SSB");
+        let mut earth = SpaceRock::from_spice("earth", epoch, &CoordinateFrame::J2000, "ssb");
 
         // compute the topocentric correction to the position of the observatory using the local sidereal time
         // let [d_pos, d_vel] = compute_topocentric_correction(self.lon, self.lat, self.elevation, epoch.epoch);

@@ -4,6 +4,9 @@ use crate::KeplerOrbit;
 use crate::Properties;
 use crate::observing::Observer;
 use crate::observing::Detection;
+use crate::spacerock::CoordinateFrame;
+use crate::time::TimeFormat;
+use crate::time::TimeScale;
 
 use crate::time::Time;
 
@@ -19,35 +22,41 @@ use nalgebra::Vector3;
 use rand;
 use rand::Rng;
 
+use std::sync::Arc;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpaceRock {
 
-    pub name: String,
+    pub name: Arc<String>,
     pub epoch: Time,
+    pub frame: CoordinateFrame,
 
-    pub frame: String,
-    pub origin: String,
-    pub mass: f64,
+    pub origin: Arc<String>,
+    pub mu: Option<f64>,
 
     pub position: Vector3<f64>,
     pub velocity: Vector3<f64>,
     pub acceleration: Vector3<f64>,
 
-    pub mu: Option<f64>,
+    pub mass: f64,
     pub orbit: Option<KeplerOrbit>,
     pub properties: Option<Properties>,
 
 }
 
+
 #[allow(dead_code)]
 impl SpaceRock {
 
     // Instantiation Methods
-    pub fn from_spice(name: &str, epoch: &Time, frame: &str, origin: &str) -> Self {
+    pub fn from_spice(name: &str, epoch: &Time, frame: &CoordinateFrame, origin: &str) -> Self {
+
+        // let frame = CoordinateFrame::from_str(frame).unwrap();
+
         let mut ep = epoch.clone();
         ep.to_utc();
         let et = spice::str2et(&format!("JD{epoch} UTC", epoch=ep.epoch));
-        let (state, _) = spice::spkezr(name, et, frame, "NONE", origin);
+        let (state, _) = spice::spkezr(name, et, frame.as_str(), "NONE", origin);
         let position = Vector3::new(state[0], state[1], state[2]) * KM_TO_AU;
         let velocity = Vector3::new(state[3], state[4], state[5]) * KM_TO_AU * SECONDS_PER_DAY;
         let acceleration = Vector3::new(0.0, 0.0, 0.0);
@@ -63,77 +72,86 @@ impl SpaceRock {
         }
 
         SpaceRock {
-            name: name.to_string(), 
+            name: name.to_string().into(),
             position: position,
             velocity: velocity,
             acceleration: acceleration,
             mu: mu,
             epoch: epoch.clone(),
-            frame: frame.to_string(),
-            origin: origin.to_string(),
+            frame: frame.clone(),
+            origin: origin.to_string().into(),
             orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: mass,
             properties: None,
         }
     }
 
-    pub fn from_xyz(name: &str, x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, epoch: Time, frame: &str, origin: &str) -> Self {
+    pub fn from_xyz(name: &str, x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, epoch: Time, frame: &CoordinateFrame, origin: &str) -> Self {
+
+        // let frame = CoordinateFrame::from_str(frame).unwrap();
+
         let position = Vector3::new(x, y, z);
         let velocity = Vector3::new(vx, vy, vz);
         let acceleration = Vector3::new(0.0, 0.0, 0.0);
         SpaceRock {
-            name: name.to_string(),
+            name: name.to_string().into(),
             position: position,
             velocity: velocity,
             acceleration: acceleration,
             epoch: epoch,
             mu: Some(MU_BARY),
-            frame: frame.to_string(),
-            origin: origin.to_string(),
+            frame: frame.clone(),
+            origin: origin.to_string().into(),
             orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: 0.0,
             properties: None,
         }
     }
 
-    pub fn from_state(name: &str, state: StateVector, epoch: Time, frame: &str, origin: &str) -> Self {
+    pub fn from_state(name: &str, state: StateVector, epoch: Time, frame: &CoordinateFrame, origin: &str) -> Self {
+
+        // let frame = CoordinateFrame::from_str(frame).unwrap();
+
         let position = state.position;
         let velocity = state.velocity;
         let acceleration = Vector3::new(0.0, 0.0, 0.0);
         SpaceRock {
-            name: name.to_string(),
+            name: name.to_string().into(),
             position: position,
             velocity: velocity,
             acceleration: acceleration,
             epoch: epoch,
             mu: Some(MU_BARY),
-            frame: frame.to_string(),
-            origin: origin.to_string(),
+            frame: frame.clone(),
+            origin: origin.to_string().into(),
             orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: 0.0,
             properties: None,
         }
     }
 
-    pub fn from_kepler(name: &str, orbit: KeplerOrbit, epoch: Time, frame: &str, origin: &str) -> Self {
+    pub fn from_kepler(name: &str, orbit: KeplerOrbit, epoch: Time, frame: &CoordinateFrame, origin: &str) -> Self {
+
+        // let frame = CoordinateFrame::from_str(frame).unwrap();
+
         let state = calc_xyz_from_kepM(orbit.a, orbit.e, orbit.inc, orbit.arg, orbit.node, orbit.M());
         let acceleration = Vector3::new(0.0, 0.0, 0.0);
         SpaceRock {
-            name: name.to_string(),
+            name: name.to_string().into(),
             position: state.position,
             velocity: state.velocity,
             acceleration: acceleration,
             epoch: epoch,
             mu: Some(MU_BARY),
-            frame: frame.to_string(),
-            origin: origin.to_string(),
+            frame: frame.clone(),
+            origin: origin.to_string().into(),
             orbit: Some(orbit),
             mass: 0.0,
             properties: None,
         }
     }
 
-    pub fn from_horizons(name: &str, epoch: &Time, frame: &str, origin: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_horizons(name: &str, epoch: &Time, frame: &CoordinateFrame, origin: &str) -> Result<Self, Box<dyn std::error::Error>> {
 
         let client = reqwest::blocking::Client::new();
 
@@ -146,15 +164,32 @@ impl SpaceRock {
         ep.to_tdb();
 
         params.insert("command", command_str.as_str());
-        let start_time = format!("'JD {}TDB'", ep.epoch);
+
+        let timescale = &ep.timescale.as_str().to_uppercase();
+
+        let start_time = format!("'JD {}{}'", ep.epoch, timescale);
         let stop_time = format!("'JD {}'", ep.epoch + 1.0);
 
+        // match frame {
+        //     "J2000" => {
+        //         params.insert("ref_system", "'J2000'");
+        //         params.insert("ref_plane", "'frame'");
+        //     },
+        //     "ECLIPJ2000" => {
+        //         params.insert("ref_system", "'J2000'");
+        //         params.insert("ref_plane", "'ecliptic'");
+        //     },
+        //     _ => {
+        //         return Err("Frame not recognized".into());
+        //     }
+        // }
+
         match frame {
-            "J2000" => {
+            CoordinateFrame::J2000 => {
                 params.insert("ref_system", "'J2000'");
                 params.insert("ref_plane", "'frame'");
             },
-            "ECLIPJ2000" => {
+            CoordinateFrame::ECLIPJ2000 => {
                 params.insert("ref_system", "'J2000'");
                 params.insert("ref_plane", "'ecliptic'");
             },
@@ -192,7 +227,11 @@ impl SpaceRock {
         let first_data_line = lines.iter().skip_while(|&line| !line.starts_with("$$SOE")).skip(1).next().ok_or("No data")?;
         
         let data: Vec<f64> = first_data_line.split(',').filter_map(|s| s.trim().parse::<f64>().ok()).collect();
-        let epoch = Time { epoch: data[0], timescale: "tdb".to_string(), format: "jd".to_string() };
+        // let epoch = Time { epoch: data[0], timescale: "tdb".to_string(), format: "jd".to_string() };
+        // let epoch = Time { epoch: data[0], timescale: "tdb".to_string().into(), format: "jd".to_string().into() };
+        let mut epoch = Time { epoch: data[0], timescale: TimeScale::TDB, format: TimeFormat::JD };
+        epoch.to_utc();
+
         let (x, y, z, vx, vy, vz) = (data[1], data[2], data[3], data[4], data[5], data[6]);
         // let (dx, dy, dz, dvx, dvy, dvz) = (data[7], data[8], data[9], data[10], data[11], data[12]);
 
@@ -200,15 +239,17 @@ impl SpaceRock {
         let velocity = Vector3::new(vx, vy, vz);
         let acceleration = Vector3::new(0.0, 0.0, 0.0);
 
+        // let frame = CoordinateFrame::from_str(frame).unwrap();
+
         let rock = SpaceRock {
-            name: name.to_string(),
+            name: name.to_string().into(),
             position: position,
             velocity: velocity,
             acceleration: acceleration,
             mu: Some(MU_BARY),
             epoch: epoch,
-            frame: frame.to_string(),
-            origin: origin.to_string(),
+            frame: frame.clone(),
+            origin: origin.to_string().into(),
             orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: 0.0,
             properties: None,
@@ -228,7 +269,7 @@ impl SpaceRock {
         // uuid for name
         let name = format!("{}", uuid::Uuid::new_v4().simple());
 
-        SpaceRock::from_kepler(&name, KeplerOrbit::new(a, e, inc, arg, node, f), Time::now(), "ECLIPJ2000", "SSB")
+        SpaceRock::from_kepler(&name, KeplerOrbit::new(a, e, inc, arg, node, f), Time::now(), &CoordinateFrame::J2000, "ssb")
     }
 
     // Methods
@@ -242,7 +283,7 @@ impl SpaceRock {
         let timescale = &self.epoch.timescale;
         let mut epoch = epoch.clone();
 
-        epoch.change_timescale(timescale);
+        epoch.change_timescale(timescale.clone());
         let dt = epoch.epoch - self.epoch.epoch;
 
         // check that self.orbit is not None
@@ -250,19 +291,6 @@ impl SpaceRock {
             None => self.calculate_orbit(),
             _ => (),
         }
-
-        // if let Some(orbit) = &mut self.orbit {
-        //     let dM = orbit.n() * dt;
-        //     let M_new = orbit.M() + dM;
-        //     let new_state = calc_xyz_from_kepM(orbit.a, orbit.e, orbit.inc, orbit.arg, orbit.node, M_new);
-        //     self.position = Vector3::new(new_state.position[0], new_state.position[1], new_state.position[2]);
-        //     self.velocity = Vector3::new(new_state.velocity[0], new_state.velocity[1], new_state.velocity[2]);
-        //     self.epoch = epoch;
-
-        //     let new_eccentric_anomaly = calc_E_from_M(orbit.e, M_new);
-        //     let new_true_anomaly = calc_f_from_E(orbit.e, new_eccentric_anomaly);
-        //     orbit.f = new_true_anomaly;
-        // }        
 
         if let Some(orbit) = &self.orbit {
             let dM = orbit.n() * dt;
@@ -277,8 +305,6 @@ impl SpaceRock {
 
     pub fn observe(&mut self, observer: &Observer) -> Detection {
 
-        // Make sure the rock is in the J2000 frame
-        let original_frame = self.frame.clone();
         self.change_frame("J2000");
 
         // Calculate the topocentric state, correct for light travel time
@@ -354,25 +380,29 @@ impl SpaceRock {
         };
 
         // Change the frame back to the original frame
-        self.change_frame(&original_frame);
+        // self.change_frame(&original_frame);
         
         return obs;
     }
 
     pub fn change_frame(&mut self, frame: &str) -> Result<(), Box<dyn std::error::Error>> {
-        if frame != self.frame {
-            let inv = ROTATION_MATRICES[&self.frame].try_inverse().ok_or("Could not invert rotation matrix")?;
-            let rot = ROTATION_MATRICES[frame] * inv;
-            self.position = rot * self.position;
-            self.velocity = rot * self.velocity;
-            self.frame = frame.to_string();
-            self.orbit = Some(KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity}));
+
+        let frame = CoordinateFrame::from_str(frame)?;
+        if frame == self.frame {
+            return Ok(());
         }
+
+        let inv = self.frame.get_rotation_matrix().try_inverse().ok_or("Could not invert rotation matrix")?;
+        let rot = frame.get_rotation_matrix() * inv;
+
+        self.position = rot * self.position;
+        self.velocity = rot * self.velocity;
+        self.frame = frame;
+
         Ok(())
     }
 
     pub fn change_origin(&mut self, origin: &SpaceRock) {
-        // Change the origin to a new body, and set the new mu.
 
         let origin_position = origin.position;
         let origin_velocity = origin.velocity;
@@ -381,20 +411,20 @@ impl SpaceRock {
         self.velocity -= origin_velocity;
 
         self.mu = Some(origin.mass * GRAVITATIONAL_CONSTANT);
-        self.origin = origin.name.to_string();
+        self.origin = (*origin.name).clone().into();
         self.orbit = Some(KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity}));
     }
 
     pub fn to_ssb(&mut self) {
         // get the ssb from spice
-        let mut ssb = SpaceRock::from_spice("ssb", &self.epoch, self.frame.as_str(), self.origin.as_str());
+        let mut ssb = SpaceRock::from_spice("ssb", &self.epoch, &self.frame, self.origin.as_ref());
         ssb.mass = MU_BARY / GRAVITATIONAL_CONSTANT;
         self.change_origin(&ssb);
     }
 
     pub fn to_helio(&mut self) {
         // get the sun from spice
-        let sun = SpaceRock::from_spice("sun", &self.epoch, self.frame.as_str(), self.origin.as_str());
+        let sun = SpaceRock::from_spice("sun", &self.epoch, &self.frame, self.origin.as_ref());
         self.change_origin(&sun);
     }
 
