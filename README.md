@@ -14,10 +14,10 @@ The package is written in `Rust` and is exposed to `Python` using [PyO3](https:/
 
 ## Python Installation
 
-To install `spacerocks` from `PyPI`, run the following command:
+<!-- To install `spacerocks` from `PyPI`, run the following command:
 ```bash
 pip install spacerocks
-```
+``` -->
 
 To install from source, you will need to have `Rust` and `maturin` installed.
 ```bash
