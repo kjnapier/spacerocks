@@ -13,9 +13,9 @@ include = ["/src"]
 nalgebra = "0.32.2"
 rust-spice = "0.7.4"
 lazy_static = "1.4.0"
-phf = {version = "*", features = ["macros"]}
+phf = {version = "0.11.2", features = ["macros"]}
 reqwest = { version = "0.11.4", features = ["json", "blocking"] }
-rayon = "*"
+rayon = "1.9"
 indicatif = "0.16.2"
 chrono = "0.4.19"
 rand = "0.8.5"
