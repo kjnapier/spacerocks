@@ -4,8 +4,8 @@ pub mod simulation;
 pub mod integrator;
 pub mod force;
 
-use crate::nbody::integrator::PyIntegrator;
-use crate::nbody::force::PyForce;
+use crate::py_nbody::integrator::PyIntegrator;
+use crate::py_nbody::force::PyForce;
 
 
 pub fn make_nbody_submodule(py: Python, m: &PyModule) -> PyResult<()> {

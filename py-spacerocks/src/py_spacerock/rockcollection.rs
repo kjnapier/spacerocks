@@ -8,10 +8,10 @@ use spacerocks::spacerock::SpaceRock;
 use spacerocks::spacerock::CoordinateFrame;
 use spacerocks::Detection;
 
-use crate::time::time::PyTime;
-use crate::spacerock::spacerock::PySpaceRock;
-use crate::observing::observer::PyObserver;
-use crate::observing::detectioncatalog::DetectionCatalog;
+use crate::py_time::time::PyTime;
+use crate::py_spacerock::spacerock::PySpaceRock;
+use crate::py_observing::observer::PyObserver;
+use crate::py_observing::detectioncatalog::DetectionCatalog;
 
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 
 use spacerocks::observing::Observer;
+use spacerocks::spacerock::CoordinateFrame;
 
 use numpy::{PyArray1, IntoPyArray};
 
@@ -32,6 +33,11 @@ impl PyObserver {
         vel.into_pyarray(py).to_owned()
     }
 
+    fn change_frame(&mut self, new_frame: &str) {
+        let frame = CoordinateFrame::from_str(new_frame).unwrap();
+        self.inner.change_frame(&frame);
+    }
+
     #[getter]
     fn lat(&self) -> Option<f64> {
         self.inner.lat
@@ -45,6 +51,11 @@ impl PyObserver {
     #[getter]
     fn rho(&self) -> Option<f64> {
         self.inner.rho
+    }
+
+    #[getter]
+    fn frame(&self) -> String {
+        self.inner.frame.to_string()
     }
     
 }

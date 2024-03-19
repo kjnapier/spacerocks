@@ -8,7 +8,7 @@ use pyo3::exceptions::PyIndexError;
 
 use numpy::{PyArray1, IntoPyArray};
 
-use crate::observing::detection::PyDetection;
+use crate::py_observing::detection::PyDetection;
 
 pub fn create_mixed_array<T: pyo3::ToPyObject>(data: Vec<Option<T>>, py: Python) -> PyResult<Py<PyArray1<PyObject>>> {
 

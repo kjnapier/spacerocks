@@ -11,9 +11,9 @@ use spacerocks::transforms::calc_xyz_from_kepM;
 
 use nalgebra::Vector3;
 
-use crate::time::time::PyTime;
-use crate::observing::detection::PyDetection;
-use crate::observing::observer::PyObserver;
+use crate::py_time::time::PyTime;
+use crate::py_observing::detection::PyDetection;
+use crate::py_observing::observer::PyObserver;
 
 
 #[pyclass]

@@ -29,3 +29,8 @@ cd spacerocks
 cd py-bindings
 maturin develop --release
 ```
+
+You will also need to have `cspice` installed on your system, and add its location to your path as
+```bash
+export CSPICE_DIR="/path/to/cspice"
+```

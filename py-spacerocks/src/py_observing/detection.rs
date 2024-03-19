@@ -3,8 +3,8 @@ use pyo3::types::PyType;
 use pyo3::exceptions::PyValueError;
 
 use spacerocks::observing::Detection;
-use crate::observing::observer::PyObserver;
-use crate::time::time::PyTime;
+use crate::py_observing::observer::PyObserver;
+use crate::py_time::time::PyTime;
 
 #[pyclass]
 #[pyo3(name = "Detection")]

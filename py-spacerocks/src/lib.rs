@@ -1,22 +1,22 @@
 use pyo3::prelude::*;
 
-mod transforms;
-use transforms::make_transforms_submodule;
+mod py_transforms;
+use py_transforms::make_transforms_submodule;
 
-mod spacerock;
-use spacerock::make_spacerock_submodule;
+mod py_spacerock;
+use py_spacerock::make_spacerock_submodule;
 
-mod spice;
-use spice::make_spice_submodule;
+mod py_spice;
+use py_spice::make_spice_submodule;
 
-mod time;
-use time::make_time_submodule;
+mod py_time;
+use py_time::make_time_submodule;
 
-mod observing;
-use observing::make_observing_submodule;
+mod py_observing;
+use py_observing::make_observing_submodule;
 
-mod nbody;
-use nbody::make_nbody_submodule;
+mod py_nbody;
+use py_nbody::make_nbody_submodule;
 
 // mod orbfit;
 // use orbfit::make_orbfit_submodule;

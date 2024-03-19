@@ -4,11 +4,11 @@ use pyo3::types::PyType;
 use spacerocks::nbody::Simulation;
 use spacerocks::spacerock::CoordinateFrame;
 
-use crate::spacerock::spacerock::PySpaceRock;
-use crate::spacerock::rockcollection::RockCollection;
-use crate::time::time::PyTime;
-use crate::nbody::integrator::PyIntegrator;
-use crate::nbody::force::PyForce;
+use crate::py_spacerock::spacerock::PySpaceRock;
+use crate::py_spacerock::rockcollection::RockCollection;
+use crate::py_time::time::PyTime;
+use crate::py_nbody::integrator::PyIntegrator;
+use crate::py_nbody::force::PyForce;
 
 use std::sync::Arc;
 

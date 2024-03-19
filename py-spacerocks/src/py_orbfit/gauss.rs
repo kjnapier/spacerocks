@@ -3,8 +3,8 @@ use pyo3::prelude::*;
 use spacerocks::orbfit::gauss;
 use spacerocks::observing::detection::Detection;
 
-use crate::spacerock::spacerock::PySpaceRock;
-use crate::observing::detection::PyDetection;
+use crate::py_spacerock::spacerock::PySpaceRock;
+use crate::py_observing::detection::PyDetection;
 
 
 // #[pyfunction]
