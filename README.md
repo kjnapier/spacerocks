@@ -30,7 +30,7 @@ cd py-bindings
 maturin develop --release
 ```
 
-You will also need to have `cspice` installed on your system, and add its location to your path as
+You will also need to have [`cspice`](https://naif.jpl.nasa.gov/naif/toolkit_C.html) installed on your system, and add its location to your path as
 ```bash
 export CSPICE_DIR="/path/to/cspice"
 ```
