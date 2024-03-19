@@ -34,3 +34,7 @@ You will also need to have [`cspice`](https://naif.jpl.nasa.gov/naif/toolkit_C.h
 ```bash
 export CSPICE_DIR="/path/to/cspice"
 ```
+You might also need to rename `cspice.a` to `libcspice.a` if you are on a Unix system.
+
+We actually use very few of the `cspice` functions, so it should be possible to remove this dependency in the future. 
+If you would like to help with this, please send a message!

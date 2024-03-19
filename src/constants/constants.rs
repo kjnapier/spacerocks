@@ -98,6 +98,7 @@ lazy_static! {
         m.insert("venus barycenter".to_string(), 3.2485859200000000E+05 * KM3_PER_SECOND2_TO_AU3_PER_DAY2 / GRAVITATIONAL_CONSTANT);
         m.insert("earth".to_string(), 3.9860043550702266E+05 * KM3_PER_SECOND2_TO_AU3_PER_DAY2 / GRAVITATIONAL_CONSTANT);
         m.insert("moon".to_string(), 4.9028001184575496E+03 * KM3_PER_SECOND2_TO_AU3_PER_DAY2 / GRAVITATIONAL_CONSTANT);
+        m.insert("earth barycenter".to_string(), 3.9860044180000000E+05 * KM3_PER_SECOND2_TO_AU3_PER_DAY2 / GRAVITATIONAL_CONSTANT);
         m.insert("mars barycenter".to_string(), 4.2828375815756102E+04 * KM3_PER_SECOND2_TO_AU3_PER_DAY2 / GRAVITATIONAL_CONSTANT);
         m.insert("jupiter barycenter".to_string(), 1.2671276409999998E+08 * KM3_PER_SECOND2_TO_AU3_PER_DAY2 / GRAVITATIONAL_CONSTANT);
         m.insert("saturn barycenter".to_string(), 3.7940584841799997E+07 * KM3_PER_SECOND2_TO_AU3_PER_DAY2 / GRAVITATIONAL_CONSTANT);

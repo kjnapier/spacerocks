@@ -63,7 +63,7 @@ impl Simulation {
         sim.integrator = Box::new(IAS15::new(1.0));
         sim.add_force(Box::new(NewtonianGravity));
 
-        let names = ["sun", "mercury barycenter", "venus barycenter", "earth", "moon", "mars barycenter", "jupiter barycenter", 
+        let names = ["sun", "mercury barycenter", "venus barycenter", "earth barycenter", "mars barycenter", "jupiter barycenter", 
                      "saturn barycenter", "uranus barycenter", "neptune barycenter"];
         for name in names.iter() {
             let mut particle = SpaceRock::from_spice(name, epoch, frame, origin);

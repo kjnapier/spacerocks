@@ -79,7 +79,7 @@ impl SpaceRock {
             mu: mu,
             epoch: epoch.clone(),
             frame: frame.clone(),
-            origin: origin.to_string().into(),
+            origin: origin.to_uppercase().into(),
             orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: mass,
             properties: None,
@@ -101,7 +101,7 @@ impl SpaceRock {
             epoch: epoch,
             mu: Some(MU_BARY),
             frame: frame.clone(),
-            origin: origin.to_string().into(),
+            origin: origin.to_uppercase().into(),
             orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: 0.0,
             properties: None,
@@ -123,7 +123,7 @@ impl SpaceRock {
             epoch: epoch,
             mu: Some(MU_BARY),
             frame: frame.clone(),
-            origin: origin.to_string().into(),
+            origin: origin.to_uppercase().into(),
             orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: 0.0,
             properties: None,
@@ -144,7 +144,7 @@ impl SpaceRock {
             epoch: epoch,
             mu: Some(MU_BARY),
             frame: frame.clone(),
-            origin: origin.to_string().into(),
+            origin: origin.to_uppercase().into(),
             orbit: Some(orbit),
             mass: 0.0,
             properties: None,
@@ -249,7 +249,7 @@ impl SpaceRock {
             mu: Some(MU_BARY),
             epoch: epoch,
             frame: frame.clone(),
-            origin: origin.to_string().into(),
+            origin: origin.to_uppercase().into(),
             orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),
             mass: 0.0,
             properties: None,
@@ -269,7 +269,7 @@ impl SpaceRock {
         // uuid for name
         let name = format!("{}", uuid::Uuid::new_v4().simple());
 
-        SpaceRock::from_kepler(&name, KeplerOrbit::new(a, e, inc, arg, node, f), Time::now(), &CoordinateFrame::J2000, "ssb")
+        SpaceRock::from_kepler(&name, KeplerOrbit::new(a, e, inc, arg, node, f), Time::now(), &CoordinateFrame::J2000, "SSB")
     }
 
     // Methods
