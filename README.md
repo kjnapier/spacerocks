@@ -9,7 +9,7 @@
 
 `spacerocks` is a software package that puts the solar system at your fingertips. 
 
-The package is written in `Rust` and is exposed to `Python` using [PyO3](https://github.com/PyO3/pyo3).
+The package is written in `Rust` and is exposed to `Python` using [`PyO3`](https://github.com/PyO3/pyo3).
 
 
 ## Python Installation
@@ -26,7 +26,7 @@ pip install maturin
 
 git clone https://github.com/kjnapier/spacerocks
 cd spacerocks
-cd py-bindings
+cd py-spacerocks
 maturin develop --release
 ```
 
