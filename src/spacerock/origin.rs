@@ -13,10 +13,18 @@ impl Origin {
         Origin::Custom { mu: mu, name: Cow::Borrowed(name) }
     }
 
+    pub fn from_string(s: &str) -> Origin {
+        match s {
+            "Sun" => Origin::Sun,
+            "Barycenter" => Origin::Barycenter,
+            _ => panic!("Unknown origin: {}", s),
+        }
+    }
+
     pub fn mu(&self) -> f64 {
         match self {
-            Origin::Sun => 0.999,
-            Origin::Barycenter => 1.000,
+            Origin::Sun => 0.00029591220828411951,
+            Origin::Barycenter => 0.00029630927493457475,
             Origin::Custom { mu, .. } => *mu,
         }
     }
