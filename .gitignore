@@ -8,6 +8,8 @@
 .DS_Store
 spacerocks/.DS_Store
 
+Cargo.lock
+
 /spacerocks/data/spice/
 /spacerocks/data/mpc/
 
