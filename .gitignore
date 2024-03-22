@@ -8,6 +8,10 @@
 .DS_Store
 spacerocks/.DS_Store
 
+Cargo.lock
+py-spacerocks/target/
+py-spacerocks/Cargo.lock
+
 /spacerocks/data/spice/
 /spacerocks/data/mpc/
 
