@@ -257,5 +257,13 @@ impl PySpaceRock {
         self.inner.mu.unwrap()
     }
 
+    #[getter]
+    fn mean_anomaly(&self) -> PyResult<f64> {
+        match self.inner.orbit.as_ref() {
+            Some(orbit) => Ok(orbit.M()),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated. Use the calculate_orbit() method to calculate the orbit.")),
+        }
+    }
+
 }
 

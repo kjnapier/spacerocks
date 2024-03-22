@@ -161,28 +161,15 @@ impl SpaceRock {
         let command_str = format!("'{}'", name);
 
         let mut ep = epoch.clone();
-        ep.to_tdb();
 
         params.insert("command", command_str.as_str());
 
-        let timescale = &ep.timescale.as_str().to_uppercase();
+        let timescale = &ep.timescale.to_str().to_uppercase();
+        let timeformat = &ep.format.to_str().to_uppercase();
 
         let start_time = format!("'JD {}{}'", ep.epoch, timescale);
         let stop_time = format!("'JD {}'", ep.epoch + 1.0);
 
-        // match frame {
-        //     "J2000" => {
-        //         params.insert("ref_system", "'J2000'");
-        //         params.insert("ref_plane", "'frame'");
-        //     },
-        //     "ECLIPJ2000" => {
-        //         params.insert("ref_system", "'J2000'");
-        //         params.insert("ref_plane", "'ecliptic'");
-        //     },
-        //     _ => {
-        //         return Err("Frame not recognized".into());
-        //     }
-        // }
 
         match frame {
             CoordinateFrame::J2000 => {
@@ -200,9 +187,25 @@ impl SpaceRock {
 
         let center = format!("'@{}'", origin);
 
-        params.insert("start_time", start_time.as_str());
-        params.insert("stop_time", stop_time.as_str());
-        params.insert("step_size", "'1d'");
+        // params.insert("start_time", start_time.as_str());
+        // params.insert("stop_time", stop_time.as_str());
+        // params.insert("step_size", "'1d'");
+
+        // TLIST_TYPE=JD
+        // TIME_TYPE=UT
+        // TLIST='2460390.5457196245'
+
+        if timescale == "UTC" {
+            params.insert("TIME_TYPE", "'UT'");
+        } else {
+            params.insert("TIME_TYPE", timescale);
+        }
+
+        let time_list = format!("'{}'", ep.epoch);
+        params.insert("TLIST", time_list.as_str());
+
+        let tf = format!("'{}'", timeformat);
+        params.insert("TLIST_TYPE", tf.as_str());
 
         params.insert("make_ephem", "'yes'");
         params.insert("ephem_type", "'vectors'");
@@ -229,8 +232,8 @@ impl SpaceRock {
         let data: Vec<f64> = first_data_line.split(',').filter_map(|s| s.trim().parse::<f64>().ok()).collect();
         // let epoch = Time { epoch: data[0], timescale: "tdb".to_string(), format: "jd".to_string() };
         // let epoch = Time { epoch: data[0], timescale: "tdb".to_string().into(), format: "jd".to_string().into() };
-        let mut epoch = Time { epoch: data[0], timescale: TimeScale::TDB, format: TimeFormat::JD };
-        epoch.to_utc();
+        // let mut epoch = Time { epoch: data[0], timescale: TimeScale::TDB, format: TimeFormat::JD };
+        // epoch.to_utc();
 
         let (x, y, z, vx, vy, vz) = (data[1], data[2], data[3], data[4], data[5], data[6]);
         // let (dx, dy, dz, dvx, dvy, dvz) = (data[7], data[8], data[9], data[10], data[11], data[12]);
@@ -247,7 +250,7 @@ impl SpaceRock {
             velocity: velocity,
             acceleration: acceleration,
             mu: Some(MU_BARY),
-            epoch: epoch,
+            epoch: epoch.clone(),
             frame: frame.clone(),
             origin: origin.to_uppercase().into(),
             orbit: Some(KeplerOrbit::from_xyz(StateVector {position: position, velocity: velocity})),

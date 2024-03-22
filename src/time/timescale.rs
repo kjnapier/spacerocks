@@ -5,7 +5,7 @@ pub enum TimeScale {
 }
 
 impl TimeScale {
-    pub fn as_str(&self) -> &str {
+    pub fn to_str(&self) -> &str {
         match self {
             TimeScale::UTC => "UTC",
             TimeScale::TDB => "TDB",

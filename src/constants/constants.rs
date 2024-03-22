@@ -39,17 +39,17 @@ pub const ROTATION_INVARIABLE: Matrix3<f64> = Matrix3::new(-0.3023595432982142, 
                                                             0.0263975536104876, -0.389928162416098 ,  0.920429658444365);
 
 // make a hash map of the rotation matrices
-// lazy_static! {
-//     pub static ref ROTATION_MATRICES: HashMap<String, Matrix3<f64>> = {
-//         let mut m = HashMap::new();
-//         m.insert("J2000".to_string(), ROTATION_J2000);
-//         m.insert("FK4".to_string(), ROTATION_FK4);
-//         m.insert("GALACTIC".to_string(), ROTATION_GALACTIC);
-//         m.insert("ECLIPJ2000".to_string(), ROTATION_ECLIPJ2000);
-//         m.insert("INVARIABLE".to_string(), ROTATION_INVARIABLE);
-//         m
-//     };
-// }
+lazy_static! {
+    pub static ref ROTATION_MATRICES: HashMap<String, Matrix3<f64>> = {
+        let mut m = HashMap::new();
+        m.insert("J2000".to_string(), ROTATION_J2000);
+        m.insert("FK4".to_string(), ROTATION_FK4);
+        m.insert("GALACTIC".to_string(), ROTATION_GALACTIC);
+        m.insert("ECLIPJ2000".to_string(), ROTATION_ECLIPJ2000);
+        m.insert("INVARIABLE".to_string(), ROTATION_INVARIABLE);
+        m
+    };
+}
 
 const KM_PER_AU: f64 = 149597870.700;
 // const SECONDS_PER_DAY: f64 = 86400.0
