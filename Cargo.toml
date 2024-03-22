@@ -35,3 +35,15 @@ rust-spice = {version = "0.7.4"}
 # target mac m1
 [target.'aarch64-apple-darwin'.dependencies]
 rust-spice = {version = "0.7.4"}
+
+# target aarch raspberry pi
+[target.'aarh64-unknown-linux-gnu'.dependencies]
+rust-spice = {version = "0.7.4", default-features = false, features = ["noclang"] }
+
+# target arm raspberry pi
+[target.'arm-unknown-linux-gnueabihf'.dependencies]
+rust-spice = {version = "0.7.4", default-features = false, features = ["noclang"] }
+
+# target windows
+[target.'x86_64-pc-windows-msvc'.dependencies]
+rust-spice = {version = "0.7.4"}

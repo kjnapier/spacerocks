@@ -156,20 +156,16 @@ impl SpaceRock {
         let client = reqwest::blocking::Client::new();
 
         let mut params = HashMap::new();
-        // make the command the name, but with a single quote around it as a string
 
         let command_str = format!("'{}'", name);
+        params.insert("command", command_str.as_str());
 
         let mut ep = epoch.clone();
 
-        params.insert("command", command_str.as_str());
+        
 
         let timescale = &ep.timescale.to_str().to_uppercase();
         let timeformat = &ep.format.to_str().to_uppercase();
-
-        let start_time = format!("'JD {}{}'", ep.epoch, timescale);
-        let stop_time = format!("'JD {}'", ep.epoch + 1.0);
-
 
         match frame {
             CoordinateFrame::J2000 => {
@@ -185,15 +181,7 @@ impl SpaceRock {
             }
         }
 
-        let center = format!("'@{}'", origin);
-
-        // params.insert("start_time", start_time.as_str());
-        // params.insert("stop_time", stop_time.as_str());
-        // params.insert("step_size", "'1d'");
-
-        // TLIST_TYPE=JD
-        // TIME_TYPE=UT
-        // TLIST='2460390.5457196245'
+        
 
         if timescale == "UTC" {
             params.insert("TIME_TYPE", "'UT'");
@@ -207,10 +195,11 @@ impl SpaceRock {
         let tf = format!("'{}'", timeformat);
         params.insert("TLIST_TYPE", tf.as_str());
 
-        params.insert("make_ephem", "'yes'");
-        params.insert("ephem_type", "'vectors'");
+        let center = format!("'@{}'", origin);
         params.insert("center", center.as_str());
 
+        params.insert("make_ephem", "'yes'");
+        params.insert("ephem_type", "'vectors'");
         params.insert("vec_corr", "'None'");
         params.insert("out_units", "'AU-D'");
         params.insert("csv_format", "'yes'");
@@ -230,19 +219,12 @@ impl SpaceRock {
         let first_data_line = lines.iter().skip_while(|&line| !line.starts_with("$$SOE")).skip(1).next().ok_or("No data")?;
         
         let data: Vec<f64> = first_data_line.split(',').filter_map(|s| s.trim().parse::<f64>().ok()).collect();
-        // let epoch = Time { epoch: data[0], timescale: "tdb".to_string(), format: "jd".to_string() };
-        // let epoch = Time { epoch: data[0], timescale: "tdb".to_string().into(), format: "jd".to_string().into() };
-        // let mut epoch = Time { epoch: data[0], timescale: TimeScale::TDB, format: TimeFormat::JD };
-        // epoch.to_utc();
-
         let (x, y, z, vx, vy, vz) = (data[1], data[2], data[3], data[4], data[5], data[6]);
         // let (dx, dy, dz, dvx, dvy, dvz) = (data[7], data[8], data[9], data[10], data[11], data[12]);
 
         let position = Vector3::new(x, y, z);
         let velocity = Vector3::new(vx, vy, vz);
         let acceleration = Vector3::new(0.0, 0.0, 0.0);
-
-        // let frame = CoordinateFrame::from_str(frame).unwrap();
 
         let rock = SpaceRock {
             name: name.to_string().into(),
