@@ -1,6 +1,6 @@
 
 pub mod spacerock;
-    pub use spacerock::{SpaceRock, StateVector, KeplerOrbit, Properties, CoordinateFrame};
+    pub use spacerock::{SpaceRock, StateVector, KeplerOrbit, Properties, CoordinateFrame, Origin};
 
 pub mod time;
     pub use time::Time;

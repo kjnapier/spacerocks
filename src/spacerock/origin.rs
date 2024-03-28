@@ -1,24 +1,34 @@
 use std::borrow::Cow;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Origin {
     Sun,
     Barycenter,
-    Custom {name: Cow<'static, str>, mu: f64},
+    Custom {name: String, mu: f64},
 }
 
 impl Origin {
 
-    pub fn new_custom(mu: f64, name: &'static str) -> Origin {
-        Origin::Custom { mu: mu, name: Cow::Borrowed(name) }
+    pub fn new_custom(mu: f64, name: &str) -> Origin {
+        Origin::Custom { mu: mu, name: name.to_string() }
     }
 
     pub fn from_string(s: &str) -> Origin {
+        // s.to_upper
+        s.to_uppercase();
         match s {
-            "Sun" => Origin::Sun,
-            "Barycenter" => Origin::Barycenter,
+            "SUN" => Origin::Sun,
+            "SSB" => Origin::Barycenter,
             _ => panic!("Unknown origin: {}", s),
         }
+    }
+
+    pub fn ssb() -> Origin {
+        Origin::Barycenter
+    }
+
+    pub fn sun() -> Origin {
+        Origin::Sun
     }
 
     pub fn mu(&self) -> f64 {
@@ -31,10 +41,14 @@ impl Origin {
 
     pub fn name(&self) -> &str {
         match self {
-            Origin::Sun => "Sun",
-            Origin::Barycenter => "Barycenter",
+            Origin::Sun => "SUN",
+            Origin::Barycenter => "SSB",
             Origin::Custom { name, .. } => name,
         }
+    }
+
+    pub fn to_string(&self) -> String {
+        self.name().to_string()
     }
 }
 
@@ -42,5 +56,11 @@ impl Origin {
 impl Default for Origin {
     fn default() -> Origin {
         Origin::Barycenter
+    }
+}
+
+impl std::fmt::Display for Origin {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.name())
     }
 }

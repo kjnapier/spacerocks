@@ -1,5 +1,6 @@
 use crate::SpaceRock;
 use crate::CoordinateFrame;
+use crate::spacerock::Origin;
 
 use crate::observing::observer::Observer;
 use crate::constants::{DEG_TO_RAD, M_TO_AU, EQUAT_RAD};
@@ -18,21 +19,12 @@ impl Observatory {
 
     pub fn from_obscode(obscode: &str) -> Result<Self, &'static str> {
         let obscode = obscode.to_uppercase();
-        // let obs = OBSERVATORIES.get(&obscode).ok_or("Observatory not found")?;
-        // return Observatory {
-        //     lon: obs.0,
-        //     rho_cos_lat: obs.1,
-        //     rho_sin_lat: obs.2
-        // }
 
         if let Some(obs) = OBSERVATORIES.get(&obscode) {
             return Ok(Observatory::from_parallax(obs.0, obs.1, obs.2));
         }
 
         return Err("Observatory not found")
-
-        // let o = Observatory::from_parallax(obs.0, obs.1, obs.2);
-        // Ok(o)
     }
 
     pub fn from_parallax(lon: f64, rho_cos_lat: f64, rho_sin_lat: f64) -> Self {
@@ -52,20 +44,12 @@ impl Observatory {
         return (self.rho_sin_lat * self.rho_sin_lat + self.rho_cos_lat * self.rho_cos_lat).sqrt()
     }
 
-    pub fn at(&self, epoch: &Time) -> Observer {
-
-        let mut earth = SpaceRock::from_spice("earth", epoch, &CoordinateFrame::J2000, "ssb");
-
-        // compute the topocentric correction to the position of the observatory using the local sidereal time
-        // let [d_pos, d_vel] = compute_topocentric_correction(self.lon, self.lat, self.elevation, epoch.epoch);
+    pub fn at(&self, epoch: &Time, origin: &Origin) -> Observer {
+        let mut earth = SpaceRock::from_spice("earth", epoch, &CoordinateFrame::J2000, origin);
         let [d_pos, d_vel] = compute_topocentric_correction(self.lon, self.rho_sin_lat, self.rho_cos_lat, epoch.epoch);
         earth.position += d_pos;
         earth.velocity += d_vel;
-
-        // let observer = Observer::from_ground(earth.position, earth.velocity, earth.epoch, &earth.frame, self.lat, self.lon, self.elevation);
-        let observer = Observer::from_ground(earth.position, earth.velocity, earth.epoch, &earth.frame, self.lat(), self.lon, self.rho());
-        
-        return observer
+        Observer::from_ground(earth.position, earth.velocity, earth.epoch, &earth.frame, &earth.origin, self.lat(), self.lon, self.rho())
     }
 
     pub fn local_sidereal_time(&self, epoch: f64) -> f64 {

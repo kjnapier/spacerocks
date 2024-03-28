@@ -14,6 +14,7 @@ use nalgebra::Vector3;
 use crate::py_time::time::PyTime;
 use crate::py_observing::detection::PyDetection;
 use crate::py_observing::observer::PyObserver;
+use crate::py_spacerock::origin::PyOrigin;
 
 
 #[pyclass]
@@ -26,12 +27,13 @@ pub struct PySpaceRock {
 impl PySpaceRock {
 
     #[classmethod]
-    #[pyo3(signature = (name, epoch, frame="J2000", origin="SSB"))]
-    fn from_horizons(_cls: &PyType, name: &str, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
+    // #[pyo3(signature = (name, epoch, frame="J2000", origin=PyOrigin::ssb()))]
+    fn from_horizons(_cls: &PyType, name: &str, epoch: PyRef<PyTime>, frame: &str, origin: PyRef<PyOrigin>) -> PyResult<Self> {
         let ep = &epoch.inner;
+        let or = &origin.inner;
 
         let frame = CoordinateFrame::from_str(frame).unwrap();
-        let rock = SpaceRock::from_horizons(name, ep, &frame, origin);
+        let rock = SpaceRock::from_horizons(name, ep, &frame, or);
         if rock.is_err() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to create SpaceRock from Horizons for name: {}", name)));
         }
@@ -39,12 +41,13 @@ impl PySpaceRock {
     }
 
     #[classmethod]
-    #[pyo3(signature = (name, epoch, frame="J2000", origin="SSB"))]
-    fn from_spice(_cls: &PyType, name: &str, epoch: &PyTime, frame: &str, origin: &str) -> PyResult<Self> {
+    // #[pyo3(signature = (name, epoch, frame="J2000", origin=PyOrigin::ssb()))]
+    fn from_spice(_cls: &PyType, name: &str, epoch: &PyTime, frame: &str, origin: &PyOrigin) -> PyResult<Self> {
         let ep = &epoch.inner;
+        let or = &origin.inner;
 
         let frame = CoordinateFrame::from_str(frame).unwrap();
-        let rock = SpaceRock::from_spice(name, &ep, &frame, origin);
+        let rock = SpaceRock::from_spice(name, &ep, &frame, &or);
         Ok(PySpaceRock { inner: rock })
     }
 
@@ -54,18 +57,20 @@ impl PySpaceRock {
     }
 
     #[classmethod]
-    fn from_xyz(_cls: &PyType, name: &str, x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
+    fn from_xyz(_cls: &PyType, name: &str, x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64, epoch: PyRef<PyTime>, frame: &str, origin: PyRef<PyOrigin>) -> PyResult<Self> {
         let ep = &epoch.inner;
+        let or = &origin.inner;
 
         let frame = CoordinateFrame::from_str(frame).unwrap();
-        let rock = SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, ep.clone(), &frame, origin);
+        let rock = SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, ep.clone(), &frame, or);
         Ok(PySpaceRock { inner: rock })
     }
 
     #[classmethod]
-    #[pyo3(signature = (name, a, e, inc, arg, node, M, epoch, frame="ECLIPJ2000", origin="SSB"))]
-    fn from_kepler(_cls: &PyType, name: &str, a: f64, e: f64, inc: f64, arg: f64, node: f64, M: f64, epoch: PyRef<PyTime>, frame: &str, origin: &str) -> PyResult<Self> {
+    // #[pyo3(signature = (name, a, e, inc, arg, node, M, epoch, frame="ECLIPJ2000", origin=PyOrigin::ssb()))]
+    fn from_kepler(_cls: &PyType, name: &str, a: f64, e: f64, inc: f64, arg: f64, node: f64, M: f64, epoch: PyRef<PyTime>, frame: &str, origin: PyRef<PyOrigin>) -> PyResult<Self> {
         let ep = &epoch.inner;
+        let or = &origin.inner;
         let state = calc_xyz_from_kepM(a, e, inc, arg, node, M);
         let acceleration = Vector3::new(0.0, 0.0, 0.0);
 
@@ -78,9 +83,8 @@ impl PySpaceRock {
             velocity: state.velocity,
             acceleration: acceleration,
             epoch: ep.clone(),
-            mu: Some(MU_BARY),
             frame: frame,
-            origin: origin.to_string().into(),
+            origin: or.clone(),
             orbit: None,
             mass: 0.0,
             properties: None,
@@ -254,13 +258,37 @@ impl PySpaceRock {
 
     #[getter]
     fn mu(&self) -> f64 {
-        self.inner.mu.unwrap()
+        self.inner.origin.mu()
     }
 
     #[getter]
     fn mean_anomaly(&self) -> PyResult<f64> {
         match self.inner.orbit.as_ref() {
             Some(orbit) => Ok(orbit.M()),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated. Use the calculate_orbit() method to calculate the orbit.")),
+        }
+    }
+
+    #[getter]
+    fn mean_longitude(&self) -> PyResult<f64> {
+        match self.inner.orbit.as_ref() {
+            Some(orbit) => Ok((orbit.M() + orbit.varpi()) % (2.0 * std::f64::consts::PI)),
+            None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated. Use the calculate_orbit() method to calculate the orbit.")),
+        }
+    }
+
+    #[getter]
+    fn t_peri(&self) -> PyResult<PyTime> {
+        let t0 = &self.inner.epoch;
+        let mean_motion = (self.a()?.powi(3) / MU_BARY).sqrt();
+        let dt = self.mean_anomaly()? * mean_motion;
+        Ok(PyTime { inner: t0 + dt })
+    }
+
+    #[getter]
+    fn q(&self) -> PyResult<f64> {
+        match self.inner.orbit.as_ref() {
+            Some(orbit) => Ok(orbit.q()),
             None => Err(PyErr::new::<pyo3::exceptions::PyAttributeError, _>("Orbit not calculated. Use the calculate_orbit() method to calculate the orbit.")),
         }
     }

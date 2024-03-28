@@ -1,7 +1,10 @@
 use pyo3::prelude::*;
 
 use spacerocks::observing::Observer;
-use spacerocks::spacerock::CoordinateFrame;
+use spacerocks::spacerock::{CoordinateFrame, Origin}; 
+
+use crate::py_time::time::PyTime;
+use crate::py_spacerock::origin::PyOrigin;
 
 use numpy::{PyArray1, IntoPyArray};
 
@@ -33,6 +36,11 @@ impl PyObserver {
         vel.into_pyarray(py).to_owned()
     }
 
+    #[getter]
+    fn origin(&self) -> PyOrigin {
+        PyOrigin { inner: self.inner.origin.clone() }
+    }
+
     fn change_frame(&mut self, new_frame: &str) {
         let frame = CoordinateFrame::from_str(new_frame).unwrap();
         self.inner.change_frame(&frame);
@@ -56,6 +64,11 @@ impl PyObserver {
     #[getter]
     fn frame(&self) -> String {
         self.inner.frame.to_string()
+    }
+
+    #[getter]
+    fn epoch(&self) -> PyTime {
+        PyTime { inner: self.inner.epoch.clone() }
     }
     
 }

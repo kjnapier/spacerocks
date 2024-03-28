@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::SpaceRock;
 use crate::constants::GRAVITATIONAL_CONSTANT;
 use crate::time::Time;
-use crate::spacerock::CoordinateFrame;
+use crate::spacerock::{CoordinateFrame, Origin};
 
 
 use crate::nbody::forces::{Force, NewtonianGravity, Drag, SolarGR};
@@ -21,7 +21,7 @@ pub struct Simulation {
     pub particle_index_map: HashMap<String, usize>,
 
     pub frame: Option<CoordinateFrame>,
-    pub origin: Option<String>,
+    pub origin: Option<Origin>,
 
     pub integrator: Box<dyn Integrator + Send + Sync>,
     pub forces: Vec<Box<dyn Force + Send + Sync>>,
@@ -39,11 +39,11 @@ impl Simulation {
                     particle_index_map: HashMap::new()}
     }
 
-    pub fn giants(epoch: &Time, frame: &CoordinateFrame, origin: &str) -> Result<Simulation, String> {
+    pub fn giants(epoch: &Time, frame: &CoordinateFrame, origin: &Origin) -> Result<Simulation, String> {
         let mut sim = Simulation::new();
         sim.epoch = epoch.clone();
         sim.frame = Some(frame.clone());
-        sim.origin = Some("SSB".to_string());
+        sim.origin = Some(origin.clone());
         sim.integrator = Box::new(IAS15::new(1.0));
         sim.add_force(Box::new(NewtonianGravity));
 
@@ -55,11 +55,11 @@ impl Simulation {
         Ok(sim)
     }
 
-    pub fn planets(epoch: &Time, frame: &CoordinateFrame, origin: &str) -> Result<Simulation, String> {
+    pub fn planets(epoch: &Time, frame: &CoordinateFrame, origin: &Origin) -> Result<Simulation, String> {
         let mut sim = Simulation::new();
         sim.epoch = epoch.clone();
         sim.frame = Some(frame.clone());
-        sim.origin = Some("SSB".to_string());
+        sim.origin = Some(origin.clone());
         sim.integrator = Box::new(IAS15::new(1.0));
         sim.add_force(Box::new(NewtonianGravity));
 
@@ -72,18 +72,13 @@ impl Simulation {
         Ok(sim)
     }
 
-    pub fn horizons(epoch: &Time, frame: &CoordinateFrame, origin: &str) -> Result<Simulation, String> {
+    pub fn horizons(epoch: &Time, frame: &CoordinateFrame, origin: &Origin) -> Result<Simulation, String> {
         let mut sim = Simulation::new();
         sim.epoch = epoch.clone();
         sim.frame = Some(frame.clone());
-        sim.origin = Some("SSB".to_string());
+        sim.origin = Some(origin.clone());
         sim.integrator = Box::new(IAS15::new(1.0));
         sim.add_force(Box::new(NewtonianGravity));
-
-        // let names = ["sun", "mercury barycenter", "venus barycenter", "earth", "moon", "mars barycenter", "jupiter barycenter", 
-        //              "saturn barycenter", "uranus barycenter", "neptune barycenter", "pluto barycenter", "2000001", "2000002", 
-        //                 "2000003", "2000004", "2000007", "2000010", "2000015", "2000016", "2000031", "2000052", "2000065", "2000087",
-        //                 "2000088", "2000107", "2000433", "2000511", "2000704"];
 
         let names = ["sun", "mercury barycenter", "venus barycenter", "earth", "moon", "mars barycenter", "jupiter barycenter", 
                      "saturn barycenter", "uranus barycenter", "neptune barycenter", "pluto barycenter", "2000001", "2000002", 
@@ -101,7 +96,8 @@ impl Simulation {
         // if the origin is None, set it to be the origin of the first rock
         if self.origin.is_none() {
             // self.origin = Some(particle.origin.clone());
-            self.origin = Some((*particle.origin).clone());
+            // self.origin = Some((*particle.origin).clone());
+            self.origin = Some(particle.origin.clone());
             println!("Setting origin to {}", particle.origin.clone());
         }
 
@@ -115,13 +111,15 @@ impl Simulation {
             return Err(format!("The epoch of {} particle ({:?}) did not match the simulation epoch", particle.name, particle.epoch));
         }
 
-        // if Some(particle.origin.clone()) != self.origin {
-        if Some((*particle.origin).clone()) != self.origin {
-            if !self.particle_index_map.contains_key(&(*particle.origin).clone()) {
+        // if Some((*particle.origin).clone()) != self.origin {
+        if Some(particle.origin.clone()) != self.origin {
+            // if !self.particle_index_map.contains_key(&(*particle.origin).clone()) {
+            if !self.particle_index_map.contains_key(&particle.origin.to_string()) {
                 return Err(format!("The origin of the particle ({}) did not match the simulation origin, and was not found in perturbers", particle.origin.clone()));
             }
 
-            let origin = &self.particles[self.particle_index_map[&(*particle.origin).clone()]];
+            // let origin = &self.particles[self.particle_index_map[&(*particle.origin).clone()]];
+            let origin = &self.particles[self.particle_index_map[&particle.origin.to_string()]];
             particle.change_origin(&origin);
 
             // log the change of origin to console
@@ -187,18 +185,19 @@ impl Simulation {
         let vy = center_of_mass_velocity.y;
         let vz = center_of_mass_velocity.z;
        
-        let mut origin = SpaceRock::from_xyz("ssb", 
-                                             x, y, z, vx, vy, vz, 
-                                             self.epoch.clone(), 
-                                             &self.frame.clone().unwrap(),
-                                             self.origin.clone().unwrap().as_str());
-        origin.mass = total_mass;
+        let mut origin_rock = SpaceRock::from_xyz("simulation_barycenter", 
+                                                  x, y, z, vx, vy, vz, 
+                                                  self.epoch.clone(), 
+                                                  &self.frame.clone().unwrap(),
+                                                  &self.origin.clone().unwrap());
+        origin_rock.mass = total_mass;
 
         for particle in &mut self.particles {
-            particle.change_origin(&origin);
+            particle.change_origin(&origin_rock);
         }
 
-        self.origin = Some("ssb".to_string());
+        let origin = Origin::new_custom(total_mass * GRAVITATIONAL_CONSTANT, "simulation_barycenter");
+        self.origin = Some(origin);
     }
 
     pub fn change_origin(&mut self, origin: &str) -> Result<(), String> {
@@ -207,7 +206,9 @@ impl Simulation {
            return Err(format!("Origin {} not found in perturbers", origin));
         }
 
-        self.origin = Some(origin.to_string());
+        let new_origin = Origin::new_custom(self.particles[self.particle_index_map[origin]].mass * GRAVITATIONAL_CONSTANT, origin);
+
+        self.origin = Some(new_origin);
 
         let origin_position = self.particles[self.particle_index_map[origin]].position;
         let origin_velocity = self.particles[self.particle_index_map[origin]].velocity;

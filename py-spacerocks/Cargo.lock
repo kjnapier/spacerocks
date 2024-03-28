@@ -1618,7 +1618,7 @@ dependencies = [
 
 [[package]]
 name = "spacerocks"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "chrono",
  "indicatif",
@@ -1643,7 +1643,7 @@ dependencies = [
  "numpy",
  "pyo3",
  "rayon",
- "spacerocks 0.1.4",
+ "spacerocks 0.1.5",
 ]
 
 [[package]]

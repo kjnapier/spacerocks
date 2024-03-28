@@ -71,8 +71,10 @@ impl PyTime {
     }
 
     // fn __sub__(&self, other: &PyTime) -> f64 {
-    //     self.inner - other.inner
+    //     self.inner.epoch - other.inner.epoch
     // }
 
+    
 }
+
 

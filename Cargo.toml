@@ -1,6 +1,6 @@
 [package]
 name = "spacerocks"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["Kevin Napier"]
 description = "Software for solar system calculations."
@@ -11,7 +11,6 @@ include = ["/src"]
 
 [dependencies]
 nalgebra = "0.32.2"
-#rust-spice = "0.7.4"
 lazy_static = "1.4.0"
 phf = {version = "0.11.2", features = ["macros"]}
 reqwest = { version = "0.11.4", features = ["json", "blocking"] }

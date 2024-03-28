@@ -2,8 +2,7 @@ use crate::time::Time;
 use nalgebra::Vector3;
 use crate::constants::ROTATION_MATRICES;
 
-use crate::spacerock::SpaceRock;
-use crate::spacerock::CoordinateFrame;
+use crate::spacerock::{SpaceRock, CoordinateFrame, Origin};
 
 use std::sync::Arc;
 
@@ -15,6 +14,7 @@ pub struct Observer {
     pub velocity: Vector3<f64>,
     pub epoch: Time,
     pub frame: CoordinateFrame,
+    pub origin: Origin,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
     pub rho: Option<f64>,
@@ -28,19 +28,21 @@ impl Observer {
             velocity: velocity,
             epoch: epoch,
             frame: CoordinateFrame::J2000,
+            origin: Origin::Barycenter,
             lat: None,
             lon: None,
             rho: None,
         }
     }
 
-    pub fn from_ground(position: Vector3<f64>, velocity: Vector3<f64>, epoch: Time, frame: &CoordinateFrame, lat: f64, lon: f64, rho: f64) -> Self {
+    pub fn from_ground(position: Vector3<f64>, velocity: Vector3<f64>, epoch: Time, frame: &CoordinateFrame, origin: &Origin, lat: f64, lon: f64, rho: f64) -> Self {
 
         Observer {
             position: position,
             velocity: velocity,
             epoch: epoch,
             frame: frame.clone(),
+            origin: origin.clone(),
             lat: Some(lat),
             lon: Some(lon),
             rho: Some(rho),
@@ -53,6 +55,7 @@ impl Observer {
             velocity: rock.velocity.clone(),
             epoch: rock.epoch.clone(),
             frame: rock.frame.clone(),
+            origin: rock.origin.clone(),
             lat: None,
             lon: None,
             rho: None,

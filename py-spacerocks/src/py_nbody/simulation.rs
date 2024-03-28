@@ -9,6 +9,7 @@ use crate::py_spacerock::rockcollection::RockCollection;
 use crate::py_time::time::PyTime;
 use crate::py_nbody::integrator::PyIntegrator;
 use crate::py_nbody::force::PyForce;
+use crate::py_spacerock::origin::PyOrigin;
 
 use std::sync::Arc;
 
@@ -27,29 +28,32 @@ impl PySimulation {
     }
 
     #[classmethod]
-    pub fn giants(_cls: &PyType, epoch: &PyTime, frame: &str, origin: &str) -> PyResult<Self> {
+    pub fn giants(_cls: &PyType, epoch: &PyTime, frame: &str, origin: &PyOrigin) -> PyResult<Self> {
         let ep = &epoch.inner;
+        let or = &origin.inner;
 
         let frame = CoordinateFrame::from_str(frame).unwrap();
-        let sim = Simulation::giants(ep, &frame, origin);
+        let sim = Simulation::giants(ep, &frame, or);
         Ok(PySimulation { inner: sim.unwrap() })
     }
 
     #[classmethod]
-    pub fn planets(_cls: &PyType, epoch: &PyTime, frame: &str, origin: &str) -> PyResult<Self> {
+    pub fn planets(_cls: &PyType, epoch: &PyTime, frame: &str, origin: &PyOrigin) -> PyResult<Self> {
         let ep = &epoch.inner;
+        let or = &origin.inner;
 
         let frame = CoordinateFrame::from_str(frame).unwrap();
-        let sim = Simulation::planets(ep, &frame, origin);
+        let sim = Simulation::planets(ep, &frame, or);
         Ok(PySimulation { inner: sim.unwrap() })
     }
 
     #[classmethod]
-    pub fn horizons(_cls: &PyType, epoch: &PyTime, frame: &str, origin: &str) -> PyResult<Self> {
+    pub fn horizons(_cls: &PyType, epoch: &PyTime, frame: &str, origin: &PyOrigin) -> PyResult<Self> {
         let ep = &epoch.inner;
+        let or = &origin.inner;
 
         let frame = CoordinateFrame::from_str(frame).unwrap();
-        let sim = Simulation::horizons(ep, &frame, origin);
+        let sim = Simulation::horizons(ep, &frame, or);
         Ok(PySimulation { inner: sim.unwrap() })
     }
 
@@ -88,8 +92,8 @@ impl PySimulation {
         self.inner.frame = Some(frame);
     }
 
-    pub fn set_origin(&mut self, origin: &str) {
-        self.inner.origin = Some(origin.to_string());
+    pub fn set_origin(&mut self, origin: &PyOrigin) {
+        self.inner.origin = Some(origin.inner.clone());
     }
 
     pub fn set_integrator(&mut self, integrator: PyRef<PyIntegrator>) {
@@ -145,8 +149,12 @@ impl PySimulation {
     }
 
     #[getter]
-    pub fn origin(&self) -> Option<String> {
-        self.inner.origin.clone()
+    pub fn origin(&self) -> Option<PyOrigin> {
+        let o = self.inner.origin.clone();
+        match o {
+            Some(origin) => Some(PyOrigin { inner: origin.clone() }),
+            None => None
+        }
     }
 
     // #[getter]
