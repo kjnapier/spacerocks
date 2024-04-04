@@ -1,10 +1,12 @@
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 use spacerocks::observing::Observer;
 use spacerocks::spacerock::{CoordinateFrame, Origin}; 
 
 use crate::py_time::time::PyTime;
 use crate::py_spacerock::origin::PyOrigin;
+use crate::py_spacerock::spacerock::PySpaceRock;
 
 use numpy::{PyArray1, IntoPyArray};
 
@@ -22,17 +24,20 @@ impl PyObserver {
     //     format!("Observer: {} at position: {:?}", self.inner.name, self.inner.position)
     // }
 
+    #[classmethod]
+    pub fn from_spacerock(_cls: &PyType, rock: &PySpaceRock) -> Self {
+        PyObserver { inner: Observer::from_spacerock(&rock.inner) }
+    }
+
     #[getter]
     fn position(&self, py: Python) -> Py<PyArray1<f64>> {
-        // self.inner.position.clone().to_vec().into_pyarray(py).to_owned()
-        let pos = vec![self.inner.position.x, self.inner.position.y, self.inner.position.z];
+\        let pos = vec![self.inner.position.x, self.inner.position.y, self.inner.position.z];
         pos.into_pyarray(py).to_owned()
     }
 
     #[getter]
     fn velocity(&self, py: Python) -> Py<PyArray1<f64>> {
-        // self.inner.velocity.clone().to_vec().into_pyarray(py).to_owned()
-        let vel = vec![self.inner.velocity.x, self.inner.velocity.y, self.inner.velocity.z];
+\        let vel = vec![self.inner.velocity.x, self.inner.velocity.y, self.inner.velocity.z];
         vel.into_pyarray(py).to_owned()
     }
 

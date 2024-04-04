@@ -21,6 +21,7 @@ pub fn correct_for_ltt(rock: &SpaceRock, observer: &Observer) -> StateVector {
     for _ in 0..3 {
 
         ltt0 = ltt;
+        acc = xi * ltt;
         temp.position = rock.position - (0.5 * acc * rock.position + rock.velocity) * ltt;
         d_pos = temp.position - observer.position;
         delta = d_pos.norm();
@@ -31,7 +32,7 @@ pub fn correct_for_ltt(rock: &SpaceRock, observer: &Observer) -> StateVector {
             break;
         }
 
-        acc = xi * ltt;
+        // acc = xi * ltt;
     }
 
     temp.velocity = rock.velocity + acc * rock.position;
