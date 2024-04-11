@@ -31,13 +31,13 @@ impl PyObserver {
 
     #[getter]
     fn position(&self, py: Python) -> Py<PyArray1<f64>> {
-\        let pos = vec![self.inner.position.x, self.inner.position.y, self.inner.position.z];
+        let pos = vec![self.inner.position.x, self.inner.position.y, self.inner.position.z];
         pos.into_pyarray(py).to_owned()
     }
 
     #[getter]
     fn velocity(&self, py: Python) -> Py<PyArray1<f64>> {
-\        let vel = vec![self.inner.velocity.x, self.inner.velocity.y, self.inner.velocity.z];
+        let vel = vec![self.inner.velocity.x, self.inner.velocity.y, self.inner.velocity.z];
         vel.into_pyarray(py).to_owned()
     }
 

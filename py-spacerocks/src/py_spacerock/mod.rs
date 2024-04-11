@@ -3,6 +3,7 @@ use pyo3::prelude::*;
 pub mod spacerock;
 pub mod rockcollection;
 pub mod origin;
+pub mod coordinate_frame;
 
 pub fn make_spacerock_submodule(py: Python, m: &PyModule) -> PyResult<()> {
     // Add the `spacerock` submodule
@@ -11,6 +12,7 @@ pub fn make_spacerock_submodule(py: Python, m: &PyModule) -> PyResult<()> {
     submodule.add_class::<spacerock::PySpaceRock>()?;
     submodule.add_class::<rockcollection::RockCollection>()?;
     submodule.add_class::<origin::PyOrigin>()?;
+    submodule.add_class::<coordinate_frame::PyCoordinateFrame>()?;
 
 
     m.add_submodule(submodule)?;
