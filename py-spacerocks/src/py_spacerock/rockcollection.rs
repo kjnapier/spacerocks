@@ -1,6 +1,10 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 use pyo3::exceptions::PyIndexError;
+use pyo3::types::PyBool;
+use pyo3::types::PyList;
+use pyo3::exceptions::PyValueError;
+use numpy::ToPyArray;
 
 use rayon::prelude::*;
 
@@ -84,6 +88,21 @@ impl RockCollection {
             Err(PyIndexError::new_err("Index out of range!"))
         }
     }
+
+    // function to filter rocks by a boolean array, and then return a new RockCollection of clones of the rocks that are True
+    pub fn filter(&self, mask: &PyArray1<bool>) -> PyResult<RockCollection> {
+        let mask = unsafe {mask.as_array()};
+        let mut new_rocks = Vec::new();
+        let mut new_name_hash_map = HashMap::new();
+        for (i, rock) in self.rocks.iter().enumerate() {
+            if mask[i] {
+                new_rocks.push(rock.clone());
+                new_name_hash_map.insert(rock.name.to_string(), new_rocks.len()-1);
+            }
+        }
+        Ok(RockCollection { rocks: new_rocks, name_hash_map: new_name_hash_map })
+    }
+
 
     pub fn calculate_orbit(&mut self) {
         self.rocks.par_iter_mut().for_each(|rock| rock.calculate_orbit());
@@ -178,33 +197,52 @@ impl RockCollection {
 
 
     #[getter]
-    pub fn node(&self) -> Vec<f64> {
-        self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().node).collect()
+    pub fn node(&self, py: Python) -> Py<PyArray1<f64>> {
+        // self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().node).collect()
+        let nodes: Vec<f64> = self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().node).collect();
+        nodes.into_pyarray(py).to_owned()
     }
 
     #[getter]
-    pub fn inc(&self) -> Vec<f64> {
-        self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().inc).collect()
+    pub fn inc(&self, py: Python) -> Py<PyArray1<f64>> {
+        // self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().inc).collect()
+        let incs: Vec<f64> = self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().inc).collect();
+        incs.into_pyarray(py).to_owned()
     }
 
     #[getter]
-    pub fn e(&self) -> Vec<f64> {
-        self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().e).collect()
+    pub fn e(&self, py: Python) -> Py<PyArray1<f64>> {
+        // self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().e).collect()
+        let es: Vec<f64> = self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().e).collect();
+        es.into_pyarray(py).to_owned()
     }
 
     #[getter]
-    pub fn a(&self) -> Vec<f64> {
-        self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().a).collect()
+    pub fn a(&self, py: Python) -> Py<PyArray1<f64>> {
+        // self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().a).collect()
+        let a_values: Vec<f64> = self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().a).collect();
+        a_values.into_pyarray(py).to_owned()
     }
 
     #[getter]
-    pub fn arg(&self) -> Vec<f64> {
-        self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().arg).collect()
+    pub fn arg(&self, py: Python) -> Py<PyArray1<f64>> {
+        // self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().arg).collect()
+        let args: Vec<f64> = self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().arg).collect();
+        args.into_pyarray(py).to_owned()
     }
 
     #[getter]
-    pub fn varpi(&self) -> Vec<f64> {
-        self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().varpi()).collect()
+    pub fn varpi(&self, py: Python) -> Py<PyArray1<f64>> {
+        // self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().varpi()).collect()
+        let varpis: Vec<f64> = self.rocks.par_iter().map(|rock| rock.orbit.as_ref().unwrap().varpi()).collect();
+        varpis.into_pyarray(py).to_owned()
     }
+
+    // #[getter]
+    // pub fn epoch(&self) -> Vec<f64> {
+    //     // self.rocks.par_iter().map(|rock| rock.epoch).collect()
+    //     let epochs: Vec<f64> = self.rocks.par_iter().map(|rock| rock.epoch).collect();
+
+    // }
 
 }

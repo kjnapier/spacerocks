@@ -25,10 +25,11 @@ use rand::Rng;
 
 use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SpaceRock {
 
     pub name: Arc<String>,
+    // pub name: String,
     pub epoch: Time,
     pub frame: CoordinateFrame,
 
@@ -143,6 +144,27 @@ impl SpaceRock {
         }
     }
 
+    /// Get a SpaceRock from the JPL Horizons API
+    ///
+    /// # Arguments
+    /// * `name` - The name of the object 
+    /// * `epoch` - The epoch of the ephemeris
+    /// * `frame` - The coordinate frame of the ephemeris
+    /// * `origin` - The origin of the orbit
+    ///
+    /// # Returns
+    /// * A SpaceRock object
+    ///
+    /// # Example
+    /// ```
+    /// use spacerocks::spacerock::SpaceRock;
+    /// use spacerocks::time::Time;
+    /// use spacerocks::spacerock::CoordinateFrame;
+    /// use spacerocks::spacerock::Origin;
+    ///
+    /// let epoch = Time::now();
+    /// let rock = SpaceRock::from_horizons("Arrokoth", &epoch, &CoordinateFrame::J2000, &Origin::SSB);
+    /// ```
     pub fn from_horizons(name: &str, epoch: &Time, frame: &CoordinateFrame, origin: &Origin) -> Result<Self, Box<dyn std::error::Error>> {
 
         let client = reqwest::blocking::Client::new();
@@ -153,8 +175,6 @@ impl SpaceRock {
         params.insert("command", command_str.as_str());
 
         let mut ep = epoch.clone();
-
-        
 
         let timescale = &ep.timescale.to_str().to_uppercase();
         let timeformat = &ep.format.to_str().to_uppercase();
@@ -172,8 +192,6 @@ impl SpaceRock {
                 return Err("Frame not recognized".into());
             }
         }
-
-        
 
         if timescale == "UTC" {
             params.insert("TIME_TYPE", "'UT'");
@@ -245,7 +263,7 @@ impl SpaceRock {
         // uuid for name
         let name = format!("{}", uuid::Uuid::new_v4().simple());
 
-        SpaceRock::from_kepler(&name, KeplerOrbit::new(a, e, inc, arg, node, f), Time::now(), &CoordinateFrame::J2000, &Origin::Barycenter)
+        SpaceRock::from_kepler(&name, KeplerOrbit::new(a, e, inc, arg, node, f), Time::now(), &CoordinateFrame::J2000, &Origin::SSB)
     }
 
     // Methods

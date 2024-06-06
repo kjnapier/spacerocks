@@ -8,11 +8,16 @@ pub fn calc_E_from_f(e: f64, f: f64) -> f64 {
     }
 
     else {
-        let cta = f.cos();
-        E = ((cta + e) / (1.0 + e * cta)).acosh();
-        if f < 0.0 {
-            E *= -1.0;
-        }
+        // let cta = f.cos();
+        // E = ((cta + e) / (1.0 + e * cta)).acosh();
+        // if f < 0.0 {
+        //     E *= -1.0;
+        // }
+
+        E = 2.0 * (((e - 1.0) / (e + 1.0)).sqrt() * (f / 2.0).tan()).atanh();
+        
+
+
     }
     return E;
 }

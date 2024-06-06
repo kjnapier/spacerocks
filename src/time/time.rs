@@ -58,7 +58,7 @@ fn jd_to_calendar(jd: &f64) -> String {
 
 
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Time {
     pub epoch: f64,
     pub timescale: TimeScale,

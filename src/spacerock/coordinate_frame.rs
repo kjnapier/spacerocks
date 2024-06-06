@@ -1,7 +1,9 @@
 use nalgebra::Matrix3;
 use crate::constants::{ROTATION_J2000, ROTATION_ECLIPJ2000, ROTATION_INVARIABLE, ROTATION_GALACTIC, ROTATION_FK4};
 
-#[derive(PartialEq, Debug, Clone)]
+use serde::{Serialize, Deserialize};
+
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub enum CoordinateFrame {
     J2000,
     ECLIPJ2000,

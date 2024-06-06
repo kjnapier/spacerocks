@@ -200,9 +200,21 @@ impl PySpaceRock {
         (*self.inner.name).clone()
     }
 
+    #[setter]
+    fn set_name(&mut self, name: &str) -> PyResult<()> {
+        self.inner.name = name.to_string().into();
+        Ok(())
+    }
+
     #[getter]
     fn position(&self) -> (f64, f64, f64) {
         (self.inner.position.x, self.inner.position.y, self.inner.position.z)
+    }
+
+    #[setter]
+    fn set_position(&mut self, pos: (f64, f64, f64)) -> PyResult<()> {
+        self.inner.position = Vector3::new(pos.0, pos.1, pos.2);
+        Ok(())
     }
 
     #[getter]
@@ -210,9 +222,21 @@ impl PySpaceRock {
         (self.inner.velocity.x, self.inner.velocity.y, self.inner.velocity.z)
     }
 
+    #[setter]
+    fn set_velocity(&mut self, vel: (f64, f64, f64)) -> PyResult<()> {
+        self.inner.velocity = Vector3::new(vel.0, vel.1, vel.2);
+        Ok(())
+    }
+
     #[getter]
     fn x(&self) -> f64 {
         self.inner.position.x
+    }
+
+    #[setter]
+    fn set_x(&mut self, x: f64) -> PyResult<()> {
+        self.inner.position.x = x;
+        Ok(())
     }
 
     #[getter]
@@ -220,9 +244,21 @@ impl PySpaceRock {
         self.inner.position.y
     }
 
+    #[setter]
+    fn set_y(&mut self, y: f64) -> PyResult<()> {
+        self.inner.position.y = y;
+        Ok(())
+    }
+
     #[getter]
     fn z(&self) -> f64 {
         self.inner.position.z
+    }
+
+    #[setter]
+    fn set_z(&mut self, z: f64) -> PyResult<()> {
+        self.inner.position.z = z;
+        Ok(())
     }
 
     #[getter]
@@ -230,9 +266,21 @@ impl PySpaceRock {
         self.inner.velocity.x
     }
 
+    #[setter]
+    fn set_vx(&mut self, vx: f64) -> PyResult<()> {
+        self.inner.velocity.x = vx;
+        Ok(())
+    }
+
     #[getter]
     fn vy(&self) -> f64 {
         self.inner.velocity.y
+    }
+
+    #[setter]
+    fn set_vy(&mut self, vy: f64) -> PyResult<()> {
+        self.inner.velocity.y = vy;
+        Ok(())
     }
 
     #[getter]
@@ -240,11 +288,18 @@ impl PySpaceRock {
         self.inner.velocity.z
     }
 
+    #[setter]
+    fn set_vz(&mut self, vz: f64) -> PyResult<()> {
+        self.inner.velocity.z = vz;
+        Ok(())
+    }
+
     #[getter]
     fn mass(&self) -> f64 {
         self.inner.mass
     }
 
+    #[setter]
     fn set_mass(&mut self, mass: f64) -> PyResult<()> {
         self.inner.mass = mass;
         Ok(())

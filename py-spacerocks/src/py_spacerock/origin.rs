@@ -20,12 +20,12 @@ impl PyOrigin {
 
     #[classmethod]
     pub fn sun(_cls: &PyType) -> Self {
-        PyOrigin { inner: Origin::Sun }
+        PyOrigin { inner: Origin::SUN }
     }
 
     #[classmethod]
     pub fn ssb(_cls: &PyType) -> Self {
-        PyOrigin { inner: Origin::Barycenter }
+        PyOrigin { inner: Origin::SSB }
     }
 
     pub fn __repr__(&self) -> String {

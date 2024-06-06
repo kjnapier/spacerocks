@@ -8,7 +8,9 @@ use std::sync::Arc;
 
 const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
 
-#[derive(PartialEq, Clone, Debug, Default)]
+use serde::{Serialize, Deserialize};
+
+#[derive(PartialEq, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Observer {
     pub position: Vector3<f64>,
     pub velocity: Vector3<f64>,
@@ -28,7 +30,7 @@ impl Observer {
             velocity: velocity,
             epoch: epoch,
             frame: CoordinateFrame::J2000,
-            origin: Origin::Barycenter,
+            origin: Origin::SSB,
             lat: None,
             lon: None,
             rho: None,

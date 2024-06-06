@@ -1,9 +1,11 @@
 use std::borrow::Cow;
 
-#[derive(Clone, Debug, PartialEq)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Origin {
-    Sun,
-    Barycenter,
+    SUN,
+    SSB,
     Custom {name: String, mu: f64},
 }
 
@@ -17,32 +19,32 @@ impl Origin {
         // s.to_upper
         s.to_uppercase();
         match s {
-            "SUN" => Origin::Sun,
-            "SSB" => Origin::Barycenter,
+            "SUN" => Origin::SUN,
+            "SSB" => Origin::SSB,
             _ => panic!("Unknown origin: {}", s),
         }
     }
 
     pub fn ssb() -> Origin {
-        Origin::Barycenter
+        Origin::SSB
     }
 
     pub fn sun() -> Origin {
-        Origin::Sun
+        Origin::SUN
     }
 
     pub fn mu(&self) -> f64 {
         match self {
-            Origin::Sun => 0.00029591220828411951,
-            Origin::Barycenter => 0.00029630927493457475,
+            Origin::SUN => 0.00029591220828411951,
+            Origin::SSB => 0.00029630927493457475,
             Origin::Custom { mu, .. } => *mu,
         }
     }
 
     pub fn name(&self) -> &str {
         match self {
-            Origin::Sun => "SUN",
-            Origin::Barycenter => "SSB",
+            Origin::SUN => "SUN",
+            Origin::SSB => "SSB",
             Origin::Custom { name, .. } => name,
         }
     }
@@ -55,7 +57,7 @@ impl Origin {
 
 impl Default for Origin {
     fn default() -> Origin {
-        Origin::Barycenter
+        Origin::SSB
     }
 }
 
