@@ -67,6 +67,16 @@ impl PySpaceRock {
     }
 
     #[classmethod]
+    fn from_spherical(_cls: &PyType, name: &str, phi: f64, theta: f64, r: f64, vr: f64, vo: f64, psi: f64, epoch: PyRef<PyTime>, frame: &str, origin: PyRef<PyOrigin>) -> PyResult<Self> {
+        let ep = &epoch.inner;
+        let or = &origin.inner;
+
+        let frame = CoordinateFrame::from_str(frame).unwrap();
+        let rock = SpaceRock::from_spherical(name, phi, theta, r, vr, vo, psi, ep.clone(), &frame, or);
+        Ok(PySpaceRock { inner: rock })
+    }
+
+    #[classmethod]
     // #[pyo3(signature = (name, a, e, inc, arg, node, M, epoch, frame="ECLIPJ2000", origin=PyOrigin::ssb()))]
     fn from_kepler(_cls: &PyType, name: &str, a: f64, e: f64, inc: f64, arg: f64, node: f64, M: f64, epoch: PyRef<PyTime>, frame: &str, origin: PyRef<PyOrigin>) -> PyResult<Self> {
         let ep = &epoch.inner;

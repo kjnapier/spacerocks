@@ -251,6 +251,27 @@ impl SpaceRock {
         return Ok(rock);
     }
 
+    pub fn from_spherical(name: &str, phi: f64, theta: f64, r: f64, vr: f64, vo: f64, psi: f64, epoch: Time, frame: &CoordinateFrame, origin: &Origin) -> Self {
+
+        let pointing = Vector3::new(phi.cos() * theta.cos(), phi.sin() * theta.cos(), theta.sin());
+
+        let position = pointing * r;
+
+        let dhat = Vector3::new(-phi.cos() * theta.sin(), -phi.sin() * theta.sin(), theta.cos());
+        let ahat = Vector3::new(-phi.sin(), phi.cos(), 0.0);
+        let velocity = pointing * vr + vo * (psi.cos() * ahat + psi.sin() * dhat);
+
+        let x = position.x;
+        let y = position.y;
+        let z = position.z;
+        let vx = velocity.x;
+        let vy = velocity.y;
+        let vz = velocity.z;
+
+        SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, epoch, frame, origin)
+
+    }
+
     pub fn random() -> Self {
         let mut rng = rand::thread_rng();
         let a = rng.gen_range(40.0..50.0);
