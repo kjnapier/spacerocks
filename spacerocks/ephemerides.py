@@ -143,10 +143,8 @@ class Ephemerides(Convenience):
 
     @property
     def l_rate(self):
-        num = self.ra_rate * (1 / cos(self.ra)) * (cos(epsilon)
-                                                   * (1 / cos(self.ra)) + sin(epsilon) * tan(self.ra))
-        denom = 1 + ((1 / cos(self.ra)) * sin(epsilon) +
-                     cos(epsilon) * tan(self.ra))**2
+        num = self.ra_rate * cos(self.dec) * (sin(self.ra) * sin(self.dec) * sin(epsilon) + cos(self.dec) * cos(epsilon)) + self.dec_rate * sin(epsilon) * cos(self.ra)
+        denom = (sin(self.ra) * cos(self.dec) * cos(epsilon) + sin(self.dec) * sin(epsilon))**2 + cos(self.ra)**2 * cos(self.dec)**2
         return num / denom
 
     def hpix(self, nside=64, nest=True):
