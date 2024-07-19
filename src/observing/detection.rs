@@ -78,7 +78,7 @@ impl Detection {
         Some(eta)
     }
 
-    pub fn pointing(&self) -> Vector3<f64> {
+    pub fn rho_hat(&self) -> Vector3<f64> {
         let x = self.ra.cos() * self.dec.cos();
         let y = self.ra.sin() * self.dec.cos();
         let z = self.dec.sin();

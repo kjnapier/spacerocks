@@ -55,7 +55,7 @@ impl DetectionCatalog {
     }
 
     pub fn __repr__(&self) -> String {
-        format!("DetectionCatalog: {} rocks", self.observations.len())
+        format!("DetectionCatalog: {} detections", self.observations.len())
     }
 
     #[getter]
@@ -98,6 +98,12 @@ impl DetectionCatalog {
     pub fn mag(&self, py: Python) -> PyResult<Py<PyArray1<PyObject>>> {
         let mags: Vec<Option<f64>> = self.observations.par_iter().map(|obs| obs.mag).collect();
         create_mixed_array(mags, py)
+    }
+
+    #[getter]
+    pub fn epoch(&self, py: Python) -> Py<PyArray1<f64>> {
+        let epochs: Vec<f64> = self.observations.par_iter().map(|obs| obs.epoch.epoch).collect();
+        epochs.into_pyarray(py).to_owned()
     }
 
     pub fn calc_altaz(&self, py: Python) -> PyResult<(Py<PyArray1<f64>>, Py<PyArray1<f64>>)> {

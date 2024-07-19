@@ -27,7 +27,6 @@ impl Integrator for Leapfrog {
             particle.epoch += 0.5 * self.timestep;
         }
       
-
         for force in forces {
             force.apply(particles);
         }

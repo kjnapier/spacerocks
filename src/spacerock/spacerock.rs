@@ -66,9 +66,9 @@ impl SpaceRock {
             None => 0.0,
         };
 
-        if mass == 0.0 {
-            println!("Could not find mass for {}. Setting mass to 0.", name);
-        }
+        // if mass == 0.0 {
+        //     println!("Could not find mass for {}. Setting mass to 0.", name);
+        // }
 
         SpaceRock {
             name: name.to_string().into(),
@@ -321,6 +321,11 @@ impl SpaceRock {
     pub fn observe(&mut self, observer: &Observer) -> Detection {
 
         self.change_frame("J2000");
+
+        // throw an error if the observer and self have different epochs
+        if self.epoch != observer.epoch {
+            panic!("Observer and object have different epochs");
+        }
 
         // Calculate the topocentric state, correct for light travel time
         let cr = correct_for_ltt(&self, observer);

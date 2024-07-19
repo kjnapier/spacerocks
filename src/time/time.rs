@@ -65,6 +65,7 @@ pub struct Time {
     pub format: TimeFormat,
 }
 
+
 impl Time {
 
     pub fn new(epoch: f64, timescale: &str, format: &str) -> Self {
@@ -110,6 +111,7 @@ impl Time {
         if self.timescale == TimeScale::UTC {
             return;
         }
+
         self.epoch = tdb_to_utc(self.epoch);
         self.timescale = TimeScale::UTC;
     }
