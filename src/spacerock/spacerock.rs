@@ -318,13 +318,17 @@ impl SpaceRock {
         }        
     }
 
-    pub fn observe(&mut self, observer: &Observer) -> Detection {
+    pub fn at(&mut self, epoch: &Time) {
+        self.analytic_propagate(epoch)
+    }
+
+    pub fn observe(&mut self, observer: &Observer) -> Result<Detection, Box<dyn std::error::Error>> {
 
         self.change_frame("J2000");
 
         // throw an error if the observer and self have different epochs
         if self.epoch != observer.epoch {
-            panic!("Observer and object have different epochs");
+            return Err("Observer and SpaceRock have different epochs".into());
         }
 
         // Calculate the topocentric state, correct for light travel time
@@ -402,7 +406,7 @@ impl SpaceRock {
         // Change the frame back to the original frame
         // self.change_frame(&original_frame);
         
-        return obs;
+        return Ok(obs);
     }
 
     pub fn change_frame(&mut self, frame: &str) -> Result<(), Box<dyn std::error::Error>> {

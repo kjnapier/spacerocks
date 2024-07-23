@@ -120,12 +120,19 @@ impl PySpaceRock {
         self.inner.analytic_propagate(&t.inner);
     }
 
+    fn at(&mut self, t: &PyTime) {
+        self.inner.at(&t.inner);
+    }
+
     fn observe(&mut self, observer: &PyObserver) -> PyResult<PyDetection> {
         if observer.inner.frame != CoordinateFrame::J2000 {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Observer frame is not J2000. Cannot observe rocks.")));
         }
-        let obs = self.inner.observe(&observer.inner);
-        Ok(PyDetection { inner: obs })
+
+        match self.inner.observe(&observer.inner) {
+            Ok(obs) => Ok(PyDetection { inner: obs }),
+            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Observer frame is not J2000. Cannot observe rocks. Error: {}", e))),
+        }
     }
 
     fn change_frame(&mut self, frame: &str) -> PyResult<()> {

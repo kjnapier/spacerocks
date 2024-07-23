@@ -142,6 +142,11 @@ impl Simulation {
             let idx = self.particle_index_map[name];
             self.particles.remove(idx);
             self.particle_index_map.remove(name);
+            for (key, value) in self.particle_index_map.iter_mut() {
+                if *value > idx {
+                    *value -= 1;
+                }
+            }
         } else {
             return Err(format!("No particle found with name {}", name));
         }
@@ -258,26 +263,11 @@ impl Simulation {
 
             self.step();
         }
-
-        
-
-        // while (&self.epoch - &epoch).abs() > self.integrator.timestep().abs() {
-        //     println!("dt = {}", dt);
-        //     println!("diff = {}", &self.epoch - &epoch);
-        //     println!("timestep = {}", self.integrator.timestep());
-        //     println!("epoch is {}", self.epoch.epoch);
-
-        //     // sleep for a bit
-        //     std::thread::sleep(std::time::Duration::from_millis(1000));
-
-        //     self.step();
-        // }      
         
         let dt = &epoch - &self.epoch;
         if dt.abs() < 1e-16 {
             return;
         }
-
 
         // create an exact match for the epoch
         let old_timestep = self.integrator.timestep();

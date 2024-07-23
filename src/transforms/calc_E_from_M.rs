@@ -167,6 +167,10 @@ pub fn calc_E_from_M(e: f64, M: f64) -> f64 {
         E = 0.0;
         return E;
     }
+
+    // if (e - 1.0).abs() < 1.0e-12 {
+    //     // analytic solution for parabolic orbits
+    // }
     
     if e < 1.0 {
 
@@ -180,14 +184,7 @@ pub fn calc_E_from_M(e: f64, M: f64) -> f64 {
         // Define initial estimate
         let sinM = M.sin();
         E = e * sinM + f64::max(M, e * (sinM + 0.591));
-        // let k = 0.85;
-        // if sinM > 0.0 {
-        //     E = M + k * e;
-        // }
-        // else {
-        //     E = M - k * e;
-        // }
-        
+       
 
         // Perform Newton-Raphson estimate
         for _ in 0..10 {

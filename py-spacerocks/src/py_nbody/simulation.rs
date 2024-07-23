@@ -64,10 +64,16 @@ impl PySimulation {
         }
     }
 
+    pub fn remove(&mut self, name: &str) -> PyResult<()> {
+        match self.inner.remove(name) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+        }
+    }
+
     pub fn integrate(&mut self, epoch: &PyTime) {
         self.inner.integrate(&epoch.inner.clone());
     }
-
     pub fn step(&mut self) {
         self.inner.step();
     }

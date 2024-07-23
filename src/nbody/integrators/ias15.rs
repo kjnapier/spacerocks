@@ -415,23 +415,6 @@ fn predict_next_coefficients(ratio: &f64, es_last: &Vec<CoefficientSeptet>, bs_l
             let be5 = b_last.p5 - e_last.p5;
             let be6 = b_last.p6 - e_last.p6;
 
-
-            // let be0 = b.p0 - e.p0;
-            // let be1 = b.p1 - e.p1;
-            // let be2 = b.p2 - e.p2;
-            // let be3 = b.p3 - e.p3;
-            // let be4 = b.p4 - e.p4;
-            // let be5 = b.p5 - e.p5;
-            // let be6 = b.p6 - e.p6;
-
-            // e.p0 = q1 * (b.p6 * 7.0 + b.p5 * 6.0 + b.p4 * 5.0 + b.p3 * 4.0 + b.p2 * 3.0 + b.p1 * 2.0 + b.p0);
-            // e.p1 = q2 * (b.p6 * 21.0 + b.p5 * 15.0 + b.p4 * 10.0 + b.p3 * 6.0 + b.p2 * 3.0 + b.p1);
-            // e.p2 = q3 * (b.p6 * 35.0 + b.p5 * 20.0 + b.p4 * 10.0 + b.p3 * 4.0 + b.p2);
-            // e.p3 = q4 * (b.p6 * 35.0 + b.p5 * 15.0 + b.p4 * 5.0 + b.p3);
-            // e.p4 = q5 * (b.p6 * 21.0 + b.p5 * 6.0 + b.p4);
-            // e.p5 = q6 * (b.p6 * 7.0 + b.p5);
-            // e.p6 = q7 * b.p6;
-
             e.p0 = q1 * (b_last.p6 * 7.0 + b_last.p5 * 6.0 + b_last.p4 * 5.0 + b_last.p3 * 4.0 + b_last.p2 * 3.0 + b_last.p1 * 2.0 + b_last.p0);
             e.p1 = q2 * (b_last.p6 * 21.0 + b_last.p5 * 15.0 + b_last.p4 * 10.0 + b_last.p3 * 6.0 + b_last.p2 * 3.0 + b_last.p1);
             e.p2 = q3 * (b_last.p6 * 35.0 + b_last.p5 * 20.0 + b_last.p4 * 10.0 + b_last.p3 * 4.0 + b_last.p2);

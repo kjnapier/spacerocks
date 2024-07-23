@@ -38,3 +38,4 @@ fn lagrange_f_and_g(chi: f64, r0: f64, vr0: f64, alpha: f64, mu: f64, dt: f64) -
     let g = dt - chi.powi(3) / mu.sqrt() * stumpff_s(z);
     (f, g)
 }
+

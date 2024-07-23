@@ -115,9 +115,31 @@ impl RockCollection {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Observer frame is not J2000. Cannot observe rocks.")));
         }
 
-        let observations: Vec<_> = self.rocks.par_iter_mut().map(|rock| rock.observe(&o)).collect();      
+        // let observations: Vec<Result<PyDetection, PyErr>> = self.rocks.par_iter().map(|rock| {
+        //     match rock.observe(&observer.inner) {
+        //             Ok(detection) => detection,
+        //             Err(e) => Err(PyValueError::new_err(format!("Error observing: {}", e))),
+        //     }
+        // }).collect();
+
+        // let mut results = Vec::new();
+        // let mut errors = Vec::new();
+
+        // for observation in observations {
+        //     match observation {
+        //         Ok(detection) => results.push(detection),
+        //         Err(err) => errors.push(err.to_string()),
+        //     }
+        // }
+
+        // if !errors.is_empty() {
+        //     return Err(PyValueError::new_err(format!("Errors occurred: {}", errors.join(", "))));
+        // }
+
+        // Ok(DetectionCatalog { observations: results })
+
+        let observations: Vec<_> = self.rocks.par_iter_mut().map(|rock| rock.observe(&o).unwrap()).collect();   
         Ok(DetectionCatalog { observations: observations })     
-        
     }
 
     pub fn analytic_propagate(&mut self, t: PyRef<PyTime>) {
