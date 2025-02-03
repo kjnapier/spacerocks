@@ -13,6 +13,7 @@ use rayon::prelude::*;
 
 use spacerocks::spacerock::SpaceRock;
 use spacerocks::Time;
+use spacerocks::transforms::calc_true_anomaly_from_mean_anomaly;
 use crate::py_time::time::PyTime;
 
 use serde_json;
@@ -358,14 +359,14 @@ impl MPCHandler {
             data.par_iter().map(|d| {
                 match SpaceRock::from_kepler(
                     &d.Principal_desig,
-                    d.a,
+                    d.a * (1.0 - d.e), // q, not a
                     d.e,
                     d.i.to_radians(),
                     d.Peri.to_radians(),
                     d.Node.to_radians(),
-                    d.M.to_radians(),
+                    calc_true_anomaly_from_mean_anomaly(d.e, d.M.to_radians()).expect("Error calculating true anomaly"),
                     Time::new(d.Epoch, "utc", "jd").map_err(|e| e.to_string())?,
-                    "J2000",
+                    "ECLIPJ2000",
                     "SSB",
                 ) {
                     Ok(mut rock) => {
