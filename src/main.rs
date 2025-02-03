@@ -52,9 +52,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut sim = Simulation::horizons(&epoch, "J2000", "SSB")?;
     println!("Sim is working");
-    sim.add(arrokoth)?;
+    sim.add(arrokoth.clone())?;
 
     println!("{}", sim.epoch);
+
+    let future = epoch + 365.25 * 10.0;
+
+    println!("Arrkoth position and velocity at epoch: {}, {}", &arrokoth.position, &arrokoth.velocity);
+
+    arrokoth.analytic_propagate(&future)?;
+
+    println!("Arrkoth position and velocity at future: {}, {}", &arrokoth.position, &arrokoth.velocity);
 
     // let observer = f51.at(&epoch)?;
 

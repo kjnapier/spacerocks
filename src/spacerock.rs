@@ -375,13 +375,18 @@ impl SpaceRock {
         let gauss_f = 1.0 - chi.powi(2) / r * stumpff_c(z);
         let gauss_g = dt - chi.powi(3) / mu.sqrt() * stumpff_s(z);
 
-        let gauss_fdot = (chi * mu.sqrt() / (r * vr)) * (z * stumpff_s(z) - 1.0);
-        let gauss_gdot = 1.0 - (chi.powi(2) / r) * stumpff_c(z);
+        let r_new = self.position * gauss_f + self.velocity * gauss_g;
 
-        let position = self.position * gauss_f + self.velocity * gauss_g;
+        // let gauss_fdot = (chi * mu.sqrt() / (r * vr)) * (z * stumpff_s(z) - 1.0);
+        let gauss_fdot = (chi * mu.sqrt() / (r_new.norm() * r)) * (z * stumpff_s(z) - 1.0);
+        // let gauss_gdot = 1.0 - (chi.powi(2) / r) * stumpff_c(z);
+        let gauss_gdot = 1.0 - (chi.powi(2) / r_new.norm()) * stumpff_c(z);
         let velocity = self.position * gauss_fdot + self.velocity * gauss_gdot;
 
-        self.position = position;
+        // let position = self.position * gauss_f + self.velocity * gauss_g;
+        // let velocity = self.position * gauss_fdot + self.velocity * gauss_gdot;
+
+        self.position = r_new;
         self.velocity = velocity;
         self.epoch = epoch.clone();
 
