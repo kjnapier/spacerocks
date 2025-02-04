@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
-use pyo3::types::{PyDict, IntoPyDict};
+use pyo3::types::{PyDict, IntoPyDict, PyList, PyTuple};
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use flate2::read::GzDecoder;
@@ -14,7 +14,11 @@ use rayon::prelude::*;
 use spacerocks::spacerock::SpaceRock;
 use spacerocks::Time;
 use spacerocks::transforms::calc_true_anomaly_from_mean_anomaly;
+use spacerocks::Observatory;
+// use crate::py_time::time::PyTime;
 use crate::py_time::time::PyTime;
+use crate::py_observing::observer::PyObserver;
+use crate::py_observing::observation::PyObservation;
 
 use serde_json;
 
@@ -162,7 +166,6 @@ impl MPCHandler {
 
     #[pyo3(signature = (designation, formats=vec!["ADES_DF".to_string()], ades_version=None))]
     pub fn get_detections(&self, designation: &str, formats: Vec<String>, ades_version: Option<String>) -> PyResult<PyObject> {
-        
         Python::with_gil(|py| {
             let requests = PyModule::import(py, "requests")?;
             
@@ -181,7 +184,65 @@ impl MPCHandler {
             
             let json_response = response.call_method0("json")?;
 
-            Ok(json_response.into())
+            // Extract ADES data and create observations
+            let ades_data = json_response.get_item(0)?.get_item("ADES_DF")?;
+            let mut observations = Vec::new();
+
+            // Iterate over each row in the ADES data
+            for row in ades_data.try_iter()? {
+                let row = row?;
+
+                // Time conversion
+                let time = Time::from_isot(&row.get_item("obstime")?.extract::<String>()?)
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                
+                // Observatory setup
+                let observatory = Observatory::from_obscode(row.get_item("stn")?.extract()?);
+                let observer = observatory.expect("Failed at making observatory").at(&time, "J2000", "SSB");
+
+                // Convert ra and dec to radians
+                let ra = row.get_item("ra")?
+                    .extract::<String>()?
+                    .parse::<f64>()
+                    .map_err(|_| pyo3::exceptions::PyValueError::new_err("Invalid RA format"))?
+                    .to_radians();
+
+                let dec = row.get_item("dec")?
+                    .extract::<String>()?
+                    .parse::<f64>()
+                    .map_err(|_| pyo3::exceptions::PyValueError::new_err("Invalid Dec format"))?
+                    .to_radians();
+
+                let mag = match row.get_item("mag") {
+                    Ok(m) => match m.extract::<String>() {
+                        Ok(val) => val.parse::<f64>().ok(), // Convert string to f64
+                        Err(_) => m.extract::<f64>().ok(),  // If already f64, use it directly
+                    },
+                    Err(_) => None,
+                };
+
+
+                let observation = PyObservation { 
+                    inner: Observation::from_astrometry(
+                        time,
+                        ra, 
+                        dec,
+                        mag,
+                        observer.expect("Couldn't make Observer object"),
+                    )
+                };
+
+                observations.push(Py::new(py, observation)?);
+            }
+
+            let py_list = PyList::new(py, observations)?;
+
+            let json_response: PyObject = json_response.to_object(py);
+            let elements: &[PyObject] = &[py_list.to_object(py), json_response.to_object(py)];
+            let tuple = PyTuple::new(py, elements);
+
+
+            Ok(tuple?.to_object(py))
         })
     }
 
