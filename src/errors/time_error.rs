@@ -1,4 +1,5 @@
 #[derive(Debug)]
+/// Errors that can occur when working with time objects.
 pub enum TimeError {
     InvalidTimeScale(String),
     InvalidTimeFormat(String),

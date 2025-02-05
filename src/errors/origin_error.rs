@@ -1,4 +1,5 @@
 #[derive(Debug)]
+/// Error from parsing an invalid origin string.
 pub enum OriginError {
     InvalidOrigin(String),
 }

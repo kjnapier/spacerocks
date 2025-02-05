@@ -6,7 +6,9 @@ use crate::errors::OriginError;
 pub enum Origin {
     SUN,
     #[default]
+    /// Solar System Barycenter
     SSB,
+    /// Define a custom origin with a specified gravitational parameter mu.
     Custom {name: String, mu: f64},
 }
 
@@ -25,7 +27,7 @@ impl Origin {
     ///
     /// # Example
     /// ```
-    /// use spacerock::coordinates::Origin;
+    /// use spacerocks::coordinates::Origin;
     /// let earth_origin = Origin::new_custom(0.000_000_000_889_954, "EARTH");
     /// ```
     pub fn new_custom(mu: f64, name: &str) -> Origin {

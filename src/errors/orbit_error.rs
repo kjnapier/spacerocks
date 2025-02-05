@@ -1,6 +1,10 @@
 #[derive(Debug, PartialEq)]
+/// Errors that can occur when calculating orbits.
 pub enum OrbitError {
+    /// The eccentricity of the orbit is negative.
     NegativeEccentricity(f64),
+
+    /// The iteration to solve Kepler's equation did not converge.
     ConvergenceFailure(f64, f64),  // (eccentricity, mean_anomaly)
 }
 

@@ -1,9 +1,13 @@
 use crate::{Time, Origin};
 
 #[derive(Debug)]
+/// Errors occurring during a simulation.
 pub enum SimulationError {
+    /// The origin of the particle did not match the simulation origin.
     OriginMismatch(Origin, Origin, String),
+    /// The epoch of the particle did not match the simulation epoch.
     EpochMismatch(Time, Time, String),
+    /// The particle was not found in the simulation.
     ParticleNotFound(String),
 }
 

@@ -1,4 +1,5 @@
 #[derive(Debug)]
+/// Error from parsing an invalid reference plane string.
 pub enum ReferencePlaneError {
     InvalidReferencePlane(String),
 }

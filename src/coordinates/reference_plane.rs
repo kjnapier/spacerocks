@@ -25,7 +25,7 @@ impl ReferencePlane {
     ///
     /// # Example
     /// ```
-    /// use spacerock::coordinates::ReferencePlane;
+    /// use spacerocks::coordinates::ReferencePlane;
     /// let reference_plane = ReferencePlane::from_str("J2000").unwrap();
     /// ```
     pub fn from_str(s: &str) -> Result<Self, String> {
