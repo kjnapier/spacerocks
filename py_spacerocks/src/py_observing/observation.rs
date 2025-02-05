@@ -69,7 +69,7 @@ impl PyObservation {
             motion,
             range,
             mag, 
-            self.inner.epoch.iso()))
+            self.inner.epoch))
 
     }
 
