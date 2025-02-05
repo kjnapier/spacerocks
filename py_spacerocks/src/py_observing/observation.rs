@@ -64,10 +64,6 @@ impl PyObservation {
         let mag = self.inner.mag()
             .map_or(String::new(), |m| format!("mag = {:.1}", m));
 
-        // Ok(format!("Observation {} at epoch {}", 
-        //     position, 
-        //     self.inner.epoch.iso(),))
-
         Ok(format!("Observation:\n{}\n{}\n{}\n{}\nepoch: {}", 
             position,
             motion,
