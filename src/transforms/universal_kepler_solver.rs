@@ -24,9 +24,18 @@ pub fn solve_for_universal_anomaly(r0: f64, vr0: f64, alpha: f64, mu: f64, dt: f
 
     while error > tol {
         if iter > max_iter {
+            println!("\nSolver failed with:");
+            println!("r0: {}, vr0: {}, alpha: {}, mu: {}, dt: {}", r0, vr0, alpha, mu, dt);
+            println!("Initial chi: {}", mu.sqrt() * alpha.abs() * dt);
+            println!("Final chi: {}, Final error: {}", chi, error);
+            println!("z value: {}", alpha * chi.powi(2));
+            println!("Last f value: {}", f(chi, r0, vr0, alpha, mu, dt));
+            println!("Last df value: {}", df_dchi(chi, r0, vr0, alpha, mu));
             return Err("Universal Kepler solver did not converge. Pretty bad.".into());
         }
-        let delta_chi = f(chi, r0, vr0, alpha, mu, dt) / df_dchi(chi, r0, vr0, alpha, mu);
+        let f_val = f(chi, r0, vr0, alpha, mu, dt);
+        let df_val = df_dchi(chi, r0, vr0, alpha, mu);
+        let delta_chi = f_val / df_val;
         chi -= delta_chi;
         error = f(chi, r0, vr0, alpha, mu, dt).abs();
         iter += 1;
