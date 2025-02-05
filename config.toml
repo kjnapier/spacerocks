@@ -3,9 +3,9 @@
 default_kernels = [
     { name = "latest_leapseconds.tls", kernel_type = "lsk" }, 
     { name = "de440s.bsp", kernel_type = "spk/planets" },
-    { name = "earth_1962_240827_2124_combined.bpc", kernel_type = "pck" } 
-    { name = "codes_300ast_20100725.bsp", kernel_type = "spk/asteroids"}
-    { name = "codes_300ast_20100725.tf", kernel_type = "spk/asteroids"}
+    { name = "earth_1962_240827_2124_combined.bpc", kernel_type = "pck" },
+    { name = "codes_300ast_20100725.bsp", kernel_type = "spk/asteroids"},
+    { name = "codes_300ast_20100725.tf", kernel_type = "spk/asteroids"},
 ]
 
 # Auto-download is enabled by default, but you can set it explicitly
