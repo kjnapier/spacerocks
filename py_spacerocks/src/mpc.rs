@@ -227,9 +227,11 @@ impl MPCHandler {
                         time,
                         ra, 
                         dec,
-                        mag,
                         observer.expect("Couldn't make Observer object"),
-                    )
+                        None,
+                        mag,
+                        None
+                    ).expect("Failed to create Observation from Astrometry")
                 };
 
                 observations.push(Py::new(py, observation)?);

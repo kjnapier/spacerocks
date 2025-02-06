@@ -47,9 +47,9 @@ pub fn gauss(o1: &Observation, o2: &Observation, o3: &Observation, min_distance:
 
     let r2sq = r2.dot(&r2);
 
-    let a = -(a.powi(2) + 2.0 * a * e + r2sq);
-    let b = -2.0 * MU_BARY * b * (a + e);
-    let c = -MU_BARY.powi(2) * b.powi(2);
+    let aa = -(a.powi(2) + 2.0 * a * e + r2sq);
+    let bb = -2.0 * MU_BARY * b * (a + e);
+    let cc = -MU_BARY.powi(2) * b.powi(2);
 
     let mat = matrix![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
                       0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0;
@@ -58,7 +58,7 @@ pub fn gauss(o1: &Observation, o2: &Observation, o3: &Observation, min_distance:
                       0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0;
                       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0;
                       0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0;
-                      -c,  0.0, 0.0, -b,  0.0, 0.0, -a,  0.0];
+                      -cc, 0.0, 0.0, -bb, 0.0, 0.0, -aa, 0.0];
 
     let mat = match mat.try_schur(0.00001, 10000) {
         Some(mat) => mat,
