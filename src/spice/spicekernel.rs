@@ -1,85 +1,18 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::fs::{self, File};
 use std::io::Write;
-use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::SystemTime;
+
+use crate::errors::KernelError;
 use crate::constants::SPICE_URL;
+use super::config::{Config, KernelSpec};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct KernelSpec {
-    pub name: String,
-    pub kernel_type: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Config {
-    #[serde(default)]
-    pub default_kernels: Vec<KernelSpec>,
-    
-    #[serde(default)]
-    pub kernel_paths: Vec<PathBuf>,
-    
-    #[serde(default = "default_download_setting")]
-    pub auto_download: bool,
-    
-    #[serde(default = "default_download_dir")]
-    pub download_dir: PathBuf,
-}
-
-impl Config {
-    fn default_with_download(download: bool) -> Self {
-        let default_path = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".spacerocks")
-            .join("spice");
-
-        Config {
-            default_kernels: vec![
-                KernelSpec {
-                    name: "latest_leapseconds.tls".to_string(),
-                    kernel_type: "lsk".to_string(),
-                },
-                KernelSpec {
-                    name: "de440s.bsp".to_string(),
-                    kernel_type: "spk/planets".to_string(),
-                },
-                KernelSpec {
-                    name: "earth_1962_240827_2124_combined.bpc".to_string(),
-                    kernel_type: "pck".to_string(),
-                },
-                KernelSpec {
-                    name: "codes_300ast_20100725.bsp".to_string(),
-                    kernel_type: "spk/asteroids".to_string(),
-                },
-                KernelSpec {
-                    name: "codes_300ast_20100725.tf".to_string(),
-                    kernel_type: "spk/asteroids".to_string(),
-                },
-            ],
-            kernel_paths: vec![default_path.clone()],
-            auto_download: download,
-            download_dir: default_path,
-        }
-    }
-
-    fn from_file(path: &str) -> Result<Self, String> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read config file: {}", e))?;
-            
-        toml::from_str(&content)
-            .map_err(|e| format!("Failed to parse config: {}", e))
-    }
-}
-
-
-fn default_download_setting() -> bool {
-    true
-}
-
-fn default_download_dir() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".spacerocks")
-        .join("spice")
+#[derive(Debug)]
+struct KernelMetadata {
+    path: PathBuf,
+    kernel_type: String,
+    load_time: SystemTime,
 }
 
 pub struct SpiceKernel {
@@ -95,8 +28,8 @@ impl SpiceKernel {
         }
     }
 
-    pub fn defaults(download: bool) -> Result<Self, String> {
-        let config = Config::default_with_download(download);
+    pub fn defaults(force_download: Option<bool>) -> Result<Self, KernelError> {
+        let config = Config::default_with_download(true);
         let mut kernel = SpiceKernel {
             loaded_files: vec![],
             config: Some(config),
@@ -108,12 +41,11 @@ impl SpiceKernel {
             println!("  Download directory: {:?}", cfg.download_dir);
             println!("  Auto-download: {}", cfg.auto_download);
         }
-        
-        kernel.load_default_kernels()?;
+        kernel.load_kernels(force_download)?;
         Ok(kernel)
     }
 
-    pub fn from_config(path: &str) -> Result<Self, String> {
+    pub fn from_config(path: &str, force_download: Option<bool>) -> Result<Self, KernelError> {
         println!("Loading configuration from {}", path);
         
         let config = Config::from_file(path)?;
@@ -129,15 +61,30 @@ impl SpiceKernel {
             println!("  Auto-download: {}", cfg.auto_download);
         }
         
-        kernel.load_default_kernels()?;
+        kernel.load_kernels(force_download)?;
         Ok(kernel)
     }
 
-    fn process_kernel(&mut self, kernel_spec: &KernelSpec) -> Result<(), String> {
+    fn process_kernel(&mut self, kernel_spec: &KernelSpec, force_download: Option<bool>) -> Result<(), KernelError> {
         // If we have kernel paths, check them first
         if let Some(config) = &self.config {
             println!("\nProcessing kernel: {}", kernel_spec.name);
-            // Check each path
+
+             // Always download earth orientation file 
+             let force_download = force_download.unwrap_or(false);
+             let is_earth_file = kernel_spec.name.starts_with("earth_") && 
+                               kernel_spec.name.ends_with("_combined.bpc");
+             
+             if force_download || is_earth_file {
+                 println!("➜ Downloading kernel...");
+                 fs::create_dir_all(&config.download_dir)
+                     .map_err(|e| KernelError::IoError(e.to_string()))?;
+                     
+                 let path = self.download_kernel(&kernel_spec.kernel_type, &kernel_spec.name)?;
+                 return self.load(path.to_str().unwrap());
+             }
+
+            // Check each path for existence
             for path in &config.kernel_paths {
                 let kernel_path = path.join(&kernel_spec.name);
                 if kernel_path.exists() {
@@ -147,35 +94,32 @@ impl SpiceKernel {
             }
             
             // Not found in paths - try downloading
-            if config.auto_download {
-                println!("➜ Downloading kernel...");
-                fs::create_dir_all(&config.download_dir)
-                    .map_err(|e| format!("Failed to create download directory: {}", e))?;
-                    
-                let path = self.download_kernel(&kernel_spec.kernel_type, &kernel_spec.name)?;
-                return self.load(path.to_str().unwrap());
-            }
-            
-            return Err(format!("✗ Kernel {} not found in any paths and auto_download is false", kernel_spec.name));
+            println!("➜ Downloading kernel...");
+            fs::create_dir_all(&config.download_dir)
+                .map_err(|e| KernelError::IoError(e.to_string()))?;
+                
+            let path = self.download_kernel(&kernel_spec.kernel_type, &kernel_spec.name)?;
+            return self.load(path.to_str().unwrap());
         }
         
-        Err("No configuration provided".to_string())
+        Err(KernelError::InvalidConfig("No configuration provided".to_string()))
     }
     
-    // Main function just iterates over kernels
-    fn load_default_kernels(&mut self) -> Result<(), String> {
+    fn load_kernels(&mut self, force_download: Option<bool>) -> Result<(), KernelError> {
         let kernels = self.config.as_ref()
             .map(|c| c.default_kernels.clone())
             .unwrap_or_default();
             
         for kernel in kernels {
-            self.process_kernel(&kernel)?;
+            self.process_kernel(&kernel, force_download)?;
         }
         Ok(())
     }
 
-    fn download_kernel(&self, kernel_type: &str, filename: &str) -> Result<PathBuf, String> {
-        let config = self.config.as_ref().unwrap();
+    fn download_kernel(&self, kernel_type: &str, filename: &str) -> Result<PathBuf, KernelError> {
+        let config = self.config.as_ref()
+            .ok_or_else(|| KernelError::InvalidConfig("No configuration provided".to_string()))?;
+            
         let url = format!("{}/{}/{}", SPICE_URL, kernel_type, filename);
         let path = config.download_dir.join(filename);
         
@@ -183,26 +127,25 @@ impl SpiceKernel {
         println!("    Saving to {}", path.display());
         
         let response = reqwest::blocking::get(&url)
-            .map_err(|e| format!("Download failed: {}", e))?;
+            .map_err(|e| KernelError::DownloadError(e.to_string()))?;
             
         if !response.status().is_success() {
-            return Err(format!("Download failed with status: {}", response.status()));
+            return Err(KernelError::DownloadError(
+                format!("Download failed with status: {}", response.status())
+            ));
         }
-        
         let content = response.bytes()
-            .map_err(|e| format!("Failed to read response: {}", e))?;
+            .map_err(|e| KernelError::DownloadError(e.to_string()))?;
             
-        let mut file = File::create(&path)
-            .map_err(|e| format!("Failed to create file: {}", e))?;
-            
-        file.write_all(&content)
-            .map_err(|e| format!("Failed to write file: {}", e))?;
-            
-        println!("    Download complete");
+        File::create(&path)
+            .map_err(|e| KernelError::IoError(e.to_string()))?
+            .write_all(&content)
+            .map_err(|e| KernelError::IoError(e.to_string()))?;
+        
         Ok(path)
     }
-    
-    pub fn load(&mut self, path: &str) -> Result<(), String> {
+
+    pub fn load(&mut self, path: &str) -> Result<(), KernelError> {
         if self.loaded_files.contains(&path.to_string()) {
             println!("Kernel already loaded: {}", path);
             return Ok(());

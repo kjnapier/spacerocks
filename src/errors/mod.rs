@@ -12,3 +12,6 @@ pub use self::simulation_error::SimulationError;
 
 pub mod reference_plane_error;
 pub use self::reference_plane_error::ReferencePlaneError;
+
+pub mod kernel_error;
+pub use self::kernel_error::KernelError;

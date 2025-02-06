@@ -19,22 +19,22 @@ impl PySpiceKernel {
     }
 
     #[classmethod]
-    #[pyo3(signature = (download = true))]
-    fn defaults(cls: Py<PyType>, download: bool) -> PyResult<Self> {
-        SpiceKernel::defaults(download)
+    #[pyo3(signature = (force_download = None))]
+    fn defaults(cls: Py<PyType>, force_download: Option<bool>) -> PyResult<Self> {
+        SpiceKernel::defaults(force_download)
             .map(|kernel| PySpiceKernel { inner: kernel })
-            .map_err(|e| PyValueError::new_err(e))
+            .map_err(|e| PyValueError::new_err(e.to_string())) 
     }
     #[classmethod]
-    fn from_config(cls: Py<PyType>, path: String) -> PyResult<Self> {
-        SpiceKernel::from_config(&path)
+    fn from_config(cls: Py<PyType>, path: String, force_download: Option<bool>) -> PyResult<Self> {
+        SpiceKernel::from_config(&path, force_download)
             .map(|kernel| PySpiceKernel { inner: kernel })
-            .map_err(|e| PyValueError::new_err(e))
+            .map_err(|e| PyValueError::new_err(e.to_string())) 
     }
 
     fn load(&mut self, path: &str) -> PyResult<()> {
         self.inner.load(path)
-            .map_err(|e| PyValueError::new_err(e))
+            .map_err(|e| PyValueError::new_err(e.to_string())) 
     }
     
     fn unload(&mut self) {
