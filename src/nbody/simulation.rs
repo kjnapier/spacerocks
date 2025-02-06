@@ -13,7 +13,7 @@ use crate::nbody::integrators::{Integrator, IAS15};
 
 use nalgebra::Vector3;
 
-
+#[derive(Clone)]
 pub struct Simulation {
     pub particles: Vec<SpaceRock>,
     pub epoch: Time,
@@ -218,11 +218,6 @@ impl Simulation {
         Ok(())
     }
 
-    /// Step the simulation forward in time by one timestep.
-    pub fn step(&mut self) {
-        self.integrator.step(&mut self.particles, &mut self.epoch, &self.forces);
-    }
-
     /// Move the simulation to the center of mass.
     pub fn move_to_center_of_mass(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut total_mass = 0.0;
@@ -290,6 +285,11 @@ impl Simulation {
         Ok(())
     }
 
+    /// Step the simulation forward in time by one timestep.
+    pub fn step(&mut self) {
+        self.integrator.step(&mut self.particles, &mut self.epoch, &self.forces);
+    }
+
     /// Integrate the simulation to a new epoch.
     ///
     /// # Arguments
@@ -297,10 +297,7 @@ impl Simulation {
     /// * `epoch` - The new epoch to integrate to.
     pub fn integrate(&mut self, epoch: &Time) {
 
-        // let mut epoch = epoch.clone();
-        // epoch.change_timescale(self.epoch.timescale.clone());
-
-        // let dt = &epoch - &self.epoch;
+        
         let dt = epoch.tdb().jd() - self.epoch.tdb().jd();
         if dt.abs() < 1e-16 {
             return;
@@ -325,7 +322,14 @@ impl Simulation {
                 self.integrator.set_timestep(dt);
                 self.step();
                 self.integrator.set_timestep(last_timestep);
-                break;
+                continue;
+
+                // let dt = epoch.tdb().jd() - self.epoch.tdb().jd();
+                // if dt.abs() < 1e-16 {
+                //     self.integrator.set_timestep(last_timestep);
+                //     break;
+                // }
+                
             }
 
             // if the timestep is negative, make sure the integrator is set to negative

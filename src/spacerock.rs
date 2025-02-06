@@ -223,10 +223,10 @@ impl SpaceRock {
         //     params.insert("TIME_TYPE", timescale);
         // }
 
-        ep.to_tdb();
+        // ep.to_tdb();
         params.insert("TIME_TYPE", "'TDB'");
 
-        let time_list = format!("'{}'", ep.epoch);
+        let time_list = format!("'{}'", ep.tdb().jd());
         params.insert("TLIST", time_list.as_str());
 
         let tf = format!("'{}'", timeformat);
@@ -235,21 +235,24 @@ impl SpaceRock {
         let center = format!("'@{}'", origin);
         params.insert("center", center.as_str());
 
-        params.insert("make_ephem", "'yes'");
+        // params.insert("make_ephem", "'yes'");
         params.insert("ephem_type", "'vectors'");
         params.insert("vec_corr", "'None'");
         params.insert("out_units", "'AU-D'");
         params.insert("csv_format", "'yes'");
         params.insert("vec_delta_t", "'no'");
-        params.insert("vec_table", "'2x'");
+        // params.insert("vec_table", "'2x'");
+        params.insert("vec_table", "'2'");
         params.insert("vec_labels", "'no'");
 
         let response = client.get("https://ssd.jpl.nasa.gov/api/horizons.api?")
             .query(&params)
             .send()?;
 
+
         let json: serde_json::Value = response.json()?;
         let text = json["result"].as_str();
+
 
         // println!("{:?}", text);
 
@@ -258,9 +261,11 @@ impl SpaceRock {
         
         let data: Vec<f64> = first_data_line.split(',').filter_map(|s| s.trim().parse::<f64>().ok()).collect();
         // let given_epoch = Time::new(data[0], "tdb", "jd")?;
+        // println!("{:?}", data);
         let (x, y, z, vx, vy, vz) = (data[1], data[2], data[3], data[4], data[5], data[6]);
 
         let rock = SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, epoch.clone(), reference_plane, origin)?;
+        // let rock = SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, given_epoch.clone(), reference_plane, origin)?;
         Ok(rock)
     }
 
@@ -745,89 +750,12 @@ impl SpaceRock {
             }
         }
 
-        let observation = Observation::from_complete(self.epoch.clone(), ra, dec, ra_rate, dec_rate, rho, rho_rate, mag, observer.clone());
+        // let observation = Observation::from_complete(self.epoch.clone(), ra, dec, ra_rate, dec_rate, rho, rho_rate, mag, observer.clone());
+        let observation = Observation::from_complete(self.epoch.clone(), ra, dec, ra_rate, dec_rate, rho, rho_rate, observer.clone(), None, mag, None)?;
         Ok(observation)
     }
 
 }
-
-    // pub fn from_state(name: &str, state: StateVector, epoch: Time, reference_plane: &ReferencePlane, origin: &Origin) -> Self {
-    //     let position = state.position;
-    //     let velocity = state.velocity;
-    //     SpaceRock {
-    //         name: name.to_string().into(),
-    //         position: position,
-    //         velocity: velocity,
-    //         epoch: epoch,
-    //         reference_plane: reference_plane.clone(),
-    //         origin: origin.clone(),
-    //     }
-    // }
-
-    // pub fn from_kepler(name: &str, orbit: KeplerOrbit, epoch: Time, reference_plane: &ReferencePlane, origin: &Origin) -> Self {
-    //     let state = calc_xyz_from_kepM(orbit.a, orbit.e, orbit.inc, orbit.arg, orbit.node, orbit.M());
-    //     SpaceRock {
-    //         name: name.to_string().into(),
-    //         position: state.position,
-    //         velocity: state.velocity,
-    //         epoch: epoch,
-    //         reference_plane: reference_plane.clone(),
-    //         origin: origin.clone(),
-    //     }
-    // }
-
-
-    // pub fn random() -> Self {
-    //     let mut rng = rand::thread_rng();
-    //     let a = rng.gen_range(40.0..50.0);
-    //     let e = rng.gen_range(0.0..0.3);
-    //     let inc = rng.gen_range(0.0..std::f64::consts::PI/3.0);
-    //     let arg = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
-    //     let node = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
-    //     let f = rng.gen_range(0.0..2.0 * std::f64::consts::PI);
-
-    //     // uuid for name
-    //     let name = format!("{}", uuid::Uuid::new_v4().simple());
-
-    //     SpaceRock::from_kepler(&name, KeplerOrbit::new(a, e, inc, arg, node, f), Time::now(), &ReferencePlane::J2000, &Origin::SSB)
-    // }
-
-    // Methods
-
-    // pub fn analytic_propagate(&mut self, epoch: &Time) {
-
-    //     let timescale = &self.epoch.timescale;
-    //     let mut epoch = epoch.clone();
-
-    //     epoch.change_timescale(timescale.clone());
-    //     let dt = epoch.epoch - self.epoch.epoch;
-
-    //     // check that self.orbit is not None
-    //     match &self.orbit {
-    //         None => self.calculate_orbit(),
-    //         _ => (),
-    //     }
-
-    //     if let Some(orbit) = &self.orbit {
-    //         let dM = orbit.n() * dt;
-    //         let M_new = orbit.M() + dM;
-    //         let new_state = calc_xyz_from_kepM(orbit.a, orbit.e, orbit.inc, orbit.arg, orbit.node, M_new);
-    //         self.position = Vector3::new(new_state.position[0], new_state.position[1], new_state.position[2]);
-    //         self.velocity = Vector3::new(new_state.velocity[0], new_state.velocity[1], new_state.velocity[2]);
-    //         self.epoch = epoch;
-    //         self.calculate_orbit();
-    //     }        
-    // }
-
-    // pub fn at(&mut self, epoch: &Time) {
-    //     self.analytic_propagate(epoch)
-    // }
-
-
-    // pub fn calculate_orbit(&mut self) {
-    //     self.orbit = Some(KeplerOrbit::from_xyz(StateVector {position: self.position, velocity: self.velocity}));
-    // }
-
 
 /// Display the SpaceRock object with each field on a new line
 impl std::fmt::Display for SpaceRock {

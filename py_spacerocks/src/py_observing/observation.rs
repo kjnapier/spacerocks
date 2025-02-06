@@ -7,6 +7,8 @@ use crate::py_observing::observer::PyObserver;
 use crate::py_time::time::PyTime;
 // use crate::py_spacerock::origin::PyOrigin;
 
+use nalgebra::DMatrix;
+
 #[pyclass]
 #[pyo3(name = "Observation")]
 pub struct PyObservation {
@@ -17,15 +19,23 @@ pub struct PyObservation {
 impl PyObservation {
 
     #[classmethod]
-    #[pyo3(signature = (epoch, ra, dec, observer, mag = None))]
-    fn from_astrometry(_cls: Py<PyType>, epoch: PyTime, ra: f64, dec: f64, observer: PyObserver, mag: Option<f64>) -> PyResult<PyObservation> {
-        Ok(PyObservation { inner: Observation::from_astrometry(epoch.inner, ra, dec, mag, observer.inner) })
+    #[pyo3(signature = (epoch, ra, dec, observer, covariance=None, mag=None, mag_err=None))]
+    fn from_astrometry(_cls: Py<PyType>, epoch: PyTime, ra: f64, dec: f64, observer: PyObserver, covariance: Option<[[f64; 2]; 2]>, mag: Option<f64>, mag_err: Option<f64>) -> PyResult<PyObservation> {
+        let obs = Observation::from_astrometry(epoch.inner, ra, dec, observer.inner, covariance, mag, mag_err);
+        if obs.is_err() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to create Observation from Astrometry")));
+        }
+        Ok(PyObservation { inner: obs.unwrap() })
     }
 
     #[classmethod]
-    #[pyo3(signature = (epoch, ra, dec, ra_rate, dec_rate, observer, mag = None))]
-    fn from_streak(_cls: Py<PyType>, epoch: PyTime, ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, observer: PyObserver, mag: Option<f64>) -> PyResult<PyObservation> {
-        Ok(PyObservation { inner: Observation::from_streak(epoch.inner, ra, dec, ra_rate, dec_rate, mag, observer.inner) })
+    #[pyo3(signature = (epoch, ra, dec, ra_rate, dec_rate, observer, covariance=None, mag=None, mag_err=None))]
+    fn from_streak(_cls: Py<PyType>, epoch: PyTime, ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, observer: PyObserver, covariance: Option<[[f64; 4]; 4]>, mag: Option<f64>, mag_err: Option<f64>) -> PyResult<PyObservation> {
+        let obs = Observation::from_streak(epoch.inner, ra, dec, ra_rate, dec_rate, observer.inner, covariance, mag, mag_err);
+        if obs.is_err() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to create Observation from Streak")));
+        }
+        Ok(PyObservation { inner: obs.unwrap() })
     }
 
     // repr
@@ -107,6 +117,28 @@ impl PyObservation {
     #[getter]
     fn observer(&self) -> PyObserver {
         PyObserver { inner: self.inner.observer.clone() }
+    }
+
+    #[getter]
+    fn covariance(&self) -> Option<Vec<Vec<f64>>> {
+        match self.inner.covariance() {
+            Some(cov) => Some(cov.data.as_vec().chunks(cov.ncols()).map(|x| x.to_vec()).collect()),
+            None => None,
+        }
+    }
+
+    fn set_covariance(&mut self, covariance: Vec<Vec<f64>>) {
+        // ingest as a DMatrix
+        let covariance = DMatrix::from_vec(covariance.len(), covariance[0].len(), covariance.iter().flatten().cloned().collect());
+        self.inner.set_covariance(covariance);
+    }
+
+    fn set_mag(&mut self, mag: f64) {
+        self.inner.set_mag(mag);
+    }
+
+    fn set_mag_err(&mut self, mag_err: f64) {
+        self.inner.set_mag_err(mag_err);
     }
 
 

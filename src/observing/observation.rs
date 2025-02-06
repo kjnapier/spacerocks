@@ -1,13 +1,13 @@
 use crate::{Time, Observer};
 
-use nalgebra::Vector3;
+use nalgebra::{Vector3, DMatrix};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ObservationType {
-    Astrometry { ra: f64, dec: f64, mag: Option<f64> },
-    Streak { ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, mag: Option<f64> },
+    Astrometry { ra: f64, dec: f64 },
+    Streak { ra: f64, dec: f64, ra_rate: f64, dec_rate: f64 },
     Radar { ra: f64, dec: f64, range: f64, range_rate: f64 },
-    Complete { ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, range: f64, range_rate: f64, mag: Option<f64> },
+    Complete { ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, range: f64, range_rate: f64 },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -15,25 +15,54 @@ pub struct Observation {
     pub epoch: Time,
     pub observation_type: ObservationType,
     pub observer: Observer,
+    pub inverse_covariance: Option<DMatrix<f64>>,
+    pub mag: Option<f64>,
+    pub mag_err: Option<f64>,
     // pub filter: Option<String>,
     // pub obsid: Option<String>,
 }
 
 impl Observation {
-    pub fn new(epoch: Time, observation_type: ObservationType, observer: Observer) -> Observation {
-        Observation { epoch, observation_type, observer }
+    pub fn new(epoch: Time, observation_type: ObservationType, observer: Observer, inverse_covariance: Option<DMatrix<f64>>, mag: Option<f64>, mag_err: Option<f64>) -> Observation {
+        Observation { epoch, observation_type, observer, inverse_covariance, mag, mag_err }
     }
 
-    pub fn from_astrometry(epoch: Time, ra: f64, dec: f64, mag: Option<f64>, observer: Observer) -> Observation {
-        Observation::new(epoch, ObservationType::Astrometry { ra, dec, mag }, observer)
+    pub fn from_astrometry(epoch: Time, ra: f64, dec: f64, observer: Observer, covariance: Option<[[f64; 2]; 2]>, mag: Option<f64>, mag_err: Option<f64>) -> Result<Observation, Box<dyn std::error::Error>> {
+
+        let cov = covariance.map(|cov| {
+            DMatrix::from_fn(2, 2, |r, c| cov[r][c])
+        });
+        let inv_cov = cov.clone().map(|cov| {
+            cov.clone().try_inverse().ok_or("Covariance matrix is not invertible").unwrap()
+        });
+        
+        Ok(Observation::new(epoch, ObservationType::Astrometry { ra, dec }, observer, inv_cov, mag, mag_err))
     }
 
-    pub fn from_streak(epoch: Time, ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, mag: Option<f64>, observer: Observer) -> Observation {
-        Observation::new(epoch, ObservationType::Streak { ra, dec, ra_rate, dec_rate, mag }, observer)
+    pub fn from_streak(epoch: Time, ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, observer: Observer, covariance: Option<[[f64; 4]; 4]>, mag: Option<f64>, mag_err: Option<f64>) -> Result<Observation, Box<dyn std::error::Error>> {
+        let cov = covariance.map(|cov| {
+            DMatrix::from_fn(4, 4, |r, c| cov[r][c])
+        });
+
+        let inv_cov = cov.clone().map(|cov| {
+            cov.clone().try_inverse().ok_or("Covariance matrix is not invertible").unwrap()
+        });
+        Ok(Observation::new(epoch, ObservationType::Streak { ra, dec, ra_rate, dec_rate }, observer, inv_cov, mag, mag_err))
     }
 
-    pub fn from_complete(epoch: Time, ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, range: f64, range_rate: f64, mag: Option<f64>, observer: Observer) -> Observation {
-        Observation::new(epoch, ObservationType::Complete { ra, dec, ra_rate, dec_rate, range, range_rate, mag }, observer)
+    pub fn from_complete(epoch: Time, ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, range: f64, range_rate: f64, observer: Observer, covariance: Option<[[f64; 6]; 6]>, mag: Option<f64>, mag_err: Option<f64>) -> Result<Observation, Box<dyn std::error::Error>> {
+        let cov = covariance.map(|cov| {
+            DMatrix::from_fn(6, 6, |r, c| cov[r][c])
+        });
+
+        if cov.is_some() && cov.as_ref().unwrap().determinant() == 0.0 {
+            return Err("Covariance matrix is singular".into());
+        }
+
+        let inv_cov = cov.clone().map(|cov| {
+            cov.clone().try_inverse().ok_or("Covariance matrix is not invertible").unwrap()
+        });
+        Ok(Observation::new(epoch, ObservationType::Complete { ra, dec, ra_rate, dec_rate, range, range_rate }, observer, inv_cov, mag, mag_err))
     }
 
     pub fn ra(&self) -> f64 {
@@ -91,12 +120,31 @@ impl Observation {
     }
 
     pub fn mag(&self) -> Option<f64> {
-        match self.observation_type {
-            ObservationType::Astrometry { mag, .. } => mag,
-            ObservationType::Streak { mag, .. } => mag,
-            ObservationType::Radar { .. } => None,
-            ObservationType::Complete { mag, .. } => mag,
-        }
+        self.mag
+    }
+
+    pub fn mag_err(&self) -> Option<f64> {
+        self.mag_err
+    }
+
+    pub fn set_mag(&mut self, mag: f64) {
+        self.mag = Some(mag);
+    }
+
+    pub fn set_mag_err(&mut self, mag_err: f64) {
+        self.mag_err = Some(mag_err);
+    }
+
+    pub fn set_covariance(&mut self, covariance: DMatrix<f64>) {
+        self.inverse_covariance = Some(covariance.try_inverse().unwrap());
+    }
+
+    pub fn inverse_covariance(&self) -> Option<&DMatrix<f64>> {
+        self.inverse_covariance.as_ref()
+    }
+
+    pub fn covariance(&self) -> Option<DMatrix<f64>> {
+        self.inverse_covariance.as_ref().map(|cov| cov.clone().try_inverse().unwrap())
     }
 
     pub fn proper_motion(&self) -> Option<f64> {
@@ -118,7 +166,7 @@ impl std::fmt::Display for Observation {
         match self.observation_type {
             ObservationType::Astrometry { ra, dec, .. } => write!(f, "Astrometric observation at epoch {} with RA: {} and Dec: {}", self.epoch, ra, dec),
             ObservationType::Streak { ra, dec, ra_rate, dec_rate, .. } => write!(f, "Streak observation at epoch {} with RA: {}, Dec: {}, RA rate: {}, Dec rate: {}", self.epoch, ra, dec, ra_rate, dec_rate),
-            ObservationType::Radar { ra, dec, range, range_rate } => write!(f, "Radar observation at epoch {} with RA: {}, Dec: {}, Range: {}, Range rate: {}", self.epoch, ra, dec, range, range_rate),
+            ObservationType::Radar { ra, dec, range, range_rate, .. } => write!(f, "Radar observation at epoch {} with RA: {}, Dec: {}, Range: {}, Range rate: {}", self.epoch, ra, dec, range, range_rate),
             ObservationType::Complete { ra, dec, ra_rate, dec_rate, range, range_rate, .. } => write!(f, "Complete observation at epoch {} with RA: {}, Dec: {}, RA rate: {}, Dec rate: {}, Range: {}, Range rate: {}", self.epoch, ra, dec, ra_rate, dec_rate, range, range_rate),
         }
     }
