@@ -302,4 +302,14 @@ impl RockCollection {
     pub fn epoch(&self) -> Vec<PyTime> {
         self.rocks.par_iter().map(|rock| PyTime { inner: rock.epoch.clone() }).collect()
     }
+
+    pub fn get(&self, name: &str) -> PyResult<PySpaceRock> {
+        let rock = self.rocks.iter().find(|rock| rock.name == name);
+        match rock {
+            Some(rock) => Ok(PySpaceRock { inner: rock.clone() }),
+            None => Err(PyErr::new::<PyValueError, _>(
+                format!("No rock found with name: {}", name)
+            ))
+        }
+    }
 }
