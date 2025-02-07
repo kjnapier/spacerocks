@@ -13,6 +13,7 @@ pub fn make_orbfit_submodule(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()
 
     submodule.add_function(wrap_pyfunction!(lmfit::fit_orbit_lm_py, submodule.clone())?)?;
     submodule.add_function(wrap_pyfunction!(lmfit::randj_py, submodule.clone())?)?;
+    submodule.add_function(wrap_pyfunction!(lmfit::orbit_chisq_py, submodule.clone())?)?;
 
 
 

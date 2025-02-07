@@ -17,7 +17,6 @@ pub fn residuals(detections: &Vec<&Observation>, theta: &[f64; 7], mut sim: Simu
     sim.add(trial);
 
     let mut residuals: DVector<f64> = DVector::zeros(detections.len());
-    // let mut rock = trial.clone();
     
     for (idx, detection) in detections.iter().enumerate() {
 
@@ -28,14 +27,11 @@ pub fn residuals(detections: &Vec<&Observation>, theta: &[f64; 7], mut sim: Simu
         };
 
         // somehow get the rock to the epoch of the detection
-        // rock.analytic_propagate(&detection.epoch);
         sim.integrate(&detection.epoch);
         let mut rock = sim.get_particle("rock")?.clone();
 
         // calculate the model observations
         let astro = rock.observe(&detection.observer)?;
-        
-
         let model_parameters = match detection.observation_type {
             ObservationType::Astrometry { ra, dec } => DVector::from_vec(vec![astro.ra(), astro.dec()]),
             ObservationType::Streak { ra, dec, ra_rate, dec_rate } => DVector::from_vec(vec![astro.ra(), astro.dec(), astro.ra_rate().expect("Must have ra rate"), astro.dec_rate().expect("Must have ra rate")]),
@@ -43,13 +39,8 @@ pub fn residuals(detections: &Vec<&Observation>, theta: &[f64; 7], mut sim: Simu
         };
 
         let d = observed_parameters - model_parameters;
-        //println!("Residual: {:?}", d);
-
         let m = &d.transpose() * &detection.inverse_covariance.clone().unwrap() * &d;
-        //println!("Chi squared: {}", m[0]);
-
-        residuals[idx] = m[0];//.sqrt();
-
+        residuals[idx] = m[0];
     }
     Ok(residuals)
 }
@@ -103,21 +94,12 @@ pub fn residuals_and_derivatives(detections: &Vec<&Observation>, theta: &[f64; 7
 }
 
 
-pub fn cost(detections: &Vec<&Observation>, theta: &[f64; 7], sim: Simulation) -> f64 {
+pub fn orbit_chisq(detections: &Vec<&Observation>, theta: &[f64; 7], sim: Simulation) -> f64 {
     let epoch = Time::new(theta[6], "tdb", "jd").unwrap();
     let trial = SpaceRock::from_xyz("rock", theta[0], theta[1], theta[2], theta[3], theta[4], theta[5], epoch, "J2000", "SSB");
     let res = residuals(detections, theta, sim.clone()).unwrap();
-    //let csq = res.dot(&res);
-    //csq
-    // sum of res
-    let mut s = 0.0;
-    for i in 0..res.len() {
-        s += res[i];
-    }
-    s
+    res.sum()
 }
-
-
 
 #[derive(Debug, Clone)]
 pub struct FitResult {
@@ -125,7 +107,7 @@ pub struct FitResult {
     pub rock: SpaceRock,
     pub niter: usize,
     pub dof: f64,
-    // pub residuals: Vec<f64>,
+    pub residuals: Vec<f64>,
     pub covariance: DMatrix<f64>,
 }
 
@@ -139,7 +121,7 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
     let theta_tol = 1e-12;
     let rho_accept = 0.0;
 
-    let maxiter = 10_000;
+    let maxiter = 1_000;
     let mut niter = 0;
 
     let dof = detections.len() as f64 * 2.0 - 6.0;
@@ -154,10 +136,6 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
     let mut new_csq: f64 = csq.clone();
 
     let mut lambda: f64 = 0.001;
-    // let mut v = 2.0;
-
-
-    // set up an identity matrix
     let eye = DMatrix::identity(6, 6);
 
     while grad.norm() > grad_tol {
@@ -207,11 +185,8 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
     }
 
     let rock = SpaceRock::from_xyz("rock", theta[0], theta[1], theta[2], theta[3], theta[4], theta[5], Time::new(theta[6], "tdb", "jd")?, "J2000", "SSB")?;
-    // let (res, mut j) = residuals_and_derivatives(detections, &theta, sim.clone());
     let a = &j.transpose() * &j;
     let cov = a.pseudo_inverse(1e-10)?;
-
-    // let rd_resid = radec_residuals(detections, &theta, epoch);
 
     println!("Final chisq: {}", new_csq);
     println!("Final chisq/dof: {}", new_csq / dof);
@@ -222,7 +197,7 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
     return Ok(Some(FitResult {
         chisq: new_csq * dof,
         dof: dof,
-        // residuals: residuals(detections, &theta).iter().map(|r| *r).collect::<Vec<_>>(),
+        residuals: res.iter().map(|r| *r).collect::<Vec<_>>(),
         rock: rock,
         niter: niter,
         covariance: cov
