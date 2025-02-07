@@ -4,7 +4,6 @@ use crate::data::{SPEED_OF_LIGHT, MU_BARY};
 use nalgebra::Matrix3;
 use nalgebra::matrix;
 
-// pub fn gauss(triplet: &[Observation; 3], min_distance: f64) -> Option<Vec<SpaceRock>> {
 
 pub fn gauss(o1: &Observation, o2: &Observation, o3: &Observation, min_distance: f64) -> Option<Vec<SpaceRock>> {
 
