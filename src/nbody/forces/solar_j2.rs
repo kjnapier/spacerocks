@@ -7,6 +7,9 @@ use crate::constants::{GRAVITATIONAL_CONSTANT, SPEED_OF_LIGHT};
 use nalgebra::Vector3;
 
 
+/// Implements perturbations due to the Sun's oblateness (J2).
+/// Accounts for the Sun's slight equatorial bulge which creates
+/// a non-spherical component to its gravitational field.
 #[derive(Debug, Clone, Copy)]
 pub struct SolarJ2;
 
@@ -14,7 +17,14 @@ const sun_j2: f64 = 2.17e-7;
 const sun_radius: f64 = 696_342.0 / 149_597_870.7;
 
 impl Force for SolarJ2 {
-    
+    /// Calculates acceleration from solar J2 effect. The force depends on 
+    /// latitude with respect to the solar equator and falls off as r⁻⁵.
+    ///
+    /// # Arguments
+    /// * `entities` - Vector of bodies (must include "sun")
+    ///
+    /// # Returns
+    /// * Vector of J2 perturbation accelerations
     fn calculate_acceleration(&self, entities: &mut Vec<SpaceRock>) -> Vec<Vector3<f64>> {
 
         let mut acceleration = vec![Vector3::zeros(); entities.len()];

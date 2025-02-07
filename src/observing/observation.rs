@@ -2,6 +2,7 @@ use crate::{Time, Observer};
 
 use nalgebra::{Vector3, DMatrix};
 
+/// Types of astronomical observations, each containing different measured quantities
 #[derive(Debug, Clone, PartialEq)]
 pub enum ObservationType {
     Astrometry { ra: f64, dec: f64 },
@@ -10,6 +11,7 @@ pub enum ObservationType {
     Complete { ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, range: f64, range_rate: f64 },
 }
 
+/// An astronomical observation of a celesital object from a specific observer
 #[derive(Debug, Clone, PartialEq)]
 pub struct Observation {
     pub epoch: Time,
@@ -153,6 +155,7 @@ impl Observation {
         Some((ra_rate.powi(2) * (self.dec().cos()).powi(2) + dec_rate.powi(2)).sqrt())
     }
 
+    /// Returns unit vector in direction of observation
     pub fn pointing(&self) -> Vector3<f64> {
         let ra = self.ra();
         let dec = self.dec();

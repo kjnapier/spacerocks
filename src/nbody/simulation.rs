@@ -33,7 +33,7 @@ impl Default for Simulation {
 }
 
 impl Simulation {
-
+    /// Creates a new simulation at the specified epoch and reference frame.
     pub fn new(epoch: &Time, reference_plane: &str, origin: &str) -> Result<Simulation, Box<dyn std::error::Error>> {
         let mut t = Time::now();
         t.to_tdb();

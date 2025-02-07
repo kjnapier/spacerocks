@@ -3,9 +3,33 @@ use crate::time::Time;
 use crate::nbody::forces::Force;
 
 
+/// A numerical integrator for advancing a system of particles forward in time.
+/// 
+/// This trait defines the core functionality required for any numerical integrator
+/// in the system. Implementors must be thread-safe (Send + Sync) and clonable.
+/// 
+/// The integrator is responsible for:
+/// - Advancing particle states (positions and velocities) through time
+/// - Managing timestep size
+/// - Coordinating force calculations
 pub trait Integrator: Send + Sync + IntegratorClone {
+    /// Advances the system one timestep forward
+    ///
+    /// # Arguments
+    ///
+    /// * `particles` - Vector of particles to be integrated
+    /// * `epoch` - Current simulation time, updated in-place to the new time
+    /// * `forces` - Vector of forces acting on the system
     fn step(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>);
+
+    /// Returns the current timestep of the integrator
     fn timestep(&self) -> f64;
+
+    /// Sets the timestep of the integrator
+    ///
+    /// # Arguments
+    ///
+    /// * `timestep` - New timestep value to use
     fn set_timestep(&mut self, timestep: f64);
 }
 

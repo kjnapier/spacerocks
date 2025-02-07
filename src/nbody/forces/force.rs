@@ -1,7 +1,21 @@
 use crate::spacerock::SpaceRock;
 use nalgebra::Vector3;
 
+/// A force that can act on spacerocks in an N-body simulation.
+/// 
+/// This trait represents any force that can affect the motion of spacerocks,
+/// such as gravity, radiation pressure, or non-gravitational forces.
+/// Implementors must be thread-safe (Send + Sync) and clonable.
 pub trait Force: Send + Sync + ForceClone {
+    /// Calculate the acceleration of a set of spacerocks due to gravity.
+    ///
+    /// # Arguments
+    ///
+    /// * `entities` - A mutable reference to a vector of spacerocks.
+    ///
+    /// # Returns
+    ///
+    /// * A vector of accelerations for each spacerock.
     fn calculate_acceleration(&self, entities: &mut Vec<SpaceRock>) -> Vec<Vector3<f64>>;
 }
 

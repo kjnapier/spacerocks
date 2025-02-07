@@ -8,10 +8,14 @@ use crate::time::Time;
 use nalgebra::Vector3;
 
 
+/// Represents different types of astronomical observatories
 #[derive(Clone, Debug, PartialEq)]
 pub enum Observatory {
+     /// Fixed ground-based observatory with known position on Earth
     GroundObservatory { obscode: String, lon: f64, lat: f64, rho: f64 },
+     /// Space-based telescope with position from SPICE kernels
     SpaceTelecope { name: String },
+    /// Observing from a SpaceRock
     SpaceRockObservatory { rock: SpaceRock }
 }
 
@@ -165,6 +169,11 @@ impl Observatory {
 
 }
 
+/// Computes local sidereal time for a given epoch and longitude
+/// 
+/// # Arguments
+/// * `epoch` - Julian date
+/// * `lon` - Longitude in radians
 fn compute_local_sidereal_time(epoch: f64, lon: f64) -> f64 {
     let t = (epoch - 2451545.0) / 36525.0;
     let mut theta = 280.46061837 + 360.98564736629 * (epoch - 2451545.0) + (0.000387933 * t * t) - (t * t * t / 38710000.0);
@@ -172,6 +181,10 @@ fn compute_local_sidereal_time(epoch: f64, lon: f64) -> f64 {
     return theta + lon
 }
 
+/// Computes sidereal rotation rate at given epoch
+/// 
+/// # Arguments
+/// * `epoch` - Julian date
 fn sidereal_rate(epoch: f64) -> f64 {
     let t = (epoch - 2451545.0) / 36525.0;
     let tprime = 1.0 / 36525.0;
@@ -179,6 +192,17 @@ fn sidereal_rate(epoch: f64) -> f64 {
     return theta_dot * DEG_TO_RAD
 }
 
+/// Calculates position and velocity corrections for Earth-based observers
+/// 
+/// # Arguments
+/// * `lon` - Observer longitude in radians
+/// * `rho_sin_lat` - ρsin(φ) where ρ is distance from Earth center
+/// * `rho_cos_lat` - ρcos(φ) where ρ is distance from Earth center
+/// * `epoch` - Julian date
+/// 
+/// # Returns
+/// * Position correction [dx, dy, dz] in AU
+/// * Velocity correction [vx, vy, vz] in AU/day
 fn compute_topocentric_correction(lon: f64, rho_sin_lat: f64, rho_cos_lat: f64, epoch: f64) -> [Vector3<f64>; 2] {
 
     let phi = compute_local_sidereal_time(epoch, lon);

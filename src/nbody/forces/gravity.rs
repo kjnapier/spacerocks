@@ -5,10 +5,23 @@ use crate::constants::GRAVITATIONAL_CONSTANT;
 use nalgebra::Vector3;
 
 
+/// Implements classical Newtonian gravitational force between bodies.
 #[derive(Debug, Clone, Copy)]
 pub struct NewtonianGravity;
 
 impl Force for NewtonianGravity {
+    /// Calculates gravitational accelerations for a system of bodies.
+    ///
+    /// Bodies with zero mass only receive acceleration but do not affect other bodies,
+    /// making them effectively test particles in the gravitational field.
+    ///
+    /// # Arguments
+    ///
+    /// * `entities` - Vector of bodies to calculate forces between
+    ///
+    /// # Returns
+    ///
+    /// * Vector of acceleration vectors, one for each body in same order as input
 
     fn calculate_acceleration(&self, entities: &mut Vec<SpaceRock>) -> Vec<Vector3<f64>> {
         // Naive implementation of Newtonian gravity. O(0.5 * n^2) complexity.

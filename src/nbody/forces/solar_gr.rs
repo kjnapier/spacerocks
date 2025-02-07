@@ -8,10 +8,19 @@ use nalgebra::Vector3;
 
 
 #[derive(Debug, Clone, Copy)]
+/// Implements general relativistic corrections to solar gravity
 pub struct SolarGR;
 
 impl Force for SolarGR {
     
+    /// Calculates relativistic acceleration: a = (μ/c²r³) * [(4μ/r - v²)r + 4(r·v)v]
+    /// where μ = GM_sun, r and v are position/velocity relative to Sun.
+    ///
+    /// # Arguments
+    /// * `entities` - Vector of bodies (must include "sun")
+    ///
+    /// # Returns
+    /// * Vector of relativistic acceleration corrections
     fn calculate_acceleration(&self, entities: &mut Vec<SpaceRock>) -> Vec<Vector3<f64>> {
 
         let mut acceleration = vec![Vector3::zeros(); entities.len()];

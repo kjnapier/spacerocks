@@ -34,22 +34,56 @@ const D: [f64; 21] = [0.056_262_560_536_922_15, 0.003_165_475_718_170_829_3, 0.2
 const SAFETY_FACTOR: f64 = 0.25;
 
 #[derive(Debug, Clone)]
+/// IAS15 (Implicit integrator with Adaptive Step size control, 15th order) numerical integrator
+/// 
+/// This implements a high-precision integrator based on the Gauss-Radau quadrature.
+/// It features:
+/// - 15th order accuracy
+/// - Adaptive timestep control
+/// - Iterative refinement at each step using carefully chosen substep positions
+/// 
+/// The method uses a predictor-corrector scheme with Gauss-Radau spacings to achieve
+/// high accuracy while maintaining reasonable performance.
 pub struct IAS15 {
+    /// Current timestep in simulation time units
     pub timestep: f64,
+    /// Desired precision of the integrator
     pub epsilon: f64,
+    /// Last timestep used by the integrator
     pub last_timestep: f64,
+    /// Current step coefficients
     bs: Vec<CoefficientSeptet>,
+    /// Intermediate step coefficients
     gs: Vec<CoefficientSeptet>,
+    /// Error estimate coefficients
     es: Vec<CoefficientSeptet>,
+    /// Previous step coefficients
     bs_last: Vec<CoefficientSeptet>,
+    /// Previous error estimate coefficients
     es_last: Vec<CoefficientSeptet>,
 }
 
 impl IAS15 {
+    /// Creates a new IAS15 integrator with the specified initial timestep
+    ///
+    /// # Arguments
+    ///
+    /// * `timestep` - Initial integration timestep in simulation time units
+    ///
+    /// The integrator will automatically adjust this timestep based on the 
+    /// local truncation error to maintain the specified precision (epsilon).
     pub fn new(timestep: f64) -> IAS15 {
         IAS15 { timestep, epsilon: 1e-9, last_timestep: 0.0, bs: vec![], gs: vec![], es: vec![], bs_last: vec![], es_last: vec![] }
     }
 
+    /// Resets all coefficient vectors to zero for the specified number of particles
+    ///
+    /// # Arguments
+    ///
+    /// * `n` - Number of particles in the simulation
+    ///
+    /// This is called when the number of particles changes or at the start of integration
+    /// to ensure proper sizing of all coefficient vectors.
     pub fn reset_coefficients(&mut self, n: usize) {
         self.bs = vec![CoefficientSeptet::zeros(); n];
         self.gs = vec![CoefficientSeptet::zeros(); n];
@@ -356,7 +390,9 @@ impl Integrator for IAS15 {
     }
 }
 
-
+/// A 7-element coefficient set used by the IAS15 integrator to represent series expansions
+/// of position, velocity and acceleration for each body. Each component (p0 through p6) 
+/// represents a term in the series approximation.
 #[derive(Clone, Debug)]
 pub struct CoefficientSeptet {
     pub p0: Vector3<f64>,
@@ -379,6 +415,18 @@ impl CoefficientSeptet {
 }
 
 
+/// Predicts coefficients for the next integration step based on the current solution
+///
+/// # Arguments
+///
+/// * `ratio` - Ratio of new timestep to current timestep
+/// * `es_last` - Previous error estimate coefficients
+/// * `bs_last` - Previous solution coefficient\]
+/// * `es` - Current error estimate coefficients (modified in-place)
+/// * `bs` - Current solution coefficients (modified in-place)
+///
+/// Uses polynomial extrapolation to predict initial values for the next step's
+/// coefficients, improving convergence of the predictor-corrector iteration.
 fn predict_next_coefficients(ratio: &f64, es_last: &Vec<CoefficientSeptet>, bs_last: &Vec<CoefficientSeptet>, es: &mut Vec<CoefficientSeptet>, bs: &mut Vec<CoefficientSeptet>) {
 
     let rat = *ratio;
@@ -446,7 +494,23 @@ fn predict_next_coefficients(ratio: &f64, es_last: &Vec<CoefficientSeptet>, bs_l
 
 }
 
-
+/// Calculates the optimal timestep for the next integration step
+///
+/// # Arguments
+///
+/// * `particles` - Vector of particles being integrated
+/// * `accelerations` - Current accelerations for all particles
+/// * `bs` - Current solution coefficients
+/// * `last_timestep` - Previous integration timestep
+/// * `epsilon` - Desired integration accuracy
+///
+/// # Returns
+///
+/// * `f64` - Recommended timestep for the next integration step
+///
+/// Estimates the optimal timestep based on the local truncation error and 
+/// the dynamics of the system. Uses the ratio of successive terms in the
+/// series expansion to gauge the convergence rate.
 pub fn calculate_new_timestep(particles: &Vec<SpaceRock>, accelerations: &Vec<Vector3<f64>>, bs: &Vec<CoefficientSeptet>, last_timestep: &f64, epsilon: &f64) -> f64 {
     let mut min_timescale2 = f64::INFINITY;
     for idx in 0..particles.len() {

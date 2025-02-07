@@ -5,6 +5,22 @@ use nalgebra::Matrix3;
 use nalgebra::matrix;
 
 
+/// Implements Gauss' method for initial orbit determination from three observations.
+/// This method uses three on-sky measurements to determine possible orbital solutions.
+///
+/// # Arguments
+/// * `o1`, `o2`, `o3` - Three observations, ordered by time
+/// * `min_distance` - Minimum distance (in AU) to consider valid solutions
+///
+/// # Returns
+/// * `Some(Vec<SpaceRock>)` - Vector of possible orbit solutions
+/// * `None` - If no valid solutions found
+///
+/// The method:
+/// 1. Orders observations chronologically
+/// 2. Solves 8th degree polynomial for orbital distance
+/// 3. Uses roots to generate candidate orbits
+/// 4. Applies light-time correction to final solutions
 pub fn gauss(o1: &Observation, o2: &Observation, o3: &Observation, min_distance: f64) -> Option<Vec<SpaceRock>> {
 
     // get the order of the epochs

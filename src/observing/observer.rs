@@ -4,6 +4,8 @@ use crate::{Time};
 
 use nalgebra::Vector3;
 
+/// An observer at a specific location and time, which may be on Earth, 
+/// in space, or attached to a moving body
 #[derive(Debug, Clone, PartialEq)]
 pub struct Observer {
     pub spacerock: SpaceRock,
