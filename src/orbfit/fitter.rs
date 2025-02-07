@@ -139,7 +139,7 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
     let theta_tol = 1e-12;
     let rho_accept = 0.0;
 
-    let maxiter = 100;
+    let maxiter = 10_000;
     let mut niter = 0;
 
     let dof = detections.len() as f64 * 2.0 - 6.0;
@@ -154,7 +154,7 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
     let mut new_csq: f64 = csq.clone();
 
     let mut lambda: f64 = 0.001;
-    let mut v = 2.0;
+    // let mut v = 2.0;
 
 
     // set up an identity matrix
@@ -188,13 +188,14 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
             j = j2;
             grad = &j.transpose() * &res;
             a = &j.transpose() * &j;
-            lambda *= f64::max(1.0 / 3.0, 1.0 - (2.0 * rho - 1.0).powi(3));
+            // lambda *= f64::max(1.0 / 3.0, 1.0 - (2.0 * rho - 1.0).powi(3));
+            lambda *= 0.1;
             csq = new_csq;
-            v = 2.0;
+            // v = 2.0;
         } else {
             // reject the step, increase lambda, and reset the parameters
-            lambda *= v;
-            v *= 2.0;
+            lambda *= 10.0;
+            // v *= 2.0;
         }
 
         niter += 1;
