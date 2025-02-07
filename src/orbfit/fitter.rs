@@ -48,7 +48,7 @@ pub fn residuals(detections: &Vec<&Observation>, theta: &[f64; 7], mut sim: Simu
         let m = &d.transpose() * &detection.inverse_covariance.clone().unwrap() * &d;
         //println!("Chi squared: {}", m[0]);
 
-        residuals[idx] = m[0].sqrt();
+        residuals[idx] = m[0];//.sqrt();
 
     }
     Ok(residuals)
@@ -135,15 +135,9 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
     // do timing
     let start = Instant::now();
     
-    let csq_tol = 1e-3;
-    let grad_tol = 1e-3;
-    let theta_tol = 1e-10;
-    let rho_accept = -0.01;
-
-    // let csq_tol = 1e-3;
-    // let grad_tol = 1e-15;
-    // let theta_tol = 1e-15;
-    // let rho_accept = 0.2;
+    let grad_tol = 1e-12;
+    let theta_tol = 1e-12;
+    let rho_accept = 0.0;
 
     let maxiter = 100;
     let mut niter = 0;
@@ -151,86 +145,56 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
     let dof = detections.len() as f64 * 2.0 - 6.0;
     let mut theta = initial_guess.clone();
     
-    let mut csq = cost(detections, &theta, sim.clone());
-    let mut new_csq: f64 = csq;
-    
-    let mut csq_change: f64 = 10000.0;
-    
-    let mut lambda: f64 = 0.01;
+    // let mut csq = cost(detections, &theta, sim.clone());
+    let (mut res, mut j) = residuals_and_derivatives(detections, &theta, sim.clone());
+    let mut grad = &j.transpose() * &res;
+    let mut a = &j.transpose() * &j;
 
-    while csq_change.abs() > csq_tol {
-    // while true {
+    let mut csq = res.sum();
+    let mut new_csq: f64 = csq.clone();
+
+    let mut lambda: f64 = 0.001;
+    let mut v = 2.0;
+
+
+    // set up an identity matrix
+    let eye = DMatrix::identity(6, 6);
+
+    while grad.norm() > grad_tol {
 
         println!("Iteration: {}, chisq: {}, lambda: {}, ndof: {}", niter, csq, lambda, dof);
 
-        // let res = residuals(detections, &theta);
-        // let mut j = jacobian(detections, &theta);
-
-        let (res, mut j) = residuals_and_derivatives(detections, &theta, sim.clone());
-
-        let mut a = &j.transpose() * &j;
-        for idx in 0..6 {
-            a[(idx, idx)] += lambda;
-        }
-        
-        let a_inv = match a.try_inverse() {
-            Some(a_inv) => a_inv,
+        let h = match (&a + lambda * &eye).lu().solve(&(-&grad)) {
+            Some(h) => h,
             None => return Err("Matrix inversion failed".into())
         };
-
-        //check if the gradient has converged
-        let grad = &j.transpose() * &res;
-        let mut max_grad = 0.0;
-        for idx in 0..6 {
-            if grad[idx].abs() > max_grad {
-                max_grad = grad[idx].abs();
-            }
-        }
-        if max_grad < grad_tol {
-            println!("Gradient converged");
-            break;
-        }
-        let h = a_inv * &grad;
-
-        // if no parameter is being changed by more than theta_tol, break
-        let mut max_h = 0.0;
-        for idx in 0..6 {
-            let perturbation = (h[idx] / theta[idx]).abs();
-            if perturbation > max_h {
-                max_h = perturbation;
-            }
-        }
-        if max_h < theta_tol {
+        if h.norm() < theta_tol {
             println!("Parameters converged");
             break;
         }
 
+        let mut theta_new = theta.clone();
         for idx in 0..6 {
-            theta[idx] -= h[idx];
+            theta_new[idx] += h[idx];
         }
 
-        new_csq = cost(detections, &theta, sim.clone());
-        csq_change = new_csq - csq;
+        let (res2, j2) = residuals_and_derivatives(detections, &theta_new, sim.clone());
+        new_csq = res2.sum();
 
-        // let rho = (csq - new_csq) / (&h.transpose() * (lambda * &h + &grad)).norm();
-        // let actual_reduction = csq - new_csq; 
-
-        // // The predicted reduction in standard LM:
-        // let predicted_reduction = - (grad.transpose() * &h + 0.5 * (h.transpose() * &j.transpose() * &j * &h))[0];
-
-        //  let rho = actual_reduction / predicted_reduction; 
-
-        let rho = (csq - new_csq) / (h.clone().transpose() * (lambda * h.clone() + grad.clone())).norm();
+        let rho = (csq - new_csq) / (&h.transpose() * (lambda * &h - &grad)).norm();
         if rho > rho_accept {
-            // accept the step and shrink lambda
-            lambda *= 0.1;
+            res = res2;
+            theta = theta_new;
+            j = j2;
+            grad = &j.transpose() * &res;
+            a = &j.transpose() * &j;
+            lambda *= f64::max(1.0 / 3.0, 1.0 - (2.0 * rho - 1.0).powi(3));
             csq = new_csq;
+            v = 2.0;
         } else {
             // reject the step, increase lambda, and reset the parameters
-            lambda *= 10.0;
-            for idx in 0..6 {
-                theta[idx] += h[idx];
-            }
+            lambda *= v;
+            v *= 2.0;
         }
 
         niter += 1;
@@ -242,10 +206,7 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
     }
 
     let rock = SpaceRock::from_xyz("rock", theta[0], theta[1], theta[2], theta[3], theta[4], theta[5], Time::new(theta[6], "tdb", "jd")?, "J2000", "SSB")?;
-
-    
-
-    let (res, mut j) = residuals_and_derivatives(detections, &theta, sim.clone());
+    // let (res, mut j) = residuals_and_derivatives(detections, &theta, sim.clone());
     let a = &j.transpose() * &j;
     let cov = a.pseudo_inverse(1e-10)?;
 
