@@ -121,7 +121,7 @@ impl Simulation {
         let mut sim = Simulation::new(epoch, reference_plane, origin)?;
         sim.epoch = epoch.clone();
         sim.epoch.to_tdb();
-        sim.integrator = Box::new(IAS15::new(1.0));
+        sim.integrator = Box::new(IAS15::new(0.001));
 
         let names = ["sun", "mercury barycenter", "venus barycenter", "earth", "moon", "mars barycenter", "jupiter barycenter", 
                      "saturn barycenter", "uranus barycenter", "neptune barycenter", "pluto barycenter", 

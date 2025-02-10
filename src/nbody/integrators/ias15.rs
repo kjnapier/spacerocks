@@ -31,7 +31,7 @@ const D: [f64; 21] = [0.056_262_560_536_922_15, 0.003_165_475_718_170_829_3, 0.2
                       0.000_276_293_090_982_647_7, 0.036_028_553_983_736_46, 0.576_733_000_277_078_7, 2.248_588_760_769_16, 
                       2.755_812_719_772_045_7];
 
-const SAFETY_FACTOR: f64 = 0.1;
+const SAFETY_FACTOR: f64 = 0.25;
 
 #[derive(Debug, Clone)]
 pub struct IAS15 {
@@ -76,6 +76,7 @@ impl Integrator for IAS15 {
         let initial_positions: Vec<Vector3<f64>> = particles.iter().map(|p| p.position).collect();
         let initial_velocities: Vec<Vector3<f64>> = particles.iter().map(|p| p.velocity).collect();
         let initial_accelerations: Vec<Vector3<f64>> = accelerations.clone();
+        let initial_epoch = particles[0].epoch.clone();
 
         // Number of particles
         let n = particles.len();
@@ -277,11 +278,13 @@ impl Integrator for IAS15 {
         }
 
         let old_timestep = self.timestep;
-        let mut new_timestep = calculate_new_timestep(particles, &accelerations, &self.bs, &old_timestep, &self.epsilon);
+        let mut new_timestep = calculate_new_timestep(particles, &initial_accelerations, &self.bs, &old_timestep, &self.epsilon);
         let timestep_ratio = (new_timestep / old_timestep).abs();
+        
 
         // Step was rejected
         if timestep_ratio < SAFETY_FACTOR {
+            println!("Timestep was rejected. Reducing the timestep to {}", new_timestep);
             self.timestep = new_timestep;
 
             // reset particles
@@ -290,7 +293,8 @@ impl Integrator for IAS15 {
                 perturber.position = initial_positions[idx];
                 perturber.velocity = initial_velocities[idx];
                 accelerations[idx] = initial_accelerations[idx];
-                perturber.epoch.epoch = epoch.epoch;
+                // perturber.epoch.epoch = epoch.epoch;
+                perturber.epoch = initial_epoch.clone();
             }
 
             if self.last_timestep != 0.0 {
@@ -301,12 +305,19 @@ impl Integrator for IAS15 {
 
             // recursively call step with the new timestep
             self.step(particles, epoch, forces);
+            // return;
         }
 
         // The timestep was accepted
-        if timestep_ratio > 1.0 / SAFETY_FACTOR {
-            new_timestep = old_timestep / SAFETY_FACTOR;
+        if timestep_ratio > 1.0 {
+            // println!("Timestep was accepted. Increasing the timestep to {}", new_timestep);
+            if timestep_ratio > 1.0 / SAFETY_FACTOR {
+                // println!("The timestep ratio is greater than 1/Safety Factor. Increasing the timestep to {}", old_timestep / SAFETY_FACTOR);
+                new_timestep = old_timestep / SAFETY_FACTOR;
+            }
         }
+
+        
 
         // Update the epoch
         *epoch += self.timestep; //self.timestep;
@@ -324,7 +335,7 @@ impl Integrator for IAS15 {
 
         
 
-        self.last_timestep = self.timestep;
+        self.last_timestep = self.timestep.clone();
         self.timestep = new_timestep;
         let ratio = self.timestep / self.last_timestep;
 
@@ -456,6 +467,7 @@ pub fn calculate_new_timestep(particles: &Vec<SpaceRock>, accelerations: &Vec<Ve
         }
 
     }
+
 
     if min_timescale2.is_normal() {
         min_timescale2.sqrt() * last_timestep * (epsilon * 5040.0).powf(1.0 / 7.0)

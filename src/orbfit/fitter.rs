@@ -8,7 +8,6 @@ use nalgebra::{DMatrix, DVector};
 
 use std::time::Instant;
 
-
 pub fn residuals(detections: &Vec<&Observation>, theta: &[f64; 7], mut sim: Simulation) -> Result<DVector<f64>, Box<dyn std::error::Error>> {
 
 
@@ -44,28 +43,6 @@ pub fn residuals(detections: &Vec<&Observation>, theta: &[f64; 7], mut sim: Simu
     }
     Ok(residuals)
 }
-
-// pub fn residuals_and_derivatives(detections: &Vec<&Observation>, theta: &[f64; 7], sim: Simulation) -> (DVector<f64>, DMatrix<f64>) {
-//     let central_residuals = residuals(detections, theta, sim.clone()).unwrap();
-
-//     let mut jac = DMatrix::zeros(detections.len(), 6);
-//     let mut theta_plus = theta.clone();
-    
-//     // let eps = (f64::EPSILON).sqrt();
-//     let eps = 1.0e-8;
-
-//     for i in 0..6 {
-//         theta_plus[i] += eps;
-//         let res_plus = residuals(detections, &theta_plus, sim.clone()).unwrap();
-//         let deriv = (res_plus - &central_residuals) / (eps);
-//         for j in 0..detections.len() {
-//             jac[(j, i)] = deriv[j]
-//         }
-//         theta_plus[i] -= eps;
-//     }
-
-//     (central_residuals, jac)
-// }
 
 pub fn residuals_and_derivatives(detections: &Vec<&Observation>, theta: &[f64; 7], sim: Simulation) -> (DVector<f64>, DMatrix<f64>) {
     let central_residuals = residuals(detections, theta, sim.clone()).unwrap();
