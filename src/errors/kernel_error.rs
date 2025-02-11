@@ -1,5 +1,5 @@
 #[derive(Debug, PartialEq)]
-/// Errors that can occur when managing SPICE kernels
+/// Errors that can occur when managing SPICE kernels.
 pub enum KernelError {
     /// Failed to read or write file
     IoError(String),

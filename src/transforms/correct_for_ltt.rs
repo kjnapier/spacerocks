@@ -3,6 +3,14 @@ use crate::StateVector;
 use crate::SpaceRock;
 use crate::Observer;
 
+/// Calculates the observer-centric state vector of a rock, accounting for light-time travel.
+///
+/// # Arguments
+/// * `rock` - A SpaceRock object representing the rock.
+/// * `observer` - An Observer object representing the observer.
+///
+/// # Returns
+/// * A StateVector object representing the observer-centric state vector of the rock.
 pub fn correct_for_ltt(rock: &SpaceRock, observer: &Observer) -> StateVector {
     // calculates the observer-centric state vector of a rock, accounting for light-time travel
 

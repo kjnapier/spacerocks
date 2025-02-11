@@ -1,3 +1,4 @@
+//! Fundamental data structure for celestial objects.
 use crate::{Origin, ReferencePlane, Time, Properties, Observer, Observation};
 use crate::constants::*;
 use crate::correct_for_ltt;
@@ -13,6 +14,38 @@ use rand::Rng;
 
 use std::collections::HashMap;
 
+/// A SpaceRock represents a celestial body with a state vector and optional physical properties.
+/// 
+/// The state vector consists of position (in AU) and velocity (in AU/day) components in a specified
+/// reference frame relative to an origin point. Physical properties like mass, absolute magnitude,
+/// and albedo are optional.
+/// 
+/// # State Components
+/// * Position and velocity in Cartesian coordinates
+/// * Reference plane defining the orientation
+/// * Origin point defining the center
+/// * Epoch specifying the time of the state vector
+/// 
+/// # Physical Properties (Optional)
+/// * Mass is in Solar Mass (M☉)
+/// * Absolute magnitude (H)
+/// * Phase slope parameter (G)
+/// * Radius (in km)
+/// * Albedo
+///
+/// A SpaceRock can be instantiated from a spice kernel, random keplerian elements, cartesian coordinates, 
+/// spherical coordinates, or the JPL Horizons API. It can be propagated in time, and observed from an observer 
+/// on Earth. It can also be transformed to the solar system barycenter or the heliocenter.
+/// 
+/// # Examples
+/// ```
+/// use spacerocks::SpaceRock;
+/// use spacerocks::Time;
+/// 
+/// let epoch = Time::now();
+/// let asteroid = SpaceRock::from_horizons("Ceres", &epoch, "ECLIPJ2000", "SSB")?;
+/// println!("Semi-major axis: {} AU", asteroid.a());
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SpaceRock {
 
@@ -28,9 +61,7 @@ pub struct SpaceRock {
     pub properties: Option<Properties>,
 }
 
-/// A SpaceRock is a celestial object with a position and velocity in space. It can be instantiated from a spice kernel, 
-/// random keplerian elements, cartesian coordinates, spherical coordinates, or the JPL Horizons API. It can be propagated
-/// in time, and observed from an observer on Earth. It can also be transformed to the solar system barycenter or the heliocenter.
+
 impl SpaceRock {
 
     /// Instantiate a SpaceRock from a spice kernel. A kernel must be loaded before calling this method.
@@ -38,11 +69,11 @@ impl SpaceRock {
     /// # Arguments
     /// * `name` - The name of the object
     /// * `epoch` - The epoch of the ephemeris
-    /// * `reference_plane` - The coordinate reference_plane of the ephemeris
-    /// * `origin` - The origin of the orbit
+    /// * `reference_plane` - The coordinate reference_plane 
+    /// * `origin` - The origin of the coordinate system
     ///
     /// # Returns
-    /// * A SpaceRock object
+    /// * [`SpaceRock`] 
     ///
     /// # Example
     /// ```
@@ -85,11 +116,12 @@ impl SpaceRock {
     ///
     /// # Arguments
     /// * `epoch` - The epoch of the ephemeris
-    /// * `reference_plane` - The coordinate reference_plane of the ephemeris
-    /// * `origin` - The origin of the orbit
+    /// * `reference_plane` - The coordinate reference_plane
+    /// * `origin` - The origin of the coordinate system
     ///
     /// # Returns
-    /// * A SpaceRock object
+    /// * [`SpaceRock`] 
+
     ///
     /// # Example
     /// ```
@@ -135,11 +167,11 @@ impl SpaceRock {
     /// * `vy` - The y-component of the velocity (au/day)
     /// * `vz` - The z-component of the velocity (au/day)
     /// * `epoch` - The epoch of the ephemeris
-    /// * `reference_plane` - The coordinate reference_plane of the ephemeris
-    /// * `origin` - The origin of the orbit
+    /// * `reference_plane` - The coordinate reference_plane 
+    /// * `origin` - The origin of the coordinate system
     ///
     /// # Returns
-    /// * A SpaceRock object
+    /// * [`SpaceRock`] 
     ///
     /// # Example
     /// ```
@@ -174,11 +206,11 @@ impl SpaceRock {
     /// # Arguments
     /// * `name` - The name of the object 
     /// * `epoch` - The epoch of the ephemeris
-    /// * `reference_plane` - The coordinate reference_plane of the ephemeris
-    /// * `origin` - The origin of the orbit
+    /// * `reference_plane` - The coordinate reference_plane 
+    /// * `origin` - The origin of the coordinate system
     ///
     /// # Returns
-    /// * A SpaceRock object
+    /// * [`SpaceRock`] 
     ///
     /// # Example
     /// ```
@@ -280,11 +312,11 @@ impl SpaceRock {
     /// * `vo` - Tangential velocity (au/day)
     /// * `psi` - Angle between the radial and tangential velocities (radians)
     /// * `epoch` - The epoch of the ephemeris
-    /// * `reference_plane` - The coordinate reference_plane of the ephemeris
-    /// * `origin` - The origin of the orbit
+    /// * `reference_plane` - The coordinate reference_plane 
+    /// * `origin` - The origin of the coordinate system
     ///
     /// # Returns
-    /// * A SpaceRock object
+    /// * [`SpaceRock`] 
     pub fn from_spherical(name: &str, phi: f64, theta: f64, r: f64, vr: f64, vo: f64, psi: f64, epoch: Time, reference_plane: &str, origin: &str) -> Result<Self, Box<dyn std::error::Error>> {
 
         let pointing = Vector3::new(phi.cos() * theta.cos(), phi.sin() * theta.cos(), theta.sin());
@@ -317,11 +349,16 @@ impl SpaceRock {
     /// * `node` - Longitude of the ascending node (radians)
     /// * `true_anomaly` - True anomaly (radians)
     /// * `epoch` - The epoch of the ephemeris
-    /// * `reference_plane` - The coordinate reference_plane of the ephemeris
-    /// * `origin` - The origin of the orbit
+    /// * `reference_plane` - The coordinate reference_plane 
+    /// * `origin` - The origin of the coordinate system
     ///
     /// # Returns
-    /// * A SpaceRock object
+    /// * [`SpaceRock`] 
+    /// # Errors
+    /// Returns an error if:
+    /// * The true anomaly is not compatible with the eccentricity for hyperbolic orbits
+    /// * The reference plane string is invalid
+    /// * The origin string is invalid
     pub fn from_kepler(name: &str, q: f64, e: f64, inc: f64, arg: f64, node: f64, true_anomaly: f64, epoch: Time, reference_plane: &str, origin: &str) -> Result<Self, Box<dyn std::error::Error>> {
 
         // first check that the eccentricity and true anomaly are commensurate
@@ -404,7 +441,7 @@ impl SpaceRock {
     /// * `epoch` - The epoch to propagate to
     ///
     /// # Returns
-    /// SpaceRock
+    /// * [`SpaceRock`] 
     pub fn analytic_at(&self, epoch: &Time) -> Result<SpaceRock, Box<dyn std::error::Error>> {
         let mut rock = self.clone();
         rock.analytic_propagate(epoch)?;
@@ -497,6 +534,7 @@ impl SpaceRock {
         self.velocity.norm()
     }
 
+    /// Set the mass in solar masses
     pub fn set_mass(&mut self, mass: f64) {
         if self.properties.is_none() {
             self.properties = Some(Properties::default());
@@ -539,6 +577,7 @@ impl SpaceRock {
         }
     }
 
+    /// Set the absolute magnitude (H)
     pub fn set_absolute_magnitude(&mut self, absolute_magnitude: f64) {
         if self.properties.is_none() {
             self.properties = Some(Properties::default());
@@ -547,6 +586,7 @@ impl SpaceRock {
         self.properties.as_mut().unwrap().gslope = Some(0.15);
     }
 
+    /// Set the phase slope parameter (G)
     pub fn set_gslope(&mut self, gslope: f64) {
         if self.properties.is_none() {
             self.properties = Some(Properties::default());
@@ -591,6 +631,7 @@ impl SpaceRock {
         self.velocity.cross(&hvec) / self.origin.mu() - self.position / self.r()
     }
 
+    /// Calculate the eccentricity (dimensionless)
     pub fn e(&self) -> f64 {
         self.evec().norm()
     }
@@ -599,10 +640,12 @@ impl SpaceRock {
         self.v_squared() / 2.0 - self.origin.mu() / self.r()
     }
 
+    /// Calculate the semi-major axis in AU
     pub fn a(&self) -> f64 {
         -self.origin.mu() / (2.0 * self.specific_energy())
     }
 
+    /// Calculate the periapsis distance in AU
     pub fn q(&self) -> f64 {
         let h = self.h();
         let e = self.e();
@@ -610,15 +653,18 @@ impl SpaceRock {
         h.powi(2) / (mu * (1.0 + e))
     }
 
+    /// Calculate the semi-latus rectum in AU
     pub fn p(&self) -> f64 {
         self.q() * (1.0 + self.e())
     }
 
+    /// Calculate the inclination in radians
     pub fn inc(&self) -> f64 {
         let hvec = self.hvec();
         (self.hvec().z / hvec.norm()).acos()
     }
 
+    /// Calculate the argument of perihelion in radians
     pub fn arg(&self) -> f64 {
         let orbit_type = OrbitType::from_eccentricity(self.e(), 1e-10).expect("Invalid eccentricity");
         if orbit_type == OrbitType::Circular {
@@ -634,6 +680,8 @@ impl SpaceRock {
         }
     }
 
+
+    /// Calculate the longitude of the ascending node in radians
     pub fn node(&self) -> f64 {
         let inc = self.inc();
         let tol = 1e-10;
@@ -678,6 +726,21 @@ impl SpaceRock {
     //     OrbitType::from_eccentricity(e, 1e-10).expect("Invalid eccentricity");
     // }
 
+    /// Compute observational quantities for this object as seen by an observer
+    /// 
+    /// Calculates topocentric coordinates including light-time correction. The observer
+    /// must have the same epoch and reference plane as the SpaceRock.
+    /// 
+    /// # Arguments
+    /// * `observer` - The Observer object representing the viewing location
+    /// 
+    /// # Returns
+    /// * [`Observation`] 
+    /// 
+    /// # Errors
+    /// Returns an error if:
+    /// * Observer and SpaceRock have different epochs
+    /// * Observer and SpaceRock have different reference planes
     pub fn observe(&mut self, observer: &Observer) -> Result<Observation, Box<dyn std::error::Error>> {
 
         // self.change_reference_plane("J2000")?;

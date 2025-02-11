@@ -8,6 +8,7 @@ use crate::errors::KernelError;
 use crate::constants::SPICE_URL;
 use super::config::{Config, KernelSpec};
 
+/// Metadata for a loaded SPICE kernel
 #[derive(Debug)]
 struct KernelMetadata {
     path: PathBuf,
@@ -15,18 +16,41 @@ struct KernelMetadata {
     load_time: SystemTime,
 }
 
+/// Manages SPICE kernel loading, downloading, and configuration.
+/// 
+/// Handles:
+/// - Loading and unloading SPICE kernel files
+/// - Downloading missing kernels
+/// - Tracking loaded kernel state
 pub struct SpiceKernel {
+    /// Currently loaded kernel file paths
     loaded_files: Vec<String>,
+    /// Optional configuration for kernel management
     config: Option<Config>,
 }
 
 impl SpiceKernel {
+    /// Creates a new empty SpiceKernel instance.
     pub fn new() -> Self {
         SpiceKernel {
             loaded_files: vec![],
             config: None,
         }
     }
+
+    /// Creates a SpiceKernel with default configuration.
+    /// 
+    /// # Arguments
+    /// * `force_download` - Optional flag to force download of kernels
+    /// 
+    /// # Returns
+    /// * [`SpiceKernel`]
+    ///
+    /// # Errors
+    /// Returns [`KernelError`] if:
+    /// - Configuration file cannot be read
+    /// - Kernel loading fails
+    /// - Downloads fail when required
 
     pub fn defaults(force_download: Option<bool>) -> Result<Self, KernelError> {
         let config = Config::default_with_download(true);
@@ -45,6 +69,20 @@ impl SpiceKernel {
         Ok(kernel)
     }
 
+    /// Creates a SpiceKernel from a configuration file.
+    /// 
+    /// # Arguments
+    /// * `path` - Path to configuration file
+    /// * `force_download` - Optional flag to force download of kernels
+    /// 
+    /// # Returns
+    /// Result containing SpiceKernel on success or KernelError on failure
+    /// 
+    /// # Errors
+    /// Returns KernelError if:
+    /// - Configuration file cannot be read
+    /// - Kernel loading fails
+    /// - Downloads fail when required
     pub fn from_config(path: &str, force_download: Option<bool>) -> Result<Self, KernelError> {
         println!("Loading configuration from {}", path);
         
@@ -65,6 +103,14 @@ impl SpiceKernel {
         Ok(kernel)
     }
 
+    /// Processes a single kernel specification, attempting to load or download it.
+    /// 
+    /// # Arguments
+    /// * `kernel_spec` - Specification of the kernel to process
+    /// * `force_download` - Whether to force download even if kernel exists
+    /// 
+    /// # Returns
+    /// Result indicating success or failure
     fn process_kernel(&mut self, kernel_spec: &KernelSpec, force_download: Option<bool>) -> Result<(), KernelError> {
         // If we have kernel paths, check them first
         if let Some(config) = &self.config {
@@ -105,6 +151,13 @@ impl SpiceKernel {
         Err(KernelError::InvalidConfig("No configuration provided".to_string()))
     }
     
+    /// Load all kernels specified in the configuration.
+    /// 
+    /// # Arguments
+    /// * `force_download` - Whether to force download of all kernels
+    /// 
+    /// # Returns
+    /// Result indicating success or failure
     fn load_kernels(&mut self, force_download: Option<bool>) -> Result<(), KernelError> {
         let kernels = self.config.as_ref()
             .map(|c| c.default_kernels.clone())
@@ -116,6 +169,14 @@ impl SpiceKernel {
         Ok(())
     }
 
+    /// Downloads a kernel file from the SPICE server.
+    /// 
+    /// # Arguments
+    /// * `kernel_type` - Type of kernel (e.g., "spk/planets")
+    /// * `filename` - Name of kernel file to download
+    /// 
+    /// # Returns
+    /// Result containing PathBuf of downloaded file or KernelError
     fn download_kernel(&self, kernel_type: &str, filename: &str) -> Result<PathBuf, KernelError> {
         let config = self.config.as_ref()
             .ok_or_else(|| KernelError::InvalidConfig("No configuration provided".to_string()))?;
@@ -145,6 +206,13 @@ impl SpiceKernel {
         Ok(path)
     }
 
+    /// Loads a SPICE kernel file.
+    /// 
+    /// # Arguments
+    /// * `path` - Path to kernel file
+    /// 
+    /// # Returns
+    /// Result containing unit on success or KernelError on failure
     pub fn load(&mut self, path: &str) -> Result<(), KernelError> {
         if self.loaded_files.contains(&path.to_string()) {
             println!("Kernel already loaded: {}", path);
@@ -157,12 +225,14 @@ impl SpiceKernel {
         Ok(())
     }
 
+    /// Unloads all currently loaded kernels.
     pub fn unload(&mut self) {
         println!("Unloading all kernels");
         spice::kclear();
         self.loaded_files.clear();
     }
     
+    /// Returns slice of currently loaded kernel file paths.
     pub fn loaded_kernels(&self) -> &[String] {
         &self.loaded_files
     }

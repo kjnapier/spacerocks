@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // kernel.load(format!("{}/latest_leapseconds.tls", spice_root).as_str())?;
     // kernel.load(format!("{}/earth_latest_high_prec.bpc", spice_root).as_str())?;
 
-    let mut kernel = SpiceKernel::defaults(true)?;
+    let mut kernel = SpiceKernel::defaults(Some(true))?;
 
     
 

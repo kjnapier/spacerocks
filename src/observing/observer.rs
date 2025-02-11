@@ -5,10 +5,12 @@ use crate::{Time};
 use nalgebra::Vector3;
 
 /// An observer at a specific location and time, which may be on Earth, 
-/// in space, or attached to a moving body
+/// in space, or attached to a moving body.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Observer {
+    /// The state vector (position and velocity) of the observer represented as a SpaceRock
     pub spacerock: SpaceRock,
+     /// The observatory associated with this observer
     pub observatory: Observatory,
 }
 
@@ -34,10 +36,12 @@ impl Observer {
         self.spacerock.origin.to_string()
     }
 
+    /// Returns the latitude of the observatory in radians, if it is a ground-based observatory
     pub fn lat(&self) -> Option<f64> {
         self.observatory.lat()
     }
-
+    
+    /// Returns the longitude of the observatory in radians, if it is a ground-based observatory 
     pub fn lon(&self) -> Option<f64> {
         self.observatory.lon()
     }

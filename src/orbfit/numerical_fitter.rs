@@ -1,5 +1,8 @@
+/// Implementation of orbit fitting using numerical integration
 pub struct NumericalOrbitFitter {
+    /// Vector of observations to fit
     pub observations: Vec<Observation>,
+    /// N-body simulation configuration
     pub simulation: Simulation,
 }
 

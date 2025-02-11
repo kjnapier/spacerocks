@@ -1,6 +1,19 @@
+//! Origin of chosen reference frame.
+
 use serde::{Serialize, Deserialize};
 use crate::errors::OriginError;
 
+/// Defines the center point of a coordinate system for dynamics calculations.
+/// 
+/// Each coordinate system requires an origin point from which positions and velocities
+/// are measured. The origin can be:
+/// - The Sun (heliocentric coordinates)
+/// - The Solar System Barycenter (barycentric coordinates)
+/// - A custom origin with specified gravitational parameter
+///
+/// The gravitational parameter (μ) is used for orbital calculations and represents
+/// the product of the gravitational constant G and the mass of the central body.
+/// All μ values are in AU³/day².
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[derive(Default)]
 pub enum Origin {
@@ -12,11 +25,6 @@ pub enum Origin {
     Custom {name: String, mu: f64},
 }
 
-
-/// The coordinates of a SpaceRock must be specified with respect to an origin.
-/// The origin can be the Sun, the Solar System Barycenter (SSB) or a custom origin.
-/// The custom origin is specified by the gravitational parameter mu, which is the product of 
-/// the gravitational constant G and the mass of the origin.
 impl Origin {
 
     /// Create a new custom origin with the specified gravitational parameter mu.

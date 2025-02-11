@@ -1,21 +1,47 @@
+//! Reference plane for specifying coordinate system.
+
 use nalgebra::Matrix3;
 use crate::constants::{ROTATION_J2000, ROTATION_ECLIPJ2000, ROTATION_INVARIABLE, ROTATION_GALACTIC, ROTATION_FK4};
 
 use serde::{Serialize, Deserialize};
 
+/// Defines the orientation of coordinate systems for dynamics calculations.
+///
+/// A reference plane specifies the fundamental plane and primary direction
+/// that orient a coordinate system in space. Each plane provides a rotation
+/// matrix that transforms coordinates to the J2000 equatorial system.
+///
+/// The choice of reference plane depends on the specific problem:
+/// - J2000/FK4 
+/// - ECLIPJ2000 
+/// - GALACTIC 
+/// - INVARIABLE 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 #[derive(Default)]
 pub enum ReferencePlane {
+    /// Earth's mean equator and equinox at J2000.0 epoch (JD 2451545.0)
     J2000,
+    /// Earth's mean ecliptic and equinox at J2000.0 epoch (default)
     #[default]
     ECLIPJ2000,
+    /// Invariable plane of the Solar System
+    /// 
+    /// The plane perpendicular to the solar system's total angular momentum vector
     INVARIABLE,
+    /// Galactic reference plane
+    ///
+    /// A coordinate system aligned with the structure of the Milky Way galaxy, where:
+    /// - The fundamental plane (b = 0°) is aligned with the mean plane of the Milky Way's disk
+    /// - The primary direction (l = 0°) points toward the galactic center 
+    /// - The north galactic pole (b = +90°) points toward the galactic north pole
     GALACTIC,
+    /// Earth's mean equator and equinox at B1950.0 epoch
+    /// 
+    /// Older reference system, mainly used for historical compatibility
     FK4,
 }
 
-/// The reference plane is the frame of reference in which the coordinates are specified.
-/// The reference plane can be J2000, ECLIPJ2000, INVARIABLE, GALACTIC, or FK4.
+
 impl ReferencePlane {
 
     /// Create a new ReferencePlane from a string.

@@ -8,7 +8,7 @@ use crate::time::Time;
 use nalgebra::Vector3;
 
 
-/// Represents different types of astronomical observatories
+/// Represents different types of astronomical observatories.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Observatory {
      /// Fixed ground-based observatory with known position on Earth

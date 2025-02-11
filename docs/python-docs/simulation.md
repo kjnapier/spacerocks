@@ -370,7 +370,7 @@ body = SpaceRock.from_kepler(
     reference_plane="ECLIPJ2000",
     origin="SSB"
 )
-body.set_mass(1e-10)  # solar masses
+body.set_mass(1e-10)  # Solar Mass (M☉)
 sim.add(body)
 
 # Run simulation
@@ -382,7 +382,6 @@ sim.integrate(epoch + 100.0)
 - All positions are in Astronomical Units (AU)
 - Velocities are in AU/day
 - Angular quantities are in radians
-- Masses are in solar masses (M☉)
 - For planets, use barycenter names (e.g., "jupiter barycenter") except for Earth ("earth") and Moon ("moon")
 - Newtonian gravity is included by default; other forces must be added explicitly
 - Available integrators:

@@ -1,3 +1,13 @@
+//! Time scale conversion functions
+//!
+//! This module provides functions for converting between different astronomical time scales:
+//! - UTC (Universal Time Coordinated)
+//! - TAI (International Atomic Time)
+//! - TT (Terrestrial Time)
+//! - TDB (Barycentric Dynamical Time)
+//!
+//! All functions operate on Julian Dates.
+
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 use crate::time::leapseconds::LEAP_SECONDS;

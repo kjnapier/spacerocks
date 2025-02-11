@@ -25,7 +25,7 @@ class SpaceRock:
     
     Example:
         rock = SpaceRock.from_horizons("Arrokoth", epoch)
-        rock.set_mass(1e-10)  # solar masses
+        rock.set_mass(1e-10)  
     """
 ```
 
@@ -265,7 +265,7 @@ These methods modify SpaceRock properties. Usage: `rock.set_property(value)`
 | --- | --- | --- |
 | `set_absolute_magnitude` | `None` | Set absolute magnitude (H) |
 | `set_gslope` | `None` | Set G-slope parameter |
-| `set_mass` | `None` | Set mass in solar masses |
+| `set_mass` | `None` | Set mass in Solar Mass (M☉) |
 | `set_x` | `None` | Set x-coordinate in AU |
 | `set_y` | `None` | Set y-coordinate in AU |
 | `set_z` | `None` | Set z-coordinate in AU |
@@ -282,7 +282,7 @@ These methods access SpaceRock properties. Usage: `rock.property`
 | --- | --- | --- |
 | `absolute_magnitude` | `float` or `None` | Get absolute magnitude (H) |
 | `gslope` | `float` or `None` | Get G-slope parameter |
-| `mass` | `float` or `None` | Get mass in solar masses |
+| `mass` | `float` or `None` | Get mass in Solar Mass (M☉)|
 | `x` | `float` | Get x-coordinate in AU |
 | `y` | `float` | Get y-coordinate in AU |
 | `z` | `float` | Get z-coordinate in AU |
@@ -337,7 +337,7 @@ print(f"Dec: {observation.dec} rad")
 - All positions are in Astronomical Units (AU)
 - All velocities are in AU/day
 - All angles are in radians
-- Masses are in solar masses (M☉)
+- Masses are in Solar Mass M☉
 - SPICE kernels must be loaded before using SPICE-dependent features
 - Physical properties are optional and default to 0.0
 - The G slope parameter defaults to 0.15 if not specified

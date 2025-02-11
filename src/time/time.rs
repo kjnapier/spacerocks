@@ -1,3 +1,9 @@
+//! Core time handling functionality
+//!
+//! Provides the Time struct and its implementation for handling
+//! different time scales and formats in astronomical calculations.
+
+
 use std::ops::{AddAssign, Add, Sub};
 use chrono::{Utc, TimeZone, DateTime};
 use crate::time::timescale::TimeScale;
@@ -8,7 +14,20 @@ use crate::time::conversions::*;
 use crate::utils::find_closest_match;
 
 
-
+/// Represents a point in time with a specific time scale and format
+///
+/// The Time struct combines:
+/// - An epoch value (in either JD or MJD format)
+/// - A time scale (UTC, TDB, TT, or TAI)
+/// - A time format specification (JD or MJD)
+///
+/// # Example
+/// ```rust
+/// use spacerocks::time::Time;
+///
+/// let t = Time::new(2451545.0, "UTC", "JD").unwrap();
+/// println!("Calendar date: {}", t.calendar());
+/// ```
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Time {
     pub epoch: f64,

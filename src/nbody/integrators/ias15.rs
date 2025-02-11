@@ -34,7 +34,7 @@ const D: [f64; 21] = [0.056_262_560_536_922_15, 0.003_165_475_718_170_829_3, 0.2
 const SAFETY_FACTOR: f64 = 0.25;
 
 #[derive(Debug, Clone)]
-/// IAS15 (Implicit integrator with Adaptive Step size control, 15th order) numerical integrator
+/// IAS15 (Implicit integrator with Adaptive Step size control, 15th order) numerical integrator.
 /// 
 /// This implements a high-precision integrator based on the Gauss-Radau quadrature.
 /// It features:
@@ -95,6 +95,7 @@ impl IAS15 {
 
 impl Integrator for IAS15 {
 
+    /// Advances the system by one step using the IAS15 algorithm.
     fn step(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>) {
         // for now I'll only integrate the particles, just to keep things simple
 
@@ -392,7 +393,7 @@ impl Integrator for IAS15 {
 
 /// A 7-element coefficient set used by the IAS15 integrator to represent series expansions
 /// of position, velocity and acceleration for each body. Each component (p0 through p6) 
-/// represents a term in the series approximation.
+/// represents a term in the series approximation (third through ninth order derivatives of position).
 #[derive(Clone, Debug)]
 pub struct CoefficientSeptet {
     pub p0: Vector3<f64>,
@@ -494,7 +495,7 @@ fn predict_next_coefficients(ratio: &f64, es_last: &Vec<CoefficientSeptet>, bs_l
 
 }
 
-/// Calculates the optimal timestep for the next integration step
+/// Calculates the optimal timestep for the next integration step.
 ///
 /// # Arguments
 ///
@@ -511,6 +512,12 @@ fn predict_next_coefficients(ratio: &f64, es_last: &Vec<CoefficientSeptet>, bs_l
 /// Estimates the optimal timestep based on the local truncation error and 
 /// the dynamics of the system. Uses the ratio of successive terms in the
 /// series expansion to gauge the convergence rate.
+///
+/// The timescale is determined by examining the magnitude of acceleration terms 
+/// and their derivatives. If the estimated error is too large, the timestep 
+/// will be reduced. If the error is well below the tolerance, the timestep may be 
+/// increased to improve efficiency.
+
 pub fn calculate_new_timestep(particles: &Vec<SpaceRock>, accelerations: &Vec<Vector3<f64>>, bs: &Vec<CoefficientSeptet>, last_timestep: &f64, epsilon: &f64) -> f64 {
     let mut min_timescale2 = f64::INFINITY;
     for idx in 0..particles.len() {

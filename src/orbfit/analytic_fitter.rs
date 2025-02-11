@@ -2,6 +2,7 @@ use crate::SpaceRock;
 
 use nalgebra::{DVector, DMatrix};
 
+/// Implementation of orbit fitting using analytic propagation
 pub struct AnalyticOrbitFitter {}
 
 impl Model for AnalyticOrbitFitter {

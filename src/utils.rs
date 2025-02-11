@@ -1,3 +1,5 @@
+//! Random utility functions for Spacerocks.
+
 use strsim::damerau_levenshtein;
 
 pub fn find_closest_match<'a>(input: &'a str, valid_options: &'a [&'a str]) -> Option<&'a str> {

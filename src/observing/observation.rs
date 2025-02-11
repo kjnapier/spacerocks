@@ -2,7 +2,7 @@ use crate::{Time, Observer};
 
 use nalgebra::{Vector3, DMatrix};
 
-/// Types of astronomical observations, each containing different measured quantities
+/// Types of astronomical observations, each containing different measured quantities.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ObservationType {
     Astrometry { ra: f64, dec: f64 },
@@ -11,7 +11,7 @@ pub enum ObservationType {
     Complete { ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, range: f64, range_rate: f64 },
 }
 
-/// An astronomical observation of a celesital object from a specific observer
+/// An astronomical observation of an object from a specific observer.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Observation {
     pub epoch: Time,
@@ -25,10 +25,32 @@ pub struct Observation {
 }
 
 impl Observation {
+    /// Creates a new Observation 
+    ///
+    /// # Arguments
+    /// * `epoch` - Time of observation
+    /// * `observation_type` - Type of observation (Astrometry, Streak, Radar, or Complete)
+    /// * `observer` - Observer making the measurement
+    /// * `inverse_covariance` - Optional inverse of measurement covariance matrix
+    /// * `mag` - Optional visual magnitude
+    /// * `mag_err` - Optional magnitude uncertainty    
     pub fn new(epoch: Time, observation_type: ObservationType, observer: Observer, inverse_covariance: Option<DMatrix<f64>>, mag: Option<f64>, mag_err: Option<f64>) -> Observation {
         Observation { epoch, observation_type, observer, inverse_covariance, mag, mag_err }
     }
 
+    /// Creates an astrometric observation from position measurements
+    ///
+    /// # Arguments
+    /// * `epoch` - Time of observation
+    /// * `ra` - Right ascension in radians
+    /// * `dec` - Declination in radians
+    /// * `observer` - Observer making the measurement
+    /// * `covariance` - Optional 2x2 covariance matrix for [ra, dec]
+    /// * `mag` - Optional visual magnitude
+    /// * `mag_err` - Optional magnitude uncertainty
+    ///
+    /// # Returns
+    /// * `Result<Observation, Box<dyn std::error::Error>>` - The created observation or an error
     pub fn from_astrometry(epoch: Time, ra: f64, dec: f64, observer: Observer, covariance: Option<[[f64; 2]; 2]>, mag: Option<f64>, mag_err: Option<f64>) -> Result<Observation, Box<dyn std::error::Error>> {
 
         let cov = covariance.map(|cov| {
@@ -41,6 +63,21 @@ impl Observation {
         Ok(Observation::new(epoch, ObservationType::Astrometry { ra, dec }, observer, inv_cov, mag, mag_err))
     }
 
+    /// Creates a streak observation including apparent motion
+    ///
+    /// # Arguments
+    /// * `epoch` - Time of observation
+    /// * `ra` - Right ascension in radians
+    /// * `dec` - Declination in radians
+    /// * `ra_rate` - Right ascension rate in rad/day
+    /// * `dec_rate` - Declination rate in rad/day
+    /// * `observer` - Observer making the measurement
+    /// * `covariance` - Optional 4x4 covariance matrix for [ra, dec, ra_rate, dec_rate]
+    /// * `mag` - Optional visual magnitude
+    /// * `mag_err` - Optional magnitude uncertainty
+    ///
+    /// # Returns
+    /// * `Result<Observation, Box<dyn std::error::Error>>` - The created observation or an error
     pub fn from_streak(epoch: Time, ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, observer: Observer, covariance: Option<[[f64; 4]; 4]>, mag: Option<f64>, mag_err: Option<f64>) -> Result<Observation, Box<dyn std::error::Error>> {
         let cov = covariance.map(|cov| {
             DMatrix::from_fn(4, 4, |r, c| cov[r][c])
@@ -52,6 +89,23 @@ impl Observation {
         Ok(Observation::new(epoch, ObservationType::Streak { ra, dec, ra_rate, dec_rate }, observer, inv_cov, mag, mag_err))
     }
 
+    /// Creates a complete observation with position, motion, and range information
+    ///
+    /// # Arguments
+    /// * `epoch` - Time of observation
+    /// * `ra` - Right ascension in radians
+    /// * `dec` - Declination in radians
+    /// * `ra_rate` - Right ascension rate in rad/day
+    /// * `dec_rate` - Declination rate in rad/day
+    /// * `range` - Distance to target in AU
+    /// * `range_rate` - Range rate in AU/day
+    /// * `observer` - Observer making the measurement
+    /// * `covariance` - Optional 6x6 covariance matrix for [ra, dec, ra_rate, dec_rate, range, range_rate]
+    /// * `mag` - Optional visual magnitude
+    /// * `mag_err` - Optional magnitude uncertainty
+    ///
+    /// # Returns
+    /// * `Result<Observation, Box<dyn std::error::Error>>` - The created observation or an error
     pub fn from_complete(epoch: Time, ra: f64, dec: f64, ra_rate: f64, dec_rate: f64, range: f64, range_rate: f64, observer: Observer, covariance: Option<[[f64; 6]; 6]>, mag: Option<f64>, mag_err: Option<f64>) -> Result<Observation, Box<dyn std::error::Error>> {
         let cov = covariance.map(|cov| {
             DMatrix::from_fn(6, 6, |r, c| cov[r][c])

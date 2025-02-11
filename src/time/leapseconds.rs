@@ -1,3 +1,15 @@
+//! Contains leap second data used for time scale conversions
+//!
+//! This module defines the leap second table used to convert between UTC and other time scales.
+//! Each entry contains a Julian Date and the number of leap seconds that were in effect at that time.
+
+/// Table of leap seconds and their introduction dates
+///
+/// Each tuple contains:
+/// - Julian Date when the leap second was introduced
+/// - Total number of leap seconds in effect after introduction
+///
+/// Ordered from most recent to oldest leap second introduction
 pub const LEAP_SECONDS: [(f64, f64); 28] = [
         (2457754.5, 37.0),
         (2457204.5, 36.0),

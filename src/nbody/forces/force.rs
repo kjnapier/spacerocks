@@ -7,7 +7,7 @@ use nalgebra::Vector3;
 /// such as gravity, radiation pressure, or non-gravitational forces.
 /// Implementors must be thread-safe (Send + Sync) and clonable.
 pub trait Force: Send + Sync + ForceClone {
-    /// Calculate the acceleration of a set of spacerocks due to gravity.
+    /// Calculate the acceleration of a set of spacerocks due to some force.
     ///
     /// # Arguments
     ///

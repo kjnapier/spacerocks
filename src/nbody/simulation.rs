@@ -1,3 +1,4 @@
+//! Set up and manage a collection of gravitationally interacting particles.
 use std::collections::HashMap;
 
 use crate::SpaceRock;
@@ -13,6 +14,11 @@ use crate::nbody::integrators::{Integrator, IAS15};
 
 use nalgebra::Vector3;
 
+/// A simulation maintains:
+/// - A collection of particles and their states
+/// - The current simulation epoch
+/// - Reference frame and origin specifications
+/// - Integration method and forces
 #[derive(Clone)]
 pub struct Simulation {
     pub particles: Vec<SpaceRock>,
@@ -291,6 +297,11 @@ impl Simulation {
     }
 
     /// Integrate the simulation to a new epoch.
+    ///
+    /// Advances the simulation time by taking steps until reaching the target epoch.
+    /// The integration direction (forward/backward) is determined automatically based
+    /// on the difference between current and target epochs. The timestep is adjusted
+    /// automatically when approaching the target epoch to hit it exactly.
     ///
     /// # Arguments
     ///

@@ -34,10 +34,12 @@ pub fn calc_conic_anomaly_from_mean_anomaly(e: f64, mean_anomaly: f64) -> Result
 
 }
 
+/// Return the mean anomaly for a circular orbit.
 fn kepler_circular(_e: f64, mean_anomaly: f64) -> f64 {
     mean_anomaly
 }
 
+/// Calculate the eccentric anomaly from the mean anomaly.
 fn kepler_elliptical(e: f64, mean_anomaly: f64) -> Result<f64, OrbitError> {
     let mut flag = false;
     let mut mean_anomaly = mean_anomaly;

@@ -1,5 +1,12 @@
+//! Stumpff functions for the universal variable formulation.
 
-
+/// Calculate the Stumpff S function.
+///
+/// # Arguments
+/// * `z` - A real number.
+///
+/// # Returns
+/// * The Stumpff S function evaluated at `z`.
 pub fn stumpff_s(z: f64) -> f64 {
     if z == 0.0 {
         1.0 / 6.0
@@ -12,6 +19,13 @@ pub fn stumpff_s(z: f64) -> f64 {
     }
 }
 
+/// Calculate the Stumpff C function.
+///
+/// # Arguments
+/// * `z` - A real number.
+///
+/// # Returns
+/// * The Stumpff C function evaluated at `z`.
 pub fn stumpff_c(z: f64) -> f64 {
     if z == 0.0 {
         1.0 / 2.0
