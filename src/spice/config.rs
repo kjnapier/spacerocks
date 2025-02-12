@@ -20,10 +20,10 @@ pub struct Config {
     /// List of default kernels to load on initialization
     #[serde(default)]
     pub default_kernels: Vec<KernelSpec>,
-    /// List of default kernels to load on initialization
+    /// List of directories to search for kernels
     #[serde(default)]
     pub kernel_paths: Vec<PathBuf>,
-    /// List of default kernels to load on initialization
+    /// Whether to automatically download missing kernels
     #[serde(default = "default_download_setting")]
     pub auto_download: bool,
     /// Directory where downloaded kernels are stored
