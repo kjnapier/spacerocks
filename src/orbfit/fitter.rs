@@ -3,19 +3,24 @@ use crate::spacerock::SpaceRock;
 use crate::nbody::Simulation;
 use crate::observing::Observation;
 use crate::observing::observation::ObservationType;
+use crate::OrbitType;
+use std::f64::consts::PI;
 
 use nalgebra::{DMatrix, DVector};
 
 use std::time::Instant;
 
-pub fn residuals(detections: &Vec<&Observation>, theta: &[f64; 7], mut sim: Simulation) -> Result<DVector<f64>, Box<dyn std::error::Error>> {
-
+pub fn residuals(detections: &Vec<&Observation>, theta: &[f64; 7], mut sim: Simulation) 
+    -> Result<(DVector<f64>, Vec<f64>, Vec<f64>), Box<dyn std::error::Error>> {
 
     let mut trial = SpaceRock::from_xyz("rock", theta[0], theta[1], theta[2], theta[3], theta[4], theta[5], Time::new(theta[6], "tdb", "jd")?, "J2000", "SSB")?;
     sim.integrate(&trial.epoch);
     sim.add(trial);
 
     let mut residuals: DVector<f64> = DVector::zeros(detections.len());
+    // Create vectors to store the raw RA and Dec residuals
+    let mut ra_residuals: Vec<f64> = Vec::new();
+    let mut dec_residuals: Vec<f64> = Vec::new();
     
     for (idx, detection) in detections.iter().enumerate() {
 
@@ -38,14 +43,20 @@ pub fn residuals(detections: &Vec<&Observation>, theta: &[f64; 7], mut sim: Simu
         };
 
         let d = observed_parameters - model_parameters;
+        // Store the raw differences 
+        ra_residuals.push(d[0]);   // RA difference in radians
+        dec_residuals.push(d[1]);  // Dec difference in radians
+
         let m = &d.transpose() * &detection.inverse_covariance.clone().unwrap() * &d;
         residuals[idx] = m[0];
     }
-    Ok(residuals)
+    // Ok(residuals)
+    // Return the residuals and the raw RA and Dec residuals
+    Ok((residuals, ra_residuals, dec_residuals))
 }
 
 pub fn residuals_and_derivatives(detections: &Vec<&Observation>, theta: &[f64; 7], sim: Simulation) -> (DVector<f64>, DMatrix<f64>) {
-    let central_residuals = residuals(detections, theta, sim.clone()).unwrap();
+    let (central_residuals, _, _) = residuals(detections, theta, sim.clone()).unwrap();
 
     let mut jac = DMatrix::zeros(detections.len(), 6);
     let mut theta_plus = theta.clone();
@@ -57,8 +68,8 @@ pub fn residuals_and_derivatives(detections: &Vec<&Observation>, theta: &[f64; 7
     for i in 0..6 {
         theta_plus[i] += eps;
         theta_minus[i] -= eps;
-        let res_plus = residuals(detections, &theta_plus, sim.clone()).unwrap();
-        let res_minus = residuals(detections, &theta_minus, sim.clone()).unwrap();
+        let (res_plus, _, _) = residuals(detections, &theta_plus, sim.clone()).unwrap();
+        let (res_minus, _, _) = residuals(detections, &theta_minus, sim.clone()).unwrap();
         let deriv = (res_plus - res_minus) / (2.0 * eps);
         for j in 0..detections.len() {
             jac[(j, i)] = deriv[j]
@@ -74,7 +85,7 @@ pub fn residuals_and_derivatives(detections: &Vec<&Observation>, theta: &[f64; 7
 pub fn orbit_chisq(detections: &Vec<&Observation>, theta: &[f64; 7], sim: Simulation) -> f64 {
     let epoch = Time::new(theta[6], "tdb", "jd").unwrap();
     let trial = SpaceRock::from_xyz("rock", theta[0], theta[1], theta[2], theta[3], theta[4], theta[5], epoch, "J2000", "SSB");
-    let res = residuals(detections, theta, sim.clone()).unwrap();
+    let (res, _, _) = residuals(detections, theta, sim.clone()).unwrap();
     res.sum()
 }
 
@@ -85,7 +96,10 @@ pub struct FitResult {
     pub niter: usize,
     pub dof: f64,
     pub residuals: Vec<f64>,
+    pub ra_residuals: Vec<f64>,
+    pub dec_residuals: Vec<f64>,
     pub covariance: DMatrix<f64>,
+    pub keplerian_covariance: DMatrix<f64>
 }
 
 
@@ -117,7 +131,7 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
 
     while grad.norm() > grad_tol {
 
-        println!("Iteration: {}, chisq: {}, lambda: {}, ndof: {}", niter, csq, lambda, dof);
+        // println!("Iteration: {}, chisq: {}, lambda: {}, ndof: {}", niter, csq, lambda, dof);
 
         let h = match (&a + lambda * &eye).lu().solve(&(-&grad)) {
             Some(h) => h,
@@ -165,6 +179,16 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
     let a = &j.transpose() * &j;
     let cov = a.pseudo_inverse(1e-10)?;
 
+     // Get the residuals in RA and Dec
+     let (res, ra_res, dec_res) = residuals(detections, &theta, sim.clone())?;
+
+     // Finally, get the covariance matrix for the keplerian elements
+     // First, transform my covariance matrix to a scaled covariance matrix
+     let cov_scaled = (new_csq / dof) * cov.clone();
+     // Then, calculate the Jacobian matrix for the keplerian elements
+     let j_kep = calculate_keplerian_jacobian(&rock);
+     let cov_kep = &j_kep * &cov_scaled * &j_kep.transpose();
+
     println!("Final chisq: {}", new_csq);
     println!("Final chisq/dof: {}", new_csq / dof);
     println!("Final parameters: {:?}", theta);
@@ -172,15 +196,115 @@ pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], si
     println!("Time elapsed in LM fit is: {:?}", duration);
 
     return Ok(Some(FitResult {
-        chisq: new_csq * dof,
+        // chisq: new_csq * dof,
+        chisq: new_csq,
         dof: dof,
         residuals: res.iter().map(|r| *r).collect::<Vec<_>>(),
+        ra_residuals: ra_res,
+        dec_residuals: dec_res,
         rock: rock,
         niter: niter,
-        covariance: cov
+        covariance: cov,
+        keplerian_covariance: cov_kep,
     }));
 
 
+}
+
+pub fn calculate_keplerian_jacobian(rock: &SpaceRock) -> DMatrix<f64> {
+    // Initialize the Jacobian matrix 
+    let mut jac = DMatrix::zeros(6, 6);
+    
+    let mut state = [
+        rock.position.x, rock.position.y, rock.position.z,
+        rock.velocity.x, rock.velocity.y, rock.velocity.z,
+        rock.epoch.jd()  // Keep epoch for creating new rocks
+    ];
+    
+    let k0 = [
+        rock.a(),
+        rock.e(),
+        rock.inc(),
+        rock.arg(),
+        rock.node(),
+        rock.mean_anomaly()
+    ];
+    
+    let eps = 1.0e-8;
+    
+    // For each Cartesian component
+    for i in 0..6 {
+        let mut state_plus = state.clone();
+        let mut state_minus = state.clone();
+        state_plus[i] += eps;
+        state_minus[i] -= eps;
+        
+        // Create perturbed SpaceRocks
+        let rock_plus = SpaceRock::from_xyz(
+            "rock_plus",
+            state_plus[0], state_plus[1], state_plus[2],
+            state_plus[3], state_plus[4], state_plus[5],
+            Time::new(state_plus[6], "tdb", "jd").unwrap(),
+            rock.reference_plane.as_str(),
+            rock.origin.as_str()
+        ).unwrap();
+        
+        let rock_minus = SpaceRock::from_xyz(
+            "rock_minus",
+            state_minus[0], state_minus[1], state_minus[2],
+            state_minus[3], state_minus[4], state_minus[5],
+            Time::new(state_minus[6], "tdb", "jd").unwrap(),
+            rock.reference_plane.as_str(),
+            rock.origin.as_str()
+        ).unwrap();
+        
+        // Get perturbed Keplerian elements
+        let k_plus = [
+            rock_plus.a(),
+            rock_plus.e(),
+            rock_plus.inc(),
+            rock_minus.arg(),
+            rock_plus.node(),
+            rock_plus.mean_anomaly()
+        ];
+        
+        let k_minus = [
+            rock_minus.a(),
+            rock_minus.e(),
+            rock_minus.inc(),
+            rock_minus.arg(),
+            rock_minus.node(),
+            rock_minus.mean_anomaly()
+        ];
+        
+        // for j in 0..6 {
+        //     jac[(j, i)] = (k_plus[j] - k_minus[j]) / (2.0 * eps);
+        // }
+
+        for j in 0..6 {
+            let mut diff = k_plus[j] - k_minus[j];
+            
+            // Angle wrapping
+            if j >= 3 {  // arg, node, mean_anomaly
+                if diff > PI {
+                    diff -= 2.0 * PI;
+                } else if diff < -PI {
+                    diff += 2.0 * PI;
+                }
+            }
+            
+            jac[(j, i)] = diff / (2.0 * eps);
+        }
+    }
+    
+    // Handle circular orbit
+    let orbit_type = OrbitType::from_eccentricity(rock.e(), 1.0e-6).unwrap();
+    if orbit_type == OrbitType::Circular {
+        jac.row_mut(3).fill(0.0);  // arg
+        jac.row_mut(5).fill(0.0);  // mean_anomaly
+    }
+
+    jac
 }
 
 
