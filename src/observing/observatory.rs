@@ -2,7 +2,7 @@ use crate::SpaceRock;
 
 use crate::observing::observer::Observer;
 use crate::constants::{DEG_TO_RAD, M_TO_AU, EQUAT_RAD};
-use crate::OBSERVATORIES;
+use crate::{OBSERVATORIES, SPACEOBSERVATORIES};
 use crate::time::Time;
 
 use nalgebra::Vector3;
@@ -30,19 +30,26 @@ impl Observatory {
     /// # Returns
     ///
     /// * `Observatory` - The Observatory object.
-    pub fn from_obscode(obscode: &str) -> Result<Self, &'static str> {
-        let obscode = obscode.to_uppercase();
-        match OBSERVATORIES.get(&obscode) {
-            Some(obs) => {
-                let lon = obs.0;
-                let lat = obs.2.atan2(obs.1);
-                let rho = (obs.1 * obs.1 + obs.2 * obs.2).sqrt();
-                return Ok(Observatory::GroundObservatory { obscode: obscode, lon, lat, rho })
-            },
-            None => {
-                return Err("Observatory not found")
-            }
+    pub fn from_obscode(obscode: &str) -> Result<Observatory, Box<dyn std::error::Error>> {
+        let ocode = obscode.to_uppercase();
+        
+        if OBSERVATORIES.get(&ocode).is_some() {
+            let obs = OBSERVATORIES.get(&ocode).unwrap();
+            let lon = obs.0;
+            let lat = obs.2.atan2(obs.1);
+            let rho = (obs.1 * obs.1 + obs.2 * obs.2).sqrt();
+            return Ok(Observatory::GroundObservatory { obscode: ocode, lon, lat, rho })
+        } 
+
+        if SPACEOBSERVATORIES.get(&ocode).is_some() {
+            let o = SPACEOBSERVATORIES.get(&ocode).unwrap();
+            let jplid = o.0;
+            let name = o.1;
+            return Ok(Observatory::SpaceTelecope { name: jplid.to_string() })
         }
+
+        Err("Observatory code not found".into())
+
     }
 
     /// Create a new Observatory from a name. 
@@ -106,7 +113,8 @@ impl Observatory {
                 Ok(Observer { spacerock: earth, observatory: self.clone() })
             },
             Observatory::SpaceTelecope { name } => {
-                let rock = SpaceRock::from_spice(&name, epoch, reference_plane, origin)?;
+                // let rock = SpaceRock::from_spice(&name, epoch, reference_plane, origin)?;
+                let rock = SpaceRock::from_horizons(&name, epoch, reference_plane, origin)?;
                 Ok(Observer { spacerock: rock, observatory: self.clone() })
             }
             _ => {

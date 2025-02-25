@@ -319,7 +319,7 @@ impl Integrator for IAS15 {
 
         // Step was rejected
         if timestep_ratio < SAFETY_FACTOR {
-            println!("Timestep was rejected. Reducing the timestep to {}", new_timestep);
+            // println!("Timestep was rejected. Reducing the timestep to {}", new_timestep);
             self.timestep = new_timestep;
 
             // reset particles

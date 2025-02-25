@@ -30,14 +30,6 @@ impl Force for NewtonianGravity {
 
             for jdx in (idx + 1)..n_entities {
 
-                // if (entities[idx].mass() == 0.0) & (entities[jdx].mass() == 0.0) {
-                //     continue;
-                // }
-
-                // if idx_massless & (entities[jdx].mass() == 0.0) {
-                //     continue;
-                // }
-
                 let r_vec = entities[idx].position - entities[jdx].position;
                 let r = r_vec.norm();
 
@@ -48,8 +40,44 @@ impl Force for NewtonianGravity {
                 acceleration[jdx] += jdx_acceleration;
             }
         }
+        acceleration
+    }
+}
 
-    //     let mut massless_indices = Vec::new();
+
+
+
+
+
+// let n_entities = entities.len();
+        // for idx in 0..n_entities {
+
+        //     let idx_massless = entities[idx].mass() == 0.0;
+
+        //     for jdx in (idx + 1)..n_entities {
+
+        //         // if (entities[idx].mass() == 0.0) & (entities[jdx].mass() == 0.0) {
+        //         //     continue;
+        //         // }
+
+        //         if idx_massless & (entities[jdx].mass() == 0.0) {
+        //             continue;
+        //         }
+
+        //         let r_vec = entities[idx].position - entities[jdx].position;
+        //         let r = r_vec.norm();
+
+        //         let xi = -GRAVITATIONAL_CONSTANT * r_vec / (r * r * r);
+        //         let idx_acceleration = xi * entities[jdx].mass();
+        //         let jdx_acceleration = -xi * entities[idx].mass();
+        //         acceleration[idx] += idx_acceleration;
+        //         acceleration[jdx] += jdx_acceleration;
+        //     }
+        // }
+
+
+
+//     let mut massless_indices = Vec::new();
     //     let mut massive_indices = Vec::new();
     //     for (idx, entity) in entities.iter().enumerate() {
     //         if entity.mass() == 0.0 {
@@ -85,33 +113,3 @@ impl Force for NewtonianGravity {
     //             acceleration[*kdx] += kdx_acceleration;
     //         }
     //     }
-        acceleration
-    }
-}
-
-
-// let n_entities = entities.len();
-        // for idx in 0..n_entities {
-
-        //     let idx_massless = entities[idx].mass() == 0.0;
-
-        //     for jdx in (idx + 1)..n_entities {
-
-        //         // if (entities[idx].mass() == 0.0) & (entities[jdx].mass() == 0.0) {
-        //         //     continue;
-        //         // }
-
-        //         if idx_massless & (entities[jdx].mass() == 0.0) {
-        //             continue;
-        //         }
-
-        //         let r_vec = entities[idx].position - entities[jdx].position;
-        //         let r = r_vec.norm();
-
-        //         let xi = -GRAVITATIONAL_CONSTANT * r_vec / (r * r * r);
-        //         let idx_acceleration = xi * entities[jdx].mass();
-        //         let jdx_acceleration = -xi * entities[idx].mass();
-        //         acceleration[idx] += idx_acceleration;
-        //         acceleration[jdx] += jdx_acceleration;
-        //     }
-        // }

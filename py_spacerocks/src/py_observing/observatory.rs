@@ -19,10 +19,10 @@ impl PyObservatory {
 
 
     #[classmethod]
-    fn from_obscode(_cls: Py<PyType>, obscode: &str) -> PyResult<Self> {
+    fn from_obscode(_cls: Py<PyType>, obscode: &str) -> PyResult<PyObservatory> {
         match Observatory::from_obscode(obscode) {
             Ok(o) => Ok(PyObservatory { inner: o }),
-            Err(e) => Err(PyValueError::new_err(e))
+            Err(e) => Err(PyValueError::new_err(e.to_string()))
         }
     }
 

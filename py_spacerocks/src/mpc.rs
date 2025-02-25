@@ -15,6 +15,7 @@ use spacerocks::spacerock::SpaceRock;
 use spacerocks::Time;
 use spacerocks::transforms::calc_true_anomaly_from_mean_anomaly;
 use spacerocks::Observatory;
+use spacerocks::SPECIAL_CASE_OBSERVATORIES;
 // use crate::py_time::time::PyTime;
 use crate::py_time::time::PyTime;
 use crate::py_observing::observer::PyObserver;
@@ -164,6 +165,50 @@ impl MPCHandler {
         })
     }
 
+    // // #[pyo3(signature = (designation, formats=vec!["ADES_DF".to_string()], ades_version=None))]
+    // pub fn get_detections(&self, designation: &str, formats: Vec<String>, ades_version: Option<String>) -> PyResult<()> {
+
+    //     let client = reqwest::blocking::Client::new();
+
+    //     let mut request_data = std::collections::HashMap::new();
+    //     request_data.insert("desigs", vec![designation.to_string()]);
+    //     request_data.insert("output_format", formats);
+    //     if let Some(version) = ades_version {
+    //         request_data.insert("ades_version", vec![version]);
+    //     }
+
+    //     println!("Request Data: {:?}", request_data);
+
+    //     let response = client.get(MPC_API)
+    //         .query(&params)
+    //         .send()?;
+
+    //     println!("Response: {:?}", response);
+
+    //     // let response = client.get(MPC_API)
+    //     //     .query(&request_data)
+    //     //     .send()
+    //     //     .map_err(|e| PyErr::new::<PyRuntimeError, _>(e.to_string()))?;
+
+    //     // println!("Response: {:?}", response);
+
+    //     // let json_response: serde_json::Value = response.json()
+    //     //     .map_err(|e| PyErr::new::<PyRuntimeError, _>(e.to_string()))?;
+
+    //     // let first_row = json_response.get(0)
+    //     //     .ok_or_else(|| PyErr::new::<PyRuntimeError, _>("No data returned"))?;
+
+    //     // println!("First Row: {:?}", first_row);
+
+    // //     let json_response: serde_json::Value = response.json()
+    // //         .map_err(|e| PyErr::new::<PyRuntimeError, _>(e.to_string()))?;
+
+    // //    println!("JSON Response: {:?}", json_response);
+       
+    //     Ok(())
+    
+    // }
+
     #[pyo3(signature = (designation, formats=vec!["ADES_DF".to_string()], ades_version=None))]
     pub fn get_detections(&self, designation: &str, formats: Vec<String>, ades_version: Option<String>) -> PyResult<PyObject> {
         Python::with_gil(|py| {
@@ -188,13 +233,27 @@ impl MPCHandler {
             let ades_data = json_response.get_item(0)?.get_item("ADES_DF")?;
             let mut observations = Vec::new();
 
+            // println!("ADES Data: {:?}", ades_data);
+
             // Iterate over each row in the ADES data
             for row in ades_data.try_iter()? {
                 let row = row?;
+                println!("Row: {:?}", row);
 
                 // Time conversion
                 let time = Time::from_isot(&row.get_item("obstime")?.extract::<String>()?)
                     .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+                // if row.get_item("stn") in SPECIAL_CASE_OBSERVATORIES {
+                //     println!("Skipping special case observatory");
+                //     continue;
+                // }
+
+                let obscode = row.get_item("stn")?.extract::<String>()?;
+                if SPECIAL_CASE_OBSERVATORIES.contains_key(&obscode) {
+                    println!("Skipping special case observatory");
+                    continue;
+                }
                 
                 // Observatory setup
                 let observatory = Observatory::from_obscode(row.get_item("stn")?.extract()?);

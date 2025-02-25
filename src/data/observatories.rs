@@ -2481,3 +2481,25 @@ lazy_static! {
         "Z99" => (6.282814250180612, 0.595468, 0.800687),
     };
 }
+
+
+lazy_static! {
+    pub static ref SPACEOBSERVATORIES: phf::Map<&'static str, (&'static str, &'static str)> = phf::phf_map! {
+        "C51" => ("-163", "WISE"),
+        "C58" => ("-33", "NEO Surveyor"),
+        "C49" => ("-234", "STEREO-A"),
+        "C50" => ("-235", "STEREO-B"),
+        "245" => ("-79", "Spitzer Space Telescope"),
+        "C54" => ("-98", "New Horizons"),
+        "250" => ("-48", "Hubble Space Telescope"),
+        "274" => ("-170", "James Webb Space Telescope"),
+        "C55" => ("-227", "Kepler"),
+    };
+}
+
+
+lazy_static! {
+    pub static ref SPECIAL_CASE_OBSERVATORIES: phf::Map<&'static str, &'static str> = phf::phf_map! {
+        "275" => ("Non-geocentric Occultation Observation"),
+    };
+}

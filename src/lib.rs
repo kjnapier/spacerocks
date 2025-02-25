@@ -20,6 +20,8 @@ pub mod coordinates;
 
 pub mod data;
     pub use data::OBSERVATORIES;
+    pub use data::SPACEOBSERVATORIES;
+    pub use data::SPECIAL_CASE_OBSERVATORIES;
     pub use data::constants;
 
 pub mod properties;
