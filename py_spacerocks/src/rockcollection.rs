@@ -1,12 +1,13 @@
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyIndexError,PyValueError};
 use pyo3::{PyErr, Python, PyResult};
-use pyo3::types::{PyList, PyType, IntoPyDict};
+// use pyo3::types::{PyList, PyType, IntoPyDict};
 use rayon::prelude::*;
-use pyo3::types::PySequence;
+// use pyo3::types::PySequence;
 
 use spacerocks::spacerock::SpaceRock;
-use spacerocks::Time;
+// use spacerocks::Time;
+use spacerocks::ReferencePlane;
 
 use crate::py_time::time::PyTime;
 use crate::PySpaceRock;
@@ -15,17 +16,17 @@ use crate::py_observing::observation::PyObservation;
 
 use numpy::{PyArray1, IntoPyArray};
 
-use std::path::{Path, PathBuf};
-use std::fs;
-use serde::{Serialize, Deserialize};
-use nalgebra::Vector3;
+use std::path::{PathBuf};
+// use std::fs;
+// use serde::{Serialize, Deserialize};
+// use nalgebra::Vector3;
 use serde_json;
-use arrow::array::{Float64Array, StringArray};
+// use arrow::array::{Float64Array, StringArray};
 use crate::mpc::MPCHandler;
 use dirs::home_dir;
 
 
-use pyo3::impl_::pymethods::AsyncIterBaseKind;
+// use pyo3::impl_::pymethods::AsyncIterBaseKind;
 
 // use numpy::{PyArray1, IntoPyArray, PyArray};
 
@@ -148,7 +149,7 @@ impl RockCollection {
     pub fn observe(&mut self, observer: PyRef<PyObserver>) -> PyResult<Vec<PyObservation>> {
         let o = observer.inner.clone();
 
-        if o.reference_plane() != "J2000" {
+        if o.reference_plane != ReferencePlane::J2000 {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Observer frame is not J2000. Cannot observe rocks.")));
         }
 

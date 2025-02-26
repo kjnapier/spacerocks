@@ -27,17 +27,17 @@ pub fn gauss(o1: &Observation, o2: &Observation, o3: &Observation, min_distance:
     let mut triplet = [o1, o2, o3];
     triplet.sort_by(|a, b| a.epoch.epoch.partial_cmp(&b.epoch.epoch).unwrap());
 
-    let r1 = triplet[0].observer.position();
-    let r2 = triplet[1].observer.position();
-    let r3 = triplet[2].observer.position();
+    let o1 = triplet[0].observer.position;
+    let o2 = triplet[1].observer.position;
+    let o3 = triplet[2].observer.position;
 
     let rho1 = triplet[0].pointing();
     let rho2 = triplet[1].pointing();
     let rho3 = triplet[2].pointing();
     
-    let t1 = triplet[0].epoch.epoch;
-    let t2 = triplet[1].epoch.epoch;
-    let t3 = triplet[2].epoch.epoch;
+    let t1 = triplet[0].epoch.utc().jd();
+    let t2 = triplet[1].epoch.utc().jd();
+    let t3 = triplet[2].epoch.utc().jd();
 
     let tau1 = t1 - t2;
     let tau3 = t3 - t2;
@@ -50,19 +50,19 @@ pub fn gauss(o1: &Observation, o2: &Observation, o3: &Observation, min_distance:
     let d0 = rho1.dot(&p1);
 
     let d: Matrix3<f64> = Matrix3::new(
-        r1.dot(&p1), r1.dot(&p2), r1.dot(&p3),
-        r2.dot(&p1), r2.dot(&p2), r2.dot(&p3),
-        r3.dot(&p1), r3.dot(&p2), r3.dot(&p3),
+        o1.dot(&p1), o1.dot(&p2), o1.dot(&p3),
+        o2.dot(&p1), o2.dot(&p2), o2.dot(&p3),
+        o3.dot(&p1), o3.dot(&p2), o3.dot(&p3),
     );
 
     // get the item in the first row, second column
     let a = (1.0/d0) * (-d[(0,1)] * (tau3/tau) + d[(1,1)] + d[(2,1)] * (tau1/tau));
     let b = (1.0/(6.0 * d0)) * (d[(0,1)] * (tau3.powi(2) - tau.powi(2)) * (tau3/tau) + d[(2,1)] * (tau.powi(2) - tau1.powi(2)) * (tau1/tau));
-    let e = r2.dot(&rho2);
+    let e = o2.dot(&rho2);
 
-    let r2sq = r2.dot(&r2);
+    let o2sq = o2.dot(&o2);
 
-    let aa = -(a.powi(2) + 2.0 * a * e + r2sq);
+    let aa = -(a.powi(2) + 2.0 * a * e + o2sq);
     let bb = -2.0 * MU_BARY * b * (a + e);
     let cc = -MU_BARY.powi(2) * b.powi(2);
 
@@ -95,9 +95,9 @@ pub fn gauss(o1: &Observation, o2: &Observation, o3: &Observation, min_distance:
         let a2 = a + (MU_BARY * b) / root.powi(3);
         let a3 = (1.0/d0) * ((6.0 * (d[(0,2)] * (tau3/tau1) - d[(1,2)] * (tau/tau1)) * root.powi(3) + MU_BARY * d[(0,2)] * (tau.powi(2) - tau3.powi(2)) * (tau3/tau1)) / (6.0 * root.powi(3) + MU_BARY * (tau.powi(2) - tau1.powi(2))) - d[(2,2)]);
 
-        let r1 = r1 + a1 * rho1;
-        let r2 = r2 + a2 * rho2;
-        let r3 = r3 + a3 * rho3;
+        let r1 = o1 + a1 * rho1;
+        let r2 = o2 + a2 * rho2;
+        let r3 = o3 + a3 * rho3;
 
         let f1 = 1.0 - 0.5 * (MU_BARY/root.powi(3)) * tau1.powi(2);
         let f3 = 1.0 - 0.5 * (MU_BARY/root.powi(3)) * tau3.powi(2);

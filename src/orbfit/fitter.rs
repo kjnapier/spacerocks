@@ -13,9 +13,9 @@ use std::time::Instant;
 pub fn residuals(detections: &Vec<&Observation>, theta: &[f64; 7], mut sim: Simulation) 
     -> Result<(DVector<f64>, Vec<f64>, Vec<f64>), Box<dyn std::error::Error>> {
 
-    let mut trial = SpaceRock::from_xyz("rock", theta[0], theta[1], theta[2], theta[3], theta[4], theta[5], Time::new(theta[6], "tdb", "jd")?, "J2000", "SSB")?;
+    let trial = SpaceRock::from_xyz("rock", theta[0], theta[1], theta[2], theta[3], theta[4], theta[5], Time::new(theta[6], "tdb", "jd")?, "J2000", "SSB")?;
     sim.integrate(&trial.epoch);
-    sim.add(trial);
+    sim.add(trial)?;
 
     let mut residuals: DVector<f64> = DVector::zeros(detections.len());
     // Create vectors to store the raw RA and Dec residuals
@@ -37,8 +37,8 @@ pub fn residuals(detections: &Vec<&Observation>, theta: &[f64; 7], mut sim: Simu
         // calculate the model observations
         let astro = rock.observe(&detection.observer)?;
         let model_parameters = match detection.observation_type {
-            ObservationType::Astrometry { ra, dec } => DVector::from_vec(vec![astro.ra(), astro.dec()]),
-            ObservationType::Streak { ra, dec, ra_rate, dec_rate } => DVector::from_vec(vec![astro.ra(), astro.dec(), astro.ra_rate().expect("Must have ra rate"), astro.dec_rate().expect("Must have ra rate")]),
+            ObservationType::Astrometry { ra: _, dec: _ } => DVector::from_vec(vec![astro.ra(), astro.dec()]),
+            ObservationType::Streak { ra: _, dec: _, ra_rate: _, dec_rate: _ } => DVector::from_vec(vec![astro.ra(), astro.dec(), astro.ra_rate().expect("Must have ra rate"), astro.dec_rate().expect("Must have ra rate")]),
             _ => return Err("Observation type not supported".into()),
         };
 
@@ -215,20 +215,20 @@ pub fn calculate_keplerian_jacobian(rock: &SpaceRock) -> DMatrix<f64> {
     // Initialize the Jacobian matrix 
     let mut jac = DMatrix::zeros(6, 6);
     
-    let mut state = [
+    let state = [
         rock.position.x, rock.position.y, rock.position.z,
         rock.velocity.x, rock.velocity.y, rock.velocity.z,
         rock.epoch.jd()  // Keep epoch for creating new rocks
     ];
     
-    let k0 = [
-        rock.a(),
-        rock.e(),
-        rock.inc(),
-        rock.arg(),
-        rock.node(),
-        rock.mean_anomaly()
-    ];
+    // let k0 = [
+    //     rock.a(),
+    //     rock.e(),
+    //     rock.inc(),
+    //     rock.arg(),
+    //     rock.node(),
+    //     rock.mean_anomaly()
+    // ];
     
     let eps = 1.0e-8;
     

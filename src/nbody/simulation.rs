@@ -150,7 +150,7 @@ impl Simulation {
                      "2000511", 
                      "2000704"];
         for name in names.iter() {
-            let mut particle = SpaceRock::from_spice(name, epoch, reference_plane, origin)?;
+            let particle = SpaceRock::from_spice(name, epoch, reference_plane, origin)?;
             sim.add(particle)?;
         }
         Ok(sim)

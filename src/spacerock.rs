@@ -229,7 +229,7 @@ impl SpaceRock {
         let command_str = format!("'{}'", name);
         params.insert("command", command_str.as_str());
 
-        let mut ep = epoch.clone();
+        let ep = epoch.clone();
 
         let timescale = &ep.timescale.to_str().to_uppercase();
         let timeformat = &ep.format.to_str().to_uppercase();
@@ -746,12 +746,12 @@ impl SpaceRock {
         // self.change_reference_plane("J2000")?;
 
         // throw an error if the observer and self have different epochs
-        if self.epoch.utc().jd() != observer.epoch().utc().jd() {
+        if self.epoch.utc().jd() != observer.epoch.utc().jd() {
             
             return Err("Observer and SpaceRock have different epochs".into());
         }
 
-        if self.reference_plane.as_str() != observer.reference_plane() {
+        if self.reference_plane != observer.reference_plane {
             return Err("Observer and SpaceRock have different reference planes".into());
         }
         // Calculate the topocentric state, correct for light travel time
@@ -786,8 +786,8 @@ impl SpaceRock {
                 let gslope = properties.gslope.unwrap();
 
                 let delta = cr.position.norm();
-                let sun_dist = (cr.position + observer.position()).norm();
-                let earth_dist = observer.position().norm();
+                let sun_dist = (cr.position + observer.position).norm();
+                let earth_dist = observer.position.norm();
                 let q = (sun_dist.powi(2) + delta.powi(2) - earth_dist) / (2.0 * sun_dist * delta);
                 // let mut beta = 0.0;
                 // match q {

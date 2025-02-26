@@ -23,19 +23,22 @@ impl PyObserver {
 
     #[getter]
     fn position(&self, py: Python) -> Py<PyArray1<f64>> {
-        let pos = vec![self.inner.position().x, self.inner.position().y, self.inner.position().z];
+        let pos = vec![self.inner.position.x, self.inner.position.y, self.inner.position.z];
         pos.into_pyarray(py).to_owned().into()
     }
 
     #[getter]
     fn velocity(&self, py: Python) -> Py<PyArray1<f64>> {
-        let vel = vec![self.inner.velocity().x, self.inner.velocity().y, self.inner.velocity().z];
+        let vel = match self.inner.velocity {
+            Some(vel) => vec![vel.x, vel.y, vel.z],
+            None => vec![0.0, 0.0, 0.0],
+        };
         vel.into_pyarray(py).to_owned().into()
     }
 
     #[getter]
     fn origin(&self) -> String {
-        self.inner.origin().to_string()
+        self.inner.origin.to_string()
     }
 
     // fn change_frame(&mut self, new_frame: &str) {
@@ -60,22 +63,22 @@ impl PyObserver {
 
     #[getter]
     fn reference_plane(&self) -> String {
-        self.inner.reference_plane().to_string()
+        self.inner.reference_plane.to_string()
     }
 
     #[getter]
     fn epoch(&self) -> PyTime {
-        PyTime { inner: self.inner.epoch().clone() }
+        PyTime { inner: self.inner.epoch.clone() }
     }
 
     // display the observer
     fn __str__(&self) -> String {
-        format!("Observer at epoch: {}", self.inner.epoch())
+        format!("Observer at epoch: {}", self.inner.epoch)
     }
 
     // display the observer
     fn __repr__(&self) -> String {
-        format!("Observer at epoch: {}", self.inner.epoch())
+        format!("Observer at epoch: {}", self.inner.epoch)
     }
     
 }

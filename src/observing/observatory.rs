@@ -1,9 +1,10 @@
 use crate::SpaceRock;
 
 use crate::observing::observer::Observer;
-use crate::constants::{DEG_TO_RAD, M_TO_AU, EQUAT_RAD};
+use crate::constants::{M_TO_AU, EQUAT_RAD};
 use crate::{OBSERVATORIES, SPACEOBSERVATORIES};
 use crate::time::Time;
+use crate::coordinates::{ReferencePlane, Origin};
 
 use nalgebra::Vector3;
 
@@ -44,7 +45,7 @@ impl Observatory {
         if SPACEOBSERVATORIES.get(&ocode).is_some() {
             let o = SPACEOBSERVATORIES.get(&ocode).unwrap();
             let jplid = o.0;
-            let name = o.1;
+            // let name = o.1;
             return Ok(Observatory::SpaceTelecope { name: jplid.to_string() })
         }
 
@@ -96,26 +97,33 @@ impl Observatory {
                 let ox = rho_cos_lat * lon.cos();
                 let oy = rho_cos_lat * lon.sin();
                 let oz = rho_sin_lat;
-                let obsVec = Vector3::new(ox, oy, oz);
+                let obs_vec = Vector3::new(ox, oy, oz);
 
-                // println!("{:?}", obsVec);
-
-                let mVec = m * obsVec * EQUAT_RAD * M_TO_AU;
-                let mVecp = mp * obsVec * EQUAT_RAD * M_TO_AU;
-                let mVecm = mm * obsVec * EQUAT_RAD * M_TO_AU;
-                let d_vel = (mVecp - mVecm) / (2.0 * delta_et / 86400.0);
-                earth.position += mVec;
+                let m_vec = m * obs_vec * EQUAT_RAD * M_TO_AU;
+                let m_vecp = mp * obs_vec * EQUAT_RAD * M_TO_AU;
+                let m_vecm = mm * obs_vec * EQUAT_RAD * M_TO_AU;
+                let d_vel = (m_vecp - m_vecm) / (2.0 * delta_et / 86400.0);
+                earth.position += m_vec;
                 earth.velocity += d_vel;
                 
-                // let [d_pos, d_vel] = compute_topocentric_correction(*lon, rho_sin_lat, rho_cos_lat, epoch.jd());
-                // earth.position += d_pos;
-                // earth.velocity += d_vel;
-                Ok(Observer { spacerock: earth, observatory: self.clone() })
+                let observer = Observer { position: earth.position, 
+                                          velocity: Some(earth.velocity), 
+                                          epoch: epoch.clone(),
+                                          reference_plane: ReferencePlane::from_str(reference_plane)?, 
+                                          origin: Origin::from_str(origin)?,
+                                          observatory: self.clone() };
+                Ok(observer)
             },
             Observatory::SpaceTelecope { name } => {
                 // let rock = SpaceRock::from_spice(&name, epoch, reference_plane, origin)?;
                 let rock = SpaceRock::from_horizons(&name, epoch, reference_plane, origin)?;
-                Ok(Observer { spacerock: rock, observatory: self.clone() })
+                let observer = Observer { position: rock.position, 
+                                          velocity: Some(rock.velocity), 
+                                          epoch: epoch.clone(),
+                                          reference_plane: ReferencePlane::from_str(reference_plane)?,
+                                          origin: Origin::from_str(origin)?,
+                                          observatory: self.clone() };
+                Ok(observer)
             }
             _ => {
                 return Err("at not implemented for this observatory type".into())
@@ -177,65 +185,65 @@ impl Observatory {
 
 }
 
-/// Computes local sidereal time for a given epoch and longitude
-/// 
-/// # Arguments
-/// * `epoch` - Julian date
-/// * `lon` - Longitude in radians
-fn compute_local_sidereal_time(epoch: f64, lon: f64) -> f64 {
-    let t = (epoch - 2451545.0) / 36525.0;
-    let mut theta = 280.46061837 + 360.98564736629 * (epoch - 2451545.0) + (0.000387933 * t * t) - (t * t * t / 38710000.0);
-    theta *= DEG_TO_RAD;
-    return theta + lon
-}
+// /// Computes local sidereal time for a given epoch and longitude
+// /// 
+// /// # Arguments
+// /// * `epoch` - Julian date
+// /// * `lon` - Longitude in radians
+// fn compute_local_sidereal_time(epoch: f64, lon: f64) -> f64 {
+//     let t = (epoch - 2451545.0) / 36525.0;
+//     let mut theta = 280.46061837 + 360.98564736629 * (epoch - 2451545.0) + (0.000387933 * t * t) - (t * t * t / 38710000.0);
+//     theta *= DEG_TO_RAD;
+//     return theta + lon
+// }
 
-/// Computes sidereal rotation rate at given epoch
-/// 
-/// # Arguments
-/// * `epoch` - Julian date
-fn sidereal_rate(epoch: f64) -> f64 {
-    let t = (epoch - 2451545.0) / 36525.0;
-    let tprime = 1.0 / 36525.0;
-    let theta_dot = 360.98564736629 + 2.0 * 0.000387933 * t * tprime + 3.0 * t * t * tprime / 38710000.0;
-    return theta_dot * DEG_TO_RAD
-}
+// /// Computes sidereal rotation rate at given epoch
+// /// 
+// /// # Arguments
+// /// * `epoch` - Julian date
+// fn sidereal_rate(epoch: f64) -> f64 {
+//     let t = (epoch - 2451545.0) / 36525.0;
+//     let tprime = 1.0 / 36525.0;
+//     let theta_dot = 360.98564736629 + 2.0 * 0.000387933 * t * tprime + 3.0 * t * t * tprime / 38710000.0;
+//     return theta_dot * DEG_TO_RAD
+// }
 
-/// Calculates position and velocity corrections for Earth-based observers
-/// 
-/// # Arguments
-/// * `lon` - Observer longitude in radians
-/// * `rho_sin_lat` - ρsin(φ) where ρ is distance from Earth center
-/// * `rho_cos_lat` - ρcos(φ) where ρ is distance from Earth center
-/// * `epoch` - Julian date
-/// 
-/// # Returns
-/// * Position correction [dx, dy, dz] in AU
-/// * Velocity correction [vx, vy, vz] in AU/day
-fn compute_topocentric_correction(lon: f64, rho_sin_lat: f64, rho_cos_lat: f64, epoch: f64) -> [Vector3<f64>; 2] {
+// /// Calculates position and velocity corrections for Earth-based observers
+// /// 
+// /// # Arguments
+// /// * `lon` - Observer longitude in radians
+// /// * `rho_sin_lat` - ρsin(φ) where ρ is distance from Earth center
+// /// * `rho_cos_lat` - ρcos(φ) where ρ is distance from Earth center
+// /// * `epoch` - Julian date
+// /// 
+// /// # Returns
+// /// * Position correction [dx, dy, dz] in AU
+// /// * Velocity correction [vx, vy, vz] in AU/day
+// fn compute_topocentric_correction(lon: f64, rho_sin_lat: f64, rho_cos_lat: f64, epoch: f64) -> [Vector3<f64>; 2] {
 
-    let phi = compute_local_sidereal_time(epoch, lon);
-    let phi_rate = sidereal_rate(epoch);
+//     let phi = compute_local_sidereal_time(epoch, lon);
+//     let phi_rate = sidereal_rate(epoch);
     
-    let sin_lon = phi.sin();
-    let cos_lon = phi.cos();
+//     let sin_lon = phi.sin();
+//     let cos_lon = phi.cos();
 
-    let sin_lon_prime = cos_lon * phi_rate;
-    let cos_lon_prime = -sin_lon * phi_rate;
+//     let sin_lon_prime = cos_lon * phi_rate;
+//     let cos_lon_prime = -sin_lon * phi_rate;
         
-    let dx = rho_cos_lat * cos_lon * EQUAT_RAD;
-    let dy = rho_cos_lat * sin_lon * EQUAT_RAD;
-    let dz = rho_sin_lat * EQUAT_RAD;
+//     let dx = rho_cos_lat * cos_lon * EQUAT_RAD;
+//     let dy = rho_cos_lat * sin_lon * EQUAT_RAD;
+//     let dz = rho_sin_lat * EQUAT_RAD;
 
-    let dvx = cos_lon_prime * rho_cos_lat * EQUAT_RAD;
-    let dvy = sin_lon_prime * rho_cos_lat * EQUAT_RAD;
-    let dvz = 0.0;
+//     let dvx = cos_lon_prime * rho_cos_lat * EQUAT_RAD;
+//     let dvy = sin_lon_prime * rho_cos_lat * EQUAT_RAD;
+//     let dvz = 0.0;
 
-    let d_pos = Vector3::new(dx, dy, dz) * M_TO_AU; // AU
-    let d_vel = Vector3::new(dvx, dvy, dvz) * M_TO_AU; // AU/day
+//     let d_pos = Vector3::new(dx, dy, dz) * M_TO_AU; // AU
+//     let d_vel = Vector3::new(dvx, dvy, dvz) * M_TO_AU; // AU/day
 
-    return [d_pos, d_vel];
+//     return [d_pos, d_vel];
 
-}
+// }
 
 
 // earth_latest_high_prec.bpc

@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
-use pyo3::types::{PyDict, IntoPyDict, PyList, PyTuple};
+use pyo3::types::{PyDict, PyList, PyTuple};
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use flate2::read::GzDecoder;
@@ -17,20 +17,20 @@ use spacerocks::transforms::calc_true_anomaly_from_mean_anomaly;
 use spacerocks::Observatory;
 use spacerocks::SPECIAL_CASE_OBSERVATORIES;
 // use crate::py_time::time::PyTime;
-use crate::py_time::time::PyTime;
-use crate::py_observing::observer::PyObserver;
+// use crate::py_time::time::PyTime;
+// use crate::py_observing::observer::PyObserver;
 use crate::py_observing::observation::PyObservation;
 
 use serde_json;
 
 use crate::RockCollection;
-use anyhow::Error;
+// use anyhow::Error;
 use spacerocks::constants::MPC_URL;
 use dirs::home_dir;
 use std::time::Duration;
-use reqwest::ClientBuilder;
+// use reqwest::ClientBuilder;
 use spacerocks::constants::MPC_API;
-use spacerocks::observing::{Observer, Observation};
+use spacerocks::observing::{Observation};
 
 
 #[derive(Debug, Clone)]

@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::fs::{self, File};
 use std::io::Write;
-use std::collections::HashMap;
 use std::time::SystemTime;
 
 use crate::errors::KernelError;
