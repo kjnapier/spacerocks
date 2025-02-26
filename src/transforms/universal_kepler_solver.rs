@@ -137,6 +137,8 @@ pub fn solve_for_universal_anomaly(r0: f64, vr0: f64, alpha: f64, mu: f64, dt: f
 
         let a = n / denom;
         chi = chi - a;
+        error = f(chi, r0, vr0, alpha, mu, dt).abs();
+        iter += 1;
     }
    
     Ok(chi)
