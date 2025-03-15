@@ -115,6 +115,13 @@ impl PySpaceRock {
         }
     }
 
+    fn to_ssb(&mut self) -> PyResult<()> {
+        match self.inner.to_ssb() {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to change origin to SSB: {}", e))),
+        }
+    }
+
     
     fn __repr__(&self) -> String {
         // build a string representation of the object

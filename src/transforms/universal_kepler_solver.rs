@@ -83,38 +83,10 @@ fn d2f_dchi2(chi: f64, r0: f64, vr0: f64, alpha: f64, mu: f64) -> f64 {
 /// ```
 
 // We can bring this back at some point, but for now we will use Laguerre's method
-// pub fn solve_for_universal_anomaly(r0: f64, vr0: f64, alpha: f64, mu: f64, dt: f64, tol: f64, max_iter: usize) -> Result<f64, Box<dyn std::error::Error>> {
-//     let mut chi = mu.sqrt() * alpha.abs() * dt;
-//     let mut iter = 0;
-//     let mut error = f(chi, r0, vr0, alpha, mu, dt).abs();
-
-//     while error > tol {
-//         if iter > max_iter {
-//             println!("\nSolver failed with:");
-//             println!("r0: {}, vr0: {}, alpha: {}, mu: {}, dt: {}", r0, vr0, alpha, mu, dt);
-//             println!("Initial chi: {}", mu.sqrt() * alpha.abs() * dt);
-//             println!("Final chi: {}, Final error: {}", chi, error);
-//             println!("z value: {}", alpha * chi.powi(2));
-//             println!("Last f value: {}", f(chi, r0, vr0, alpha, mu, dt));
-//             println!("Last df value: {}", df_dchi(chi, r0, vr0, alpha, mu));
-//             return Err("Universal Kepler solver did not converge. Pretty bad.".into());
-//         }
-//         let f_val = f(chi, r0, vr0, alpha, mu, dt);
-//         let df_val = df_dchi(chi, r0, vr0, alpha, mu);
-//         let delta_chi = f_val / df_val;
-//         chi -= delta_chi;
-//         error = f(chi, r0, vr0, alpha, mu, dt).abs();
-//         iter += 1;
-//     }
-//     Ok(chi)
-// }
-
-// Implement solver using Laguerre's method
 pub fn solve_for_universal_anomaly(r0: f64, vr0: f64, alpha: f64, mu: f64, dt: f64, tol: f64, max_iter: usize) -> Result<f64, Box<dyn std::error::Error>> {
     let mut chi = mu.sqrt() * alpha.abs() * dt;
     let mut iter = 0;
     let mut error = f(chi, r0, vr0, alpha, mu, dt).abs();
-    let n = 3.0; // Polynomial degree
 
     while error > tol {
         if iter > max_iter {
@@ -127,19 +99,47 @@ pub fn solve_for_universal_anomaly(r0: f64, vr0: f64, alpha: f64, mu: f64, dt: f
             println!("Last df value: {}", df_dchi(chi, r0, vr0, alpha, mu));
             return Err("Universal Kepler solver did not converge. Pretty bad.".into());
         }
-        
-        let G = df_dchi(chi, r0, vr0, alpha, mu) / error; 
-        let H = G.powi(2) - d2f_dchi2(chi, r0, vr0, alpha, mu) / error;
-
-        let denom_plus = G + ((n-1.0) * (n*H - G.powi(2))).sqrt();
-        let denom_minus = G - ((n-1.0) * (n*H - G.powi(2))).sqrt();
-        let denom = if denom_plus.abs() > denom_minus.abs() { denom_plus } else { denom_minus };
-
-        let a = n / denom;
-        chi = chi - a;
+        let f_val = f(chi, r0, vr0, alpha, mu, dt);
+        let df_val = df_dchi(chi, r0, vr0, alpha, mu);
+        let delta_chi = f_val / df_val;
+        chi -= delta_chi;
         error = f(chi, r0, vr0, alpha, mu, dt).abs();
         iter += 1;
     }
-   
     Ok(chi)
 }
+
+// Implement solver using Laguerre's method
+// pub fn solve_for_universal_anomaly(r0: f64, vr0: f64, alpha: f64, mu: f64, dt: f64, tol: f64, max_iter: usize) -> Result<f64, Box<dyn std::error::Error>> {
+//     let mut chi = mu.sqrt() * alpha.abs() * dt;
+//     let mut iter = 0;
+//     let mut error = f(chi, r0, vr0, alpha, mu, dt).abs();
+//     let n = 3.0; // Polynomial degree
+
+//     while error > tol {
+//         if iter > max_iter {
+//             println!("\nSolver failed with:");
+//             println!("r0: {}, vr0: {}, alpha: {}, mu: {}, dt: {}", r0, vr0, alpha, mu, dt);
+//             println!("Initial chi: {}", mu.sqrt() * alpha.abs() * dt);
+//             println!("Final chi: {}, Final error: {}", chi, error);
+//             println!("z value: {}", alpha * chi.powi(2));
+//             println!("Last f value: {}", f(chi, r0, vr0, alpha, mu, dt));
+//             println!("Last df value: {}", df_dchi(chi, r0, vr0, alpha, mu));
+//             return Err("Universal Kepler solver did not converge. Pretty bad.".into());
+//         }
+        
+//         let G = df_dchi(chi, r0, vr0, alpha, mu) / error; 
+//         let H = G.powi(2) - d2f_dchi2(chi, r0, vr0, alpha, mu) / error;
+
+//         let denom_plus = G + ((n-1.0) * (n*H - G.powi(2))).sqrt();
+//         let denom_minus = G - ((n-1.0) * (n*H - G.powi(2))).sqrt();
+//         let denom = if denom_plus.abs() > denom_minus.abs() { denom_plus } else { denom_minus };
+
+//         let a = n / denom;
+//         chi = chi - a;
+//         error = f(chi, r0, vr0, alpha, mu, dt).abs();
+//         iter += 1;
+//     }
+   
+//     Ok(chi)
+// }

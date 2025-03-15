@@ -79,8 +79,9 @@ pub fn gauss(o1: &Observation, o2: &Observation, o3: &Observation, min_distance:
         Some(mat) => mat,
         None => return None,
     };
+    
+    let complex_roots = mat.complex_eigenvalues();    
 
-    let complex_roots = mat.complex_eigenvalues();
     let roots: Vec<f64> = complex_roots.iter().filter(|x| x.im == 0.0 && x.re > min_distance).map(|x| x.re).collect();
     if roots.len() == 0 {
         return None;
