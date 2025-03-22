@@ -11,6 +11,7 @@ use crate::py_time::time::PyTime;
 use crate::py_nbody::integrator::PyIntegrator;
 use crate::py_nbody::force::PyForce;
 use crate::py_coordinates::origin::PyOrigin;
+use crate::PySpiceKernel;
 
 #[pyclass]
 #[pyo3(name = "Simulation")]
@@ -41,8 +42,8 @@ impl PySimulation {
     ///
     /// * `Result<Simulation, &'static str>` - The Simulation object.
     #[classmethod]
-    pub fn giants(_cls: Py<PyType>, epoch: &PyTime, reference_plane: &str, origin: &str) -> PyResult<Self> {
-        match Simulation::giants(&epoch.inner, reference_plane, origin) {
+    pub fn giants(_cls: Py<PyType>, epoch: &PyTime, reference_plane: &str, origin: &str, kernel: &PySpiceKernel) -> PyResult<Self> {
+        match Simulation::giants(&epoch.inner, reference_plane, origin, &kernel.inner) {
             Ok(sim) => Ok(PySimulation { inner: sim }),
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
         }
@@ -60,8 +61,8 @@ impl PySimulation {
     ///
     /// * `Result<Simulation, &'static str>` - The Simulation object.
     #[classmethod]
-    pub fn planets(_cls: Py<PyType>, epoch: &PyTime, reference_plane: &str, origin: &str) -> PyResult<Self> {
-        match Simulation::planets(&epoch.inner, reference_plane, origin) {
+    pub fn planets(_cls: Py<PyType>, epoch: &PyTime, reference_plane: &str, origin: &str, kernel: &PySpiceKernel) -> PyResult<Self> {
+        match Simulation::planets(&epoch.inner, reference_plane, origin, &kernel.inner) {
             Ok(sim) => Ok(PySimulation { inner: sim }),
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
         }
@@ -79,8 +80,8 @@ impl PySimulation {
     ///
     /// * `Result<Simulation, &'static str>` - The Simulation object.
     #[classmethod]
-    pub fn horizons(_cls: Py<PyType>, epoch: &PyTime, reference_plane: &str, origin: &str) -> PyResult<Self> {
-        match Simulation::horizons(&epoch.inner, reference_plane, origin) {
+    pub fn horizons(_cls: Py<PyType>, epoch: &PyTime, reference_plane: &str, origin: &str, kernel: &PySpiceKernel) -> PyResult<Self> {
+        match Simulation::horizons(&epoch.inner, reference_plane, origin, &kernel.inner) {
             Ok(sim) => Ok(PySimulation { inner: sim }),
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
         }

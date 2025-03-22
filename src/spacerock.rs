@@ -3,6 +3,8 @@ use crate::{Origin, ReferencePlane, Time, Properties, Observer, Observation};
 use crate::constants::*;
 use crate::correct_for_ltt;
 use crate::OrbitType;
+use crate::SpiceKernel;
+use crate::spice::SpiceBody;
 
 use crate::transforms::{calc_conic_anomaly_from_true_anomaly, calc_mean_anomaly_from_conic_anomaly, solve_for_universal_anomaly, stumpff_c, stumpff_s};
 
@@ -46,7 +48,7 @@ use std::collections::HashMap;
 /// let asteroid = SpaceRock::from_horizons("Ceres", &epoch, "ECLIPJ2000", "SSB")?;
 /// println!("Semi-major axis: {} AU", asteroid.a());
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SpaceRock {
 
     pub name: String,
@@ -83,28 +85,35 @@ impl SpaceRock {
     /// let epoch = Time::now();
     /// let rock = SpaceRock::from_spice("Earth", &epoch, "J2000", "SSB");
     /// ```
-    pub fn from_spice(name: &str, epoch: &Time, reference_plane: &str, origin: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_spice(name: &str, epoch: &Time, reference_plane: &str, origin: &str, kernel: &SpiceKernel) -> Result<Self, Box<dyn std::error::Error>> {
 
         // check a priori if the name is in the list of loaded kernels
 
         let reference_plane = ReferencePlane::from_str(reference_plane)?;
         let origin = Origin::from_str(origin)?;
 
+        let spicebody = SpiceBody::from_name(&name.to_uppercase().as_str())?;
+        let origin_spicebody = SpiceBody::from_name(&origin.to_string().to_uppercase())?;
+        let (x, y, z, vx, vy, vz) = kernel.compute_state(&spicebody, &origin_spicebody, epoch.tdb().jd())?;
+        let position = Vector3::new(x, y, z);
+        let velocity = Vector3::new(vx, vy, vz);
+
         // let mut ep = epoch.clone();
-        let et = spice::str2et(&format!("JD{epoch} UTC", epoch=epoch.utc().jd()));
-        let (state, _) = spice::spkezr(name, et, reference_plane.as_str(), "NONE", &origin.to_string());
-        let position = Vector3::new(state[0], state[1], state[2]) * KM_TO_AU;
-        let velocity = Vector3::new(state[3], state[4], state[5]) * KM_TO_AU * SECONDS_PER_DAY;
+        // let et = spice::str2et(&format!("JD{epoch} UTC", epoch=epoch.utc().jd()));
+        // let (state, _) = spice::spkezr(name, et, reference_plane.as_str(), "NONE", &origin.to_string());
+        // let position = Vector3::new(state[0], state[1], state[2]) * KM_TO_AU;
+        // let velocity = Vector3::new(state[3], state[4], state[5]) * KM_TO_AU * SECONDS_PER_DAY;
 
         let mut rock = SpaceRock {
             name: name.to_string(),
             position,
             velocity,
             epoch: epoch.clone(),
-            reference_plane,
+            reference_plane: reference_plane.clone(),
             origin,
             properties: None,
         };
+        rock.change_reference_plane(reference_plane.as_str())?;
 
         if let Some(m) = MASSES.get(name.to_lowercase().as_str()) { rock.set_mass(*m) };
 
@@ -496,9 +505,9 @@ impl SpaceRock {
     /// let rock = SpaceRock::from_horizons("Arrokoth", &epoch, "J2000", "SSB");
     /// rock.to_ssb();
     /// ```
-    pub fn to_ssb(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn to_ssb(&mut self, kernel: &SpiceKernel) -> Result<(), Box<dyn std::error::Error>> {
         // get the ssb from spice
-        let mut ssb = SpaceRock::from_spice("ssb", &self.epoch, self.reference_plane.as_str(), self.origin.as_str())?;
+        let mut ssb = SpaceRock::from_spice("ssb", &self.epoch, self.reference_plane.as_str(), self.origin.as_str(), &kernel)?;
         ssb.set_mass(MU_BARY / GRAVITATIONAL_CONSTANT);
         self.change_origin(&ssb);
         Ok(())
@@ -515,9 +524,9 @@ impl SpaceRock {
     /// let rock = SpaceRock::from_horizons("Arrokoth", &epoch, "J2000", "SSB");
     /// rock.to_helio();
     /// ```
-    pub fn to_helio(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn to_helio(&mut self, kernel: &SpiceKernel) -> Result<(), Box<dyn std::error::Error>> {
         // get the sun from spice
-        let sun = SpaceRock::from_spice("sun", &self.epoch, self.reference_plane.as_str(), self.origin.as_str())?;
+        let sun = SpaceRock::from_spice("sun", &self.epoch, self.reference_plane.as_str(), self.origin.as_str(), &kernel)?;
         self.change_origin(&sun);
         Ok(())
     }

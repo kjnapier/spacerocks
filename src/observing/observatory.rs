@@ -6,7 +6,11 @@ use crate::{OBSERVATORIES, SPACEOBSERVATORIES};
 use crate::time::Time;
 use crate::coordinates::{ReferencePlane, Origin};
 
+use crate::spice::SpiceKernel;
+use crate::spice::SpiceBody;
+
 use nalgebra::Vector3;
+use nalgebra::Matrix3;
 
 
 /// Represents different types of astronomical observatories.
@@ -68,27 +72,28 @@ impl Observatory {
         Observatory::SpaceTelecope { name: name.to_string() }
     }
    
-    /// Get the Observer at a specific time.
-    ///
-    /// # Arguments
-    ///
-    /// * `epoch` - The time to get the observer at.
-    ///
-    /// # Returns
-    ///
-    /// * `Result<Observer, Box<dyn std::error::Error>>` - The Observer object.
-    pub fn at(&self, epoch: &Time, reference_plane: &str, origin: &str) -> Result<Observer, Box<dyn std::error::Error>> {
+    // /// Get the Observer at a specific time.
+    // ///
+    // /// # Arguments
+    // ///
+    // /// * `epoch` - The time to get the observer at.
+    // ///
+    // /// # Returns
+    // ///
+    // /// * `Result<Observer, Box<dyn std::error::Error>>` - The Observer object.
+    pub fn at(&self, epoch: &Time, reference_plane: &str, origin: &str, kernel: &SpiceKernel) -> Result<Observer, Box<dyn std::error::Error>> {
         match self {
             Observatory::GroundObservatory { obscode: _, lon, lat, rho } => {
-                let mut earth = SpaceRock::from_spice("earth", epoch, reference_plane, origin)?;
+                let mut earth = SpaceRock::from_spice("earth", epoch, reference_plane, origin, &kernel)?;
                 let rho_sin_lat = lat.sin() * rho;
                 let rho_cos_lat = lat.cos() * rho;
                 
-                let delta_et = 10.0;
-                let et = spice::str2et(&format!("JD{epoch} UTC", epoch=epoch.utc().jd()));     
-                let m: nalgebra::Matrix3<f64> = spice::pxform("ITRF93", reference_plane, et).into();
-                let mp: nalgebra::Matrix3<f64> = spice::pxform("ITRF93", reference_plane, et + delta_et).into();
-                let mm: nalgebra::Matrix3<f64> = spice::pxform("ITRF93", reference_plane, et - delta_et).into();
+                let delta_et = 10.0 / 86400.0;
+                let et = epoch.tdb().jd();
+
+                let m: nalgebra::Matrix3<f64> = kernel.pxform(et)?.into();
+                let mp: nalgebra::Matrix3<f64> = kernel.pxform(et + delta_et)?.into();
+                let mm: nalgebra::Matrix3<f64> = kernel.pxform(et - delta_et)?.into();
                 // transpose the matrix
                 let m = m.transpose();
                 let mp = mp.transpose();
@@ -130,6 +135,84 @@ impl Observatory {
             }
         }
     }
+
+    // /// Create a new Observatory from a name. 
+    // /// The name should usually the name of a space telescope, but it can be anything that 
+    // /// is loaded into the SPICE kernel.
+    // ///
+    // /// # Arguments
+    // ///
+    // /// * `name` - Name of the observatory.
+    // ///
+    // /// # Returns
+    // ///
+    // /// * `Observatory` - The Observatory object.
+    // pub fn from_name(name: &str) -> Self {
+    //     Observatory::SpaceTelecope { name: name.to_string() }
+    // }
+   
+    // // /// Get the Observer at a specific time.
+    // // ///
+    // // /// # Arguments
+    // // ///
+    // // /// * `epoch` - The time to get the observer at.
+    // // ///
+    // // /// # Returns
+    // // ///
+    // // /// * `Result<Observer, Box<dyn std::error::Error>>` - The Observer object.
+    // pub fn at(&self, epoch: &Time, reference_plane: &str, origin: &str, kernel: &SpiceKernel) -> Result<Observer, Box<dyn std::error::Error>> {
+    //     match self {
+    //         Observatory::GroundObservatory { obscode: _, lon, lat, rho } => {
+    //             let mut earth = SpaceRock::from_spice("earth", epoch, reference_plane, origin, &kernel)?;
+    //             let rho_sin_lat = lat.sin() * rho;
+    //             let rho_cos_lat = lat.cos() * rho;
+                
+    //             let delta_et = 10.0;
+    //             let et = spice::str2et(&format!("JD{epoch} UTC", epoch=epoch.utc().jd()));     
+    //             let m: nalgebra::Matrix3<f64> = spice::pxform("ITRF93", reference_plane, et).into();
+    //             let mp: nalgebra::Matrix3<f64> = spice::pxform("ITRF93", reference_plane, et + delta_et).into();
+    //             let mm: nalgebra::Matrix3<f64> = spice::pxform("ITRF93", reference_plane, et - delta_et).into();
+    //             // transpose the matrix
+    //             let m = m.transpose();
+    //             let mp = mp.transpose();
+    //             let mm = mm.transpose();
+
+    //             let ox = rho_cos_lat * lon.cos();
+    //             let oy = rho_cos_lat * lon.sin();
+    //             let oz = rho_sin_lat;
+    //             let obs_vec = Vector3::new(ox, oy, oz);
+
+    //             let m_vec = m * obs_vec * EQUAT_RAD * M_TO_AU;
+    //             let m_vecp = mp * obs_vec * EQUAT_RAD * M_TO_AU;
+    //             let m_vecm = mm * obs_vec * EQUAT_RAD * M_TO_AU;
+    //             let d_vel = (m_vecp - m_vecm) / (2.0 * delta_et / 86400.0);
+    //             earth.position += m_vec;
+    //             earth.velocity += d_vel;
+                
+    //             let observer = Observer { position: earth.position, 
+    //                                       velocity: Some(earth.velocity), 
+    //                                       epoch: epoch.clone(),
+    //                                       reference_plane: ReferencePlane::from_str(reference_plane)?, 
+    //                                       origin: Origin::from_str(origin)?,
+    //                                       observatory: self.clone() };
+    //             Ok(observer)
+    //         },
+    //         Observatory::SpaceTelecope { name } => {
+    //             // let rock = SpaceRock::from_spice(&name, epoch, reference_plane, origin)?;
+    //             let rock = SpaceRock::from_horizons(&name, epoch, reference_plane, origin)?;
+    //             let observer = Observer { position: rock.position, 
+    //                                       velocity: Some(rock.velocity), 
+    //                                       epoch: epoch.clone(),
+    //                                       reference_plane: ReferencePlane::from_str(reference_plane)?,
+    //                                       origin: Origin::from_str(origin)?,
+    //                                       observatory: self.clone() };
+    //             Ok(observer)
+    //         }
+    //         _ => {
+    //             return Err("at not implemented for this observatory type".into())
+    //         }
+    //     }
+    // }
 
     /// Get the name of the Observatory.
     ///

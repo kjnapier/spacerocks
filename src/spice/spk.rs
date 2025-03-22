@@ -1,10 +1,14 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};
 use std::mem;
 use std::path::Path;
 use std::slice;
 
+
 use memmap2::Mmap;
+
+use crate::spice::error::SpiceError;
 
 const RECORD_LENGTH: usize = 1024;
 
@@ -50,6 +54,7 @@ struct FileRecord {
 }
 
 /// A target with its associated summary data.
+#[derive(Debug)]
 pub struct SpkTarget {
     pub code: i32,
     pub cen: i32,
@@ -67,23 +72,10 @@ pub struct Spk {
     pub map: Mmap, // memory-mapped file contents
     pub len: usize,
     pub targets: Vec<SpkTarget>,
+    // hash map of target codes to indices
+    pub target_map: HashMap<i32, usize>,
 }
 
-/// Possible errors during SPK processing.
-#[derive(Debug)]
-pub enum SpiceError {
-    AstFile,
-    Nast,
-    Coverage,
-    IoError(io::Error),
-    ParseError(String),
-}
-
-impl From<io::Error> for SpiceError {
-    fn from(err: io::Error) -> Self {
-        SpiceError::IoError(err)
-    }
-}
 
 impl Spk {
     /// Open and initialize an SPK file given by `path`.
@@ -173,15 +165,22 @@ impl Spk {
         // Memory-map the file.
         let map = unsafe { Mmap::map(&file)? };
 
+        // Create a hash map of target codes to indices.
+        let target_map = targets
+            .iter()
+            .enumerate()
+            .map(|(i, target)| (target.code, i))
+            .collect();
+
         // Optionally, you could advise the OS for random access (using libc::madvise).
         // For simplicity, this version omits that step.
 
-        Ok(Spk { map, len, targets })
+        Ok(Spk { map, len, targets, target_map })
     }
 
     /// Calculate position data given the Julian date `jde`, a time offset `rel`,
     /// and target index `m`. On success returns a tuple (GM, x, y, z).
-    pub fn calc(&self, jde: f64, rel: f64, m: usize) -> Result<(f64, f64, f64, f64, f64, f64, f64), SpiceError> {
+    pub fn calc(&self, jde: f64, rel: f64, m: usize) -> Result<(f64, f64, f64, f64, f64, f64, i32), SpiceError> {
         if m >= self.targets.len() {
             return Err(SpiceError::Nast);
         }
@@ -191,7 +190,6 @@ impl Spk {
             return Err(SpiceError::Coverage);
         }
 
-        let gm = target.mass;
         let mut pos_u = [0.0f64; 3];
         let mut vel_u = [0.0f64; 3];
         // Note: The v component is computed in the C version but not used.
@@ -294,7 +292,12 @@ impl Spk {
             
         }
 
-        Ok((gm, pos_u[0], pos_u[1], pos_u[2], vel_u[0], vel_u[1], vel_u[2]))
+        Ok((pos_u[0], pos_u[1], pos_u[2], vel_u[0], vel_u[1], vel_u[2], target.cen))
+    }
+
+    pub fn state_at(&self, epoch: f64, target: usize) -> Result<(f64, f64, f64, f64, f64, f64, i32), SpiceError> {
+        let rel = epoch - 2451545.0;
+        self.calc(2451545.0, rel, target)
     }
 }
 
@@ -306,32 +309,4 @@ unsafe fn ptr_from_bytes<T: Copy>(bytes: &[u8]) -> Result<T, SpiceError> {
     }
     let ptr = bytes.as_ptr() as *const T;
     Ok(ptr.read_unaligned())
-}
-
-
-fn main() {
-    let spk = Spk::open("/Users/kjnapier/data/spice/de440s.bsp").unwrap();
-    for target in &spk.targets {
-        println!("Target code: {}", target.code);
-    }
-
-    let (gm, x, y, z, vx, vy, vz) = spk.calc(2451545.0, 0.0, 2).unwrap();
-    let dx = x - -1.842959633455135E-01;
-    let dy = y - 8.847595207660238E-01;
-    let dz = z - 3.838138091664636E-01;
-    let dvx = vx - -1.719773059488726E-02;
-    let dvy = vy - -2.909600206280292E-03;
-    let dvz = vz - -1.261542480302772E-03;
-    println!("epoch: {}, dx: {:.15}, dy: {:.15}, dz: {:.15}, dvx: {:.15}, dvy: {:.15}, dvz: {:.15}", 2451545.0, dx, dy, dz, dvx, dvy, dvz);
-    // println!("dx: {:.15}, dy: {:.15}, dz: {:.15}", dx, dy, dz);
-
-
-    let (gm, x, y, z, vx, vy, vz) = spk.calc(2451545.0, 10_000.0, 2).unwrap();
-    let dx = x - -5.372595064506600E-01;
-    let dy = y - -7.905152671576224E-01;
-    let dz = z - -3.425944911455414E-01;
-    let dvx = vx - 1.430235418521835E-02;
-    let dvy = vy - -8.438365796227539E-03;
-    let dvz = vz - -3.658045316486823E-03;
-    println!("epoch: {}, dx: {:.15}, dy: {:.15}, dz: {:.15}, dvx: {:.15}, dvy: {:.15}, dvz: {:.15}", 2451545.0 + 10_000.0, dx, dy, dz, dvx, dvy, dvz);
 }

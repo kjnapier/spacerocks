@@ -9,7 +9,7 @@ use crate::py_time::time::PyTime;
 use crate::py_coordinates::origin::PyOrigin;
 use crate::py_observing::observer::{PyObserver};
 use crate::py_observing::observation::{PyObservation};
-
+use crate::PySpiceKernel;
 
 #[pyclass]
 #[pyo3(name = "SpaceRock")]
@@ -31,9 +31,9 @@ impl PySpaceRock {
     }
 
     #[classmethod]
-    #[pyo3(signature = (name, epoch, reference_plane="ECLIPJ2000", origin="SSB"))]
-    fn from_spice(_cls: Py<PyType>, name: &str, epoch: PyRef<PyTime>, reference_plane: &str, origin: &str) -> PyResult<Self> {
-        let rock = SpaceRock::from_spice(name, &epoch.inner, reference_plane, origin);
+   //  #[pyo3(signature = (name, epoch, reference_plane="ECLIPJ2000", origin="SSB"))]
+    fn from_spice(_cls: Py<PyType>, name: &str, epoch: PyRef<PyTime>, reference_plane: &str, origin: &str, kernel: &PySpiceKernel) -> PyResult<Self> {
+        let rock = SpaceRock::from_spice(name, &epoch.inner, reference_plane, origin, &kernel.inner);
         if rock.is_err() {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to create SpaceRock from Spice for name: {}", name)));
         }
@@ -115,10 +115,19 @@ impl PySpaceRock {
         }
     }
 
-    fn to_ssb(&mut self) -> PyResult<()> {
-        match self.inner.to_ssb() {
+    fn to_ssb(&mut self, kernel: &PySpiceKernel) -> PyResult<()> {
+        let ker = &kernel.inner;
+        match self.inner.to_ssb(&ker) {
             Ok(_) => Ok(()),
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to change origin to SSB: {}", e))),
+        }
+    }
+
+    fn to_helio(&mut self, kernel: &PySpiceKernel) -> PyResult<()> {
+        let ker = &kernel.inner;
+        match self.inner.to_helio(&ker) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to change origin to Heliocenter: {}", e))),
         }
     }
 

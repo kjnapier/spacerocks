@@ -17,52 +17,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // kernel.load(format!("{}/latest_leapseconds.tls", spice_root).as_str())?;
     // kernel.load(format!("{}/earth_latest_high_prec.bpc", spice_root).as_str())?;
 
-    let mut kernel = SpiceKernel::defaults(Some(true))?;
+    //let mut kernel = SpiceKernel::defaults(Some(true))?;
 
     
 
     // kernel.load(format!("{}/codes_300ast_20100725.tf", spice_root).as_str())?;
     // kernel.load(format!("{}/pck00011.tpc", spice_root).as_str())?;
    
-    // Try these in sequence
-    let jupiter = SpaceRock::from_spice("jupiter barycenter", &epoch, "J2000", "ssb")?;
-    println!("Jupiter worked!");
+    // // Try these in sequence
+    // let jupiter = SpaceRock::from_spice("jupiter barycenter", &epoch, "J2000", "ssb")?;
+    // println!("Jupiter worked!");
 
-    let mars = SpaceRock::from_spice("mars barycenter", &epoch, "J2000", "ssb")?;
-    println!("Mars worked!");
+    // let mars = SpaceRock::from_spice("mars barycenter", &epoch, "J2000", "ssb")?;
+    // println!("Mars worked!");
 
-    let ceres = SpaceRock::from_spice("CERES", &epoch, "J2000", "SSB")?;
-    println!("Ceres by name worked!");
+    // let ceres = SpaceRock::from_spice("CERES", &epoch, "J2000", "SSB")?;
+    // println!("Ceres by name worked!");
 
-    let ceres = SpaceRock::from_spice("2000001", &epoch, "J2000", "ssb")?;
-    println!("Ceres worked!");
-
-
+    // let ceres = SpaceRock::from_spice("2000001", &epoch, "J2000", "ssb")?;
+    // println!("Ceres worked!");
 
 
 
-    // observer not working rn, so commenting out for complilation
-    let f51 = Observatory::from_obscode("F51")?;
 
-    let observer = f51.at(&epoch, "J2000", "SSB")?;
-    println!("{:?}", observer);
 
-    let mut arrokoth = SpaceRock::from_horizons("Arrokoth", &epoch, "J2000", "SSB")?;
-    println!("{}", arrokoth);
+    // // observer not working rn, so commenting out for complilation
+    // let f51 = Observatory::from_obscode("F51")?;
 
-    let mut sim = Simulation::horizons(&epoch, "J2000", "SSB")?;
-    println!("Sim is working");
-    sim.add(arrokoth.clone())?;
+    // let observer = f51.at(&epoch, "J2000", "SSB")?;
+    // println!("{:?}", observer);
 
-    println!("{}", sim.epoch);
+    // let mut arrokoth = SpaceRock::from_horizons("Arrokoth", &epoch, "J2000", "SSB")?;
+    // println!("{}", arrokoth);
 
-    let future = epoch + 365.25 * 10.0;
+    // let mut sim = Simulation::horizons(&epoch, "J2000", "SSB")?;
+    // println!("Sim is working");
+    // sim.add(arrokoth.clone())?;
 
-    println!("Arrkoth position and velocity at epoch: {}, {}", &arrokoth.position, &arrokoth.velocity);
+    // println!("{}", sim.epoch);
 
-    arrokoth.analytic_propagate(&future)?;
+    // let future = epoch + 365.25 * 10.0;
 
-    println!("Arrkoth position and velocity at future: {}, {}", &arrokoth.position, &arrokoth.velocity);
+    // println!("Arrkoth position and velocity at epoch: {}, {}", &arrokoth.position, &arrokoth.velocity);
+
+    // arrokoth.analytic_propagate(&future)?;
+
+    // println!("Arrkoth position and velocity at future: {}, {}", &arrokoth.position, &arrokoth.velocity);
 
     // let observer = f51.at(&epoch)?;
 

@@ -28,16 +28,15 @@ pip install maturin
 
 git clone https://github.com/kjnapier/spacerocks
 cd spacerocks
-git checkout v3
 cd py_spacerocks
 maturin develop --release
 ```
 
-You will also need to have [`cspice`](https://naif.jpl.nasa.gov/naif/toolkit_C.html) installed on your system, and add its location to your path as
+<!-- You will also need to have [`cspice`](https://naif.jpl.nasa.gov/naif/toolkit_C.html) installed on your system, and add its location to your path as
 ```bash
 export CSPICE_DIR="/path/to/cspice"
 ```
 You might also need to rename `cspice/lib/cspice.a` to `cspice/lib/libcspice.a` if you are on a Unix system.
 
 We actually use very few of the `cspice` functions, so it should be possible to remove this dependency in the future. 
-If you would like to help with this, please send a message!
+If you would like to help with this, please send a message! -->

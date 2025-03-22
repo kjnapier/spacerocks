@@ -22,7 +22,7 @@ use std::path::{PathBuf};
 // use nalgebra::Vector3;
 use serde_json;
 // use arrow::array::{Float64Array, StringArray};
-use crate::mpc::MPCHandler;
+// use crate::mpc::MPCHandler;
 use dirs::home_dir;
 
 
@@ -80,23 +80,23 @@ impl RockCollection {
     ///
     /// rocks = RockCollection.from_mpc("data/mpc", "mpcorb_extended", download_data=True)
     /// ```
-    #[staticmethod]
-    #[pyo3(signature = (catalog, download_data=false, mpc_path=None, orbit_type=None))]
-    pub fn from_mpc(catalog: String, download_data: bool, mpc_path: Option<PathBuf>, orbit_type: Option<String>) -> PyResult<Self> {
-        let default_path = home_dir()
-            .unwrap_or_default()
-            .join(".spacerocks")
-            .join("mpc");
+    // #[staticmethod]
+    // #[pyo3(signature = (catalog, download_data=false, mpc_path=None, orbit_type=None))]
+    // pub fn from_mpc(catalog: String, download_data: bool, mpc_path: Option<PathBuf>, orbit_type: Option<String>) -> PyResult<Self> {
+    //     let default_path = home_dir()
+    //         .unwrap_or_default()
+    //         .join(".spacerocks")
+    //         .join("mpc");
         
-        let final_path = mpc_path.unwrap_or(default_path);
+    //     let final_path = mpc_path.unwrap_or(default_path);
 
-        MPCHandler::create_rock_collection(
-            final_path,
-            catalog,
-            download_data,
-            orbit_type 
-        )
-    }
+    //     MPCHandler::create_rock_collection(
+    //         final_path,
+    //         catalog,
+    //         download_data,
+    //         orbit_type 
+    //     )
+    // }
 
     
 

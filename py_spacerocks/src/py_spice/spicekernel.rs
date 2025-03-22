@@ -18,39 +18,49 @@ impl PySpiceKernel {
         }
     }
 
-    #[classmethod]
-    #[pyo3(signature = (force_download = None))]
-    fn defaults(cls: Py<PyType>, force_download: Option<bool>) -> PyResult<Self> {
-        SpiceKernel::defaults(force_download)
-            .map(|kernel| PySpiceKernel { inner: kernel })
-            .map_err(|e| PyValueError::new_err(e.to_string())) 
-    }
-    #[classmethod]
-    fn from_config(cls: Py<PyType>, path: String, force_download: Option<bool>) -> PyResult<Self> {
-        SpiceKernel::from_config(&path, force_download)
-            .map(|kernel| PySpiceKernel { inner: kernel })
+    fn load_spk(&mut self, path: &str) -> PyResult<()> {
+        self.inner.load_spk(path)
             .map_err(|e| PyValueError::new_err(e.to_string())) 
     }
 
-    fn load(&mut self, path: &str) -> PyResult<()> {
-        self.inner.load(path)
+    fn load_bpc(&mut self, path: &str) -> PyResult<()> {
+        self.inner.load_bpc(path)
             .map_err(|e| PyValueError::new_err(e.to_string())) 
     }
+
+    // #[classmethod]
+    // #[pyo3(signature = (force_download = None))]
+    // fn defaults(cls: Py<PyType>, force_download: Option<bool>) -> PyResult<Self> {
+    //     SpiceKernel::defaults(force_download)
+    //         .map(|kernel| PySpiceKernel { inner: kernel })
+    //         .map_err(|e| PyValueError::new_err(e.to_string())) 
+    // }
+    // #[classmethod]
+    // fn from_config(cls: Py<PyType>, path: String, force_download: Option<bool>) -> PyResult<Self> {
+    //     SpiceKernel::from_config(&path, force_download)
+    //         .map(|kernel| PySpiceKernel { inner: kernel })
+    //         .map_err(|e| PyValueError::new_err(e.to_string())) 
+    // }
+
+    // fn load(&mut self, path: &str) -> PyResult<()> {
+    //     self.inner.load(path)
+    //         .map_err(|e| PyValueError::new_err(e.to_string())) 
+    // }
     
-    fn unload(&mut self) {
-        self.inner.unload();
-    }
+    // fn unload(&mut self) {
+    //     self.inner.unload();
+    // }
     
-    #[getter]
-    fn loaded_kernels(&self) -> Vec<String> {
-        self.inner.loaded_kernels().to_vec()
-    }
+    // #[getter]
+    // fn loaded_kernels(&self) -> Vec<String> {
+    //     self.inner.loaded_kernels().to_vec()
+    // }
     
-    fn __repr__(&self) -> String {
-        let mut s = String::from("SpiceKernel:\n");
-        for kernel in self.inner.loaded_kernels() {
-            s.push_str(&format!("  - {}\n", kernel));
-        }
-        s
-    }
+    // fn __repr__(&self) -> String {
+    //     let mut s = String::from("SpiceKernel:\n");
+    //     for kernel in self.inner.loaded_kernels() {
+    //         s.push_str(&format!("  - {}\n", kernel));
+    //     }
+    //     s
+    // }
 }

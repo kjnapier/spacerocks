@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use crate::mpc::MPCHandler;
+// use crate::mpc::MPCHandler;
 
 mod py_transforms;
 use py_transforms::make_transforms_submodule;
@@ -63,7 +63,7 @@ pub fn py_spacerocks(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add_class::<PySpaceRock>()?;
     m.add_class::<RockCollection>()?;
-    m.add_class::<MPCHandler>()?;
+    // m.add_class::<MPCHandler>()?;
     m.add_class::<PySpiceKernel>()?;
     m.add_class::<PyOrbitType>()?; 
 

@@ -7,11 +7,8 @@ use crate::time::Time;
 use crate::{ReferencePlane, Origin};
 use crate::errors::SimulationError;
 
-
 use crate::nbody::forces::{Force, NewtonianGravity};
 use crate::nbody::integrators::{Integrator, IAS15};
-use crate::spice::spicekernel::SpiceKernel;
-
 
 use nalgebra::Vector3;
 
@@ -25,6 +22,8 @@ pub struct Simulation {
     pub particles: Vec<SpaceRock>,
     pub epoch: Time,
     pub particle_index_map: HashMap<String, usize>,
+
+    pub spice_bodies: Vec<SpiceBody>,
 
     pub reference_plane: ReferencePlane,
     pub origin: Origin,
@@ -70,7 +69,7 @@ impl Simulation {
     /// # Returns
     ///
     /// * `Result<Simulation, Box<dyn std::error::Error>>` - The simulation with the solar system giants.
-    pub fn giants(epoch: &Time, reference_plane: &str, origin: &str, kernel: &SpiceKernel) -> Result<Simulation, Box<dyn std::error::Error>> {
+    pub fn giants(epoch: &Time, reference_plane: &str, origin: &str) -> Result<Simulation, Box<dyn std::error::Error>> {
 
         let mut sim = Simulation::new(epoch, reference_plane, origin)?;
         sim.epoch = epoch.clone();
@@ -79,84 +78,15 @@ impl Simulation {
 
         // add sun, jupiter barycenter, saturn barycenter, uranus barycenter, neptune barycenter.
         for name in ["sun", "jupiter barycenter", "saturn barycenter", "uranus barycenter", "neptune barycenter"].iter() {
-            let particle = SpaceRock::from_spice(name, epoch, reference_plane, origin, kernel)?;
-            sim.add(particle)?;
+            let particle = SpiceBody::from_name(name)?;
+            sim.add_spice_body(particle);
         }
         Ok(sim)
     }
 
-    /// Instantiate a simulation with the solar system planets.
-    /// Includes the sun, mercury barycenter, venus barycenter, earth barycenter, mars barycenter, jupiter barycenter, saturn barycenter, uranus barycenter, neptune barycenter.
-    ///
-    /// # Arguments
-    ///
-    /// * `epoch` - The epoch of the simulation.
-    /// * `reference_plane` - The reference plane of the simulation.
-    /// * `origin` - The origin of the simulation.
-    ///
-    /// # Returns
-    ///
-    /// * `Result<Simulation, Box<dyn std::error::Error>>` - The simulation with the solar system planets.
-    pub fn planets(epoch: &Time, reference_plane: &str, origin: &str, kernel: &SpiceKernel) -> Result<Simulation, Box<dyn std::error::Error>> {
-        let mut sim = Simulation::new(epoch, reference_plane, origin)?;
-        sim.epoch = epoch.clone();
-        sim.epoch.to_tdb();
-        sim.integrator = Box::new(IAS15::new(1.0));
-
-        let names = ["sun", "mercury barycenter", "venus barycenter", "earth barycenter", "mars barycenter", "jupiter barycenter", 
-                     "saturn barycenter", "uranus barycenter", "neptune barycenter"];
-        for name in names.iter() {
-            let particle = SpaceRock::from_spice(name, epoch, reference_plane, origin, kernel)?;
-            sim.add(particle)?;
-        }
-        Ok(sim)
+    pub fn add_spice_body(&mut self, body: SpiceBody) {
+        self.spice_bodies.push(body);
     }
-
-    /// Instantiate a simulation with the solar system planets and moons.
-    /// Includes the sun, mercury barycenter, venus barycenter, earth, moon, mars barycenter, jupiter barycenter, saturn barycenter, uranus barycenter, neptune barycenter, pluto barycenter.
-    ///
-    /// # Arguments
-    ///
-    /// * `epoch` - The epoch of the simulation.
-    /// * `reference_plane` - The reference plane of the simulation.
-    /// * `origin` - The origin of the simulation.
-    ///
-    /// # Returns
-    ///
-    /// * `Result<Simulation, Box<dyn std::error::Error>>` - The simulation with the solar system planets and moons.
-    pub fn horizons(epoch: &Time, reference_plane: &str, origin: &str, kernel: &SpiceKernel) -> Result<Simulation, Box<dyn std::error::Error>> {
-        let mut sim = Simulation::new(epoch, reference_plane, origin)?;
-        sim.epoch = epoch.clone();
-        sim.epoch.to_tdb();
-        sim.integrator = Box::new(IAS15::new(0.001));
-
-        let names = ["sun", "mercury barycenter", "venus barycenter", "earth", "moon", "mars barycenter", "jupiter barycenter", 
-                     "saturn barycenter", "uranus barycenter", "neptune barycenter", "pluto barycenter", 
-                     "2000001", 
-                     "2000002", 
-                     "2000003", 
-                     "2000004", 
-                     "2000007",
-                     "2000010", 
-                     "2000015", 
-                     "2000016", 
-                     "2000031", 
-                    //  "2000048", 
-                     "2000052", 
-                     "2000065", 
-                     "2000087",
-                     "2000088", 
-                     "2000107",
-                    //  "2000451", 
-                     "2000511", 
-                     "2000704"];
-        for name in names.iter() {
-            let particle = SpaceRock::from_spice(name, epoch, reference_plane, origin, kernel)?;
-            sim.add(particle)?;
-        }
-        Ok(sim)
-    }
-
     
     /// Add a particle to the simulation.
     ///
@@ -225,73 +155,6 @@ impl Simulation {
         Ok(())
     }
 
-    /// Move the simulation to the center of mass.
-    pub fn move_to_center_of_mass(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let mut total_mass = 0.0;
-        let mut center_of_mass = Vector3::new(0.0, 0.0, 0.0);
-        let mut center_of_mass_velocity = Vector3::new(0.0, 0.0, 0.0);
-
-        for particle in &self.particles {
-            if particle.mass() == 0.0 {
-                continue;
-            }
-            center_of_mass += particle.mass() * particle.position;
-            center_of_mass_velocity += particle.mass() * particle.velocity;
-            total_mass += particle.mass();
-        }
-
-        center_of_mass /= total_mass;
-        center_of_mass_velocity /= total_mass;
-
-        let x = center_of_mass.x;
-        let y = center_of_mass.y;
-        let z = center_of_mass.z;
-        let vx = center_of_mass_velocity.x;
-        let vy = center_of_mass_velocity.y;
-        let vz = center_of_mass_velocity.z;
-       
-        let mut origin_rock = SpaceRock::from_xyz("simulation_barycenter", 
-                                                  x, y, z, vx, vy, vz, 
-                                                  self.epoch.clone(), 
-                                                  self.reference_plane.as_str(),
-                                                  self.origin.as_str())?;
-        origin_rock.set_mass(total_mass);
-
-        for particle in &mut self.particles {
-            particle.change_origin(&origin_rock);
-        }
-
-        let origin = Origin::new_custom(total_mass * GRAVITATIONAL_CONSTANT, "simulation_barycenter");
-        self.origin = origin;
-        Ok(())
-    }
-
-    /// Change the origin of the simulation.
-    ///
-    /// # Arguments
-    ///     
-    /// * `origin` - The name of the particle to set as the origin.
-    pub fn change_origin(&mut self, origin: &str) -> Result<(), String> {
-
-        if !self.particle_index_map.contains_key(origin) {
-           return Err(format!("Origin {} not found in perturbers", origin));
-        }
-
-        let new_origin = Origin::new_custom(self.particles[self.particle_index_map[origin]].mass() * GRAVITATIONAL_CONSTANT, origin);
-
-        self.origin = new_origin;
-
-        let origin_position = self.particles[self.particle_index_map[origin]].position;
-        let origin_velocity = self.particles[self.particle_index_map[origin]].velocity;
-
-        for particle in &mut self.particles {
-            particle.position -= origin_position;
-            particle.velocity -= origin_velocity;
-        }
-
-        Ok(())
-    }
-
     /// Step the simulation forward in time by one timestep.
     pub fn step(&mut self) {
         self.integrator.step(&mut self.particles, &mut self.epoch, &self.forces);
@@ -309,7 +172,6 @@ impl Simulation {
     /// * `epoch` - The new epoch to integrate to.
     pub fn integrate(&mut self, epoch: &Time) {
 
-        
         let dt = epoch.tdb().jd() - self.epoch.tdb().jd();
         if dt.abs() < 1e-16 {
             return;
@@ -318,7 +180,6 @@ impl Simulation {
         if dt < 0.0 && self.integrator.timestep() > 0.0 {
             self.integrator.set_timestep(-self.integrator.timestep());
         }
-
 
         loop {
             let dt = epoch.tdb().jd() - self.epoch.tdb().jd();
@@ -334,14 +195,7 @@ impl Simulation {
                 self.integrator.set_timestep(dt);
                 self.step();
                 self.integrator.set_timestep(last_timestep);
-                continue;
-
-                // let dt = epoch.tdb().jd() - self.epoch.tdb().jd();
-                // if dt.abs() < 1e-16 {
-                //     self.integrator.set_timestep(last_timestep);
-                //     break;
-                // }
-                
+                continue;                
             }
 
             // if the timestep is negative, make sure the integrator is set to negative
@@ -354,18 +208,6 @@ impl Simulation {
             }
             self.step();
         }
-        
-        // let dt = &epoch - &self.epoch;
-        // let dt = epoch.tdb().jd() - self.epoch.tdb().jd();
-        // if dt.abs() < 1e-16 {
-        //     return;
-        // }
-        // // create an exact match for the epoch
-        // let old_timestep = self.integrator.timestep();
-        // self.integrator.set_timestep(dt);
-        // self.step();
-        // // reset the timestep
-        // self.integrator.set_timestep(old_timestep);
     }
 
     /// Get a particle from the simulation by name.
@@ -384,21 +226,6 @@ impl Simulation {
             return Ok(p);
         }
         Err(SimulationError::ParticleNotFound(name.to_string()))
-    }
-
-    /// Get the energy of the simulation.
-    pub fn energy(&self) -> f64 {
-        let mut kinetic_energy = 0.0;
-        let mut potential_energy = 0.0;
-
-        for idx in 0..self.particles.len() {
-            kinetic_energy += 0.5 * self.particles[idx].mass() * self.particles[idx].velocity.norm_squared();
-            for jdx in (idx + 1)..self.particles.len() {
-                let r = (self.particles[idx].position - self.particles[jdx].position).norm();
-                potential_energy -= GRAVITATIONAL_CONSTANT * self.particles[idx].mass() * self.particles[jdx].mass() / r;
-            }
-        }
-        kinetic_energy + potential_energy
     }
 
     /// Add a force to the simulation.
