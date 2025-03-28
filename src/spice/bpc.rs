@@ -73,6 +73,7 @@ pub struct PckSegment {
 }
 
 /// The top-level binary PCK (BPC) structure.
+#[derive(Debug)]
 pub struct Bpc {
     pub map: Mmap,                   // Memory-mapped file contents
     pub len: usize,                  // Total file length in bytes

@@ -1,45 +1,55 @@
 use spacerocks::{SpaceRock, Time, SpiceKernel, Observatory, Simulation};
+use spacerocks::SpiceSimulation;
 
+use std::sync::Arc;
+
+use nalgebra::Vector3;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // let spice_root = "/Users/kjnapier/data/spice";
-    let spice_root = "/Users/thomasruch/.spacerocks/spice";
+    let spice_root = "/Users/kjnapier/data/spice/";
 
-    // define the epoch
-    let epoch = Time::now() - 1000.0;
+    // load spice kernels
+    let mut kernel = SpiceKernel::new();
+    kernel.load_spk(format!("{}/sb441-n16.bsp", spice_root).as_str())?;
+    kernel.load_spk(format!("{}/de441_part-2.bsp", spice_root).as_str())?;
+    kernel.load_bpc(format!("{}/earth_1962_240827_2124_combined.bpc", spice_root).as_str())?;
 
-    println!("{}", epoch);
+    // let epoch = Time::new(2451545.0, "utc", "jd")?;
+   // let mut rock = SpaceRock::from_horizons("holman", &epoch, "J2000", "SSB")?;
 
-    // // // load spice kernels
-    // let mut kernel = SpiceKernel::new();
-    // kernel.load(format!("{}/sb441-n373s.bsp", spice_root).as_str())?;
-    // kernel.load(format!("{}/de440s.bsp", spice_root).as_str())?;
-    // kernel.load(format!("{}/latest_leapseconds.tls", spice_root).as_str())?;
-    // kernel.load(format!("{}/earth_latest_high_prec.bpc", spice_root).as_str())?;
+    let mut epoch = Time::new(2460762.549988426, "UTC", "JD")?;
+    let mut rock = SpaceRock::from_xyz("holman", 2.963305899720348, -1.627586306680811, -0.7799786968810375, 
+                                        0.004951381894813546, 0.006677060249157604, 0.002540378471598749, epoch.clone(), "J2000", "SSB")?;
 
-    //let mut kernel = SpiceKernel::defaults(Some(true))?;
+    // Need to wrap the kernel in an Arc, since we don't want to clone it or give ownership to the simulation.
+    // The simulation gets a pointer to the kernel, and the kernel, and the kernel can be shared between multiple simulations.
+    // Since the simulations are not modifying the kernel, they can share it safely.
+    let kernel = Arc::new(kernel);
+    let mut sim = SpiceSimulation::horizons(&epoch, "J2000", "SSB", &kernel)?;
+    sim.add(rock)?;
+
+
+    let start = std::time::Instant::now();
+    for _ in 0..1000 {
+        sim.step();
+    }
+    let elapsed = start.elapsed();
+    let time_per_step = elapsed.as_secs_f64() / 1000.0;
+    println!("Time per step: {:?} us", time_per_step * 1_000_000.0);
+
+    // let start = std::time::Instant::now();
+    // kernel.get_barycentric_states(&sim.state.spice_bodies, sim.state.epoch)?;
+    // let elapsed = start.elapsed();
+    // println!("Time to get barycentric states: {:?}", elapsed);
+
+
 
     
 
-    // kernel.load(format!("{}/codes_300ast_20100725.tf", spice_root).as_str())?;
-    // kernel.load(format!("{}/pck00011.tpc", spice_root).as_str())?;
-   
-    // // Try these in sequence
-    // let jupiter = SpaceRock::from_spice("jupiter barycenter", &epoch, "J2000", "ssb")?;
-    // println!("Jupiter worked!");
 
-    // let mars = SpaceRock::from_spice("mars barycenter", &epoch, "J2000", "ssb")?;
-    // println!("Mars worked!");
-
-    // let ceres = SpaceRock::from_spice("CERES", &epoch, "J2000", "SSB")?;
-    // println!("Ceres by name worked!");
-
-    // let ceres = SpaceRock::from_spice("2000001", &epoch, "J2000", "ssb")?;
-    // println!("Ceres worked!");
-
-
-
-
+    // println!("Simulation created successfully");
+    // println!("sim: {:?}", sim.state.spice_particles);
 
     // // observer not working rn, so commenting out for complilation
     // let f51 = Observatory::from_obscode("F51")?;

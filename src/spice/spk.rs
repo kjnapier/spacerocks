@@ -68,6 +68,7 @@ pub struct SpkTarget {
 }
 
 /// The top-level SPK structure.
+#[derive(Debug)]
 pub struct Spk {
     pub map: Mmap, // memory-mapped file contents
     pub len: usize,

@@ -2,6 +2,8 @@ use crate::spice::spk::Spk;
 use crate::spice::error::SpiceError;
 use crate::spice::spicekernel::SpiceKernel;
 
+use crate::constants::MASSES;
+
 use std::collections::HashMap;
 use std::cell::Cell;
 
@@ -47,21 +49,39 @@ lazy_static! {
     };
 }
 
+// #[derive(Debug, Clone)]
+// pub struct SpiceBody {
+//     pub code: i32,
+//     pub name: String,
+//     pub gm: f64,
+//     pub mass: f64,
+//     // Cached index for the target.
+//     cached_index: Cell<Option<usize>>,
+//     cached_spk_index: Cell<Option<usize>>,
+// }
+
+use std::sync::Mutex;
+
+#[derive(Debug, Clone)]
 pub struct SpiceBody {
     pub code: i32,
     pub name: String,
     pub gm: f64,
+    pub mass: f64,
     // Cached index for the target.
     cached_index: Cell<Option<usize>>,
     cached_spk_index: Cell<Option<usize>>,
 }
 
+
 impl SpiceBody {
     pub fn new(code: i32, name: &str, gm: f64) -> Self {
+        let mass = MASSES.get(&name.to_string().to_lowercase()).cloned().unwrap_or(0.0);
         SpiceBody {
             code,
             name: name.to_string(),
             gm,
+            mass: mass, // TODO: Get the mass value from the SPK file.
             cached_index: Cell::new(None),
             cached_spk_index: Cell::new(None),
         }
@@ -93,3 +113,5 @@ impl SpiceBody {
     }
 
 }
+
+unsafe impl Sync for SpiceBody {}

@@ -171,7 +171,8 @@ impl Integrator for IAS15 {
                     let d_velocity = (((((((b.p6 * 7.0 * hh / 8.0 + b.p5) * 6.0 * hh / 7.0 + b.p4) * 5.0 * hh / 6.0 + b.p3) * 4.0 * hh / 5.0 + b.p2) * 3.0 * hh / 4.0 + b.p1) * 2.0 * hh / 3.0 + b.p0) * hh / 2.0 + a0) * self.timestep * hh;
                     particles[idx].velocity = initial_velocities[idx] + d_velocity;
 
-                    particles[idx].epoch += self.timestep * hh;
+                    // particles[idx].epoch += self.timestep * hh;
+                    particles[idx].epoch = initial_epoch.clone() + self.timestep * hh;
                 }
 
                 let mut accelerations: Vec<Vector3<f64>> = vec![Vector3::zeros(); particles.len()];

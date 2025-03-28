@@ -151,7 +151,7 @@ lazy_static! {
         m.insert("2000002".to_string(), 3.0471146330043200e-14 / GRAVITATIONAL_CONSTANT);
         m.insert("2000003".to_string(), 4.2823439677995011e-15 / GRAVITATIONAL_CONSTANT);
         m.insert("2000004".to_string(), 3.8548000225257904e-14 / GRAVITATIONAL_CONSTANT);
-        m.insert("2000007".to_string(), 2.5416014973471498e-15);
+        m.insert("2000007".to_string(), 2.5416014973471498e-15 / GRAVITATIONAL_CONSTANT);
         m.insert("2000010".to_string(), 1.2542530761640810e-14 / GRAVITATIONAL_CONSTANT);
         m.insert("2000015".to_string(), 4.5107799051436795e-15 / GRAVITATIONAL_CONSTANT);
         m.insert("2000016".to_string(), 3.5445002842488978e-15 / GRAVITATIONAL_CONSTANT);
@@ -161,9 +161,8 @@ lazy_static! {
         m.insert("2000065".to_string(), 2.0917175955133682e-15 / GRAVITATIONAL_CONSTANT);
         m.insert("2000087".to_string(), 4.8345606546105521e-15 / GRAVITATIONAL_CONSTANT);
         m.insert("2000088".to_string(), 2.6529436610356353e-15 / GRAVITATIONAL_CONSTANT);
-        m.insert("2000107".to_string(), 3.2191392075878588e-15);
+        m.insert("2000107".to_string(), 3.2191392075878588e-15 / GRAVITATIONAL_CONSTANT);
         m.insert("2000451".to_string(), 1.2973797046097596e-15 / GRAVITATIONAL_CONSTANT);
-        // m.insert("2000433".to_string(), 9.9506001554648484e-19);
         m.insert("2000511".to_string(), 8.6836253492286545e-15 / GRAVITATIONAL_CONSTANT);
         m.insert("2000704".to_string(), 6.3110343420878887e-15 / GRAVITATIONAL_CONSTANT);
         m
