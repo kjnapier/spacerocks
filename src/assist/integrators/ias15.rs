@@ -57,15 +57,15 @@ pub struct IAS15 {
     /// Last timestep used by the integrator
     pub last_timestep: f64,
     /// Current step coefficients
-    bs: Vec<CoefficientSeptet>,
+    pub bs: Vec<CoefficientSeptet>,
     /// Intermediate step coefficients
-    gs: Vec<CoefficientSeptet>,
+    pub gs: Vec<CoefficientSeptet>,
     /// Error estimate coefficients
-    es: Vec<CoefficientSeptet>,
+    pub es: Vec<CoefficientSeptet>,
     /// Previous step coefficients
-    bs_last: Vec<CoefficientSeptet>,
+    pub bs_last: Vec<CoefficientSeptet>,
     /// Previous error estimate coefficients
-    es_last: Vec<CoefficientSeptet>,
+    pub es_last: Vec<CoefficientSeptet>,
 }
 
 impl IAS15 {
@@ -96,6 +96,7 @@ impl IAS15 {
         self.bs_last = vec![CoefficientSeptet::zeros(); n];
         self.es_last = vec![CoefficientSeptet::zeros(); n];
     }
+
 }
 
 impl Integrator for IAS15 {
@@ -379,7 +380,7 @@ impl Integrator for IAS15 {
                     state.particles[idx].position = initial_positions[idx];
                     state.particles[idx].velocity = initial_velocities[idx];
                     state.particles[idx].acceleration = initial_accelerations[idx];
-                    accelerations[idx] = initial_accelerations[idx];
+                    // accelerations[idx] = initial_accelerations[idx];
                     state.particles[idx].epoch = initial_epoch;
                 }
                 if self.last_timestep != 0.0 {
@@ -396,6 +397,15 @@ impl Integrator for IAS15 {
             //         new_timestep = old_timestep / SAFETY_FACTOR;
             //     }
             // }
+
+            // calculate the acceleration at the new timestep
+            let mut accelerations = vec![Vector3::zeros(); n];
+            for force in forces {
+                let acc = force.calculate_acceleration(state);
+                for (i, a) in acc.iter().enumerate() {
+                    accelerations[i] += *a;
+                }
+            }
 
             // Accept the step: update epoch and particles.
             *(&mut state.epoch) += self.timestep;
@@ -450,6 +460,14 @@ impl Integrator for IAS15 {
 
     fn set_timestep(&mut self, timestep: f64) {
         self.timestep = timestep;
+    }
+
+    fn last_timestep(&self) -> f64 {
+        self.last_timestep
+    }
+
+    fn bs_last(&self) -> &Vec<CoefficientSeptet> {
+        &self.bs_last
     }
 }
 

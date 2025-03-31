@@ -223,4 +223,103 @@ impl SpiceSimulation {
     pub fn step(&mut self) {
         self.integrator.step(&mut self.state, &self.forces);
     }
+
+    pub fn integrate_or_interpolate(&mut self, epoch: &Time) -> Result<(), Box<dyn std::error::Error>> {
+
+        let t = epoch.tdb().jd();
+
+        // Early return if the epoch is the same as the current epoch
+        if (t - self.state.epoch).abs() < 1e-16 {
+            return Ok(());
+        }
+
+        // Set the timestep to be in the correct direction
+        if t < self.state.epoch {
+            self.integrator.set_timestep(-1.0 * self.integrator.timestep().abs());
+        } else {
+            self.integrator.set_timestep(self.integrator.timestep().abs());
+        }
+
+        // check if self.state.last_timestep is None
+        if self.integrator.last_timestep() == 0.0 {
+            // println!("Taking a step");
+            self.step();
+            // println!("Step taken");
+            // println!("epoch: {}", self.state.epoch);
+        }
+
+        loop {
+            let a = self.state.epoch - self.integrator.last_timestep();
+            let b = self.state.epoch;
+            let d1 = t - a;
+            let d2 = t - b;
+            let sign = d1.signum() * d2.signum();
+            if sign == -1.0 {
+                // We are in the interpolation regime. Do the interpolation, and break.
+                // println!("Interpolating");
+                self.interpolate_simulation(t)?;
+                break;
+            } else {
+                // We are in the integration regime. Take a step, and check again.
+                // println!("Taking a step 2");
+                self.step();
+                // println!("Step taken");
+                // println!("epoch: {}", self.state.epoch);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn interpolate_simulation(&mut self, time: f64) -> Result<(), Box<dyn std::error::Error>> {
+        let bs_vector = &self.integrator.bs_last();
+
+        let h = - (self.state.epoch - time) / self.integrator.last_timestep(); 
+
+        println!("h: {}", h);
+
+        let mut s = vec![0.0; 9];
+        s[0] = self.integrator.last_timestep() * h;
+        s[1] =       s[0] * s[0] / 2.0;
+        s[2] =       s[1] * h / 3.0;
+        s[3] =       s[2] * h / 2.0;
+        s[4] = 3.0 * s[3] * h / 5.0;
+        s[5] = 2.0 * s[4] * h / 3.0;
+        s[6] = 5.0 * s[5] * h / 7.0;
+        s[7] = 3.0 * s[6] * h / 4.0;
+        s[8] = 7.0 * s[7] * h / 9.0;
+
+        let mut u = vec![0.0; 8];
+        u[0] = self.integrator.last_timestep() * h;
+        u[1] =      u[0] * h / 2.;
+        u[2] = 2. * u[1] * h / 3.;
+        u[3] = 3. * u[2] * h / 4.;
+        u[4] = 4. * u[3] * h / 5.;
+        u[5] = 5. * u[4] * h / 6.;
+        u[6] = 6. * u[5] * h / 7.;
+        u[7] = 7. * u[6] * h / 8.;
+
+        for idx in 0..self.state.particles.len() {
+            let p = &mut self.state.particles[idx];
+            let bs = &bs_vector[idx];
+
+            // let w = (s[8] * bs.p6 + s[7] * bs.p5 + s[6] * bs.p4 + s[5] * bs.p3 + s[4] * bs.p2 + s[3] * bs.p1 + s[2] * bs.p0 + s[1] * p.acceleration + s[0] * p.velocity);
+            // println!("w: {:?}", w);
+
+            let new_pos = p.position + (s[8] * bs.p6 + s[7] * bs.p5 + s[6] * bs.p4 + s[5] * bs.p3 + s[4] * bs.p2 + s[3] * bs.p1 + s[2] * bs.p0 + s[1] * p.acceleration + s[0] * p.velocity);
+            p.position = new_pos;
+
+            let new_vel = p.velocity + (u[7] * bs.p6 + u[6] * bs.p5 + u[5] * bs.p4 + u[4] * bs.p3 + u[3] * bs.p2 + u[2] * bs.p1 + u[1] * bs.p0 + u[0] * p.acceleration);
+            p.velocity = new_vel;
+
+        }
+
+        // update the acceleration of the particles
+
+
+        self.state.epoch = self.state.epoch - self.integrator.last_timestep() + s[0];
+
+        Ok(())
+    }
+
 }

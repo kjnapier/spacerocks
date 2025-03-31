@@ -12,6 +12,7 @@ pub mod integrator;
 
 pub mod ias15;
     pub use self::ias15::IAS15;
+    pub use self::ias15::CoefficientSeptet;
 
 // pub mod mvs;
 //     pub use self::mvs::MVS;

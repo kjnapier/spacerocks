@@ -15,28 +15,60 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     kernel.load_spk(format!("{}/de441_part-2.bsp", spice_root).as_str())?;
     kernel.load_bpc(format!("{}/earth_1962_240827_2124_combined.bpc", spice_root).as_str())?;
 
-    // let epoch = Time::new(2451545.0, "utc", "jd")?;
-   // let mut rock = SpaceRock::from_horizons("holman", &epoch, "J2000", "SSB")?;
+    let epoch = Time::new(2451545.0, "tdb", "jd")?;
+    let mut rock = SpaceRock::from_horizons("holman", &epoch, "J2000", "SSB")?;
 
-    let mut epoch = Time::new(2460762.549988426, "UTC", "JD")?;
-    let mut rock = SpaceRock::from_xyz("holman", 2.963305899720348, -1.627586306680811, -0.7799786968810375, 
-                                        0.004951381894813546, 0.006677060249157604, 0.002540378471598749, epoch.clone(), "J2000", "SSB")?;
+    // let mut epoch = Time::new(2460762.549988426, "UTC", "JD")?;
+    // let mut rock = SpaceRock::from_xyz("holman", 2.963305899720348, -1.627586306680811, -0.7799786968810375, 
+    //                                     0.004951381894813546, 0.006677060249157604, 0.002540378471598749, epoch.clone(), "J2000", "SSB")?;
 
     // Need to wrap the kernel in an Arc, since we don't want to clone it or give ownership to the simulation.
     // The simulation gets a pointer to the kernel, and the kernel, and the kernel can be shared between multiple simulations.
     // Since the simulations are not modifying the kernel, they can share it safely.
     let kernel = Arc::new(kernel);
+    // let mut sim = SpiceSimulation::horizons(&epoch, "J2000", "SSB", &kernel)?;
     let mut sim = SpiceSimulation::horizons(&epoch, "J2000", "SSB", &kernel)?;
+
     sim.add(rock)?;
 
 
-    let start = std::time::Instant::now();
-    for _ in 0..1000 {
-        sim.step();
-    }
-    let elapsed = start.elapsed();
-    let time_per_step = elapsed.as_secs_f64() / 1000.0;
-    println!("Time per step: {:?} us", time_per_step * 1_000_000.0);
+    let t2 = epoch.clone() + 1000.0;
+    sim.integrate_or_interpolate(&t2);
+
+    // sim.step();
+    // sim.step();
+    // sim.step();
+
+    println!("sim: {:?}", sim.state.particles[0].position);
+
+
+    let mut rock = SpaceRock::from_horizons("holman", &t2, "J2000", "SSB")?;
+    println!("jpl: {:?}", rock.position);
+
+    // let tt = std::time::Instant::now();
+    // sim.interpolate_simulation(sim.state.epoch);
+    // let elapsed = tt.elapsed();
+    // println!("int: {:?}", sim.state.particles[0].position);
+
+    // for _ in 0..1000 {
+    //     sim.step();
+    // }
+    
+    // println!("Simulation created successfully");
+    // println!("sim: {:?}", sim.state.particles[0].position);
+
+
+    // let mut rock = SpaceRock::from_horizons("holman", &Time::new(sim.state.epoch, "tdb", "jd")?, "J2000", "SSB")?;
+    // println!("jpl: {:?}", rock.position);
+
+
+    // let start = std::time::Instant::now();
+    // for _ in 0..1000 {
+    //     sim.step();
+    // }
+    // let elapsed = start.elapsed();
+    // let time_per_step = elapsed.as_secs_f64() / 1000.0;
+    // println!("Time per step: {:?} us", time_per_step * 1_000_000.0);
 
     // let start = std::time::Instant::now();
     // kernel.get_barycentric_states(&sim.state.spice_bodies, sim.state.epoch)?;

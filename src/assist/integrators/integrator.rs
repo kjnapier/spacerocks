@@ -2,6 +2,7 @@ use crate::SpaceRock;
 use crate::time::Time;
 use crate::assist::forces::Force;
 use crate::assist::SimulationState;
+use crate::assist::integrators::ias15::CoefficientSeptet;
 
 
 /// A numerical integrator for advancing a system of particles forward in time.
@@ -32,6 +33,11 @@ pub trait Integrator: Send + Sync + IntegratorClone {
     ///
     /// * `timestep` - New timestep value to use
     fn set_timestep(&mut self, timestep: f64);
+
+    fn last_timestep(&self) -> f64;
+
+    fn bs_last(&self) -> &Vec<CoefficientSeptet>;
+
 }
 
 

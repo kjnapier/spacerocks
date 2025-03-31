@@ -13,5 +13,9 @@ pub mod spice_simulation;
     pub use self::spice_simulation::SimulationParticle;
     pub use self::spice_simulation::SimulationState;
 
+    
+
 pub mod forces;
 pub mod integrators;
+    pub use self::integrators::ias15::IAS15;
+    pub use self::integrators::ias15::CoefficientSeptet;
