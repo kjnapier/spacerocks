@@ -26,35 +26,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The simulation gets a pointer to the kernel, and the kernel, and the kernel can be shared between multiple simulations.
     // Since the simulations are not modifying the kernel, they can share it safely.
     let kernel = Arc::new(kernel);
-    // let mut sim = SpiceSimulation::horizons(&epoch, "J2000", "SSB", &kernel)?;
     let mut sim = SpiceSimulation::horizons(&epoch, "J2000", "SSB", &kernel)?;
+
+
+    let start = std::time::Instant::now();
+    for idx in 0..10000 {
+        kernel.get_barycentric_states(&sim.state.spice_bodies, sim.state.epoch + (idx as f64) * 1.0)?;
+    }
+    let elapsed = start.elapsed();
+    let time_per_step = elapsed.as_secs_f64() / 10000.0;
+    println!("Time per step: {:?} us", time_per_step * 1_000_000.0);
+    // let mut sim = SpiceSimulation::horizons(&epoch, "J2000", "SSB", &kernel)?;
 
     sim.add(rock)?;
 
-    sim.step();
-    sim.step();
-    sim.step();
-    sim.step();
-    println!("sim: {:?}", sim.state.particles_1[0].position);
+    let start = std::time::Instant::now();
+    for _ in 0..1000 {
+        sim.step();
+    }
+    let elapsed = start.elapsed();
+    let time_per_step = elapsed.as_secs_f64() / 1000.0;
+    println!("Time per step: {:?} us", time_per_step * 1_000_000.0);
+
+
+    // sim.step();
+    // sim.step();
+    // sim.step();
+    // sim.step();
+    // println!("sim: {:?}", sim.state.particles_1[0].position);
 
     
-    let mut rock = SpaceRock::from_horizons("holman", &Time::new(sim.state.epoch, "tdb", "jd")?, "J2000", "SSB")?;
-    println!("jpl: {:?}", rock.position);
+    // let mut rock = SpaceRock::from_horizons("holman", &Time::new(sim.state.epoch, "tdb", "jd")?, "J2000", "SSB")?;
+    // println!("jpl: {:?}", rock.position);
 
 
-    let t2 = epoch.clone() + 1000.0;
-    sim.integrate(&t2);
-    println!("sim: {:?}", sim.state.particles[0].position);
+    // let t2 = epoch.clone() + 1000.0;
+    // sim.integrate(&t2);
+    // println!("sim: {:?}", sim.state.particles[0].position);
 
 
-    let mut rock = SpaceRock::from_horizons("holman", &t2, "J2000", "SSB")?;
-    println!("jpl: {:?}", rock.position);
+    // let mut rock = SpaceRock::from_horizons("holman", &t2, "J2000", "SSB")?;
+    // println!("jpl: {:?}", rock.position);
 
-    // let tt = std::time::Instant::now();
-    // sim.interpolate_simulation(sim.state.epoch);
-    // let elapsed = tt.elapsed();
-    // println!("int: {:?}", sim.state.particles[0].position);
-
+    
     // for _ in 0..1000 {
     //     sim.step();
     // }
@@ -74,14 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let elapsed = start.elapsed();
     // println!("Time to get barycentric states: {:?}", elapsed);
 
-    // let start = std::time::Instant::now();
-    // for _ in 0..1000 {
-    //     sim.step();
-    // }
-    // let elapsed = start.elapsed();
-    // let time_per_step = elapsed.as_secs_f64() / 1000.0;
-    // println!("Time per step: {:?} us", time_per_step * 1_000_000.0);
-
+   
     
 
 
