@@ -114,15 +114,6 @@ impl Integrator for IAS15 {
                 state.spice_particles[i].velocity = velocity;
             }
 
-            // for (body, particle) in state.spice_bodies.iter().zip(state.spice_particles.iter_mut()) {
-            //     let (x, y, z, vx, vy, vz) = state.kernel.compute_state(body, &state.origin, state.epoch).unwrap();
-            //     let position = Vector3::new(x, y, z);
-            //     let velocity = Vector3::new(vx, vy, vz);
-            //     particle.position = position;
-            //     particle.velocity = velocity;
-            //     particle.epoch = state.particles[0].epoch;
-            // }
-
             // Allocate and fill temporary acceleration vector once.
             let mut accelerations = vec![Vector3::zeros(); n];
             for force in forces {
@@ -133,10 +124,10 @@ impl Integrator for IAS15 {
             }
 
             // Save initial conditions.
-            let initial_positions: Vec<Vector3<f64>> = state.particles.iter().map(|p| p.position).collect();
-            let initial_velocities: Vec<Vector3<f64>> = state.particles.iter().map(|p| p.velocity).collect();
+            let initial_positions: Vec<Vector3<f64>> = state.particles_1.iter().map(|p| p.position).collect();
+            let initial_velocities: Vec<Vector3<f64>> = state.particles_1.iter().map(|p| p.velocity).collect();
             let initial_accelerations: Vec<Vector3<f64>> = accelerations.clone();
-            let initial_epoch = state.particles[0].epoch;
+            let initial_epoch = state.particles_1[0].epoch;
 
             
 
@@ -219,16 +210,16 @@ impl Integrator for IAS15 {
                             * 3.0 * hh / 5.0 + b.p1) * hh / 2.0 + b.p0)
                             * hh / 3.0 + a0) * self.timestep * hh / 2.0 + v0)
                             * self.timestep * hh;
-                        state.particles[idx].position = initial_positions[idx] + d_position;
+                        state.particles_1[idx].position = initial_positions[idx] + d_position;
 
                         // Compute velocity increment.
                         let d_velocity = (((((((b.p6 * 7.0 * hh / 8.0 + b.p5) * 6.0 * hh / 7.0 + b.p4)
                             * 5.0 * hh / 6.0 + b.p3) * 4.0 * hh / 5.0 + b.p2)
                             * 3.0 * hh / 4.0 + b.p1) * 2.0 * hh / 3.0 + b.p0)
                             * hh / 2.0 + a0) * self.timestep * hh;
-                        state.particles[idx].velocity = initial_velocities[idx] + d_velocity;
+                        state.particles_1[idx].velocity = initial_velocities[idx] + d_velocity;
 
-                        state.particles[idx].epoch = initial_epoch + self.timestep * hh;
+                        state.particles_1[idx].epoch = initial_epoch + self.timestep * hh;
 
                     }
 
@@ -370,18 +361,18 @@ impl Integrator for IAS15 {
 
             // Compute the new timestep.
             let old_timestep = self.timestep;
-            let mut new_timestep = calculate_new_timestep(&state.particles, &initial_accelerations, &self.bs, &old_timestep, &self.epsilon);
+            let mut new_timestep = calculate_new_timestep(&state.particles_1, &initial_accelerations, &self.bs, &old_timestep, &self.epsilon);
             let timestep_ratio = (new_timestep / old_timestep).abs();
 
             // If the new timestep is too small, reject the step and try again.
             if timestep_ratio < SAFETY_FACTOR {
                 self.timestep = new_timestep;
                 for idx in 0..n {
-                    state.particles[idx].position = initial_positions[idx];
-                    state.particles[idx].velocity = initial_velocities[idx];
-                    state.particles[idx].acceleration = initial_accelerations[idx];
+                    state.particles_1[idx].position = initial_positions[idx];
+                    state.particles_1[idx].velocity = initial_velocities[idx];
+                    state.particles_1[idx].acceleration = initial_accelerations[idx];
                     // accelerations[idx] = initial_accelerations[idx];
-                    state.particles[idx].epoch = initial_epoch;
+                    state.particles_1[idx].epoch = initial_epoch;
                 }
                 if self.last_timestep != 0.0 {
                     predict_next_coefficients(&timestep_ratio, &self.es_last, &self.bs_last, &mut self.es, &mut self.bs);
@@ -399,7 +390,10 @@ impl Integrator for IAS15 {
             // }
 
             // calculate the acceleration at the new timestep
-            let mut accelerations = vec![Vector3::zeros(); n];
+            // clear the accelerations vector
+            for acc in accelerations.iter_mut() {
+                *acc = Vector3::zeros();
+            }
             for force in forces {
                 let acc = force.calculate_acceleration(state);
                 for (i, a) in acc.iter().enumerate() {
@@ -411,8 +405,8 @@ impl Integrator for IAS15 {
             *(&mut state.epoch) += self.timestep;
             for idx in 0..n {
                 let b = &self.bs[idx];
-                state.particles[idx].epoch = state.epoch;
-                state.particles[idx].position = initial_positions[idx]
+                state.particles_1[idx].epoch = state.epoch;
+                state.particles_1[idx].position = initial_positions[idx]
                     + self.timestep * initial_velocities[idx]
                     + self.timestep.powi(2)
                         * (initial_accelerations[idx] / 2.0
@@ -423,7 +417,7 @@ impl Integrator for IAS15 {
                             + b.p4 / 42.0
                             + b.p5 / 56.0
                             + b.p6 / 72.0);
-                state.particles[idx].velocity = initial_velocities[idx]
+                state.particles_1[idx].velocity = initial_velocities[idx]
                     + self.timestep
                         * (initial_accelerations[idx]
                             + b.p0 / 2.0
@@ -433,19 +427,17 @@ impl Integrator for IAS15 {
                             + b.p4 / 6.0
                             + b.p5 / 7.0
                             + b.p6 / 8.0);
-                state.particles[idx].acceleration = accelerations[idx]
+                state.particles_1[idx].acceleration = accelerations[idx];
+
+                state.particles_0[idx].position = initial_positions[idx];
+                state.particles_0[idx].velocity = initial_velocities[idx];
+                state.particles_0[idx].acceleration = initial_accelerations[idx];
+                state.particles_0[idx].epoch = initial_epoch;
             }
             self.last_timestep = self.timestep.clone();
             self.timestep = new_timestep;
             let ratio = self.timestep / self.last_timestep;            
 
-            // // Instead of full cloning, copy coefficient values element‐by‐element.
-            // for (dst, src) in self.es_last.iter_mut().zip(self.es.iter()) {
-            //     *dst = src.clone();
-            // }
-            // for (dst, src) in self.bs_last.iter_mut().zip(self.bs.iter()) {
-            //     *dst = src.clone();
-            // }
             self.es_last = self.es.clone();
             self.bs_last = self.bs.clone();
 

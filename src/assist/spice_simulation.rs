@@ -37,6 +37,8 @@ pub struct SimulationParticle {
 pub struct SimulationState {
     pub epoch: f64,
     pub particles: Vec<SimulationParticle>,
+    pub particles_0: Vec<SimulationParticle>,
+    pub particles_1: Vec<SimulationParticle>,
     pub spice_particles: Vec<SimulationParticle>,
     pub particle_index_map: HashMap<String, usize>,
     pub spice_particle_index_map: HashMap<String, usize>,
@@ -66,6 +68,8 @@ impl SpiceSimulation {
         let mut state = SimulationState {
             epoch: epoch.tdb().jd(),
             particles: Vec::new(),
+            particles_0: Vec::new(),
+            particles_1: Vec::new(),
             spice_particles: Vec::new(),
             particle_index_map: HashMap::new(),
             spice_particle_index_map: HashMap::new(),
@@ -131,6 +135,8 @@ impl SpiceSimulation {
         let mut state = SimulationState {
             epoch: epoch.tdb().jd(),
             particles: Vec::new(),
+            particles_0: Vec::new(),
+            particles_1: Vec::new(),
             spice_particles: Vec::new(),
             particle_index_map: HashMap::new(),
             spice_particle_index_map: HashMap::new(),
@@ -174,7 +180,9 @@ impl SpiceSimulation {
         };
 
         // Add the simulation particle to the simulation
-        self.state.particles.push(simulation_particle);
+        self.state.particles.push(simulation_particle.clone());
+        self.state.particles_0.push(simulation_particle.clone());
+        self.state.particles_1.push(simulation_particle);
         self.state.particle_index_map.insert(body.name.clone(), self.state.particles.len() - 1);
 
         Ok(())
@@ -224,7 +232,7 @@ impl SpiceSimulation {
         self.integrator.step(&mut self.state, &self.forces);
     }
 
-    pub fn integrate_or_interpolate(&mut self, epoch: &Time) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn integrate(&mut self, epoch: &Time) -> Result<(), Box<dyn std::error::Error>> {
 
         let t = epoch.tdb().jd();
 
@@ -274,9 +282,7 @@ impl SpiceSimulation {
     pub fn interpolate_simulation(&mut self, time: f64) -> Result<(), Box<dyn std::error::Error>> {
         let bs_vector = &self.integrator.bs_last();
 
-        let h = - (self.state.epoch - time) / self.integrator.last_timestep(); 
-
-        println!("h: {}", h);
+        let h = 1.0 - (self.state.epoch - time) / self.integrator.last_timestep(); 
 
         let mut s = vec![0.0; 9];
         s[0] = self.integrator.last_timestep() * h;
@@ -299,23 +305,20 @@ impl SpiceSimulation {
         u[6] = 6. * u[5] * h / 7.;
         u[7] = 7. * u[6] * h / 8.;
 
-        for idx in 0..self.state.particles.len() {
-            let p = &mut self.state.particles[idx];
+        for idx in 0..self.state.particles_0.len() {
+            let p = &mut self.state.particles_0[idx];
             let bs = &bs_vector[idx];
 
             // let w = (s[8] * bs.p6 + s[7] * bs.p5 + s[6] * bs.p4 + s[5] * bs.p3 + s[4] * bs.p2 + s[3] * bs.p1 + s[2] * bs.p0 + s[1] * p.acceleration + s[0] * p.velocity);
             // println!("w: {:?}", w);
 
             let new_pos = p.position + (s[8] * bs.p6 + s[7] * bs.p5 + s[6] * bs.p4 + s[5] * bs.p3 + s[4] * bs.p2 + s[3] * bs.p1 + s[2] * bs.p0 + s[1] * p.acceleration + s[0] * p.velocity);
-            p.position = new_pos;
+            self.state.particles[idx].position = new_pos;
 
             let new_vel = p.velocity + (u[7] * bs.p6 + u[6] * bs.p5 + u[5] * bs.p4 + u[4] * bs.p3 + u[3] * bs.p2 + u[2] * bs.p1 + u[1] * bs.p0 + u[0] * p.acceleration);
-            p.velocity = new_vel;
+            self.state.particles[idx].velocity = new_vel;
 
         }
-
-        // update the acceleration of the particles
-
 
         self.state.epoch = self.state.epoch - self.integrator.last_timestep() + s[0];
 

@@ -7,12 +7,12 @@ use nalgebra::Vector3;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // let spice_root = "/Users/kjnapier/data/spice";
-    let spice_root = "/Users/kjnapier/data/spice/";
+    let spice_root = "/home/kevin/data/spice/";
 
     // load spice kernels
     let mut kernel = SpiceKernel::new();
     kernel.load_spk(format!("{}/sb441-n16.bsp", spice_root).as_str())?;
-    kernel.load_spk(format!("{}/de441_part-2.bsp", spice_root).as_str())?;
+    kernel.load_spk(format!("{}/de440s.bsp", spice_root).as_str())?;
     kernel.load_bpc(format!("{}/earth_1962_240827_2124_combined.bpc", spice_root).as_str())?;
 
     let epoch = Time::new(2451545.0, "tdb", "jd")?;
@@ -31,14 +31,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     sim.add(rock)?;
 
+    sim.step();
+    sim.step();
+    sim.step();
+    sim.step();
+    println!("sim: {:?}", sim.state.particles_1[0].position);
+
+    
+    let mut rock = SpaceRock::from_horizons("holman", &Time::new(sim.state.epoch, "tdb", "jd")?, "J2000", "SSB")?;
+    println!("jpl: {:?}", rock.position);
+
 
     let t2 = epoch.clone() + 1000.0;
-    sim.integrate_or_interpolate(&t2);
-
-    // sim.step();
-    // sim.step();
-    // sim.step();
-
+    sim.integrate(&t2);
     println!("sim: {:?}", sim.state.particles[0].position);
 
 
@@ -62,6 +67,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // println!("jpl: {:?}", rock.position);
 
 
+    
+
+    // let start = std::time::Instant::now();
+    // kernel.get_barycentric_states(&sim.state.spice_bodies, sim.state.epoch)?;
+    // let elapsed = start.elapsed();
+    // println!("Time to get barycentric states: {:?}", elapsed);
+
     // let start = std::time::Instant::now();
     // for _ in 0..1000 {
     //     sim.step();
@@ -69,13 +81,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let elapsed = start.elapsed();
     // let time_per_step = elapsed.as_secs_f64() / 1000.0;
     // println!("Time per step: {:?} us", time_per_step * 1_000_000.0);
-
-    // let start = std::time::Instant::now();
-    // kernel.get_barycentric_states(&sim.state.spice_bodies, sim.state.epoch)?;
-    // let elapsed = start.elapsed();
-    // println!("Time to get barycentric states: {:?}", elapsed);
-
-
 
     
 

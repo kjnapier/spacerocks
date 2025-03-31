@@ -22,7 +22,7 @@ impl Force for NewtonianGravity {
         // Speed it up if you want!
 
         let spice_particles = &state.spice_particles;
-        let particles = &state.particles;
+        let particles = &state.particles_1;
 
         // we only need to calculate the accelerations for the particles. assume for now that they're all massless.
 
