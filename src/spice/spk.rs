@@ -13,8 +13,9 @@ use crate::spice::error::SpiceError;
 const RECORD_LENGTH: usize = 1024;
 
 /// Convert SPK epoch (seconds since J2000.0) to Julian day.
+#[inline(always)]
 fn jul(eph: f64) -> f64 {
-    2451545.0 + eph / 86400.0
+    2451545.0 + eph * (1.0 / 86400.0)
 }
 
 /// Representation of one summary record from the SPK file.
@@ -182,6 +183,7 @@ impl Spk {
     /// Calculate position data given the Julian date `jde`, a time offset `rel`,
     /// and target index `m`. On success returns a tuple (GM, x, y, z).
     pub fn calc(&self, jde: f64, rel: f64, m: usize) -> Result<(f64, f64, f64, f64, f64, f64, i32), SpiceError> {
+        
         if m >= self.targets.len() {
             return Err(SpiceError::Nast);
         }
@@ -193,7 +195,6 @@ impl Spk {
 
         let mut pos_u = [0.0f64; 3];
         let mut vel_u = [0.0f64; 3];
-        // Note: The v component is computed in the C version but not used.
 
         // Find the appropriate summary block index.
         let n = ((jde + rel - target.beg) / target.res) as usize;
@@ -258,10 +259,16 @@ impl Spk {
                 "Not enough data in record for interpolation".to_string(),
             ));
         }
+
+        // bench
+
+        
+        
         let t0 = record_ptr[0];
         let t1 = record_ptr[1] / 86400.0;
         let z = ((jde - jul(t0)) + rel) / t1;
-
+        
+        
         // Set up Chebyshev polynomials.
         let mut T = [0.0f64; 32];
         let mut S = [0.0f64; 32];
@@ -288,13 +295,14 @@ impl Spk {
                 vel_u[n_coord] += record_ptr[coeff_start + p] * S[p];
             }
             pos_u[n_coord] /= 149597870.7;
-            vel_u[n_coord] /= 149597870.7;
-            vel_u[n_coord] /= t1;
-            
+            vel_u[n_coord] /= (149597870.7 * t1);
+            // vel_u[n_coord] /= t1;
         }
 
         Ok((pos_u[0], pos_u[1], pos_u[2], vel_u[0], vel_u[1], vel_u[2], target.cen))
     }
+
+    
 
     pub fn state_at(&self, epoch: f64, target: usize) -> Result<(f64, f64, f64, f64, f64, f64, i32), SpiceError> {
         let rel = epoch - 2451545.0;

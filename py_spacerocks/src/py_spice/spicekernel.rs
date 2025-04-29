@@ -3,9 +3,12 @@ use spacerocks::spice::SpiceKernel;
 use pyo3::exceptions::PyValueError;
 use pyo3::types::PyType;
 
+use std::sync::{Arc, Mutex};
+
 #[pyclass]
 #[pyo3(name = "SpiceKernel")]
 pub struct PySpiceKernel {
+    // pub inner: SpiceKernel,
     pub inner: SpiceKernel,
 }
 

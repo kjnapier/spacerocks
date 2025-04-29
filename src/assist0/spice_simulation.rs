@@ -17,53 +17,36 @@ use nalgebra::Vector3;
 
 #[derive(Debug, Clone)]
 pub struct VariationalParticle {
-    pub epoch: f64,
     pub position: Vector3<f64>,
     pub velocity: Vector3<f64>,
     pub acceleration: Vector3<f64>,
-    pub parent: usize,
 }
 
 #[derive(Debug, Clone)]
 pub struct SimulationParticle {
     pub mass: f64,
-    pub epoch: f64,
     pub position: Vector3<f64>,
     pub velocity: Vector3<f64>,
     pub acceleration: Vector3<f64>,
-    // 6x6 matrix for the jacobian
-    pub jacobian: [[f64; 6]; 6],
-}
-
-#[derive(Debug, Clone)]
-pub struct SimulationSpiceParticle {
-    pub mass: f64,
     pub epoch: f64,
-    pub position: Vector3<f64>,
-    pub velocity: Vector3<f64>,
-    pub acceleration: Vector3<f64>,
+    pub variational_particles: Option<Vec<usize>>, // just store the indices of the variational particles that correspond to this particle
+    // pub interpolation_coefficients: Option<Vec<f64>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct SimulationState {
     pub epoch: f64,
-    
+    pub particles: Vec<SpaceRock>,
     pub particles_0: Vec<SimulationParticle>,
     pub particles_1: Vec<SimulationParticle>,
-
-    pub variational_particles_0: Vec<VariationalParticle>,
-    pub variational_particles_1: Vec<VariationalParticle>,
-
-    pub spice_particles: Vec<SimulationSpiceParticle>,
-    pub spice_bodies: Vec<SpiceBody>,
-
+    pub spice_particles: Vec<SimulationParticle>,
     pub particle_index_map: HashMap<String, usize>,
     pub spice_particle_index_map: HashMap<String, usize>,
-
-    pub particles: Vec<SpaceRock>,
-    // pub variational_particles: Vec<[f64; 6]>,
+    pub spice_bodies: Vec<SpiceBody>,
     pub reference_plane: ReferencePlane,
     pub origin: SpiceBody,
+    pub nreal: usize,
+    pub nvar: usize,
 }
 
 pub struct SpiceSimulation {
@@ -84,8 +67,6 @@ impl SpiceSimulation {
             particles: Vec::new(),
             particles_0: Vec::new(),
             particles_1: Vec::new(),
-            variational_particles_0: Vec::new(),
-            variational_particles_1: Vec::new(),
             spice_particles: Vec::new(),
             particle_index_map: HashMap::new(),
             spice_particle_index_map: HashMap::new(),
@@ -151,39 +132,39 @@ impl SpiceSimulation {
     /// # Returns
     ///
     /// * `Result<Simulation, Box<dyn std::error::Error>>` - The simulation with the solar system giants.
-    // pub fn giants(epoch: &Time, kernel: &SpiceKernel) -> Result<SpiceSimulation, Box<dyn std::error::Error>> {
+    pub fn giants(epoch: &Time, kernel: &SpiceKernel) -> Result<SpiceSimulation, Box<dyn std::error::Error>> {
 
-    //     let reference_plane = ReferencePlane::from_str("J2000")?;
-    //     let origin = SpiceBody::from_name("SSB")?;
+        let reference_plane = ReferencePlane::from_str("J2000")?;
+        let origin = SpiceBody::from_name("SSB")?;
 
-    //     let mut state = SimulationState {
-    //         epoch: epoch.tdb().jd(),
-    //         particles: Vec::new(),
-    //         particles_0: Vec::new(),
-    //         particles_1: Vec::new(),
-    //         spice_particles: Vec::new(),
-    //         particle_index_map: HashMap::new(),
-    //         spice_particle_index_map: HashMap::new(),
-    //         spice_bodies: Vec::new(),
-    //         reference_plane,
-    //         origin,
-    //     };
+        let mut state = SimulationState {
+            epoch: epoch.tdb().jd(),
+            particles: Vec::new(),
+            particles_0: Vec::new(),
+            particles_1: Vec::new(),
+            spice_particles: Vec::new(),
+            particle_index_map: HashMap::new(),
+            spice_particle_index_map: HashMap::new(),
+            spice_bodies: Vec::new(),
+            reference_plane,
+            origin,
+        };
 
-    //     let mut sim = SpiceSimulation {
-    //         state,
-    //         integrator: Box::new(IAS15::new(0.001)),
-    //         forces: vec![Box::new(NewtonianGravity)],
-    //     };
+        let mut sim = SpiceSimulation {
+            state,
+            integrator: Box::new(IAS15::new(0.001)),
+            forces: vec![Box::new(NewtonianGravity)],
+        };
 
-    //     // add sun, jupiter barycenter, saturn barycenter, uranus barycenter, neptune barycenter.
-    //     for name in ["sun", "jupiter barycenter", "saturn barycenter", "uranus barycenter", "neptune barycenter"].iter() {
-    //         // uppercase the name
-    //         let name = name.to_uppercase();
-    //         let particle = SpiceBody::from_name(&name)?;
-    //         sim.add_spice_body(particle, kernel);
-    //     }
-    //     Ok(sim)
-    // }
+        // add sun, jupiter barycenter, saturn barycenter, uranus barycenter, neptune barycenter.
+        for name in ["sun", "jupiter barycenter", "saturn barycenter", "uranus barycenter", "neptune barycenter"].iter() {
+            // uppercase the name
+            let name = name.to_uppercase();
+            let particle = SpiceBody::from_name(&name)?;
+            sim.add_spice_body(particle, kernel);
+        }
+        Ok(sim)
+    }
 
     pub fn add(&mut self, body: SpaceRock) -> Result<(), Box<dyn std::error::Error>> {
         // Check if the body is already in the simulation
@@ -198,7 +179,8 @@ impl SpiceSimulation {
             velocity: body.velocity,
             acceleration: Vector3::zeros(),
             epoch: body.epoch.tdb().jd(),
-            jacobian: [[0.0; 6]; 6],
+            variational_particles: None,
+            // interpolation_coefficients: None,
         };
 
         // Add the simulation particle to the simulation
@@ -209,28 +191,6 @@ impl SpiceSimulation {
 
         Ok(())
     }
-
-    // pub fn add_variation(&mut self, state: [f64; 6], parent: &str) -> Result<(), Box<dyn std::error::Error>> {
-
-    //     let parent_idx = self.state.particle_index_map.get(parent).unwrap();
-    //     let variational_particle = VariationalParticle {
-    //         epoch: self.state.epoch,
-    //         position: Vector3::new(state[0], state[1], state[2]),
-    //         velocity: Vector3::new(state[3], state[4], state[5]),
-    //         acceleration: Vector3::zeros(),
-    //         parent: *parent_idx,
-    //     };
-    //     self.state.variational_particles_0.push(variational_particle.clone());
-    //     self.state.variational_particles_1.push(variational_particle.clone());
-        
-    //     if let Some(v) = self.state.variation_map.get_mut(parent) {
-    //         v.push(variational_particle);
-    //     } else {
-    //         self.state.variation_map.insert(parent.to_string(), vec![variational_particle]);
-    //     }
-
-    //     Ok(())
-    // }
 
     pub fn add_spice_body(&mut self, body: SpiceBody, kernel: &SpiceKernel) -> Result<(), Box<dyn std::error::Error>> {
         // Check if the body is already in the simulation
@@ -244,12 +204,14 @@ impl SpiceSimulation {
         let velocity = Vector3::new(vx, vy, vz);
 
         // Create a new spice particle
-        let spice_particle = SimulationSpiceParticle {
+        let spice_particle = SimulationParticle {
             mass: body.mass,
             position: position,
             velocity: velocity,
             acceleration: Vector3::zeros(),
             epoch: self.state.epoch,
+            variational_particles: None,
+            // interpolation_coefficients: None,
         };
 
         // Add the spice particle to the simulation
@@ -273,7 +235,6 @@ impl SpiceSimulation {
     pub fn step(&mut self, kernel: &SpiceKernel) {
         self.integrator.step(&mut self.state, &self.forces, kernel);
     }
-
 
     pub fn integrate(&mut self, epoch: &Time, kernel: &SpiceKernel) -> Result<(), Box<dyn std::error::Error>> {
 

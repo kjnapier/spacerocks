@@ -29,6 +29,10 @@ mod py_orbfit;
 use py_orbfit::make_orbfit_submodule;
 // use py_orbfit::lmfit::PyFitResult;
 
+pub mod py_assist;
+use py_assist::make_assist_submodule;
+
+
 mod mpc;
 // use mpc::MPC;
 
@@ -59,6 +63,9 @@ pub fn py_spacerocks(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Add the `orbfit` submodule
     make_orbfit_submodule(py, m)?;
+
+    // Add the `assist` submodule
+    make_assist_submodule(py, m)?;
 
 
     m.add_class::<PySpaceRock>()?;

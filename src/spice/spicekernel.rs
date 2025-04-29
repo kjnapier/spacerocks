@@ -18,7 +18,7 @@ use nalgebra::Matrix3;
 
 use std::sync::{Arc, Mutex};
 
-
+use rayon::prelude::*;
 
 // ----- SpiceKernel with automatic graph building and caching -----
 
@@ -374,9 +374,6 @@ impl SpiceKernel {
             spk_indices.push(spk_index);
         }
 
-        // let mut codes = Vec::new();
-        // let mut centers = Vec::new();
-        // let mut states = Vec::new();
 
         let mut codes = Vec::with_capacity(bodies.len());
         let mut centers = Vec::with_capacity(bodies.len());
@@ -390,11 +387,12 @@ impl SpiceKernel {
 
             let state = spk.state_at(epoch, *target_index)?;
             let state = (state.0, state.1, state.2, state.3, state.4, state.5);
+    
             states.push(state);
             codes.push(target.code);
             centers.push(target.cen);
         }
-
+        
         // find all unique non-zero centers
         let mut unique_centers = HashSet::new();
         for center in &centers {
