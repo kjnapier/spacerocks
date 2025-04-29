@@ -41,13 +41,13 @@ impl PySpiceSimulation {
     /// # Returns
     ///
     /// * `Result<Simulation, &'static str>` - The Simulation object.
-    #[classmethod]
-    pub fn giants(_cls: Py<PyType>, epoch: &PyTime, kernel: &PySpiceKernel) -> PyResult<Self> {
-        match SpiceSimulation::giants(&epoch.inner, &kernel.inner) {
-            Ok(sim) => Ok(PySpiceSimulation { inner: sim }),
-            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
-        }
-    }
+    // #[classmethod]
+    // pub fn giants(_cls: Py<PyType>, epoch: &PyTime, kernel: &PySpiceKernel) -> PyResult<Self> {
+    //     match SpiceSimulation::giants(&epoch.inner, &kernel.inner) {
+    //         Ok(sim) => Ok(PySpiceSimulation { inner: sim }),
+    //         Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+    //     }
+    // }
 
     /// Create a new simulation with the JPL horizons perturbers.
     ///
