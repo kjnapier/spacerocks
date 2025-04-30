@@ -171,7 +171,8 @@ impl Integrator for IAS15 {
             state.spice_particles[i].velocity = velocity;
         }
 
-        update_accelerations(state, forces);
+        update_accelerations_and_stms(state, forces);
+        update_variational_accelerations(state);
 
         // Save initial conditions.
         let initial_particles = state.particles_1.clone();
@@ -237,7 +238,7 @@ impl Integrator for IAS15 {
                 for substep in 1..8 {
 
                     let hh = H[substep];
-                    for idx in 0..n {
+                    for idx in 0..nreal {
                         let a0 = initial_particles[idx].acceleration;
                         let v0 = initial_particles[idx].velocity;
                         let b = &self.bs[idx];
@@ -270,14 +271,14 @@ impl Integrator for IAS15 {
                             * 3.0 * hh / 5.0 + b.p1) * hh / 2.0 + b.p0)
                             * hh / 3.0 + a0) * self.timestep * hh / 2.0 + v0)
                             * self.timestep * hh;
-                        state.variational_particles_1[idx].position = initial_variational_particles[idx - nreal].position + d_position;
+                        state.variational_particles_1[idx - nreal].position = initial_variational_particles[idx - nreal].position + d_position;
 
                         // Compute velocity increment.
                         let d_velocity = (((((((b.p6 * 7.0 * hh / 8.0 + b.p5) * 6.0 * hh / 7.0 + b.p4)
                             * 5.0 * hh / 6.0 + b.p3) * 4.0 * hh / 5.0 + b.p2)
                             * 3.0 * hh / 4.0 + b.p1) * 2.0 * hh / 3.0 + b.p0)
                             * hh / 2.0 + a0) * self.timestep * hh;
-                        state.variational_particles_1[idx].velocity = initial_variational_particles[idx - nreal].velocity + d_velocity;
+                        state.variational_particles_1[idx - nreal].velocity = initial_variational_particles[idx - nreal].velocity + d_velocity;
                     }
 
                     // Update the state of the simulation with the new positions and velocities.
@@ -289,7 +290,8 @@ impl Integrator for IAS15 {
                         particle.epoch = state.particles_1[0].epoch;
                     }
 
-                    update_accelerations(state, forces);
+                    update_accelerations_and_stms(state, forces);
+                    update_variational_accelerations(state);
 
                     // Update coefficients based on substep.
                     match substep {
@@ -333,7 +335,7 @@ impl Integrator for IAS15 {
                             }
                         },
                         3 => {
-                            for idx in 0..n {
+                            for idx in 0..nreal {
                                 let a_old = initial_particles[idx].acceleration;
                                 let a_new = state.particles_1[idx].acceleration;
                                 let mut temp = self.gs[idx].p2;
@@ -355,7 +357,7 @@ impl Integrator for IAS15 {
                             }
                         },
                         4 => {
-                            for idx in 0..n {
+                            for idx in 0..nreal {
                                 let a_old = initial_particles[idx].acceleration;
                                 let a_new = state.particles_1[idx].acceleration;
                                 let mut temp = self.gs[idx].p3;
@@ -379,7 +381,7 @@ impl Integrator for IAS15 {
                             }
                         },
                         5 => {
-                            for idx in 0..n {
+                            for idx in 0..nreal {
                                 let a_old = initial_particles[idx].acceleration;
                                 let a_new = state.particles_1[idx].acceleration;
                                 let mut temp = self.gs[idx].p4;
@@ -405,7 +407,7 @@ impl Integrator for IAS15 {
                             }
                         },
                         6 => {
-                            for idx in 0..n {
+                            for idx in 0..nreal {
                                 let a_old = initial_particles[idx].acceleration;
                                 let a_new = state.particles_1[idx].acceleration;
                                 let mut temp = self.gs[idx].p5;
@@ -435,7 +437,7 @@ impl Integrator for IAS15 {
                         7 => {
                             let mut max_b6_temp = 0.0;
                             let mut max_acceleration = 0.0;
-                            for idx in 0..n {
+                            for idx in 0..nreal {
                                 let a_old = initial_particles[idx].acceleration;
                                 let a_new = state.particles_1[idx].acceleration;
                                 let mut temp = self.gs[idx].p6;
@@ -504,7 +506,8 @@ impl Integrator for IAS15 {
                 continue 'integration_loop;
             }
 
-            update_accelerations(state, forces);
+            update_accelerations_and_stms(state, forces);
+            update_variational_accelerations(state);
 
             // Accept the step: update epoch and particles.
             // *(&mut state.epoch) += self.timestep;
@@ -534,7 +537,6 @@ impl Integrator for IAS15 {
                             + b.p4 / 6.0
                             + b.p5 / 7.0
                             + b.p6 / 8.0);
-                // state.particles_1[idx].acceleration = accelerations[idx];
 
                 state.particles_0[idx].position = initial_particles[idx].position;
                 state.particles_0[idx].velocity = initial_particles[idx].velocity;
@@ -544,8 +546,8 @@ impl Integrator for IAS15 {
 
             for idx in nreal..n {
                 let b = &self.bs[idx];
-                state.variational_particles_1[idx].epoch = new_epoch;
-                state.variational_particles_1[idx].position = initial_variational_particles[idx - nreal].position
+                state.variational_particles_1[idx - nreal].epoch = new_epoch;
+                state.variational_particles_1[idx - nreal].position = initial_variational_particles[idx - nreal].position
                     + self.timestep * initial_variational_particles[idx - nreal].velocity
                     + self.timestep.powi(2)
                         * (initial_variational_particles[idx - nreal].acceleration / 2.0
@@ -557,7 +559,7 @@ impl Integrator for IAS15 {
                             + b.p5 / 56.0
                             + b.p6 / 72.0);
                             
-                state.variational_particles_1[idx].velocity = initial_variational_particles[idx - nreal].velocity
+                state.variational_particles_1[idx - nreal].velocity = initial_variational_particles[idx - nreal].velocity
                     + self.timestep
                         * (initial_variational_particles[idx - nreal].acceleration
                             + b.p0 / 2.0
@@ -567,7 +569,6 @@ impl Integrator for IAS15 {
                             + b.p4 / 6.0
                             + b.p5 / 7.0
                             + b.p6 / 8.0);
-                // state.particles_1[idx].acceleration = accelerations[idx];
 
                 state.variational_particles_0[idx - nreal].position = initial_variational_particles[idx - nreal].position;
                 state.variational_particles_0[idx - nreal].velocity = initial_variational_particles[idx - nreal].velocity;
@@ -779,12 +780,35 @@ pub fn update_accelerations(state: &mut SimulationState, forces: &Vec<Box<dyn Fo
 }
 
 
-pub fn update_accelerations_and_jacobians(state: &mut SimulationState, forces: &Vec<Box<dyn Force + Send + Sync>>) {
+pub fn update_accelerations_and_stms(state: &mut SimulationState, forces: &Vec<Box<dyn Force + Send + Sync>>) {
     // first clear the accelerations vector
     for acc in state.particles_1.iter_mut() {
         acc.acceleration = Vector3::zeros();
     }
+    // then clear the stm matrix
+    for p in state.particles_1.iter_mut() {
+        let stm = &mut p.stm;
+        *stm = [[0.0; 6]; 6];
+    }
+
     for force in forces {
-        force.apply_acceleration(state);
+        force.apply_acceleration_and_stm(state);
+    }
+}
+
+pub fn update_variational_accelerations(state: &mut SimulationState) {    
+    // calculate the acceleration for each variational particle
+    for i in 0..state.variational_particles_1.len() {
+        let p = &mut state.variational_particles_1[i];
+        let reference_particle_index = p.parent;
+        let reference_particle = &state.particles_1[reference_particle_index];
+        let stm = &reference_particle.stm;
+        let ax = stm[3][0] * p.position.x + stm[3][1] * p.position.y + stm[3][2] * p.position.z;
+        let ay = stm[4][0] * p.position.x + stm[4][1] * p.position.y + stm[4][2] * p.position.z;
+        let az = stm[5][0] * p.position.x + stm[5][1] * p.position.y + stm[5][2] * p.position.z;
+
+        // println!("ax: {}, ay: {}, az: {}", ax, ay, az);
+        p.acceleration = Vector3::new(ax, ay, az);
+        
     }
 }

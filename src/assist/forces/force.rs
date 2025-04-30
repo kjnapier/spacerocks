@@ -21,6 +21,7 @@ pub trait Force: Send + Sync + ForceClone {
     /// * A vector of accelerations for each spacerock.
     fn calculate_acceleration(&self, state: &mut SimulationState) -> Vec<Vector3<f64>>;
     fn apply_acceleration(&self, state: &mut SimulationState);
+    fn apply_acceleration_and_stm(&self, state: &mut SimulationState);
     
 }
 

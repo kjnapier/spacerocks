@@ -67,10 +67,61 @@ impl Force for NewtonianGravity {
 
                 let r_vec = particle.position - p2.position;
                 let r = r_vec.norm();
+                let r2 = r * r;
+                let r3 = r2 * r;
+                let r5 = r3 * r2;
 
-                let xi = -GRAVITATIONAL_CONSTANT * r_vec / (r * r * r);
+                let xi = -GRAVITATIONAL_CONSTANT * r_vec / r3;
                 let idx_acceleration = xi * p2.mass;
                 particle.acceleration += idx_acceleration;
+
+            }
+        }
+        
+    }
+
+    fn apply_acceleration_and_stm(&self, state: &mut SimulationState) {
+        let spice_particles = &state.spice_particles;
+        let particles = &mut state.particles_1;
+
+        let n_particles = particles.len();
+        let n_spice_particles = spice_particles.len();
+
+        for idx in 0..n_particles {
+
+            let particle = &mut particles[idx];
+
+            for jdx in 0..n_spice_particles {
+
+                let p2 = &spice_particles[jdx];
+
+                let r_vec = particle.position - p2.position;
+                let r = r_vec.norm();
+                let r2 = r * r;
+                let r3 = r2 * r;
+                let r5 = r3 * r2;
+
+                let xi = -GRAVITATIONAL_CONSTANT * r_vec / r3;
+                let idx_acceleration = xi * p2.mass;
+                particle.acceleration += idx_acceleration;
+
+                let dxdx = GRAVITATIONAL_CONSTANT * p2.mass * (3.0 * r_vec.x * r_vec.x / r5 - 1.0 / r3);
+                let dydy = GRAVITATIONAL_CONSTANT * p2.mass * (3.0 * r_vec.y * r_vec.y / r5 - 1.0 / r3);
+                let dzdz = GRAVITATIONAL_CONSTANT * p2.mass * (3.0 * r_vec.z * r_vec.z / r5 - 1.0 / r3);
+                let dxdy = GRAVITATIONAL_CONSTANT * p2.mass * 3.0 * r_vec.x * r_vec.y / r5;
+                let dydz = GRAVITATIONAL_CONSTANT * p2.mass * 3.0 * r_vec.y * r_vec.z / r5;
+                let dxdz = GRAVITATIONAL_CONSTANT * p2.mass * 3.0 * r_vec.x * r_vec.z / r5;
+
+                particle.stm[3][0] += dxdx;
+                particle.stm[3][1] += dxdy;
+                particle.stm[3][2] += dxdz;
+                particle.stm[4][0] += dxdy;
+                particle.stm[4][1] += dydy;
+                particle.stm[4][2] += dydz;
+                particle.stm[5][0] += dxdz;
+                particle.stm[5][1] += dydz;
+                particle.stm[5][2] += dzdz;
+
             }
         }
         

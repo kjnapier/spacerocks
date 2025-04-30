@@ -40,3 +40,7 @@ You might also need to rename `cspice/lib/cspice.a` to `cspice/lib/libcspice.a` 
 
 We actually use very few of the `cspice` functions, so it should be possible to remove this dependency in the future. 
 If you would like to help with this, please send a message! -->
+
+
+
+https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/
