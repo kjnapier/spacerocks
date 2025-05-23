@@ -99,12 +99,12 @@ impl Force for NewtonianGravity {
                 let r = r_vec.norm();
                 let r2 = r * r;
                 let r3 = r2 * r;
-                let r5 = r3 * r2;
-
+                
                 let xi = -GRAVITATIONAL_CONSTANT * r_vec / r3;
                 let idx_acceleration = xi * p2.mass;
                 particle.acceleration += idx_acceleration;
 
+                let r5 = r3 * r2;
                 let dxdx = GRAVITATIONAL_CONSTANT * p2.mass * (3.0 * r_vec.x * r_vec.x / r5 - 1.0 / r3);
                 let dydy = GRAVITATIONAL_CONSTANT * p2.mass * (3.0 * r_vec.y * r_vec.y / r5 - 1.0 / r3);
                 let dzdz = GRAVITATIONAL_CONSTANT * p2.mass * (3.0 * r_vec.z * r_vec.z / r5 - 1.0 / r3);

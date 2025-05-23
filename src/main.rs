@@ -26,14 +26,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut perturbed_rock = SpaceRock::from_xyz("holman_dx", 2.963305899720348 + 1.0e-8, -1.627586306680811, -0.7799786968810375, 
                                         0.004951381894813546, 0.006677060249157604, 0.002540378471598749, epoch.clone(), "J2000", "SSB")?;
 
-    // Need to wrap the kernel in an Arc, since we don't want to clone it or give ownership to the simulation.
     // The simulation gets a pointer to the kernel, and the kernel, and the kernel can be shared between multiple simulations.
     // Since the simulations are not modifying the kernel, they can share it safely.
     let mut sim = SpiceSimulation::horizons(&epoch, &kernel)?;
     sim.add(rock)?;
     sim.add(perturbed_rock)?;
-
-    sim.add_variation("x", "holman");
+    // sim.add_variation("x", "holman");
+    sim.add_full_variation("holman");
 
 
     // sim.step(&kernel);
@@ -55,10 +54,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let r2 = sim.state.variational_particles[0].position.x * 1.0e-8;
         analytic_dx.push(r2);
-        println!("{:?}", sim.state.variational_particles[0].position);
     }
     let elapsed = start.elapsed();
     println!("Time to integrate: {:?}", elapsed);
+
+    println!("variational: {:?}", sim.state.variational_particles);
 
     let au_km = 149597870.700;
     // Convert to km

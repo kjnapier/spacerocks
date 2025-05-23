@@ -89,9 +89,12 @@ impl SpiceBody {
 
     pub fn from_name(name: &str) -> Result<Self, Box<dyn std::error::Error>> {
 
-        let spiceid = SPICE_BODY_MAP.get(name).ok_or_else(|| SpiceError::BodyNotFound(name.to_string()))?;
+        // first get name to all upper case
+        let name = name.to_uppercase();
+
+        let spiceid = SPICE_BODY_MAP.get(&name).ok_or_else(|| SpiceError::BodyNotFound(name.to_string()))?;
         let gm = 0.0; // TODO: Get the GM value from the SPK file.
-        Ok(SpiceBody::new(*spiceid, name, gm))
+        Ok(SpiceBody::new(*spiceid, &name, gm))
 
     }
 

@@ -17,6 +17,8 @@ use nalgebra::Vector3;
 
 #[derive(Debug, Clone)]
 pub struct VariationalParticle {
+    pub name: String,
+    pub initial_state: [f64; 6],
     pub epoch: f64,
     pub position: Vector3<f64>,
     pub velocity: Vector3<f64>,
@@ -211,32 +213,45 @@ impl SpiceSimulation {
         Ok(())
     }
 
+    pub fn add_full_variation(&mut self, parent: &str) -> Result<(), Box<dyn std::error::Error>> {
+        for s in ["x", "y", "z", "vx", "vy", "vz"].iter() {
+            self.add_variation(s, parent)?;
+        }      
+        Ok(())
+    }
+
     pub fn add_variation(&mut self, dimension: &str, parent: &str) -> Result<(), Box<dyn std::error::Error>> {
         
         let parent_idx = self.state.particle_index_map.get(parent).unwrap();
-        let mut variational_particle = VariationalParticle {
-            epoch: self.state.epoch,
-            position: Vector3::zeros(),
-            velocity: Vector3::zeros(),
-            acceleration: Vector3::zeros(),
-            parent: *parent_idx,
-        };
+        
+
+        let mut initial_state = [0.0; 6];
 
         if dimension == "x" {
-            variational_particle.position.x = 1.0;
+            initial_state[0] = 1.0;
         } else if dimension == "y" {
-            variational_particle.position.y = 1.0;
+            initial_state[1] = 1.0;
         } else if dimension == "z" {
-            variational_particle.position.z = 1.0;
+            initial_state[2] = 1.0;
         } else if dimension == "vx" {
-            variational_particle.velocity.x = 1.0;
+            initial_state[3] = 1.0;
         } else if dimension == "vy" {
-            variational_particle.velocity.y = 1.0;
+            initial_state[4] = 1.0;
         } else if dimension == "vz" {
-            variational_particle.velocity.z = 1.0;
+            initial_state[5] = 1.0;
         } else {
             panic!("Invalid dimension: {}", dimension);
         }
+
+        let mut variational_particle = VariationalParticle {
+            name: format!("dd{}", dimension),
+            initial_state: initial_state,
+            epoch: self.state.epoch,
+            position: Vector3::new(initial_state[0], initial_state[1], initial_state[2]),
+            velocity: Vector3::new(initial_state[3], initial_state[4], initial_state[5]),
+            acceleration: Vector3::zeros(),
+            parent: *parent_idx,
+        };
 
         self.state.variational_particles_0.push(variational_particle.clone());
         self.state.variational_particles_1.push(variational_particle.clone());
@@ -245,10 +260,12 @@ impl SpiceSimulation {
         Ok(())
     }
 
-    pub fn add_variation_from_state(&mut self, state: [f64; 6], parent: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn add_variation_from_state(&mut self, name: &str, state: [f64; 6], parent: &str) -> Result<(), Box<dyn std::error::Error>> {
 
         let parent_idx = self.state.particle_index_map.get(parent).unwrap();
         let variational_particle = VariationalParticle {
+            name: name.to_string(),
+            initial_state: state,
             epoch: self.state.epoch,
             position: Vector3::new(state[0], state[1], state[2]),
             velocity: Vector3::new(state[3], state[4], state[5]),

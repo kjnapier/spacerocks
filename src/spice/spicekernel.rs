@@ -216,6 +216,7 @@ impl SpiceKernel {
         for target in &spk.targets {
             // Insert the connection if not already present.
             self.parent_map.entry(target.code).or_insert((target.cen, spk_index));
+            // println!("Adding target {} with parent {} to parent_map", target.code, target.cen);
         }
         self.spk.push(spk);
         self.precompute_connection_chains();
@@ -347,6 +348,12 @@ impl SpiceKernel {
         
         for edge in chain {
             let spk = &self.spk[edge.spk_index];
+            // println!("Using SPK index {}", edge.spk_index);
+            // println!("Using target map {:?}", spk.target_map);
+            // println!("Using targets {:?}", spk.targets);
+            // println!("Using edge {:?}", edge);
+            // println!("parent {:?}", edge.parent);
+            // println!("child {:?}", edge.child);
             let target_index = spk.target_map.get(&edge.parent)
                 .ok_or_else(|| SpiceError::ParseError(format!("Body {} not found in SPK index {}", edge.child, edge.spk_index)))?;
 

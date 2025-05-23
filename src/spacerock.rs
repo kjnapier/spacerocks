@@ -94,6 +94,7 @@ impl SpaceRock {
 
         let spicebody = SpiceBody::from_name(&name.to_uppercase().as_str())?;
         let origin_spicebody = SpiceBody::from_name(&origin.to_string().to_uppercase())?;
+
         let (x, y, z, vx, vy, vz) = kernel.compute_state(&spicebody, &origin_spicebody, epoch.tdb().jd())?;
         let position = Vector3::new(x, y, z);
         let velocity = Vector3::new(vx, vy, vz);
@@ -507,9 +508,17 @@ impl SpaceRock {
     /// ```
     pub fn to_ssb(&mut self, kernel: &SpiceKernel) -> Result<(), Box<dyn std::error::Error>> {
         // get the ssb from spice
-        let mut ssb = SpaceRock::from_spice("ssb", &self.epoch, self.reference_plane.as_str(), self.origin.as_str(), &kernel)?;
-        ssb.set_mass(MU_BARY / GRAVITATIONAL_CONSTANT);
-        self.change_origin(&ssb);
+        // let mut ssb = SpaceRock::from_spice("ssb", &self.epoch, self.reference_plane.as_str(), self.origin.as_str(), &kernel)?;
+        let mut ssb = SpaceRock::from_spice(self.origin.as_str(), &self.epoch, self.reference_plane.as_str(), "ssb", &kernel)?;
+        self.position += ssb.position;
+        self.velocity += ssb.velocity;
+
+        self.origin = Origin::ssb();
+
+        // set the mass of the ssb to the mass of the bary
+
+        // ssb.set_mass(MU_BARY / GRAVITATIONAL_CONSTANT);
+        // self.change_origin(&ssb);
         Ok(())
     }
 
