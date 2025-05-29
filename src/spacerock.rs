@@ -113,7 +113,8 @@ impl SpaceRock {
             position,
             velocity,
             epoch: epoch.clone(),
-            reference_plane: reference_plane.clone(),
+            // reference_plane: reference_plane.clone(),
+            reference_plane: ReferencePlane::from_str("J2000")?,
             origin,
             properties: None,
         };
