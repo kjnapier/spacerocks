@@ -92,13 +92,16 @@ impl SpaceRock {
         let reference_plane = ReferencePlane::from_str(reference_plane)?;
         let origin = Origin::from_str(origin)?;
 
+
         let spicebody = SpiceBody::from_name(&name.to_uppercase().as_str())?;
         let origin_spicebody = SpiceBody::from_name(&origin.to_string().to_uppercase())?;
+
 
         let (x, y, z, vx, vy, vz) = kernel.compute_state(&spicebody, &origin_spicebody, epoch.tdb().jd())?;
         let position = Vector3::new(x, y, z);
         let velocity = Vector3::new(vx, vy, vz);
 
+        // println!("Position: {:?}", position);
         // let mut ep = epoch.clone();
         // let et = spice::str2et(&format!("JD{epoch} UTC", epoch=epoch.utc().jd()));
         // let (state, _) = spice::spkezr(name, et, reference_plane.as_str(), "NONE", &origin.to_string());

@@ -354,16 +354,41 @@ impl SpiceKernel {
             // println!("Using edge {:?}", edge);
             // println!("parent {:?}", edge.parent);
             // println!("child {:?}", edge.child);
-            let target_index = spk.target_map.get(&edge.parent)
+
+            // if the child is not in the target map, make the parent the child and the child the parent            
+
+            // let target_index = spk.target_map.get(target)
+            //     .ok_or_else(|| SpiceError::ParseError(format!("Body {} not found in SPK index {}", edge.child, edge.spk_index)))?;
+
+            // if edge.parent is in the target map:
+            if spk.target_map.contains_key(&edge.parent) {
+                let target_index = spk.target_map.get(&edge.parent)
                 .ok_or_else(|| SpiceError::ParseError(format!("Body {} not found in SPK index {}", edge.child, edge.spk_index)))?;
 
-            let state = spk.state_at(epoch, *target_index)?;
-            pos[0] += state.0;
-            pos[1] += state.1;
-            pos[2] += state.2;
-            vel[0] += state.3;
-            vel[1] += state.4;
-            vel[2] += state.5;
+                let state = spk.state_at(epoch, *target_index)?;
+                pos[0] += state.0;
+                pos[1] += state.1;
+                pos[2] += state.2;
+                vel[0] += state.3;
+                vel[1] += state.4;
+                vel[2] += state.5;
+            }
+
+            // else if edge.child is in the target map:
+            else if spk.target_map.contains_key(&edge.child) {
+                let target_index = spk.target_map.get(&edge.child)
+                .ok_or_else(|| SpiceError::ParseError(format!("Body {} not found in SPK index {}", edge.child, edge.spk_index)))?;
+
+                let state = spk.state_at(epoch, *target_index)?;
+                pos[0] -= state.0;
+                pos[1] -= state.1;
+                pos[2] -= state.2;
+                vel[0] -= state.3;
+                vel[1] -= state.4;
+                vel[2] -= state.5;
+            }
+
+            
         }
         Ok((pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]))
     }
