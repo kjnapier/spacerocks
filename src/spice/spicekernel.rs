@@ -372,10 +372,7 @@ impl SpiceKernel {
                 vel[0] += state.3;
                 vel[1] += state.4;
                 vel[2] += state.5;
-            }
-
-            // else if edge.child is in the target map:
-            else if spk.target_map.contains_key(&edge.child) {
+            } else if spk.target_map.contains_key(&edge.child) {
                 let target_index = spk.target_map.get(&edge.child)
                 .ok_or_else(|| SpiceError::ParseError(format!("Body {} not found in SPK index {}", edge.child, edge.spk_index)))?;
 
@@ -387,7 +384,6 @@ impl SpiceKernel {
                 vel[1] -= state.4;
                 vel[2] -= state.5;
             }
-
             
         }
         Ok((pos[0], pos[1], pos[2], vel[0], vel[1], vel[2]))

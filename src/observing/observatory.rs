@@ -107,7 +107,7 @@ impl Observatory {
                 let m_vec = m * obs_vec * EQUAT_RAD * M_TO_AU;
                 let m_vecp = mp * obs_vec * EQUAT_RAD * M_TO_AU;
                 let m_vecm = mm * obs_vec * EQUAT_RAD * M_TO_AU;
-                let d_vel = (m_vecp - m_vecm) / (2.0 * delta_et / 86400.0);
+                let d_vel = (m_vecp - m_vecm) / (2.0 * delta_et);
                 earth.position += m_vec;
                 earth.velocity += d_vel;
                 
