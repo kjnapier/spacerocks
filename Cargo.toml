@@ -33,4 +33,4 @@ dirs = "*"
 url = "*"
 strsim = "0.11.1"
 
-plotly = { version = "0.8", features = ["kaleido"] }
+# plotly = { version = "0.8", features = ["kaleido"] }

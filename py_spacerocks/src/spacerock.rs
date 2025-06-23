@@ -89,6 +89,14 @@ impl PySpaceRock {
         }
     }
 
+    fn propagate(&mut self, epoch: PyRef<PyTime>, kernel: &PySpiceKernel) -> PyResult<()> {
+        let ker = &kernel.inner;
+        match self.inner.propagate(&epoch.inner, &ker) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to propagate rock: {}", e))),
+        }
+    }
+
     fn analytic_propagate(&mut self, epoch: PyRef<PyTime>) -> PyResult<()> {
         match self.inner.analytic_propagate(&epoch.inner) {
             Ok(_) => Ok(()),

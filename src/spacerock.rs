@@ -5,6 +5,7 @@ use crate::correct_for_ltt;
 use crate::OrbitType;
 use crate::SpiceKernel;
 use crate::spice::SpiceBody;
+use crate::assist::SpiceSimulation;
 
 use crate::transforms::{calc_conic_anomaly_from_true_anomaly, calc_mean_anomaly_from_conic_anomaly, solve_for_universal_anomaly, stumpff_c, stumpff_s};
 
@@ -410,6 +411,38 @@ impl SpaceRock {
 
         let rock = SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, epoch, reference_plane, origin)?;
         Ok(rock)
+    }
+
+
+    pub fn propagate(&mut self, epoch: &Time, kernel: &SpiceKernel) -> Result<(), Box<dyn std::error::Error>> {
+
+        // check if the epoch is the same as the current epoch
+        if self.epoch.utc().jd() == epoch.utc().jd() {
+            return Ok(());
+        }
+
+        let mut sim = SpiceSimulation::horizons(&self.epoch, &kernel)?;
+
+        // clone self so that we can add it to the simulation
+        let mut rock = self.clone();
+        rock.to_ssb(&kernel)?;
+
+
+        let initial_reference_plane = rock.reference_plane.clone();
+        sim.add(rock)?;
+        sim.integrate(epoch, &kernel)?;
+
+        let p = &sim.state.particles[0];
+
+        self.position = p.position;
+        self.velocity = p.velocity;
+        self.epoch = epoch.clone();
+        self.reference_plane = sim.state.reference_plane.clone();
+        self.origin = Origin::ssb();
+
+        // self.change_reference_plane(initial_reference_plane.as_str())?;
+
+        Ok(())
     }
 
     /// Propagate the SpaceRock in time along a keplerian orbit. The operation is performed in place.
