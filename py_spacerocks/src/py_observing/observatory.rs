@@ -27,6 +27,14 @@ impl PyObservatory {
         }
     }
 
+    #[classmethod]
+    fn from_name(_cls: Py<PyType>, name: &str) -> PyResult<PyObservatory> {
+        match Observatory::from_name(name) {
+            Ok(o) => Ok(PyObservatory { inner: o }),
+            Err(e) => Err(PyValueError::new_err(e.to_string()))
+        }
+    }
+
     #[pyo3(signature = (epoch, kernel, reference_plane="J2000", origin="SSB"))]
     fn at(&self, epoch: &PyTime, kernel: &PySpiceKernel, reference_plane: &str, origin: &str) -> PyResult<PyObserver> {
         let ep = &epoch.inner;

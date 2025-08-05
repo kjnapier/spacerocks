@@ -68,8 +68,8 @@ impl Observatory {
     /// # Returns
     ///
     /// * `Observatory` - The Observatory object.
-    pub fn from_name(name: &str) -> Self {
-        Observatory::SpaceTelecope { name: name.to_string() }
+    pub fn from_name(name: &str) -> Result<Observatory, Box<dyn std::error::Error>> {
+        Ok(Observatory::SpaceTelecope { name: name.to_string() })
     }
    
     // /// Get the Observer at a specific time.

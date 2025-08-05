@@ -246,8 +246,9 @@ impl SpaceRock {
 
         let ep = epoch.clone();
 
-        let timescale = &ep.timescale.to_str().to_uppercase();
-        let timeformat = &ep.format.to_str().to_uppercase();
+        // let timescale = &ep.timescale.to_str().to_uppercase();
+        // let timeformat = &ep.format.to_str().to_uppercase();
+
 
         match reference_plane.to_uppercase().as_str() {
             "J2000" => {
@@ -269,6 +270,9 @@ impl SpaceRock {
         // } else {
         //     params.insert("TIME_TYPE", timescale);
         // }
+
+        let timescale = "TDB";
+        let timeformat = "JD"; // 'CALENDAR' or 'ISO'
 
         // ep.to_tdb();
         params.insert("TIME_TYPE", "'TDB'");
@@ -300,10 +304,8 @@ impl SpaceRock {
         let json: serde_json::Value = response.json()?;
         let text = json["result"].as_str();
 
-
-        // println!("{:?}", text);
-
         let lines: Vec<&str> = text.ok_or("No data")?.split('\n').collect();
+
         let first_data_line = lines.iter().skip_while(|&line| !line.starts_with("$$SOE")).nth(1).ok_or("No data")?;
         
         let data: Vec<f64> = first_data_line.split(',').filter_map(|s| s.trim().parse::<f64>().ok()).collect();

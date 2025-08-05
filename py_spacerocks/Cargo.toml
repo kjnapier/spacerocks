@@ -13,7 +13,7 @@ pyo3 = { version = "*", features = ["extension-module"] }
 
 numpy = "*"
 rayon = "*"
-nalgebra = "*"
+nalgebra = "0.32.2"
 
 # arrow = "40.0" 
 flate2 = "1.0"

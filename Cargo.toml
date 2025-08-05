@@ -10,8 +10,8 @@ include = ["/src"]
 
 [dependencies]
 
-# nalgebra = "0.32.2"
-nalgebra = "*"
+nalgebra = "0.32.2"
+
 
 reqwest = { version = "0.11.4", features = ["json", "blocking"] }
 lazy_static = "1.4.0"
