@@ -16,6 +16,7 @@ use rand;
 use rand::Rng;
 
 use std::collections::HashMap;
+use std::time::Duration;
 
 /// A SpaceRock represents a celestial body with a state vector and optional physical properties.
 /// 
