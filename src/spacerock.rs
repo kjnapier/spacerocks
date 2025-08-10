@@ -237,7 +237,11 @@ impl SpaceRock {
     /// ```
     pub fn from_horizons(name: &str, epoch: &Time, reference_plane: &str, origin: &str) -> Result<Self, Box<dyn std::error::Error>> {
 
-        let client = reqwest::blocking::Client::new();
+        // let client = reqwest::blocking::Client::new();
+
+        let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(60)) // wait up to 60s
+            .build()?;
 
         let mut params = HashMap::new();
 
