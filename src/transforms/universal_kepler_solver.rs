@@ -57,32 +57,32 @@ fn d2f_dchi2(chi: f64, r0: f64, vr0: f64, alpha: f64, mu: f64) -> f64 {
     first_term + second_term + third_term
 }
 
-/// Solves the universal Kepler equation using Newton-Raphson iteration.
-/// 
-/// This function implements a numerical solver for the universal form of Kepler's equation,
-/// which works for all orbit types (elliptical, parabolic, and hyperbolic).
-/// It uses Newton-Raphson iteration to find the universal anomaly χ that satisfies
-/// the time equation.
-/// 
-/// # Arguments
-/// * `r0` - Initial radius [AU]
-/// * `vr0` - Initial radial velocity [AU/day]
-/// * `alpha` - Reciprocal of semi-major axis (-2E/μ) [1/AU]
-/// * `mu` - Gravitational parameter [AU³/day²]
-/// * `dt` - Time interval [days]
-/// * `tol` - Convergence tolerance
-/// * `max_iter` - Maximum number of iterations
-/// 
-/// # Returns
-/// * `Ok(f64)` - Universal anomaly χ if solution converges
-/// * `Err(Box<dyn Error>)` - Error if solution fails to converge
-/// 
-/// # Example
-/// ```
-/// let chi = solve_for_universal_anomaly(1.0, 0.1, -1.0, 1.0, 1.0, 1e-12, 1000)?;
-/// ```
+// / Solves the universal Kepler equation using Newton-Raphson iteration.
+// / 
+// / This function implements a numerical solver for the universal form of Kepler's equation,
+// / which works for all orbit types (elliptical, parabolic, and hyperbolic).
+// / It uses Newton-Raphson iteration to find the universal anomaly χ that satisfies
+// / the time equation.
+// / 
+// / # Arguments
+// / * `r0` - Initial radius [AU]
+// / * `vr0` - Initial radial velocity [AU/day]
+// / * `alpha` - Reciprocal of semi-major axis (-2E/μ) [1/AU]
+// / * `mu` - Gravitational parameter [AU³/day²]
+// / * `dt` - Time interval [days]
+// / * `tol` - Convergence tolerance
+// / * `max_iter` - Maximum number of iterations
+// / 
+// / # Returns
+// / * `Ok(f64)` - Universal anomaly χ if solution converges
+// / * `Err(Box<dyn Error>)` - Error if solution fails to converge
+// / 
+// / # Example
+// / ```
+// / let chi = solve_for_universal_anomaly(1.0, 0.1, -1.0, 1.0, 1.0, 1e-12, 1000)?;
+// / ```
 
-// We can bring this back at some point, but for now we will use Laguerre's method
+// // We can bring this back at some point, but for now we will use Laguerre's method
 pub fn solve_for_universal_anomaly(r0: f64, vr0: f64, alpha: f64, mu: f64, dt: f64, tol: f64, max_iter: usize) -> Result<f64, Box<dyn std::error::Error>> {
     let mut chi = mu.sqrt() * alpha.abs() * dt;
     let mut iter = 0;

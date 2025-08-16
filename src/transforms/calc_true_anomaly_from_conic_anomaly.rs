@@ -28,7 +28,8 @@ fn true_anomaly_from_conic_anomaly_circular(_e: f64, conic_anomaly: f64) -> f64 
 
 /// Calculate the true anomaly of an elliptical orbit from the conic anomaly.
 fn true_anomaly_from_conic_anomaly_elliptical(e: f64, conic_anomaly: f64) -> f64 {
-    return 2.0 * ((1.0 + e).sqrt() * (conic_anomaly / 2.0).sin()).atan2((1.0 - e).sqrt() * (conic_anomaly / 2.0).cos());
+    // return 2.0 * ((1.0 + e).sqrt() * (conic_anomaly / 2.0).sin()).atan2((1.0 - e).sqrt() * (conic_anomaly / 2.0).cos());
+    return 2.0 * (((1.0 + e) / (1.0 - e)).sqrt() * (conic_anomaly / 2.0).tan()).atan2(1.0);
 }
 
 /// Calculate the true anomaly of a parabolic orbit from the conic anomaly.
