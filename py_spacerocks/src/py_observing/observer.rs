@@ -1,8 +1,13 @@
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 use spacerocks::observing::Observer;
+use spacerocks::Origin;
+use spacerocks::ReferencePlane;
+use nalgebra::Vector3;
 
 use crate::py_time::time::PyTime;
+use crate::py_observing::observatory::PyObservatory;
 
 use numpy::{PyArray1, IntoPyArray};
 
@@ -20,6 +25,24 @@ impl PyObserver {
     // pub fn from_spacerock(_cls: &PyType, rock: &PySpaceRock) -> Self {
     //     PyObserver { inner: Observer::from_spacerock(&rock.inner) }
     // }
+
+    #[classmethod]
+    pub fn from_xyz(_cls: Py<PyType>, x: f64, y: f64, z: f64, epoch: PyTime, reference_plane: &str, origin: &str, vx: Option<f64>, vy: Option<f64>, vz: Option<f64>) -> Self {
+        let position = Vector3::new(x, y, z);
+
+        let mut velocity = None;
+        if let (Some(vx), Some(vy), Some(vz)) = (vx, vy, vz) {
+            velocity = Some(Vector3::new(vx, vy, vz));
+        }
+        
+        let epoch = epoch.inner.clone();
+        let reference_plane = ReferencePlane::from_str(reference_plane).unwrap();
+        let origin = Origin::from_str(origin).unwrap();
+
+        PyObserver {
+            inner: Observer::from_xyz(position, velocity, epoch, reference_plane, origin, None)
+        }
+    }
 
     #[getter]
     fn position(&self, py: Python) -> Py<PyArray1<f64>> {
@@ -48,17 +71,17 @@ impl PyObserver {
 
     #[getter]
     fn lat(&self) -> Option<f64> {
-        self.inner.observatory.lat()
+        self.inner.observatory.clone()?.lat()
     }
 
     #[getter]
     fn lon(&self) -> Option<f64> {
-        self.inner.observatory.lon()
+        self.inner.observatory.clone()?.lon()
     }
 
     #[getter]
     fn rho(&self) -> Option<f64> {
-        self.inner.observatory.rho()
+        self.inner.observatory.clone()?.rho()
     }
 
     #[getter]

@@ -71,7 +71,7 @@ impl Observatory {
     pub fn from_name(name: &str) -> Result<Observatory, Box<dyn std::error::Error>> {
         Ok(Observatory::SpaceTelecope { name: name.to_string() })
     }
-   
+
     // /// Get the Observer at a specific time.
     // ///
     // /// # Arguments
@@ -116,7 +116,7 @@ impl Observatory {
                                           epoch: epoch.clone(),
                                           reference_plane: ReferencePlane::from_str(reference_plane)?, 
                                           origin: Origin::from_str(origin)?,
-                                          observatory: self.clone() };
+                                          observatory: Some(self.clone()) };
                 Ok(observer)
             },
             Observatory::SpaceTelecope { name } => {
@@ -127,7 +127,7 @@ impl Observatory {
                                           epoch: epoch.clone(),
                                           reference_plane: ReferencePlane::from_str(reference_plane)?,
                                           origin: Origin::from_str(origin)?,
-                                          observatory: self.clone() };
+                                          observatory: Some(self.clone()) };
                 Ok(observer)
             }
             _ => {

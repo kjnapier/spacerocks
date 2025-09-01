@@ -94,7 +94,6 @@ impl SpaceRock {
         let reference_plane = ReferencePlane::from_str(reference_plane)?;
         let origin = Origin::from_str(origin)?;
 
-
         let spicebody = SpiceBody::from_name(&name.to_uppercase().as_str())?;
         let origin_spicebody = SpiceBody::from_name(&origin.to_string().to_uppercase())?;
 

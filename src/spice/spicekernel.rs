@@ -339,9 +339,11 @@ impl SpiceKernel {
         // let chain = self.connection_chain(from, to)
         //     .ok_or_else(|| SpiceError::ParseError(format!("No connection chain found from {} to {}", from, to)))?;
 
+
         // try to get the chain from the cache
         let chain = self.connection_chain(from, to)
             .ok_or_else(|| SpiceError::ParseError(format!("No connection chain found from {} to {}", from, to)))?;
+
 
         let mut pos = [0.0; 3];
         let mut vel = [0.0; 3];

@@ -15,11 +15,31 @@ pub struct Observer {
     pub epoch: Time,
     pub reference_plane: ReferencePlane,
     pub origin: Origin,
-    pub observatory: Observatory,
+    pub observatory: Option<Observatory>,
 }
 
 
 impl Observer {
+
+    /// Create a new Observer from Cartesian coordinates.
+    ///
+    /// # Arguments
+    /// * `position` - The position of the observer
+    /// * `velocity` - The velocity of the observer
+    /// * `epoch` - The epoch of the observer
+    /// * `reference_plane` - The reference plane of the observer
+    /// * `origin` - The origin of the observer
+    /// * `observatory` - The observatory of the observer
+    pub fn from_xyz(position: Vector3<f64>, velocity: Option<Vector3<f64>>, epoch: Time, reference_plane: ReferencePlane, origin: Origin, observatory: Option<Observatory>) -> Self {
+        Observer {
+            position,
+            velocity,
+            epoch,
+            reference_plane,
+            origin,
+            observatory,
+        }
+    }
 
     /// Change the reference plane of the Observer
     ///
@@ -64,11 +84,13 @@ impl Observer {
 
     /// Returns the latitude of the observatory in radians, if it is a ground-based observatory
     pub fn lat(&self) -> Option<f64> {
-        self.observatory.lat()
+        self.observatory.as_ref()?.lat()
+        // self.observatory.lat()
     }
     
     /// Returns the longitude of the observatory in radians, if it is a ground-based observatory 
     pub fn lon(&self) -> Option<f64> {
-        self.observatory.lon()
+        self.observatory.as_ref()?.lon()
+        // self.observatory.lon()
     }
 }

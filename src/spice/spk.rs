@@ -230,6 +230,7 @@ impl Spk {
         }
         let p_count = p_count as usize;
 
+
         // Determine record timing information from data preceding the record.
         if index_val < 3 {
             return Err(SpiceError::ParseError(
