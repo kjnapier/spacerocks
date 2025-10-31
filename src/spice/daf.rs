@@ -17,6 +17,8 @@ impl From<io::Error> for DAFError {
         DAFError::IoError(err)
     }
 }
+/// https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/daf.html
+/// https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/FORTRAN/req/spk.html
 
 /// Each physical record in a DAF file is 1024 bytes long.
 const RECORD_LENGTH: usize = 1024;
