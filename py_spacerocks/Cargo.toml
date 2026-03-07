@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 spacerocks = { path = "../" }
 pyo3 = { version = "*", features = ["extension-module"] }
 
-numpy = "*"
+numpy = "0.27"
 rayon = "*"
 nalgebra = "0.32.2"
 
