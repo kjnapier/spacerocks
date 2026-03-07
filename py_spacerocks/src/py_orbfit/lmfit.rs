@@ -51,7 +51,7 @@ impl PyFitResult {
 
     #[getter]
     fn rock(&self) -> PyResult<Py<PySpaceRock>> {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let rock = PySpaceRock { inner: self.inner.rock.clone() };
             Py::new(py, rock)  // This ensures correct type conversion
         })

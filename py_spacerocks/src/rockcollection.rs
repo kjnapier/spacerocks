@@ -14,7 +14,7 @@ use crate::PySpaceRock;
 use crate::py_observing::observer::PyObserver;
 use crate::py_observing::observation::PyObservation;
 
-use numpy::{PyArray1, IntoPyArray};
+use numpy::{PyArray1, IntoPyArray, PyArray2};
 
 use std::path::{PathBuf};
 // use std::fs;
@@ -24,6 +24,7 @@ use serde_json;
 // use arrow::array::{Float64Array, StringArray};
 // use crate::mpc::MPCHandler;
 use dirs::home_dir;
+use ndarray;
 
 
 // use pyo3::impl_::pymethods::AsyncIterBaseKind;
@@ -158,6 +159,96 @@ impl RockCollection {
         Ok(py_observations)
            
     }
+
+    pub fn calc_radec<'py>(
+        &self,
+        py: Python<'py>,
+        observer: PyRef<PyObserver>,
+    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+        let o = &observer.inner;
+
+        if o.reference_plane != ReferencePlane::J2000 {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Observer frame is not J2000. Cannot calculate RA/Dec.",
+            ));
+        }
+
+        let n = self.rocks.len();
+        let mut data = vec![0.0f64; 2 * n];
+
+        data.par_chunks_mut(2)
+            .zip(self.rocks.par_iter())
+            .for_each(|(row, rock)| {
+                let (ra, dec) = rock.calc_radec(o).unwrap();
+                row[0] = ra;
+                row[1] = dec;
+            });
+
+        let arr = ndarray::Array2::from_shape_vec((n, 2), data).unwrap();
+        Ok(arr.into_pyarray(py))
+    }
+
+
+    pub fn calc_radec_no_light_time<'py>(
+        &self,
+        py: Python<'py>,
+        observer: PyRef<PyObserver>,
+    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+        let o = &observer.inner;
+
+        if o.reference_plane != ReferencePlane::J2000 {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Observer frame is not J2000. Cannot calculate RA/Dec.",
+            ));
+        }
+
+        let n = self.rocks.len();
+        let mut data = vec![0.0f64; 2 * n];
+
+        data.par_chunks_mut(2)
+            .zip(self.rocks.par_iter())
+            .for_each(|(row, rock)| {
+                let (ra, dec) = rock.calc_radec_no_light_time(o).unwrap();
+                row[0] = ra;
+                row[1] = dec;
+            });
+
+        let arr = ndarray::Array2::from_shape_vec((n, 2), data).unwrap();
+        Ok(arr.into_pyarray(py))
+    }
+
+
+
+
+    // pub fn calc_radec_no_light_time(&self, observer: PyRef<PyObserver>) -> PyResult<Vec<(f64, f64)>> {
+    //     let o = &observer.inner;
+
+    //     if o.reference_plane != ReferencePlane::J2000 {
+    //         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+    //             "Observer frame is not J2000. Cannot calculate RA/Dec."
+    //         ));
+    //     }
+
+    //     let radec_values: Vec<_> = self
+    //         .rocks
+    //         .par_iter()
+    //         .map(|rock| rock.calc_radec_no_light_time(o).unwrap())
+    //         .collect();
+
+    //     Ok(radec_values)
+    // }
+
+    // pub fn calc_radec_no_light_time(&mut self, observer: PyRef<PyObserver>) -> PyResult<Vec<(f64, f64)>> {
+    //     let o = observer.inner.clone();
+
+    //     if o.reference_plane != ReferencePlane::J2000 {
+    //         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Observer frame is not J2000. Cannot calculate RA/Dec.")));
+    //     }
+
+    //     let radec_values: Vec<_> = self.rocks.par_iter_mut().map(|rock| rock.calc_radec_no_light_time(&o).unwrap()).collect();   
+    //     Ok(radec_values)
+           
+    // }
 
     pub fn analytic_propagate(&mut self, epoch: PyRef<PyTime>) -> PyResult<()> {
         let ep = &epoch.inner;

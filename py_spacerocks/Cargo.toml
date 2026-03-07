@@ -22,3 +22,4 @@ serde = { version = "1.0.197", features = ["derive", "rc"]}
 reqwest = { version = "0.11.4", features = ["json", "blocking"] }
 anyhow = "*"
 dirs = "*"
+ndarray = "0.16"

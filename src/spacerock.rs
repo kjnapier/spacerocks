@@ -7,6 +7,8 @@ use crate::SpiceKernel;
 use crate::spice::SpiceBody;
 use crate::assist::SpiceSimulation;
 
+
+
 use crate::transforms::{calc_conic_anomaly_from_true_anomaly, calc_mean_anomaly_from_conic_anomaly, solve_for_universal_anomaly, stumpff_c, stumpff_s};
 
 use serde::{Serialize, Deserialize};
@@ -513,7 +515,7 @@ impl SpaceRock {
             return Ok(());
         }
 
-        let inv = self.reference_plane.get_rotation_matrix().try_inverse().ok_or("Could not invert rotation matrix")?;
+        let inv = self.reference_plane.get_rotation_matrix().try_inverse().ok_or("Could not invert rotation matrix")?; // gets you back to J2000
         let rot = reference_plane.get_rotation_matrix() * inv;
 
         self.position = rot * self.position;
@@ -802,13 +804,81 @@ impl SpaceRock {
     /// Returns an error if:
     /// * Observer and SpaceRock have different epochs
     /// * Observer and SpaceRock have different reference planes
+    pub fn calc_radec(&self, observer: &Observer) -> Result<(f64, f64), Box<dyn std::error::Error>> {
+
+        // self.change_reference_plane("J2000")?;
+
+        // throw an error if the observer and self have different epochs
+        // if self.epoch.utc().jd() != observer.epoch.utc().jd() {
+        //     return Err("Observer and SpaceRock have different epochs".into());
+        // }
+
+        // if self.reference_plane != observer.reference_plane {
+        //     return Err("Observer and SpaceRock have different reference planes".into());
+        // }
+        // Calculate the topocentric state, correct for light travel time
+        let cr = correct_for_ltt(&self, observer);
+
+        // Calaculate the ra, and dec
+        let mut ra = cr.position.y.atan2(cr.position.x);
+        if ra < 0.0 {
+            ra += 2.0 * std::f64::consts::PI;
+        }
+        let dec = (cr.position.z / cr.position.norm()).asin();
+
+        Ok((ra, dec))
+        
+    }
+
+
+    pub fn calc_radec_no_light_time(&self, observer: &Observer) -> Result<(f64, f64), Box<dyn std::error::Error>> {
+
+        // self.change_reference_plane("J2000")?;
+
+        // throw an error if the observer and self have different epochs
+        // if self.epoch.utc().jd() != observer.epoch.utc().jd() {
+        //     return Err("Observer and SpaceRock have different epochs".into());
+        // }
+
+        // if self.reference_plane != observer.reference_plane {
+        //     return Err("Observer and SpaceRock have different reference planes".into());
+        // }
+        // Calculate the topocentric state, correct for light travel time
+        let cr = self.position - observer.position;
+
+        // Calaculate the ra, and dec
+        let mut ra = cr.y.atan2(cr.x);
+        if ra < 0.0 {
+            ra += 2.0 * std::f64::consts::PI;
+        }
+        let dec = (cr.z / cr.norm()).asin();
+
+        Ok((ra, dec))
+        
+    }
+
+
+    /// Compute observational quantities for this object as seen by an observer
+    /// 
+    /// Calculates topocentric coordinates including light-time correction. The observer
+    /// must have the same epoch and reference plane as the SpaceRock.
+    /// 
+    /// # Arguments
+    /// * `observer` - The Observer object representing the viewing location
+    /// 
+    /// # Returns
+    /// * [`Observation`] 
+    /// 
+    /// # Errors
+    /// Returns an error if:
+    /// * Observer and SpaceRock have different epochs
+    /// * Observer and SpaceRock have different reference planes
     pub fn observe(&mut self, observer: &Observer) -> Result<Observation, Box<dyn std::error::Error>> {
 
         // self.change_reference_plane("J2000")?;
 
         // throw an error if the observer and self have different epochs
         if self.epoch.utc().jd() != observer.epoch.utc().jd() {
-            
             return Err("Observer and SpaceRock have different epochs".into());
         }
 
