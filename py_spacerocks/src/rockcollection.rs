@@ -24,7 +24,7 @@ use serde_json;
 // use arrow::array::{Float64Array, StringArray};
 // use crate::mpc::MPCHandler;
 use dirs::home_dir;
-use ndarray;
+// use ndarray;
 
 
 // use pyo3::impl_::pymethods::AsyncIterBaseKind;
@@ -160,62 +160,62 @@ impl RockCollection {
            
     }
 
-    pub fn calc_radec<'py>(
-        &self,
-        py: Python<'py>,
-        observer: PyRef<PyObserver>,
-    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
-        let o = &observer.inner;
+    // pub fn calc_radec<'py>(
+    //     &self,
+    //     py: Python<'py>,
+    //     observer: PyRef<PyObserver>,
+    // ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    //     let o = &observer.inner;
 
-        if o.reference_plane != ReferencePlane::J2000 {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Observer frame is not J2000. Cannot calculate RA/Dec.",
-            ));
-        }
+    //     if o.reference_plane != ReferencePlane::J2000 {
+    //         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+    //             "Observer frame is not J2000. Cannot calculate RA/Dec.",
+    //         ));
+    //     }
 
-        let n = self.rocks.len();
-        let mut data = vec![0.0f64; 2 * n];
+    //     let n = self.rocks.len();
+    //     let mut data = vec![0.0f64; 2 * n];
 
-        data.par_chunks_mut(2)
-            .zip(self.rocks.par_iter())
-            .for_each(|(row, rock)| {
-                let (ra, dec) = rock.calc_radec(o).unwrap();
-                row[0] = ra;
-                row[1] = dec;
-            });
+    //     data.par_chunks_mut(2)
+    //         .zip(self.rocks.par_iter())
+    //         .for_each(|(row, rock)| {
+    //             let (ra, dec) = rock.calc_radec(o).unwrap();
+    //             row[0] = ra;
+    //             row[1] = dec;
+    //         });
 
-        let arr = ndarray::Array2::from_shape_vec((n, 2), data).unwrap();
-        Ok(arr.into_pyarray(py))
-    }
+    //     let arr = ndarray::Array2::from_shape_vec((n, 2), data).unwrap();
+    //     Ok(arr.into_pyarray(py))
+    // }
 
 
-    pub fn calc_radec_no_light_time<'py>(
-        &self,
-        py: Python<'py>,
-        observer: PyRef<PyObserver>,
-    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
-        let o = &observer.inner;
+    // pub fn calc_radec_no_light_time<'py>(
+    //     &self,
+    //     py: Python<'py>,
+    //     observer: PyRef<PyObserver>,
+    // ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+    //     let o = &observer.inner;
 
-        if o.reference_plane != ReferencePlane::J2000 {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Observer frame is not J2000. Cannot calculate RA/Dec.",
-            ));
-        }
+    //     if o.reference_plane != ReferencePlane::J2000 {
+    //         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+    //             "Observer frame is not J2000. Cannot calculate RA/Dec.",
+    //         ));
+    //     }
 
-        let n = self.rocks.len();
-        let mut data = vec![0.0f64; 2 * n];
+    //     let n = self.rocks.len();
+    //     let mut data = vec![0.0f64; 2 * n];
 
-        data.par_chunks_mut(2)
-            .zip(self.rocks.par_iter())
-            .for_each(|(row, rock)| {
-                let (ra, dec) = rock.calc_radec_no_light_time(o).unwrap();
-                row[0] = ra;
-                row[1] = dec;
-            });
+    //     data.par_chunks_mut(2)
+    //         .zip(self.rocks.par_iter())
+    //         .for_each(|(row, rock)| {
+    //             let (ra, dec) = rock.calc_radec_no_light_time(o).unwrap();
+    //             row[0] = ra;
+    //             row[1] = dec;
+    //         });
 
-        let arr = ndarray::Array2::from_shape_vec((n, 2), data).unwrap();
-        Ok(arr.into_pyarray(py))
-    }
+    //     let arr = ndarray::Array2::from_shape_vec((n, 2), data).unwrap();
+    //     Ok(arr.into_pyarray(py))
+    // }
 
 
 
