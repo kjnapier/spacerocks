@@ -9,10 +9,10 @@ crate-type = ["cdylib"]
 
 [dependencies]
 spacerocks = { path = "../" }
-pyo3 = { version = "*", features = ["extension-module"] }
+pyo3 = { version = "0.27", features = ["extension-module"] }
 
 numpy = "0.27"
-rayon = "*"
+rayon = "1.10"
 nalgebra = "0.32.2"
 
 # arrow = "40.0" 
@@ -20,6 +20,6 @@ flate2 = "1.0"
 serde_json = "1.0.68"
 serde = { version = "1.0.197", features = ["derive", "rc"]}
 reqwest = { version = "0.11.4", features = ["json", "blocking"] }
-anyhow = "*"
-dirs = "*"
+anyhow = "1"
+dirs = "6"
 ndarray = "0.16"

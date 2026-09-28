@@ -1,0 +1,436 @@
+use crate::time::Time;
+use crate::spacerock::SpaceRock;
+use crate::nbody::Simulation;
+use crate::observing::Observation;
+use crate::observing::observation::ObservationType;
+use crate::OrbitType;
+use std::f64::consts::PI;
+
+use nalgebra::{DMatrix, DVector};
+
+use std::time::Instant;
+
+pub fn residuals(detections: &Vec<&Observation>, theta: &[f64; 7], mut sim: Simulation) 
+    -> Result<(DVector<f64>, Vec<f64>, Vec<f64>), Box<dyn std::error::Error>> {
+
+    let trial = SpaceRock::from_xyz("rock", theta[0], theta[1], theta[2], theta[3], theta[4], theta[5], Time::new(theta[6], "tdb", "jd")?, "J2000", "SSB")?;
+    sim.integrate(&trial.epoch);
+    sim.add(trial)?;
+
+    let mut residuals: DVector<f64> = DVector::zeros(detections.len());
+    // Create vectors to store the raw RA and Dec residuals
+    let mut ra_residuals: Vec<f64> = Vec::new();
+    let mut dec_residuals: Vec<f64> = Vec::new();
+    
+    for (idx, detection) in detections.iter().enumerate() {
+
+        let observed_parameters = match detection.observation_type {
+            ObservationType::Astrometry { ra, dec } => DVector::from_vec(vec![ra, dec]),
+            ObservationType::Streak { ra, dec, ra_rate, dec_rate } => DVector::from_vec(vec![ra, dec, ra_rate, dec_rate]),
+            _ => return Err("Observation type not supported".into()),
+        };
+
+        // somehow get the rock to the epoch of the detection
+        sim.integrate(&detection.epoch);
+        let mut rock = sim.get_particle("rock")?.clone();
+
+        // calculate the model observations
+        let astro = rock.observe(&detection.observer)?;
+        let model_parameters = match detection.observation_type {
+            ObservationType::Astrometry { ra: _, dec: _ } => DVector::from_vec(vec![astro.ra(), astro.dec()]),
+            ObservationType::Streak { ra: _, dec: _, ra_rate: _, dec_rate: _ } => DVector::from_vec(vec![astro.ra(), astro.dec(), astro.ra_rate().expect("Must have ra rate"), astro.dec_rate().expect("Must have ra rate")]),
+            _ => return Err("Observation type not supported".into()),
+        };
+
+        let d = observed_parameters - model_parameters;
+        // Store the raw differences 
+        ra_residuals.push(d[0]);   // RA difference in radians
+        dec_residuals.push(d[1]);  // Dec difference in radians
+
+        let m = &d.transpose() * &detection.inverse_covariance.clone().unwrap() * &d;
+        residuals[idx] = m[0];
+    }
+    // Ok(residuals)
+    // Return the residuals and the raw RA and Dec residuals
+    Ok((residuals, ra_residuals, dec_residuals))
+}
+
+pub fn residuals_and_derivatives(detections: &Vec<&Observation>, theta: &[f64; 7], sim: Simulation) -> (DVector<f64>, DMatrix<f64>) {
+    let (central_residuals, _, _) = residuals(detections, theta, sim.clone()).unwrap();
+
+    let mut jac = DMatrix::zeros(detections.len(), 6);
+    let mut theta_plus = theta.clone();
+    let mut theta_minus = theta.clone();
+    
+    // let eps = (f64::EPSILON).sqrt();
+    let eps = 1.0e-8;
+
+    for i in 0..6 {
+        theta_plus[i] += eps;
+        theta_minus[i] -= eps;
+        let (res_plus, _, _) = residuals(detections, &theta_plus, sim.clone()).unwrap();
+        let (res_minus, _, _) = residuals(detections, &theta_minus, sim.clone()).unwrap();
+        let deriv = (res_plus - res_minus) / (2.0 * eps);
+        for j in 0..detections.len() {
+            jac[(j, i)] = deriv[j]
+        }
+        theta_plus[i] -= eps;
+        theta_minus[i] += eps;
+    }
+
+    (central_residuals, jac)
+}
+
+
+pub fn orbit_chisq(detections: &Vec<&Observation>, theta: &[f64; 7], sim: Simulation) -> f64 {
+    let epoch = Time::new(theta[6], "tdb", "jd").unwrap();
+    let _trial = SpaceRock::from_xyz("rock", theta[0], theta[1], theta[2], theta[3], theta[4], theta[5], epoch, "J2000", "SSB");
+    let (res, _, _) = residuals(detections, theta, sim.clone()).unwrap();
+    res.sum()
+}
+
+#[derive(Debug, Clone)]
+pub struct FitResult {
+    pub chisq: f64,
+    pub rock: SpaceRock,
+    pub niter: usize,
+    pub dof: f64,
+    pub residuals: Vec<f64>,
+    pub ra_residuals: Vec<f64>,
+    pub dec_residuals: Vec<f64>,
+    pub covariance: DMatrix<f64>,
+    pub keplerian_covariance: DMatrix<f64>
+}
+
+
+pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], sim: Simulation) -> Result<Option<FitResult>, Box<dyn std::error::Error>> {  
+
+    // do timing
+    let start = Instant::now();
+    
+    let grad_tol = 1e-12;
+    let theta_tol = 1e-12;
+    let rho_accept = 0.0;
+
+    let maxiter = 1_000;
+    let mut niter = 0;
+
+    let dof = detections.len() as f64 * 2.0 - 6.0;
+    let mut theta = initial_guess.clone();
+    
+    // let mut csq = cost(detections, &theta, sim.clone());
+    let (mut res, mut j) = residuals_and_derivatives(detections, &theta, sim.clone());
+    let mut grad = &j.transpose() * &res;
+    let mut a = &j.transpose() * &j;
+
+    let mut csq = res.sum();
+    let mut new_csq: f64 = csq.clone();
+
+    let mut lambda: f64 = 0.001;
+    let eye = DMatrix::identity(6, 6);
+
+    while grad.norm() > grad_tol {
+
+        // println!("Iteration: {}, chisq: {}, lambda: {}, ndof: {}", niter, csq, lambda, dof);
+
+        let h = match (&a + lambda * &eye).lu().solve(&(-&grad)) {
+            Some(h) => h,
+            None => return Err("Matrix inversion failed".into())
+        };
+        if h.norm() < theta_tol {
+            println!("Parameters converged");
+            break;
+        }
+
+        let mut theta_new = theta.clone();
+        for idx in 0..6 {
+            theta_new[idx] += h[idx];
+        }
+
+        let (res2, j2) = residuals_and_derivatives(detections, &theta_new, sim.clone());
+        new_csq = res2.sum();
+
+        let rho = (csq - new_csq) / (&h.transpose() * (lambda * &h - &grad)).norm();
+        if rho > rho_accept {
+            res = res2;
+            theta = theta_new;
+            j = j2;
+            grad = &j.transpose() * &res;
+            a = &j.transpose() * &j;
+            // lambda *= f64::max(1.0 / 3.0, 1.0 - (2.0 * rho - 1.0).powi(3));
+            lambda *= 0.1;
+            csq = new_csq;
+            // v = 2.0;
+        } else {
+            // reject the step, increase lambda, and reset the parameters
+            lambda *= 10.0;
+            // v *= 2.0;
+        }
+
+        niter += 1;
+        if niter >= maxiter {
+            println!("Max iterations reached");
+            break;
+        }
+        
+    }
+
+    let rock = SpaceRock::from_xyz("rock", theta[0], theta[1], theta[2], theta[3], theta[4], theta[5], Time::new(theta[6], "tdb", "jd")?, "J2000", "SSB")?;
+    let a = &j.transpose() * &j;
+    let cov = a.pseudo_inverse(1e-10)?;
+
+     // Get the residuals in RA and Dec
+     let (res, ra_res, dec_res) = residuals(detections, &theta, sim.clone())?;
+
+     // Finally, get the covariance matrix for the keplerian elements
+     // First, transform my covariance matrix to a scaled covariance matrix
+     let cov_scaled = (new_csq / dof) * cov.clone();
+     // Then, calculate the Jacobian matrix for the keplerian elements
+     let j_kep = calculate_keplerian_jacobian(&rock);
+     let cov_kep = &j_kep * &cov_scaled * &j_kep.transpose();
+
+    println!("Final chisq: {}", new_csq);
+    println!("Final chisq/dof: {}", new_csq / dof);
+    println!("Final parameters: {:?}", theta);
+    let duration = start.elapsed();
+    println!("Time elapsed in LM fit is: {:?}", duration);
+
+    return Ok(Some(FitResult {
+        // chisq: new_csq * dof,
+        chisq: new_csq,
+        dof: dof,
+        residuals: res.iter().map(|r| *r).collect::<Vec<_>>(),
+        ra_residuals: ra_res,
+        dec_residuals: dec_res,
+        rock: rock,
+        niter: niter,
+        covariance: cov,
+        keplerian_covariance: cov_kep,
+    }));
+
+
+}
+
+pub fn calculate_keplerian_jacobian(rock: &SpaceRock) -> DMatrix<f64> {
+    // Initialize the Jacobian matrix 
+    let mut jac = DMatrix::zeros(6, 6);
+    
+    let state = [
+        rock.position.x, rock.position.y, rock.position.z,
+        rock.velocity.x, rock.velocity.y, rock.velocity.z,
+        rock.epoch.jd()  // Keep epoch for creating new rocks
+    ];
+    
+    // let k0 = [
+    //     rock.a(),
+    //     rock.e(),
+    //     rock.inc(),
+    //     rock.arg(),
+    //     rock.node(),
+    //     rock.mean_anomaly()
+    // ];
+    
+    let eps = 1.0e-8;
+    
+    // For each Cartesian component
+    for i in 0..6 {
+        let mut state_plus = state.clone();
+        let mut state_minus = state.clone();
+        state_plus[i] += eps;
+        state_minus[i] -= eps;
+        
+        // Create perturbed SpaceRocks
+        let rock_plus = SpaceRock::from_xyz(
+            "rock_plus",
+            state_plus[0], state_plus[1], state_plus[2],
+            state_plus[3], state_plus[4], state_plus[5],
+            Time::new(state_plus[6], "tdb", "jd").unwrap(),
+            rock.reference_plane.as_str(),
+            rock.origin.as_str()
+        ).unwrap();
+        
+        let rock_minus = SpaceRock::from_xyz(
+            "rock_minus",
+            state_minus[0], state_minus[1], state_minus[2],
+            state_minus[3], state_minus[4], state_minus[5],
+            Time::new(state_minus[6], "tdb", "jd").unwrap(),
+            rock.reference_plane.as_str(),
+            rock.origin.as_str()
+        ).unwrap();
+        
+        // Get perturbed Keplerian elements
+        let k_plus = [
+            rock_plus.a(),
+            rock_plus.e(),
+            rock_plus.inc(),
+            rock_minus.arg(),
+            rock_plus.node(),
+            rock_plus.mean_anomaly()
+        ];
+        
+        let k_minus = [
+            rock_minus.a(),
+            rock_minus.e(),
+            rock_minus.inc(),
+            rock_minus.arg(),
+            rock_minus.node(),
+            rock_minus.mean_anomaly()
+        ];
+        
+        // for j in 0..6 {
+        //     jac[(j, i)] = (k_plus[j] - k_minus[j]) / (2.0 * eps);
+        // }
+
+        for j in 0..6 {
+            let mut diff = k_plus[j] - k_minus[j];
+            
+            // Angle wrapping
+            if j >= 3 {  // arg, node, mean_anomaly
+                if diff > PI {
+                    diff -= 2.0 * PI;
+                } else if diff < -PI {
+                    diff += 2.0 * PI;
+                }
+            }
+            
+            jac[(j, i)] = diff / (2.0 * eps);
+        }
+    }
+    
+    // Handle circular orbit
+    let orbit_type = OrbitType::from_eccentricity(rock.e(), 1.0e-6).unwrap();
+    if orbit_type == OrbitType::Circular {
+        jac.row_mut(3).fill(0.0);  // arg
+        jac.row_mut(5).fill(0.0);  // mean_anomaly
+    }
+
+    jac
+}
+
+
+// pub fn fit_orbit_lm(detections: &Vec<&Observation>, initial_guess: &[f64; 7], sim: Simulation) -> Result<Option<FitResult>, Box<dyn std::error::Error>> {  
+
+//     // do timing
+//     let start = Instant::now();
+    
+//     let csq_tol = 1e-1;
+//     let grad_tol = 1e-3;
+//     let theta_tol = 1e-4;
+//     let rho_accept = 0.1;
+//     let tol = 1.0e-10;
+
+//     let maxiter = 10;
+//     let dof = detections.len() as f64 * 2.0 - 6.0;
+//     let mut theta = initial_guess.clone();
+    
+//     let mut chisq = cost(detections, &theta, sim.clone()) / dof;
+//     println!("Initial chisq: {}", chisq);
+//     let mut new_csq: f64 = chisq;
+    
+//     let mut csq_change: f64 = 1000.0;
+    
+//     let mut lambda: f64 = 0.00001;
+
+//     for iter in 0..maxiter {
+
+//         let (r, J) = residuals_and_derivatives(detections, &theta, sim.clone());
+
+//         // Compute the gradient g = J^T * r.
+//         let g = J.transpose() * &r;
+
+//         // Convergence check: if the gradient is small, we are done.
+//         if g.norm() < tol {
+//             println!("Converged (gradient norm < tol) at iteration {}.", iter);
+//             break;
+//         }
+
+//         // Hessian approximation H = J^T * J.
+//         let H = J.transpose() * &J;
+//         // Form the damped Hessian: H_damped = H + lambda * I.
+//         let H_damped = &H + lambda * DMatrix::identity(H.nrows(), H.ncols());
+
+//         // Solve for update: h = - (H_damped)^{-1} * g.
+//         let h = match H_damped.lu().solve(&(-&g)) {
+//             Some(sol) => sol,
+//             None => {
+//                 println!("Failed to solve linear system at iteration {}.", iter);
+//                 break;
+//             }
+//         };
+
+//         println!("Update: {:?}", h);
+
+//         // Candidate new parameters.
+//         // let theta_new = &theta + &h;
+//         let mut theta_new = theta.clone();
+//         for idx in 0..6 {
+//             theta_new[idx] += h[idx];
+//         }
+//         let r_new = residuals(detections, &theta_new, sim.clone())?;
+//         let chisq_new = r_new.norm_squared();
+//         println!("New chisq: {}", chisq_new);
+
+//         // Compute the actual reduction.
+//         let actual_reduction = chisq - chisq_new;
+//         // Compute the predicted reduction from the quadratic model:
+//         // predicted = - [g^T h + 0.5 * h^T H h]
+//         let predicted_reduction = - (g.dot(&h) + 0.5 * &h.dot(&(H * &h)));
+
+//         // Compute the ratio of actual to predicted reduction.
+//         let rho = actual_reduction / predicted_reduction;
+
+//         // Decide whether to accept the step.
+//         if rho > 0.0 {
+//             // Accept the update.
+//             theta = theta_new;
+//             chisq = chisq_new;
+//             // Optionally reduce lambda.
+//             lambda *= 0.1;
+//         } else {
+//             // Reject the update and increase lambda.
+//             lambda *= 10.0;
+//         }
+
+//         println!(
+//             "Iteration {}: chisq = {}, lambda = {}, rho = {}",
+//             iter, chisq, lambda, rho
+//         );
+
+//         // Convergence check: if the update h is very small.
+//         let mut theta_norm_sq = 0.0;
+//         for idx in 0..6 {
+//             theta_norm_sq += theta[idx] * theta[idx];
+//         }
+//         let theta_norm = theta_norm_sq.sqrt();
+
+//         if h.norm() < tol * (theta_norm + tol) {
+//             println!("Converged (parameter update small) at iteration {}.", iter);
+//             break;
+//         }
+        
+//     }
+
+//     let rock = SpaceRock::from_xyz("rock", theta[0], theta[1], theta[2], theta[3], theta[4], theta[5], Time::new(theta[6], "tdb", "jd")?, "J2000", "SSB")?; 
+
+//     let (res, mut j) = residuals_and_derivatives(detections, &theta, sim.clone());
+//     let a = &j.transpose() * &j;
+//     let cov = a.pseudo_inverse(1e-10)?;
+
+//     // let rd_resid = radec_residuals(detections, &theta, epoch);
+
+//     println!("Final chisq: {}", new_csq * dof);
+//     println!("Final parameters: {:?}", theta);
+//     let duration = start.elapsed();
+//     println!("Time elapsed in LM fit is: {:?}", duration);
+
+//     return Ok(Some(FitResult {
+//         chisq: new_csq * dof,
+//         dof: dof,
+//         // residuals: residuals(detections, &theta).iter().map(|r| *r).collect::<Vec<_>>(),
+//         rock: rock,
+//         niter: 0,
+//         covariance: cov
+//     }));
+
+
+// }

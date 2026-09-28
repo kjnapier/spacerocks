@@ -42,3 +42,12 @@ spacerocks_old
 # Added by cargo
 
 /target
+
+# test fixtures
+!tests/data/*.json
+!tests/data/*.csv
+notebooks/examples/mpc_cache/
+
+# checker catalogs (binary snapshots)
+*.srcat
+__pycache__/

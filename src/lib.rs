@@ -46,7 +46,12 @@ pub mod utils; // Putting the 'find_closest_match' function in a separate module
 
 pub mod orbfit;
     pub use orbfit::gauss;
-//     pub use orbfit::fitter;
 
 pub mod assist;
     pub use assist::spice_simulation::SpiceSimulation;
+
+pub mod batch;
+    pub use batch::{BatchOptions, Ephemeris};
+
+pub mod checker;
+    pub use checker::Catalog;
