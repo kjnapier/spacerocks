@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 
 pub mod spicekernel;
+mod display;
 
 pub fn make_spice_submodule(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Create a submodule named "time"

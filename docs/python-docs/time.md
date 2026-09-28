@@ -227,3 +227,12 @@ tt = time.tt()        # New TT time
 - ISO format follows the 8601 standard
 - Invalid inputs raise ValueError with suggestions 
 - Method chaining supported for conversions
+
+- UTC before 1972. From 1972, TT − UTC = 32.184 s plus the leap seconds. From 1960 to 1972, UTC
+  ran at offset rates from TAI with small steps; spacerocks follows the same table as SOFA/ERFA,
+  and applies each step at 0h UTC, when it happened (ERFA spreads it over the preceding day).
+  Before 1960 there was no UTC: times are taken as UT, and TT − UT = ΔT from Stephenson, Morrison
+  & Hohenkerk (2016, updated 2021; Table S15.2020), about −2 s in 1900, 29 s in 1950 and 33 s in
+  1960. `spacerocks.time` agrees with ERFA from 1960 on and with that table before, to the 40 µs
+  precision of a Julian date (`validation/time/compare_erfa.py`). SPICE (and so layup, sorcha)
+  instead takes 42.184 s for every date before 1972, which is off by 8–44 s in the 20th century.

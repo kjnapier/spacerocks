@@ -112,6 +112,7 @@ impl Time {
     /// # Example
     ///
     /// ```
+    /// # use spacerocks::time::{Time, TimeScale};
     /// let t = Time::now();
     /// ```
     pub fn now() -> Self {
@@ -137,6 +138,7 @@ impl Time {
     /// # Example
     ///
     /// ```
+    /// # use spacerocks::time::{Time, TimeScale};
     /// let t = Time::from_fuzzy_str("2451545.0 UTC JD");
     /// ```
     pub fn from_fuzzy_str(s: &str) -> Result<Self, TimeError> {
@@ -165,6 +167,7 @@ impl Time {
     /// # Example
     ///
     /// ```
+    /// # use spacerocks::time::{Time, TimeScale};
     /// let t = Time::infer_time_format(2451545.0, None);
     /// ```
     // pub fn infer_time_format(epoch: f64, timescale: Option<&str>) -> Result<Self, TimeError> {
@@ -212,6 +215,7 @@ impl Time {
     /// # Example
     ///
     /// ```
+    /// # use spacerocks::time::{Time, TimeScale};
     /// let t = Time::from_isot("2021-01-01T00:00:00Z");
     /// ```
     
@@ -235,6 +239,7 @@ impl Time {
     /// * `Time` - New time object with the timescale set to UTC.
     ///
     /// ```
+    /// # use spacerocks::time::{Time, TimeScale};
     /// let tdb_time = Time::new(2456205.5, "tdb", "jd").unwrap();
     /// let utc_time = tdb_time.utc();  // Creates new Time object in UTC
     /// assert!(tdb_time.epoch != utc_time.epoch);  // Epochs differ due to timescale conversion
@@ -355,6 +360,7 @@ impl Time {
     /// # Example
     ///
     /// ```
+    /// # use spacerocks::time::{Time, TimeScale};
     /// let mut time = Time::new(2456205.5, "tdb", "jd").unwrap();
     /// time.to_utc();  // Converts time to UTC in place
     /// assert_eq!(time.timescale, TimeScale::UTC);
@@ -513,10 +519,11 @@ impl Time {
         
         // Convert JD to DateTime<Utc>
         let days_since_epoch = utc_time.jd() - 2440587.5; // JD of Unix epoch (1970-01-01)
-        let seconds_since_epoch = (days_since_epoch * 86400.0) as i64;
-        
+        // Round to the nearest millisecond (this used to truncate to whole seconds).
+        let millis_since_epoch = (days_since_epoch * 86_400_000.0).round() as i64;
+
         // Create DateTime from timestamp
-        let dt: DateTime<Utc> = Utc.timestamp_opt(seconds_since_epoch, 0)
+        let dt: DateTime<Utc> = Utc.timestamp_millis_opt(millis_since_epoch)
             .unwrap();  // Safe to unwrap as our JD calculations are valid
             
         // Format as ISO string

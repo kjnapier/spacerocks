@@ -266,3 +266,18 @@ let diff: f64 = &time2 - &time1;  // Returns 1.0 (days)
    - Addition and subtraction preserve timescale and format
    - Time differences require matching timescales
    - Panic on timescale mismatch for differences
+
+## UTC before 1972
+
+`utc_to_tai`, `tai_to_utc` and everything built on them use `tt_minus_utc(jd_utc)`:
+
+- from 1972: 32.184 s plus the leap seconds (`leapseconds::LEAP_SECONDS`);
+- 1960–1972: 32.184 s plus TAI − UTC from UTC's rate-offset table, as SOFA/ERFA's `dat`, with
+  each step applied at 0h UTC;
+- before 1960 (`UTC_START`), when there was no UTC: the epoch is UT, and TT − UT = ΔT
+  (`time::delta_t`, the cubic splines of Stephenson, Morrison & Hohenkerk 2016, Table S15.2020;
+  their long-term parabola outside 720 BC–AD 2019).
+
+Results from 1972 on are bit-identical to before. Validated against ERFA and the table in
+`validation/time/compare_erfa.py`. SPICE, and so layup and sorcha, take 42.184 s for all dates
+before 1972.

@@ -1,17 +1,28 @@
-# Default kernels to load automatically
+# Example spacerocks kernel-set configuration.
+# Use with  SpiceKernel.from_config("config.toml")  (Python)  or
+#           SpiceKernel::from_config_file("config.toml")  (Rust).
+# SpiceKernel.defaults() uses the same list as below without needing this file.
 
-default_kernels = [
-    { name = "latest_leapseconds.tls", kernel_type = "lsk" }, 
-    { name = "de440s.bsp", kernel_type = "spk/planets" },
-    { name = "earth_1962_240827_2124_combined.bpc", kernel_type = "pck" },
-    { name = "codes_300ast_20100725.bsp", kernel_type = "spk/asteroids"},
-    { name = "codes_300ast_20100725.tf", kernel_type = "spk/asteroids"},
-]
-
-# Auto-download is enabled by default, but you can set it explicitly
-
+# Download kernels that are missing locally.
 auto_download = true
 
-# Directory settings 
-kernel_paths = ["/Users/thomasruch/Gerdes", "/Users/thomasruch/.spacerocks/spice/"]
-#download_dir = "/Users/thomasruch/srnew1/spacerocks/spice_and_mpc_data/"
+# For wildcard names, also check the server for a newer file when one is already cached.
+check_for_updates = false
+
+# Where downloaded kernels are stored (default: $SPACEROCKS_SPICE_DIR or ~/.spacerocks/spice).
+# download_dir = "~/.spacerocks/spice"
+
+# Extra directories searched, in order, before download_dir.
+# kernel_paths = ["~/data/spice"]
+
+# Kernels to load, in order (later files take priority). `kernel_type` is the directory on
+# https://naif.jpl.nasa.gov/pub/naif/generic_kernels/ ; `url` downloads from anywhere else;
+# a spec with neither must already exist locally. `*` picks the newest matching file.
+default_kernels = [
+    { name = "latest_leapseconds.tls", kernel_type = "lsk" },
+    { name = "de440s.bsp", kernel_type = "spk/planets" },
+    { name = "earth_1962_*_combined.bpc", kernel_type = "pck" },
+    { name = "gm_de440.tpc", kernel_type = "pck" },
+    { name = "pck00010.tpc", kernel_type = "pck" },
+    { name = "sb441-n16.bsp", url = "https://ssd.jpl.nasa.gov/ftp/eph/small_bodies/asteroids_de441/sb441-n16.bsp" },
+]
