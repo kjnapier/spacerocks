@@ -31,3 +31,7 @@
 - 003: Include custom perturbers in a simulation.
 
 - 004: Calculate the increase in the rate of the precession of Mercury's orbit due to General Relativity.
+
+- 005: Fit orbits to MPC astrometry (and JPL radar) with the `orbfit` module (`examples/orbit_fitting.ipynb`).
+
+- 006: Identify detections with known objects, MPChecker-style, with the `checker` module (`examples/mpchecker.ipynb`).
