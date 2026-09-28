@@ -74,6 +74,73 @@ trojan_collection = RockCollection.from_mpc(
 ### Operation Methods
 ---
 
+**`propagate()`**
+```python
+def propagate(self, epoch: Time, kernel: SpiceKernel, method: str = "nbody", chunk_size: int = 64) -> None
+```
+Moves every rock to `epoch`. With `method="nbody"` (default) the rocks are integrated with IAS15
+in the field of the Sun, planets, Moon, Pluto and the 16 most massive asteroids from `kernel`;
+`method="twobody"` uses Keplerian motion instead.
+
+Rocks are integrated together, up to `chunk_size` per simulation: they are grouped by epoch and
+sorted by perihelion distance, so each simulation holds dynamically similar objects, and
+simulations run in parallel with the GIL released. Sharing a simulation means the perturber
+ephemeris is evaluated once per step for the whole group, which makes this 3–6x faster than
+integrating rocks one at a time. Rocks in a group share its step size, which is never longer than
+any member's own, so results differ from `SpaceRock.propagate` only at the integrator's tolerance
+(typically metres after months) and are at least as accurate. `chunk_size=1` integrates every
+rock on its own, exactly like `SpaceRock.propagate`.
+
+Each rock keeps its reference plane and origin (SUN or SSB; a custom origin is returned as SSB).
+Raises `ValueError` if a rock cannot be integrated (for example, when the kernel does not cover the
+requested epoch).
+
+*Example:*
+```python
+kernel = SpiceKernel.defaults()
+rocks.propagate(Time(2461000.5, "tdb", "jd"), kernel)
+```
+
+**`ephemeris()`**
+```python
+def ephemeris(self, epochs, observer, kernel: SpiceKernel, method: str = "nbody",
+              timescale: str = "utc", return_states: bool = False, chunk_size: int = 64) -> dict
+```
+**Arguments:**
+- `epochs`: a list of `Time` objects, or an array of Julian dates in `timescale`
+- `observer`: an `Observatory` (its position is computed at each epoch), or a list of
+  `Observer` objects, one per epoch (then `epochs` may be `None`)
+- `kernel`: the SPICE kernel (perturbers and observer positions)
+- `method`: `"nbody"` or `"twobody"`
+
+**Returns:** a dict of NumPy arrays of shape `(len(rocks), n_epochs)`:
+
+| Key | Units | Description |
+|---|---|---|
+| `ra`, `dec` | radians | Astrometric position (J2000 equator), corrected for light travel time |
+| `ra_rate`, `dec_rate` | radians/day | Rates (`ra_rate` is dRA/dt, not multiplied by cos(dec)) |
+| `range`, `range_rate` | AU, AU/day | Observer–object distance and its rate |
+| `r_helio` | AU | Sun–object distance |
+| `phase`, `elong` | radians | Sun–object–observer and Sun–observer–object angles |
+| `mag` | mag | H-G apparent magnitude (NaN for rocks without an absolute magnitude) |
+| `epoch` | TDB JD | The epochs, shape `(n_epochs,)` |
+| `states` | AU, AU/day | Barycentric J2000 states, shape `(len(rocks), n_epochs, 6)` (only with `return_states=True`) |
+
+Each rock is integrated once through all epochs, which can be in any order and before or after the
+rocks' epochs, and states are read off the integrator's dense output between steps. This is
+typically 40x or more faster than propagating and observing at each epoch. The collection is not
+modified.
+
+*Example:*
+```python
+import numpy as np
+kernel = SpiceKernel.defaults()
+w84 = Observatory.from_obscode("W84")
+nights = np.arange(2461000.6, 2461030.6, 1.0)      # UTC Julian dates
+eph = rocks.ephemeris(nights, w84, kernel)
+visible = (eph["mag"] < 24) & (np.degrees(eph["elong"]) > 90)
+```
+
 **`analytic_propagate()`**
 ```python
 def analytic_propagate(self, epoch: Time) -> RockCollection
@@ -123,6 +190,22 @@ observatory = Observatory.from_obscode("F51")
 observer = observatory.at(epoch)
 
 observations = collection.observe(observer)
+```
+
+**`observe_arrays()`**
+```python
+def observe_arrays(self, observer: Observer) -> dict
+```
+The same computation as `observe`, but returns a dict of 1-D NumPy arrays (one entry per rock;
+same keys as `ephemeris` without `epoch` and `states`) instead of a list of `Observation` objects.
+For large collections this is roughly 7x faster, and much faster again than pulling values out of
+`Observation` objects one by one. The rocks and the observer must be at the same epoch and in the
+same reference plane.
+
+*Example:*
+```python
+obs = collection.observe_arrays(observatory.at(epoch, kernel, "J2000", "SSB"))
+ra, dec, mag = obs["ra"], obs["dec"], obs["mag"]
 ```
 
 **`filter()`**

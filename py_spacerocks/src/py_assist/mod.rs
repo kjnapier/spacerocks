@@ -4,14 +4,15 @@ pub mod simulation;
 pub mod integrator;
 pub mod force;
 
-use crate::py_nbody::integrator::PyIntegrator;
-use crate::py_nbody::force::PyForce;
+use crate::py_assist::integrator::PyIntegrator;
+use crate::py_assist::force::PyForce;
 
 
 pub fn make_assist_submodule(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     let submodule = PyModule::new(py, "assist")?;
 
     submodule.add_class::<simulation::PySpiceSimulation>()?;
+    submodule.add_class::<simulation::PyPerturberCache>()?;
     submodule.add_class::<PyIntegrator>()?;
     submodule.add_class::<PyForce>()?;
 

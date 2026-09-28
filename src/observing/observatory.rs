@@ -7,10 +7,8 @@ use crate::time::Time;
 use crate::coordinates::{ReferencePlane, Origin};
 
 use crate::spice::SpiceKernel;
-use crate::spice::SpiceBody;
 
 use nalgebra::Vector3;
-use nalgebra::Matrix3;
 
 
 /// Represents different types of astronomical observatories.
@@ -81,53 +79,68 @@ impl Observatory {
     // /// # Returns
     // ///
     // /// * `Result<Observer, Box<dyn std::error::Error>>` - The Observer object.
+    /// Position of a ground observatory in the Earth-fixed (ITRF93) frame, in AU; `None` for
+    /// other kinds of observatory.
+    pub fn earth_fixed_position(&self) -> Option<[f64; 3]> {
+        match self {
+            Observatory::GroundObservatory { lon, lat, rho, .. } => Some([
+                rho * lat.cos() * lon.cos() * EQUAT_RAD * M_TO_AU,
+                rho * lat.cos() * lon.sin() * EQUAT_RAD * M_TO_AU,
+                rho * lat.sin() * EQUAT_RAD * M_TO_AU,
+            ]),
+            _ => None,
+        }
+    }
+
     pub fn at(&self, epoch: &Time, reference_plane: &str, origin: &str, kernel: &SpiceKernel) -> Result<Observer, Box<dyn std::error::Error>> {
         match self {
             Observatory::GroundObservatory { obscode: _, lon, lat, rho } => {
-                let mut earth = SpaceRock::from_spice("earth", epoch, reference_plane, origin, &kernel)?;
-                let rho_sin_lat = lat.sin() * rho;
-                let rho_cos_lat = lat.cos() * rho;
-                
-                let delta_et = 10.0 / 86400.0;
-                let et = epoch.tdb().jd();
+                let earth = SpaceRock::from_spice("earth", epoch, reference_plane, origin, &kernel)?;
 
-                let m: nalgebra::Matrix3<f64> = kernel.pxform(et)?.into();
-                let mp: nalgebra::Matrix3<f64> = kernel.pxform(et + delta_et)?.into();
-                let mm: nalgebra::Matrix3<f64> = kernel.pxform(et - delta_et)?.into();
-                // transpose the matrix
-                let m = m.transpose();
-                let mp = mp.transpose();
-                let mm = mm.transpose();
+                // Geocentric observatory position in the Earth-fixed (ITRF93) frame, in AU.
+                let obs_vec = [
+                    rho * lat.cos() * lon.cos() * EQUAT_RAD * M_TO_AU,
+                    rho * lat.cos() * lon.sin() * EQUAT_RAD * M_TO_AU,
+                    rho * lat.sin() * EQUAT_RAD * M_TO_AU,
+                    0.0,
+                    0.0,
+                    0.0,
+                ];
 
-                let ox = rho_cos_lat * lon.cos();
-                let oy = rho_cos_lat * lon.sin();
-                let oz = rho_sin_lat;
-                let obs_vec = Vector3::new(ox, oy, oz);
+                // Rotate position and velocity (from Earth rotation) into J2000, then into the
+                // requested reference plane.
+                let et = crate::spice::et_from_jd(epoch.tdb().jd());
+                let xf = kernel.earth_fixed_to_j2000(et)?;
+                let s = xf.apply(&obs_vec);
+                let plane = ReferencePlane::from_str(reference_plane)?;
+                let rot = plane.get_rotation_matrix()
+                    * ReferencePlane::J2000.get_rotation_matrix().try_inverse().ok_or("Could not invert rotation matrix")?;
+                let offset = rot * Vector3::new(s[0], s[1], s[2]);
+                // xf.rate is per second; convert to AU/day
+                let offset_vel = rot * Vector3::new(s[3], s[4], s[5]) * 86400.0;
 
-                let m_vec = m * obs_vec * EQUAT_RAD * M_TO_AU;
-                let m_vecp = mp * obs_vec * EQUAT_RAD * M_TO_AU;
-                let m_vecm = mm * obs_vec * EQUAT_RAD * M_TO_AU;
-                let d_vel = (m_vecp - m_vecm) / (2.0 * delta_et);
-                earth.position += m_vec;
-                earth.velocity += d_vel;
-                
-                let observer = Observer { position: earth.position, 
-                                          velocity: Some(earth.velocity), 
-                                          epoch: epoch.clone(),
-                                          reference_plane: ReferencePlane::from_str(reference_plane)?, 
-                                          origin: Origin::from_str(origin)?,
-                                          observatory: Some(self.clone()) };
+                let observer = Observer::from_xyz(earth.position + offset,
+                                                  Some(earth.velocity + offset_vel),
+                                                  epoch.clone(),
+                                                  plane,
+                                                  Origin::from_str(origin)?,
+                                                  Some(self.clone()))
+                    .with_sun_position(sun_position(epoch, reference_plane, origin, kernel)?);
                 Ok(observer)
             },
             Observatory::SpaceTelecope { name } => {
-                // let rock = SpaceRock::from_spice(&name, epoch, reference_plane, origin)?;
-                let rock = SpaceRock::from_horizons(&name, epoch, reference_plane, origin)?;
-                let observer = Observer { position: rock.position, 
-                                          velocity: Some(rock.velocity), 
-                                          epoch: epoch.clone(),
-                                          reference_plane: ReferencePlane::from_str(reference_plane)?,
-                                          origin: Origin::from_str(origin)?,
-                                          observatory: Some(self.clone()) };
+                // Use loaded SPK data when available (e.g. jwst_pred.bsp), otherwise ask Horizons.
+                let rock = match SpaceRock::from_spice(&name, epoch, reference_plane, origin, &kernel) {
+                    Ok(rock) => rock,
+                    Err(_) => SpaceRock::from_horizons(&name, epoch, reference_plane, origin)?,
+                };
+                let observer = Observer::from_xyz(rock.position,
+                                                  Some(rock.velocity),
+                                                  epoch.clone(),
+                                                  ReferencePlane::from_str(reference_plane)?,
+                                                  Origin::from_str(origin)?,
+                                                  Some(self.clone()))
+                    .with_sun_position(sun_position(epoch, reference_plane, origin, kernel)?);
                 Ok(observer)
             }
             _ => {
@@ -374,3 +387,22 @@ impl Observatory {
 //     mVecp = np.dot(mp, obsVec) * Rearth
 //     mVecm = np.dot(mm, obsVec) * Rearth
 //     return pos + mVec, vel + (mVecp - mVecm) / (2 * delta_et)
+
+/// Position of the Sun relative to `origin` in `reference_plane`, in AU.
+fn sun_position(epoch: &Time, reference_plane: &str, origin: &str, kernel: &SpiceKernel) -> Result<Vector3<f64>, Box<dyn std::error::Error>> {
+    if Origin::from_str(origin)? == Origin::SUN {
+        return Ok(Vector3::zeros());
+    }
+    Ok(SpaceRock::from_spice("sun", epoch, reference_plane, origin, kernel)?.position)
+}
+
+/// Barycentric J2000 state (AU, AU/day) at TDB Julian date `jd_tdb` of a point fixed on the Earth
+/// at `earth_fixed` (ITRF93, AU): the same computation as [`Observatory::at`] for a ground
+/// observatory.
+pub fn earth_fixed_state(earth_fixed: &[f64; 3], jd_tdb: f64, kernel: &SpiceKernel) -> Result<[f64; 6], Box<dyn std::error::Error>> {
+    let earth = kernel.state_au(399, 0, jd_tdb)?;
+    let xf = kernel.earth_fixed_to_j2000(crate::spice::et_from_jd(jd_tdb))?;
+    let s = xf.apply(&[earth_fixed[0], earth_fixed[1], earth_fixed[2], 0.0, 0.0, 0.0]);
+    // xf's rates are per second.
+    Ok([earth[0] + s[0], earth[1] + s[1], earth[2] + s[2], earth[3] + s[3] * 86400.0, earth[4] + s[4] * 86400.0, earth[5] + s[5] * 86400.0])
+}

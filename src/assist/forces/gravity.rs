@@ -1,8 +1,7 @@
-use crate::spacerock::SpaceRock;
 use crate::constants::GRAVITATIONAL_CONSTANT;
 
 use crate::assist::forces::Force;
-use crate::assist::{SimulationParticle, SimulationState};
+use crate::assist::SimulationState;
 
 use nalgebra::Vector3;
 
@@ -54,30 +53,18 @@ impl Force for NewtonianGravity {
         let spice_particles = &state.spice_particles;
         let particles = &mut state.particles_1;
 
-        let n_particles = particles.len();
-        let n_spice_particles = spice_particles.len();
-
-        for idx in 0..n_particles {
-
-            let particle = &mut particles[idx];
-
-            for jdx in 0..n_spice_particles {
-
-                let p2 = &spice_particles[jdx];
-
+        for particle in particles.iter_mut() {
+            // One square root and one division per pair; accumulate locally.
+            let mut acc = Vector3::zeros();
+            for p2 in spice_particles.iter() {
                 let r_vec = particle.position - p2.position;
-                let r = r_vec.norm();
-                let r2 = r * r;
-                let r3 = r2 * r;
-                let r5 = r3 * r2;
-
-                let xi = -GRAVITATIONAL_CONSTANT * r_vec / r3;
-                let idx_acceleration = xi * p2.mass;
-                particle.acceleration += idx_acceleration;
-
+                let r2 = r_vec.norm_squared();
+                let inv_r = 1.0 / r2.sqrt();
+                let f = GRAVITATIONAL_CONSTANT * p2.mass * inv_r * inv_r * inv_r;
+                acc -= r_vec * f;
             }
+            particle.acceleration += acc;
         }
-        
     }
 
     fn apply_acceleration_and_stm(&self, state: &mut SimulationState) {

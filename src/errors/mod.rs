@@ -14,15 +14,13 @@
 //! # Examples
 //!
 //! ```
-//! use spacerocks::{OrbitError, TimeError};
+//! use spacerocks::{OrbitError, OrbitType};
 //!
-//! fn propagate_orbit(epoch: f64) -> Result<(), Box<dyn std::error::Error>> {
-//!     // Example error handling for orbital calculations
-//!     if epoch < 0.0 {
-//!         return Err(Box::new(TimeError::InvalidEpoch(epoch)));
-//!     }
-//!     Ok(())
+//! fn classify(e: f64) -> Result<OrbitType, OrbitError> {
+//!     // Negative eccentricities are rejected with OrbitError::NegativeEccentricity
+//!     OrbitType::from_eccentricity(e, 1e-10)
 //! }
+//! assert!(classify(-0.1).is_err());
 //! ```
 
 pub mod orbit_error;

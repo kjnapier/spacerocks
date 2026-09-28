@@ -15,7 +15,13 @@ pub mod spice_simulation;
 
     
 
+pub mod constants;
+    pub use self::constants::EphemerisConstants;
+
+pub mod perturber_cache;
+    pub use self::perturber_cache::PerturberCache;
+
 pub mod forces;
 pub mod integrators;
-    pub use self::integrators::ias15::IAS15;
+    pub use self::integrators::ias15::{AdaptiveMode, Summation, IAS15};
     pub use self::integrators::ias15::CoefficientSeptet;

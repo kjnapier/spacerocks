@@ -168,6 +168,25 @@ def remove(self, name: str) -> None
 sim.remove("custom_body")
 ```
 
+### Perturber Cache
+---
+**`PerturberCache(kernel, start, end)`** and **`set_perturber_cache(cache)`**
+```python
+from spacerocks.assist import SpiceSimulation, PerturberCache
+
+cache = PerturberCache(kernel, Time(2461000.5, "tdb", "jd"), Time(2461400.5, "tdb", "jd"))
+sim = SpiceSimulation.horizons(epoch, kernel)
+sim.set_perturber_cache(cache)
+```
+Fits the barycentric states of the `horizons` perturbers over a time span with piecewise
+Chebyshev polynomials (to ~1e-14 AU, far below the ephemeris accuracy) and reads perturber
+states from the fits instead of the kernel for epochs in that span. Evaluating the fits is about
+twice as fast as reading the kernel, which speeds up simulations with a handful of particles by
+roughly 1.2–1.6x; simulations with many particles are dominated by the force calculation and do
+not benefit. Building a cache takes about 0.07 ms per day of span, so it pays off when the same
+span is integrated many times (orbit fitting, Monte Carlo clones). One cache can be shared by any
+number of simulations.
+
 ### Integration Methods
 ---
 

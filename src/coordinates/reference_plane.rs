@@ -71,6 +71,7 @@ impl ReferencePlane {
     ///
     /// # Example
     /// ```
+    /// # use spacerocks::coordinates::ReferencePlane;
     /// let reference_plane = ReferencePlane::from_str("J2000").unwrap();
     /// let rotation_matrix = reference_plane.get_rotation_matrix();
     /// ```
@@ -88,6 +89,7 @@ impl ReferencePlane {
     ///
     /// # Example
     /// ```
+    /// # use spacerocks::coordinates::ReferencePlane;
     /// let reference_plane = ReferencePlane::from_str("J2000").unwrap();
     /// assert_eq!(reference_plane.as_str(), "J2000");
     /// ```

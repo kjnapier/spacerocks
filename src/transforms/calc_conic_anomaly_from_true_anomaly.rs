@@ -24,8 +24,9 @@ pub fn calc_conic_anomaly_from_true_anomaly(e: f64, true_anomaly: f64) -> Result
     let orbit_type = OrbitType::from_eccentricity(e, 1e-10)?; // returns OrbitError error if e < 0.0
     match orbit_type {
         OrbitType::Circular => Ok(true_anomaly),
-        // OrbitType::Elliptical => Ok(2.0 * ((1.0 - e).sqrt() * (true_anomaly / 2.0).sin()).atan2((1.0 + e).sqrt() * (true_anomaly / 2.0).cos())),
-        OrbitType::Elliptical => Ok(2.0 * (((1.0 - e) / (e + 1.0)).sqrt() * (true_anomaly / 2.0).tan()).atan2(1.0)),
+        // Half-angle form with atan2: well defined at f = pi, and E stays on the same
+        // revolution as f (f in [0, 2pi) gives E in [0, 2pi)).
+        OrbitType::Elliptical => Ok(2.0 * ((1.0 - e).sqrt() * (true_anomaly / 2.0).sin()).atan2((1.0 + e).sqrt() * (true_anomaly / 2.0).cos())),
         OrbitType::Parabolic => Ok((true_anomaly / 2.0).tan()),
         OrbitType::Hyperbolic => Ok(2.0 * (((e - 1.0) / (e + 1.0)).sqrt() * (true_anomaly / 2.0).tan()).atanh()),
         OrbitType::Radial => unreachable!(),

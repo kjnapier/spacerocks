@@ -7,7 +7,6 @@ use spacerocks::ReferencePlane;
 use nalgebra::Vector3;
 
 use crate::py_time::time::PyTime;
-use crate::py_observing::observatory::PyObservatory;
 
 use numpy::{PyArray1, IntoPyArray};
 

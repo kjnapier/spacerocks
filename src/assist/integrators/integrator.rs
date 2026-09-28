@@ -1,5 +1,3 @@
-use crate::SpaceRock;
-use crate::time::Time;
 use crate::assist::forces::Force;
 use crate::assist::SimulationState;
 use crate::assist::integrators::ias15::CoefficientSeptet;
@@ -23,7 +21,7 @@ pub trait Integrator: Send + Sync + IntegratorClone {
     /// * `particles` - Vector of particles to be integrated
     /// * `epoch` - Current simulation time, updated in-place to the new time
     /// * `forces` - Vector of forces acting on the system
-    fn step(&mut self, state: &mut SimulationState, forces: &Vec<Box<dyn Force + Send + Sync>>, kernel: &SpiceKernel);
+    fn step(&mut self, state: &mut SimulationState, forces: &Vec<Box<dyn Force + Send + Sync>>, kernel: &SpiceKernel) -> crate::assist::integrators::ias15::StepResult;
 
     /// Returns the current timestep of the integrator
     fn timestep(&self) -> f64;
@@ -38,6 +36,22 @@ pub trait Integrator: Send + Sync + IntegratorClone {
     fn last_timestep(&self) -> f64;
 
     fn bs_last(&self) -> &Vec<CoefficientSeptet>;
+
+    /// Tolerance of the adaptive step control (IAS15's epsilon).
+    fn epsilon(&self) -> f64;
+    fn set_epsilon(&mut self, epsilon: f64);
+
+    /// Smallest allowed |timestep| (days).
+    fn min_timestep(&self) -> f64;
+    fn set_min_timestep(&mut self, min_timestep: f64);
+
+    /// Step-size criterion (see [`crate::assist::AdaptiveMode`]).
+    fn adaptive_mode(&self) -> crate::assist::AdaptiveMode;
+    fn set_adaptive_mode(&mut self, mode: crate::assist::AdaptiveMode);
+
+    /// Round-off control in the integrator's sums (see [`crate::assist::Summation`]).
+    fn summation(&self) -> crate::assist::Summation;
+    fn set_summation(&mut self, summation: crate::assist::Summation);
 
 }
 

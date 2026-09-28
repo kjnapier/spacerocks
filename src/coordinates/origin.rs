@@ -50,6 +50,7 @@ impl Origin {
     ///
     /// # Example
     /// ```
+    /// # use spacerocks::coordinates::Origin;
     /// let origin = Origin::from_str("SUN").unwrap();
     /// ```
     pub fn from_str(s: &str) -> Result<Origin, OriginError> {
@@ -64,6 +65,7 @@ impl Origin {
     ///
     /// # Example
     /// ```
+    /// # use spacerocks::coordinates::Origin;
     /// let origin = Origin::from_str("SUN").unwrap();
     /// assert_eq!(origin.as_str(), "SUN");
     /// ```
@@ -79,6 +81,7 @@ impl Origin {
     ///
     /// # Example
     /// ```
+    /// # use spacerocks::coordinates::Origin;
     /// let origin = Origin::ssb();
     /// ```
     pub fn ssb() -> Origin {
@@ -89,6 +92,7 @@ impl Origin {
     ///
     /// # Example
     /// ```
+    /// # use spacerocks::coordinates::Origin;
     /// let origin = Origin::sun();
     /// ```
     pub fn sun() -> Origin {
@@ -99,6 +103,7 @@ impl Origin {
     ///
     /// # Example
     /// ```
+    /// # use spacerocks::coordinates::Origin;
     /// let origin = Origin::from_str("SUN").unwrap();
     /// assert_eq!(origin.mu(), 0.000_295_912_208_284_119_5);
     /// ```
@@ -114,7 +119,8 @@ impl Origin {
     ///
     /// # Example
     /// ```
-    /// let origin = Origin::SSB();
+    /// # use spacerocks::coordinates::Origin;
+    /// let origin = Origin::ssb();
     /// assert_eq!(origin.name(), "SSB");
     /// ```
     pub fn name(&self) -> &str {
@@ -129,7 +135,8 @@ impl Origin {
     ///
     /// # Example
     /// ```
-    /// let origin = Origin::SUN();
+    /// # use spacerocks::coordinates::Origin;
+    /// let origin = Origin::sun();
     /// assert_eq!(origin.to_string(), "SUN");
     /// ```
     pub fn to_string(&self) -> String {

@@ -1,17 +1,15 @@
 //! Fundamental data structure for celestial objects.
 use crate::{Origin, ReferencePlane, Time, Properties, Observer, Observation};
+use crate::observing::{apparent, Apparent};
 use crate::constants::*;
 use crate::correct_for_ltt;
-use crate::OrbitType;
 use crate::SpiceKernel;
-use crate::spice::SpiceBody;
 use crate::assist::SpiceSimulation;
 
 
 
 use crate::transforms::{calc_conic_anomaly_from_true_anomaly, calc_mean_anomaly_from_conic_anomaly, solve_for_universal_anomaly, stumpff_c, stumpff_s};
 
-use serde::{Serialize, Deserialize};
 use nalgebra::Vector3;
 
 use rand;
@@ -44,12 +42,12 @@ use std::time::Duration;
 /// on Earth. It can also be transformed to the solar system barycenter or the heliocenter.
 /// 
 /// # Examples
-/// ```
+/// ```no_run
 /// use spacerocks::SpaceRock;
 /// use spacerocks::Time;
-/// 
+///
 /// let epoch = Time::now();
-/// let asteroid = SpaceRock::from_horizons("Ceres", &epoch, "ECLIPJ2000", "SSB")?;
+/// let asteroid = SpaceRock::from_horizons("Ceres", &epoch, "ECLIPJ2000", "SSB").unwrap();
 /// println!("Semi-major axis: {} AU", asteroid.a());
 /// ```
 #[derive(Debug, Clone, PartialEq)]
@@ -82,12 +80,12 @@ impl SpaceRock {
     /// * [`SpaceRock`] 
     ///
     /// # Example
-    /// ```
-    /// use spacerocks::SpaceRock;
-    /// use spacerocks::Time;
+    /// ```no_run
+    /// use spacerocks::{SpaceRock, SpiceKernel, Time};
     ///
+    /// let kernel = SpiceKernel::defaults().unwrap();
     /// let epoch = Time::now();
-    /// let rock = SpaceRock::from_spice("Earth", &epoch, "J2000", "SSB");
+    /// let rock = SpaceRock::from_spice("Earth", &epoch, "J2000", "SSB", &kernel).unwrap();
     /// ```
     pub fn from_spice(name: &str, epoch: &Time, reference_plane: &str, origin: &str, kernel: &SpiceKernel) -> Result<Self, Box<dyn std::error::Error>> {
 
@@ -96,11 +94,11 @@ impl SpaceRock {
         let reference_plane = ReferencePlane::from_str(reference_plane)?;
         let origin = Origin::from_str(origin)?;
 
-        let spicebody = SpiceBody::from_name(&name.to_uppercase().as_str())?;
-        let origin_spicebody = SpiceBody::from_name(&origin.to_string().to_uppercase())?;
+        let target_id = kernel.body_id(name).ok_or_else(|| crate::spice::SpiceError::UnknownBody(name.to_string()))?;
+        let origin_id = kernel.body_id(origin.as_str()).ok_or_else(|| crate::spice::SpiceError::UnknownBody(origin.to_string()))?;
 
-
-        let (x, y, z, vx, vy, vz) = kernel.compute_state(&spicebody, &origin_spicebody, epoch.tdb().jd())?;
+        // J2000 state in AU, AU/day
+        let [x, y, z, vx, vy, vz] = kernel.state_au(target_id, origin_id, epoch.tdb().jd())?;
         let position = Vector3::new(x, y, z);
         let velocity = Vector3::new(vx, vy, vz);
 
@@ -277,7 +275,7 @@ impl SpaceRock {
         //     params.insert("TIME_TYPE", timescale);
         // }
 
-        let timescale = "TDB";
+        let _timescale = "TDB";
         let timeformat = "JD"; // 'CALENDAR' or 'ISO'
 
         // ep.to_tdb();
@@ -422,34 +420,41 @@ impl SpaceRock {
     }
 
 
+    /// Numerically propagate the SpaceRock to `epoch` with IAS15, in the field of the Sun,
+    /// planets, Moon, Pluto and the 16 most massive asteroids (all from `kernel`), with ASSIST's
+    /// force model: Newtonian gravity, relativity (Einstein-Infeld-Hoffmann, Sun), Earth J2-J4,
+    /// solar J2, and non-gravitational forces if the rock has A1/A2/A3 (`set_nongrav`).
+    ///
+    /// The integration is done in J2000 about the solar system barycenter; the result is
+    /// returned in the rock's original reference plane and origin (SUN or SSB; a custom
+    /// origin is returned as SSB).
     pub fn propagate(&mut self, epoch: &Time, kernel: &SpiceKernel) -> Result<(), Box<dyn std::error::Error>> {
-
-        // check if the epoch is the same as the current epoch
-        if self.epoch.utc().jd() == epoch.utc().jd() {
+        if self.epoch.tdb().jd() == epoch.tdb().jd() {
             return Ok(());
         }
+        let original_plane = self.reference_plane.clone();
+        let original_origin = self.origin.clone();
 
-        let mut sim = SpiceSimulation::horizons(&self.epoch, &kernel)?;
-
-        // clone self so that we can add it to the simulation
+        // The simulation's perturber states are barycentric J2000.
         let mut rock = self.clone();
-        rock.to_ssb(&kernel)?;
+        rock.change_reference_plane("J2000")?;
+        rock.to_ssb(kernel)?;
 
-
-        let initial_reference_plane = rock.reference_plane.clone();
+        let mut sim = SpiceSimulation::horizons(&rock.epoch, kernel)?;
         sim.add(rock)?;
-        sim.integrate(epoch, &kernel)?;
-
+        sim.integrate(epoch, kernel)?;
         let p = &sim.state.particles[0];
 
         self.position = p.position;
         self.velocity = p.velocity;
         self.epoch = epoch.clone();
-        self.reference_plane = sim.state.reference_plane.clone();
+        self.reference_plane = ReferencePlane::J2000;
         self.origin = Origin::ssb();
 
-        // self.change_reference_plane(initial_reference_plane.as_str())?;
-
+        if original_origin == Origin::SUN {
+            self.to_helio(kernel)?;
+        }
+        self.change_reference_plane(original_plane.as_str())?;
         Ok(())
     }
 
@@ -543,18 +548,21 @@ impl SpaceRock {
     /// Change the origin of the SpaceRock to the solar system barycenter
     /// 
     /// # Example
-    /// ```
-    /// use spacerocks::SpaceRock;
-    /// use spacerocks::Time;
+    /// ```no_run
+    /// use spacerocks::{SpaceRock, SpiceKernel, Time};
     ///
+    /// let kernel = SpiceKernel::defaults().unwrap();
     /// let epoch = Time::now();
-    /// let rock = SpaceRock::from_horizons("Arrokoth", &epoch, "J2000", "SSB");
-    /// rock.to_ssb();
+    /// let mut rock = SpaceRock::from_horizons("Arrokoth", &epoch, "J2000", "SSB").unwrap();
+    /// rock.to_ssb(&kernel).unwrap();
     /// ```
     pub fn to_ssb(&mut self, kernel: &SpiceKernel) -> Result<(), Box<dyn std::error::Error>> {
+        if self.origin == Origin::SSB {
+            return Ok(());
+        }
         // get the ssb from spice
         // let mut ssb = SpaceRock::from_spice("ssb", &self.epoch, self.reference_plane.as_str(), self.origin.as_str(), &kernel)?;
-        let mut ssb = SpaceRock::from_spice(self.origin.as_str(), &self.epoch, self.reference_plane.as_str(), "ssb", &kernel)?;
+        let ssb = SpaceRock::from_spice(self.origin.as_str(), &self.epoch, self.reference_plane.as_str(), "ssb", &kernel)?;
         self.position += ssb.position;
         self.velocity += ssb.velocity;
 
@@ -570,18 +578,23 @@ impl SpaceRock {
     /// Change the origin of the SpaceRock to the heliocenter
     ///
     /// # Example
-    /// ```
-    /// use spacerocks::SpaceRock;
-    /// use spacerocks::Time;
+    /// ```no_run
+    /// use spacerocks::{SpaceRock, SpiceKernel, Time};
     ///
+    /// let kernel = SpiceKernel::defaults().unwrap();
     /// let epoch = Time::now();
-    /// let rock = SpaceRock::from_horizons("Arrokoth", &epoch, "J2000", "SSB");
-    /// rock.to_helio();
+    /// let mut rock = SpaceRock::from_horizons("Arrokoth", &epoch, "J2000", "SSB").unwrap();
+    /// rock.to_helio(&kernel).unwrap();
     /// ```
     pub fn to_helio(&mut self, kernel: &SpiceKernel) -> Result<(), Box<dyn std::error::Error>> {
         // get the sun from spice
+        if self.origin == Origin::SUN {
+            return Ok(());
+        }
         let sun = SpaceRock::from_spice("sun", &self.epoch, self.reference_plane.as_str(), self.origin.as_str(), &kernel)?;
-        self.change_origin(&sun);
+        self.position -= sun.position;
+        self.velocity -= sun.velocity;
+        self.origin = Origin::sun();
         Ok(())
     }
 
@@ -671,6 +684,21 @@ impl SpaceRock {
         self.properties.as_mut().unwrap().albedo = Some(albedo);
     }
 
+    /// Set the non-gravitational parameters (A1, A2, A3) of the Marsden model, in AU/day^2
+    /// (radial, transverse and normal components at 1 AU), as listed by JPL's small-body
+    /// database. They are used by the `NonGravitational` force in numerical propagation.
+    pub fn set_nongrav(&mut self, a1: f64, a2: f64, a3: f64) {
+        if self.properties.is_none() {
+            self.properties = Some(Properties::default());
+        }
+        self.properties.as_mut().unwrap().nongrav = Some([a1, a2, a3]);
+    }
+
+    /// Non-gravitational parameters (A1, A2, A3), if set.
+    pub fn nongrav(&self) -> Option<[f64; 3]> {
+        self.properties.as_ref().and_then(|p| p.nongrav)
+    }
+
     pub fn r(&self) -> f64 {
         self.position.norm()
     }
@@ -723,55 +751,55 @@ impl SpaceRock {
 
     /// Calculate the inclination in radians
     pub fn inc(&self) -> f64 {
-        let hvec = self.hvec();
-        (self.hvec().z / hvec.norm()).acos()
+        let h = self.hvec();
+        (h.x.hypot(h.y)).atan2(h.z)
     }
 
-    /// Calculate the argument of perihelion in radians
+    /// Reference direction in the orbital plane from which the argument of perihelion and the
+    /// argument of latitude are measured: the ascending node, or the x-axis for (near-)
+    /// equatorial orbits, where the node is undefined and taken to be 0.
+    fn node_direction(&self) -> Vector3<f64> {
+        let n = self.nvec();
+        let h = self.hvec().norm();
+        if n.norm() <= 1e-11 * h {
+            Vector3::new(1.0, 0.0, 0.0)
+        } else {
+            n / n.norm()
+        }
+    }
+
+    /// Signed angle from `a` to `b` about the orbit normal, in [0, 2π).
+    fn angle_in_plane(&self, a: &Vector3<f64>, b: &Vector3<f64>) -> f64 {
+        let hhat = self.hvec().normalize();
+        let ang = a.cross(b).dot(&hhat).atan2(a.dot(b));
+        ang.rem_euclid(2.0 * std::f64::consts::PI)
+    }
+
+    /// Calculate the argument of perihelion in radians (0 for circular orbits; for equatorial
+    /// orbits this is the longitude of perihelion)
     pub fn arg(&self) -> f64 {
-        let orbit_type = OrbitType::from_eccentricity(self.e(), 1e-10).expect("Invalid eccentricity");
-        if orbit_type == OrbitType::Circular {
-            return 0.0;
-        }
-        let nvec = self.nvec();
         let evec = self.evec();
-        let arg = (nvec.dot(&evec) / (nvec.norm() * evec.norm())).acos();
-        if evec.z < 0.0 {
-            2.0 * std::f64::consts::PI - arg
-        } else {
-            arg
-        }
-    }
-
-
-    /// Calculate the longitude of the ascending node in radians
-    pub fn node(&self) -> f64 {
-        let inc = self.inc();
-        let tol = 1e-10;
-        if inc < tol || inc > std::f64::consts::PI - tol {
+        if evec.norm() < 1e-10 {
             return 0.0;
         }
-        let nvec = self.nvec();
-        let n = nvec.norm();
-        if nvec.y < 0.0 {
-            2.0 * std::f64::consts::PI - (nvec.x / n).acos()
-        } else {
-            (nvec.x / n).acos()
-        }
+        self.angle_in_plane(&self.node_direction(), &evec)
     }
 
+    /// Calculate the longitude of the ascending node in radians (0 for equatorial orbits)
+    pub fn node(&self) -> f64 {
+        let n = self.nvec();
+        if n.norm() <= 1e-11 * self.h() {
+            return 0.0;
+        }
+        n.y.atan2(n.x).rem_euclid(2.0 * std::f64::consts::PI)
+    }
+
+    /// Calculate the true anomaly in radians. For circular orbits (where perihelion is
+    /// undefined) this is the argument of latitude, consistent with `arg() == 0`.
     pub fn true_anomaly(&self) -> f64 {
-        let orbit_type = OrbitType::from_eccentricity(self.e(), 1e-10).expect("Invalid eccentricity");
-        let nvec = self.nvec();
-        if orbit_type == OrbitType::Circular {
-            return (nvec.dot(&self.position) / (nvec.norm() * self.r())).acos();
-        }
-        let nu = (self.evec().dot(&self.position) / (self.e() * self.r())).acos();
-        if self.position.dot(&self.velocity) < 0.0 {
-            2.0 * std::f64::consts::PI - nu
-        } else {
-            nu
-        }
+        let evec = self.evec();
+        let reference = if evec.norm() < 1e-10 { self.node_direction() } else { evec };
+        self.angle_in_plane(&reference, &self.position)
     }
 
     pub fn mean_anomaly(&self) -> f64 {
@@ -885,70 +913,61 @@ impl SpaceRock {
         if self.reference_plane != observer.reference_plane {
             return Err("Observer and SpaceRock have different reference planes".into());
         }
-        // Calculate the topocentric state, correct for light travel time
-        let cr = correct_for_ltt(&self, observer);
-
-        // Calaculate the ra, and dec
-        let mut ra = cr.position.y.atan2(cr.position.x);
-        if ra < 0.0 {
-            ra += 2.0 * std::f64::consts::PI;
+        if observer.velocity.is_none() {
+            return Err("Observer velocity is required to compute rates".into());
         }
-        let dec = (cr.position.z / cr.position.norm()).asin();
-
-        // Calculate the ra and dec rates
-        let xi = cr.position.x.powi(2) + cr.position.y.powi(2);
-        let ra_rate = - (cr.position.y * cr.velocity.x - cr.position.x * cr.velocity.y) / xi;
-        let num = -cr.position.z * (cr.position.x * cr.velocity.x + cr.position.y * cr.velocity.y) + xi * cr.velocity.z;
-        let denom = xi.sqrt() * cr.position.norm_squared();
-        let dec_rate = num / denom;
-
-        // calculate the topocentric range and range rate
-        let rho = cr.position.norm();
-        let rho_rate = cr.position.dot(&cr.velocity) / rho;
-
-
-        // if self has properties, calculate the magnitude
-        let mut mag = None;
-        
-        if let Some(properties) = &self.properties {
-
-            if let Some(absolute_magnitude) = properties.absolute_magnitude {
-                
-                let gslope = properties.gslope.unwrap();
-
-                let delta = cr.position.norm();
-                let sun_dist = (cr.position + observer.position).norm();
-                let earth_dist = observer.position.norm();
-                let q = (sun_dist.powi(2) + delta.powi(2) - earth_dist) / (2.0 * sun_dist * delta);
-                // let mut beta = 0.0;
-                // match q {
-                //     q if q <= -1.0 => beta = std::f64::consts::PI,
-                //     q if q >= 1.0 => beta = 0.0,
-                //     _ => beta = q.acos(),
-                // };
-                let beta = match q {
-                    q if q <= -1.0 => std::f64::consts::PI,
-                    q if q >= 1.0 => 0.0,
-                    _ => q.acos(),
-                };
-
-                let psi_1 = (-3.332 * ((beta / 2.0).tan()).powf(0.631)).exp();
-                let psi_2 = (-1.862 * ((beta / 2.0).tan()).powf(1.218)).exp();
-                mag = Some(absolute_magnitude + 5.0 * (sun_dist * delta).log10());
-                if psi_1 == 0.0 && psi_2 == 0.0 {
-                    mag = mag;
-                } else {
-                    let mm = mag.unwrap() - 2.5 * ((1.0 - gslope) * psi_1 + gslope * psi_2).log10();
-                    mag = Some(mm);
-                }
-            }
-        }
-
-        // let observation = Observation::from_complete(self.epoch.clone(), ra, dec, ra_rate, dec_rate, rho, rho_rate, mag, observer.clone());
-        let observation = Observation::from_complete(self.epoch.clone(), ra, dec, ra_rate, dec_rate, rho, rho_rate, observer.clone(), None, mag, None)?;
+        let app = self.apparent_unchecked(observer);
+        let has_h = self.properties.as_ref().and_then(|p| p.absolute_magnitude).is_some();
+        let mag = if has_h { Some(app.mag) } else { None };
+        let observation = Observation::from_complete(self.epoch.clone(), app.ra, app.dec, app.ra_rate, app.dec_rate, app.range, app.range_rate, observer.clone(), None, mag, None)?;
         Ok(observation)
     }
 
+    /// Observable quantities (RA/Dec, rates, range, phase, elongation, magnitude) as plain
+    /// numbers, with the same light-time correction as [`SpaceRock::observe`] but without
+    /// building an [`Observation`]. The observer must be at the rock's epoch (to within 1 µs),
+    /// in the same reference plane, and have a velocity. Heliocentric distance, phase and
+    /// elongation use the observer's `sun_position` (the origin if it has none).
+    pub fn apparent(&self, observer: &Observer) -> Result<Apparent, Box<dyn std::error::Error>> {
+        if observer.velocity.is_none() {
+            return Err("Observer velocity is required to compute rates".into());
+        }
+        if self.reference_plane != observer.reference_plane {
+            return Err("Observer and SpaceRock have different reference planes".into());
+        }
+        if (self.epoch.tdb().jd() - observer.epoch.tdb().jd()).abs() > 1e-6 / 86400.0 {
+            return Err("Observer and SpaceRock have different epochs".into());
+        }
+        Ok(self.apparent_unchecked(observer))
+    }
+
+    fn apparent_unchecked(&self, observer: &Observer) -> Apparent {
+        let obs_vel = observer.velocity.unwrap_or_else(Vector3::zeros);
+        let (h, g) = match &self.properties {
+            Some(p) => (p.absolute_magnitude, p.gslope.unwrap_or(0.15)),
+            None => (None, 0.15),
+        };
+        apparent(&self.position, &self.velocity, &observer.position, &obs_vel, &observer.sun(), h, g)
+    }
+
+}
+
+/// Apparent magnitude in the IAU H-G system (Bowell et al. 1989).
+///
+/// * `h`, `g` - absolute magnitude and slope parameter
+/// * `r`, `delta` - heliocentric and observer distances (AU)
+/// * `phase` - Sun-object-observer angle (radians)
+pub fn hg_magnitude(h: f64, g: f64, r: f64, delta: f64, phase: f64) -> f64 {
+    let t = (phase / 2.0).tan();
+    let phi1 = (-3.332 * t.powf(0.631)).exp();
+    let phi2 = (-1.862 * t.powf(1.218)).exp();
+    let reduced = h + 5.0 * (r * delta).log10();
+    let phase_term = (1.0 - g) * phi1 + g * phi2;
+    if phase_term > 0.0 {
+        reduced - 2.5 * phase_term.log10()
+    } else {
+        reduced
+    }
 }
 
 /// Display the SpaceRock object with each field on a new line

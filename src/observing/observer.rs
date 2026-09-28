@@ -16,6 +16,10 @@ pub struct Observer {
     pub reference_plane: ReferencePlane,
     pub origin: Origin,
     pub observatory: Option<Observatory>,
+    /// Position of the Sun in the same frame and origin as `position` (AU), used for
+    /// phase angles and heliocentric distances. `None` means the origin is taken to be the
+    /// Sun's position (exact when `origin` is SUN, ~0.01 AU off for SSB).
+    pub sun_position: Option<Vector3<f64>>,
 }
 
 
@@ -38,7 +42,19 @@ impl Observer {
             reference_plane,
             origin,
             observatory,
+            sun_position: None,
         }
+    }
+
+    /// Attach the Sun's position (same frame and origin as the observer).
+    pub fn with_sun_position(mut self, sun_position: Vector3<f64>) -> Self {
+        self.sun_position = Some(sun_position);
+        self
+    }
+
+    /// Position of the Sun relative to the observer's origin (zero if unknown).
+    pub fn sun(&self) -> Vector3<f64> {
+        self.sun_position.unwrap_or_else(Vector3::zeros)
     }
 
     /// Change the reference plane of the Observer
@@ -60,6 +76,9 @@ impl Observer {
         if let Some(velocity) = self.velocity {
             self.velocity = Some(rot * velocity);
         }
+        if let Some(sun) = self.sun_position {
+            self.sun_position = Some(rot * sun);
+        }
         self.reference_plane = reference_plane;
 
         Ok(())
@@ -73,6 +92,9 @@ impl Observer {
 
         let origin_position = origin.position;
         self.position -= origin_position;
+        if let Some(sun) = self.sun_position {
+            self.sun_position = Some(sun - origin_position);
+        }
 
         if let Some(velocity) = self.velocity {
             self.velocity = Some(velocity - origin.velocity);

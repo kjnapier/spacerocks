@@ -26,7 +26,7 @@ fn df_dchi(chi: f64, r0: f64, vr0: f64, alpha: f64, mu: f64) -> f64 {
 /// Safe derivatives of Stumpff S and C wrt z.
 /// These are ONLY needed if you want Halley (second derivative).
 /// They must handle z ~ 0 safely.
-fn dS_dz(z: f64) -> f64 {
+fn ds_dz(z: f64) -> f64 {
     // Series near 0:
     // S(z) = 1/6 - z/120 + z^2/5040 - ...
     // dS/dz = -1/120 + z/2520 - z^2/100800 + ...
@@ -38,7 +38,7 @@ fn dS_dz(z: f64) -> f64 {
     (stumpff_c(z) - 3.0 * stumpff_s(z)) / (2.0 * z)
 }
 
-fn dC_dz(z: f64) -> f64 {
+fn dc_dz(z: f64) -> f64 {
     // Series near 0:
     // C(z) = 1/2 - z/24 + z^2/720 - ...
     // dC/dz = -1/24 + z/360 - z^2/13440 + ...
@@ -60,8 +60,8 @@ fn d2f_dchi2(chi: f64, r0: f64, vr0: f64, alpha: f64, mu: f64) -> f64 {
 
     let s = stumpff_s(z);
     let c = stumpff_c(z);
-    let ds = dS_dz(z);
-    let dc = dC_dz(z);
+    let ds = ds_dz(z);
+    let dc = dc_dz(z);
 
     let a = r0 * vr0 / sqrt_mu;
     let b = 1.0 - alpha * r0;
@@ -201,7 +201,6 @@ pub fn solve_for_universal_anomaly(
             f_lo = f_new;
         } else {
             chi_hi = chi_new;
-            f_hi = f_new;
         }
 
         chi = chi_new;

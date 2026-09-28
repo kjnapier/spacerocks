@@ -2,6 +2,7 @@ use crate::constants::*;
 use crate::StateVector;
 use crate::SpaceRock;
 use crate::Observer;
+use nalgebra::Vector3;
 
 /// Calculates the observer-centric state vector of a rock, accounting for light-time travel.
 ///
@@ -11,54 +12,29 @@ use crate::Observer;
 ///
 /// # Returns
 /// * A StateVector object representing the observer-centric state vector of the rock.
-// pub fn correct_for_ltt(rock: &SpaceRock, observer: &Observer) -> StateVector {
-//     // calculates the observer-centric state vector of a rock, accounting for light-time travel
-
-//     let mut temp = StateVector::new(rock.position, rock.velocity);
-
-//     let r = rock.position.norm();
-//     let xi = MU_BARY / (r * r * r);    
-//     let mut ltt0: f64;
-
-//     let mut d_pos = temp.position - observer.position;
-//     let mut delta = d_pos.norm();
-//     let mut ltt = delta / SPEED_OF_LIGHT;
-//     let mut acc = xi * ltt;
-
-//     for _ in 0..10 {
-
-//         ltt0 = ltt;
-//         acc = xi * ltt;
-//         temp.position = rock.position - (0.5 * acc * rock.position + rock.velocity) * ltt;
-//         d_pos = temp.position - observer.position;
-//         delta = d_pos.norm();
-//         ltt = delta / SPEED_OF_LIGHT;
-//         let dltt = (ltt - ltt0).abs();
-        
-//         // if dltt < 1.0e-6 {
-//         //     break;
-//         // }
-
-//         if dltt < 1.0e-6 {
-//             break;
-//         }
-
-//         // acc = xi * ltt;
-//     }
-
-//     temp.velocity = rock.velocity + acc * rock.position;
-//     let d_vel = temp.velocity - observer.velocity.unwrap();
-
-
-//     return StateVector::new(d_pos, d_vel);
-
-// }
-
+///
+/// The rock's position at the emission time is found by a second-order Taylor expansion
+/// (velocity plus a central-force acceleration), iterated twice on the light time; its velocity
+/// at emission is corrected to first order. If the observer has no velocity, it is taken as zero
+/// (the position is unaffected; the relative velocity then refers to a stationary observer).
 pub fn correct_for_ltt(rock: &SpaceRock, observer: &Observer) -> StateVector {
-    let r0 = rock.position;
-    let v0 = rock.velocity;
-    let obs_pos = observer.position;
-    let obs_vel = observer.velocity.expect("observer velocity required");
+    let obs_vel = observer.velocity.unwrap_or_else(Vector3::zeros);
+    let (d_pos, d_vel) = correct_for_ltt_vectors(&rock.position, &rock.velocity, &observer.position, &obs_vel);
+    StateVector::new(d_pos, d_vel)
+}
+
+/// Vector form of [`correct_for_ltt`]: returns the observer-centric position and velocity of an
+/// object with barycentric state (`r0`, `v0`) seen from an observer at (`obs_pos`, `obs_vel`).
+#[inline]
+pub fn correct_for_ltt_vectors(
+    r0: &Vector3<f64>,
+    v0: &Vector3<f64>,
+    obs_pos: &Vector3<f64>,
+    obs_vel: &Vector3<f64>,
+) -> (Vector3<f64>, Vector3<f64>) {
+    let r0 = *r0;
+    let v0 = *v0;
+    let obs_pos = *obs_pos;
 
     let xi = MU_BARY / r0.norm().powi(3);
     let inv_c = 1.0 / SPEED_OF_LIGHT;
@@ -79,42 +55,7 @@ pub fn correct_for_ltt(rock: &SpaceRock, observer: &Observer) -> StateVector {
     ltt = d_pos.norm() * inv_c;
 
     acc = xi * ltt;
-    let d_vel = (v0 - r0 * acc) - obs_vel;
+    let d_vel = (v0 + r0 * acc) - obs_vel;
 
-    StateVector::new(d_pos, d_vel)
+    (d_pos, d_vel)
 }
-
-// pub fn correct_for_ltt(rock: &SpaceRock, observer: &Observer) -> StateVector {
-//     // calculates the observer-centric state vector of a rock, accounting for light-time travel
-
-//     let mut d_pos = rock.position - observer.position;
-//     let mut delta = d_pos.norm();
-//     let mut ltt = delta / SPEED_OF_LIGHT;
-//     let mut ltt0 = ltt.clone();
-//     let mut dltt = 1000.0;
-
-//     let t0 = rock.epoch.clone();
-
-//     let mut temp = rock.analytic_at(&(t0.clone() - ltt)).unwrap();
-
-//     for _ in 0..3 {
-
-//         ltt = delta / SPEED_OF_LIGHT;
-//         dltt = (ltt - ltt0).abs();
-        
-//         if dltt < 1.0e-6 {
-//             break;
-//         }
-
-//         ltt0 = ltt;
-//         temp = rock.analytic_at(&(t0.clone() - ltt)).unwrap();
-//         d_pos = temp.position - observer.position;
-//         delta = d_pos.norm();
-
-//         // acc = xi * ltt;
-//     }
-
-//     let d_vel = temp.velocity - observer.velocity.unwrap();
-//     return StateVector::new(d_pos, d_vel);
-
-// }

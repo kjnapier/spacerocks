@@ -286,6 +286,19 @@ impl PySpaceRock {
         self.inner.absolute_magnitude()
     }
 
+    /// Set the non-gravitational parameters A1, A2, A3 (AU/day^2; radial, transverse, normal)
+    /// of the Marsden model, as listed by JPL's small-body database. Used by numerical
+    /// propagation.
+    fn set_nongrav(&mut self, a1: f64, a2: f64, a3: f64) {
+        self.inner.set_nongrav(a1, a2, a3);
+    }
+
+    /// Non-gravitational parameters (A1, A2, A3), or None.
+    #[getter]
+    fn nongrav(&self) -> Option<(f64, f64, f64)> {
+        self.inner.nongrav().map(|[a, b, c]| (a, b, c))
+    }
+
     fn set_gslope(&mut self, gslope: f64) -> PyResult<()> {
         self.inner.set_gslope(gslope);
         Ok(())

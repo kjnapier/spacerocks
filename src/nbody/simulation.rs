@@ -10,7 +10,7 @@ use crate::errors::SimulationError;
 
 use crate::nbody::forces::{Force, NewtonianGravity};
 use crate::nbody::integrators::{Integrator, IAS15};
-use crate::spice::spicekernel::SpiceKernel;
+use crate::spice::SpiceKernel;
 
 
 use nalgebra::Vector3;

@@ -1,8 +1,7 @@
-use crate::spacerock::SpaceRock;
 use nalgebra::Vector3;
 use std::fmt::Debug;
 
-use crate::assist::{SimulationParticle, SimulationState};
+use crate::assist::SimulationState;
 
 /// A force that can act on spacerocks in an N-body simulation.
 /// 
@@ -19,8 +18,22 @@ pub trait Force: Send + Sync + ForceClone {
     /// # Returns
     ///
     /// * A vector of accelerations for each spacerock.
-    fn calculate_acceleration(&self, state: &mut SimulationState) -> Vec<Vector3<f64>>;
+    fn calculate_acceleration(&self, state: &mut SimulationState) -> Vec<Vector3<f64>> {
+        let saved: Vec<Vector3<f64>> = state.particles_1.iter().map(|p| p.acceleration).collect();
+        for p in state.particles_1.iter_mut() {
+            p.acceleration = Vector3::zeros();
+        }
+        self.apply_acceleration(state);
+        let out = state.particles_1.iter().map(|p| p.acceleration).collect();
+        for (p, a) in state.particles_1.iter_mut().zip(saved) {
+            p.acceleration = a;
+        }
+        out
+    }
+    /// Add this force's acceleration to every particle.
     fn apply_acceleration(&self, state: &mut SimulationState);
+    /// Add this force's acceleration, and its partial derivatives (see
+    /// [`crate::assist::SimulationParticle::stm`]), to every particle.
     fn apply_acceleration_and_stm(&self, state: &mut SimulationState);
     
 }

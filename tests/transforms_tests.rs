@@ -2,13 +2,11 @@ use spacerocks::OrbitType;
 use spacerocks::SpaceRock;
 use spacerocks::Observer;
 use spacerocks::Time;
-use spacerocks::transforms::kep_from_xyz::calc_kep_from_state;
 use spacerocks::transforms::calc_conic_anomaly_from_mean_anomaly;
 use spacerocks::transforms::calc_conic_anomaly_from_true_anomaly;
 use spacerocks::transforms::calc_mean_anomaly_from_conic_anomaly;
 use spacerocks::transforms::calc_true_anomaly_from_conic_anomaly;
 use spacerocks::transforms::calc_true_anomaly_from_mean_anomaly;
-use spacerocks::transforms::calc_xyz_from_kepM;
 use spacerocks::transforms::correct_for_ltt;
 use spacerocks::constants::SPEED_OF_LIGHT;
 use spacerocks::errors::OrbitError;
@@ -233,101 +231,110 @@ mod tests {
     }
 
     #[test]
-    fn test_calc_xyz_from_kepM() {
-        // const MU: f64 = 1.0; // Use standardized gravitational parameter
-        
-        // Test circular orbit (e = 0)
-        {
-            let a = 1.0;
-            let e = 0.0;
-            let inc = 0.0;
-            let arg = 0.0;
-            let node = 0.0;
-            let M = 0.0;
-            
-            match calc_xyz_from_kepM(a, e, inc, arg, node, M, MU_BARY) {
-                Ok((pos, vel)) => {
-                    // For circular orbit at periapsis:
-                    // - Position should be (a, 0, 0)
-                    // - Velocity should be (0, sqrt(mu/a), 0)
-                    assert!((pos[0] - a).abs() < EPSILON);
-                    assert!(pos[1].abs() < EPSILON);
-                    assert!(pos[2].abs() < EPSILON);
-                    
-                    assert!(vel[0].abs() < EPSILON);
-                    assert!((vel[1] - (MU_BARY/a).sqrt()).abs() < EPSILON);
-                    assert!(vel[2].abs() < EPSILON);
-                },
-                Err(_) => panic!("Circular orbit calculation failed"),
-            }
+    fn test_state_from_kepler_elements() {
+        let epoch = Time::new(2451545.0, "tdb", "jd").unwrap();
+        let mu = spacerocks::Origin::SSB.mu();
+
+        // Circular orbit at periapsis: position (a, 0, 0), velocity (0, sqrt(mu/a), 0)
+        let r = SpaceRock::from_kepler("c", 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, epoch.clone(), "J2000", "SSB").unwrap();
+        assert!((r.position - Vector3::new(1.0, 0.0, 0.0)).norm() < EPSILON);
+        assert!((r.velocity - Vector3::new(0.0, (mu / 1.0f64).sqrt(), 0.0)).norm() < EPSILON);
+
+        // Elliptical and hyperbolic orbits at periapsis: r = q, v from vis-viva
+        for (q, e) in [(1.0f64, 0.5f64), (2.0, 2.0)] {
+            let a = q / (1.0 - e);
+            let r = SpaceRock::from_kepler("e", q, e, 0.0, 0.0, 0.0, 0.0, epoch.clone(), "J2000", "SSB").unwrap();
+            let v = (mu * (2.0 / q - 1.0 / a)).sqrt();
+            assert!((r.position.norm() - q).abs() < EPSILON);
+            assert!((r.velocity.norm() - v).abs() < EPSILON);
         }
 
-        // Test elliptical orbit (0 < e < 1)
-        {
-            let a = 2.0;
-            let e = 0.5;
-            let inc = 0.0;
-            let arg = 0.0;
-            let node = 0.0;
-            let M = 0.0;  // Test at periapsis
-            
-            match calc_xyz_from_kepM(a, e, inc, arg, node, M, MU_BARY) {
-                Ok((pos, vel)) => {
-                    // At periapsis:
-                    // - Distance should be a(1-e)
-                    // - Velocity should be sqrt(mu*(2/(r) - 1/a))
-                    let r = a * (1.0 - e);
-                    let v = (MU_BARY * (2.0/r - 1.0/a)).sqrt();
-                    
-                    assert!((pos.norm() - r).abs() < EPSILON);
-                    assert!((vel.norm() - v).abs() < EPSILON);
-                },
-                Err(_) => panic!("Elliptical orbit calculation failed"),
-            }
-        }
+        // 90 degree inclination: orbit in the x-z plane
+        let r = SpaceRock::from_kepler("i", 1.0, 0.0, PI / 2.0, 0.0, 0.0, 0.0, epoch.clone(), "J2000", "SSB").unwrap();
+        assert!(r.position.y.abs() < EPSILON && r.velocity.y.abs() < EPSILON);
 
-        // Test hyperbolic orbit (e > 1)
-        {
-            let a = -2.0;  // Negative semi-major axis for hyperbolic
-            let e = 2.0;
-            let inc = 0.0;
-            let arg = 0.0;
-            let node = 0.0;
-            let M = 0.0;  // Test at periapsis
-            
-            match calc_xyz_from_kepM(a, e, inc, arg, node, M, MU_BARY) {
-                Ok((pos, vel)) => {
-                    // At periapsis:
-                    // - Distance should be a(1-e)
-                    // - Velocity should be sqrt(mu*(-2/(r) - 1/a))
-                    let r = a * (1.0 - e);
-                    let v = (MU_BARY * (2.0/r - 1.0/a)).sqrt();
-                    
-                    assert!((pos.norm() - r.abs()).abs() < EPSILON);
-                    assert!((vel.norm() - v).abs() < EPSILON);
-                },
-                Err(_) => panic!("Hyperbolic orbit calculation failed"),
-            }
-        }
+        // Round trip through the element accessors
+        let (q, e, inc, arg, node, nu) = (2.5, 0.3, 0.4, 1.1, 0.7, 0.9);
+        let r = SpaceRock::from_kepler("rt", q, e, inc, arg, node, nu, epoch, "J2000", "SSB").unwrap();
+        assert!((r.q() - q).abs() < 1e-12);
+        assert!((r.e() - e).abs() < 1e-12);
+        assert!((r.inc() - inc).abs() < 1e-12);
+        assert!((r.arg() - arg).abs() < 1e-12);
+        assert!((r.node() - node).abs() < 1e-12);
+        assert!((r.true_anomaly() - nu).abs() < 1e-12);
+    }
 
-        // Test orbital rotations
-        {
-            let a = 1.0;
-            let e = 0.0;
-            let inc = std::f64::consts::PI/2.0;  // 90 degrees inclination
-            let arg = 0.0;
-            let node = 0.0;
-            let M = 0.0;
-            
-            match calc_xyz_from_kepM(a, e, inc, arg, node, M, MU_BARY) {
-                Ok((pos, vel)) => {
-                    // For 90 degree inclination, orbit should be in x-z plane
-                    assert!(pos[1].abs() < EPSILON);
-                    assert!(vel[1].abs() < EPSILON);
-                },
-                Err(_) => panic!("Inclined orbit calculation failed"),
-            }
-        }
+    #[test]
+    fn test_light_time_correction_matches_two_body() {
+        let epoch = Time::new(2460000.5, "tdb", "jd").unwrap();
+        let rock = SpaceRock::from_kepler("neo", 0.9, 0.3, 0.2, 1.0, 0.5, 0.3, epoch.clone(), "J2000", "SSB").unwrap();
+        let obs = Observer::from_xyz(rock.position + Vector3::new(0.15, -0.1, 0.05), Some(Vector3::new(0.0, 0.017, 0.0)),
+            epoch.clone(), spacerocks::ReferencePlane::J2000, spacerocks::Origin::SSB, None);
+        let cr = correct_for_ltt(&rock, &obs);
+        let tau = cr.position.norm() / SPEED_OF_LIGHT;
+        let exact = rock.analytic_at(&(epoch - tau)).unwrap();
+        assert!((cr.position - (exact.position - obs.position)).norm() < 1e-10);
+        assert!((cr.velocity - (exact.velocity - obs.velocity.unwrap())).norm() < 1e-10);
+    }
 
+    #[test]
+    fn test_elements_round_trip_including_degenerate_orbits() {
+        let epoch = Time::new(2451545.0, "tdb", "jd").unwrap();
+        let two_pi = 2.0 * PI;
+        let wrap = |x: f64| x.rem_euclid(two_pi);
+        let close = |a: f64, b: f64| {
+            let d = (wrap(a) - wrap(b)).abs();
+            d.min(two_pi - d) < 1e-9
+        };
+        // (q, e, inc, arg, node, nu)
+        let cases = [
+            (2.5, 0.3, 0.4, 1.1, 0.7, 0.9),
+            (2.5, 0.3, 0.4, 5.9, 4.0, 4.5),   // quadrants > pi
+            (1.0, 1.7, 2.8, 0.5, 3.3, -0.6),  // retrograde hyperbolic
+            (40.0, 0.05, 1.0e-3, 2.0, 1.0, 3.5),
+        ];
+        for &(q, e, inc, arg, node, nu) in &cases {
+            let r = SpaceRock::from_kepler("x", q, e, inc, arg, node, nu, epoch.clone(), "J2000", "SSB").unwrap();
+            assert!((r.q() - q).abs() < 1e-9 * q && (r.e() - e).abs() < 1e-11 && (r.inc() - inc).abs() < 1e-11);
+            assert!(close(r.arg(), arg) && close(r.node(), node) && close(r.true_anomaly(), nu), "{:?}", (q, e, inc, arg, node, nu));
+        }
+        // Equatorial: node undefined (0); arg is then the longitude of perihelion.
+        let r = SpaceRock::from_kepler("eq", 2.0, 0.2, 0.0, 1.0, 0.5, 2.0, epoch.clone(), "J2000", "SSB").unwrap();
+        assert_eq!(r.node(), 0.0);
+        assert!(close(r.arg(), 1.5) && close(r.true_anomaly(), 2.0));
+        // Circular: perihelion undefined (arg 0); true anomaly is the argument of latitude.
+        let r = SpaceRock::from_kepler("c", 2.0, 0.0, 0.3, 0.0, 0.5, 4.0, epoch.clone(), "J2000", "SSB").unwrap();
+        assert!(close(r.arg(), 0.0) && close(r.node(), 0.5) && close(r.true_anomaly(), 4.0));
+        // Circular and equatorial: true longitude.
+        let r = SpaceRock::from_kepler("ce", 2.0, 0.0, 0.0, 0.0, 0.0, 4.0, epoch, "J2000", "SSB").unwrap();
+        assert!(!r.true_anomaly().is_nan() && close(r.true_anomaly(), 4.0));
+    }
+
+    #[test]
+    fn test_apparent_magnitude_geometry() {
+        use spacerocks::spacerock::hg_magnitude;
+        let epoch = Time::new(2460000.5, "tdb", "jd").unwrap();
+        let obs = |x: f64, y: f64| Observer::from_xyz(Vector3::new(x, y, 0.0), Some(Vector3::zeros()),
+            epoch.clone(), spacerocks::ReferencePlane::J2000, spacerocks::Origin::SUN, None);
+        let rock = |x: f64, y: f64| {
+            let mut r = SpaceRock::from_xyz("m", x, y, 0.0, 0.0, 0.0, 0.0, epoch.clone(), "J2000", "SUN").unwrap();
+            r.set_absolute_magnitude(7.0);
+            r
+        };
+        // Opposition: phase 0, r = 2, delta = 1  ->  H + 5 log10(2)
+        let o = rock(2.0, 0.0).observe(&obs(1.0, 0.0)).unwrap();
+        assert!((o.mag.unwrap() - (7.0 + 5.0 * 2f64.log10())).abs() < 1e-6);
+        // Quadrature-like geometry: phase = atan(1/2) (26.57 deg), r = 2, delta = sqrt(5)
+        let o = rock(0.0, 2.0).observe(&obs(1.0, 0.0)).unwrap();
+        let expected = hg_magnitude(7.0, 0.15, 2.0, 5f64.sqrt(), (0.5f64).atan());
+        assert!((o.mag.unwrap() - expected).abs() < 1e-6);
+        // With the Sun offset from the origin, the observer's sun_position is used.
+        let shift = Vector3::new(0.01, -0.02, 0.0);
+        let mut r = rock(2.01, -0.02);
+        r.origin = spacerocks::Origin::SSB;
+        let mut ob = obs(1.01, -0.02).with_sun_position(shift);
+        ob.origin = spacerocks::Origin::SSB;
+        let o = r.observe(&ob).unwrap();
+        assert!((o.mag.unwrap() - (7.0 + 5.0 * 2f64.log10())).abs() < 1e-6);
     }
 }

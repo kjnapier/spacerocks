@@ -11,10 +11,12 @@
 //! various observation types including astrometry, radar, and streak observations.
 
 pub mod observatory;
-    pub use observatory::Observatory;
+    pub use observatory::{earth_fixed_state, Observatory};
 
 pub mod observer;
     pub use observer::Observer;
 
 pub mod observation;
     pub use observation::{Observation};
+pub mod apparent;
+    pub use apparent::{apparent, Apparent};

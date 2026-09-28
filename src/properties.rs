@@ -16,4 +16,8 @@ pub struct Properties {
     pub gslope: Option<f64>,
     pub radius: Option<f64>,
     pub albedo: Option<f64>,
+    /// Non-gravitational parameters (A1, A2, A3) of the Marsden et al. (1973) model, in
+    /// AU/day^2 (radial, transverse, normal), as used by JPL and ASSIST.
+    #[serde(default)]
+    pub nongrav: Option<[f64; 3]>,
 }

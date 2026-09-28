@@ -11,6 +11,7 @@ pub struct PyOrbitType {
 }
 
 #[pymethods]
+#[allow(non_snake_case)]
 impl PyOrbitType {
     #[classattr]
     fn HYPERBOLIC() -> Self {
