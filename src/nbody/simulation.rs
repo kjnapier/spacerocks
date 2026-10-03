@@ -322,6 +322,18 @@ impl Simulation {
         self.dense_valid = true;
     }
 
+    /// Step the simulation forward by `n` timesteps. Same result as calling [`Simulation::step`]
+    /// `n` times, but integrators can share work between the steps: Wisdom–Holman then splits
+    /// test particles between threads.
+    pub fn steps(&mut self, n: usize) {
+        if n == 0 {
+            return;
+        }
+        self.synchronize();
+        self.integrator.steps(&mut self.particles, &mut self.epoch, &self.forces, n);
+        self.dense_valid = true;
+    }
+
     /// Integrate to a new epoch, or interpolate to it when the integrator supports it.
     ///
     /// The integrator takes its own adaptive steps until one of them brackets `epoch`, and the
@@ -466,7 +478,10 @@ impl Simulation {
             } else if self.integrator.timestep() < 0.0 {
                 self.integrator.set_timestep(-self.integrator.timestep());
             }
-            self.step();
+            // A fixed-step integrator takes every full step this loop would take before the last,
+            // shorter one, together; an adaptive one may change its timestep at each step.
+            let n = if self.integrator.fixed_timestep() { self.full_steps_to(epoch) } else { 1 };
+            self.steps(n.max(1));
         }
         
         // let dt = &epoch - &self.epoch;
@@ -480,6 +495,23 @@ impl Simulation {
         // self.step();
         // // reset the timestep
         // self.integrator.set_timestep(old_timestep);
+    }
+
+    /// How many steps of the current timestep fit before `epoch` (as the loop in
+    /// [`Simulation::integrate`] counts them, on the same epoch arithmetic).
+    fn full_steps_to(&self, epoch: &Time) -> usize {
+        let h = self.integrator.timestep();
+        let target = epoch.tdb().jd();
+        let mut t = self.epoch.clone();
+        let mut n = 0;
+        loop {
+            let dt = target - t.tdb().jd();
+            if dt.abs() < 1e-16 || dt.abs() < h.abs() || (dt < 0.0) != (h < 0.0) {
+                return n;
+            }
+            t += h;
+            n += 1;
+        }
     }
 
     /// Get a particle from the simulation by name.

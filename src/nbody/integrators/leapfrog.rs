@@ -81,4 +81,8 @@ impl Integrator for Leapfrog {
     fn set_timestep(&mut self, timestep: f64) {
         self.timestep = timestep;
     }
+
+    fn fixed_timestep(&self) -> bool {
+        true
+    }
 }

@@ -24,6 +24,21 @@ pub trait Integrator: Send + Sync + IntegratorClone {
     /// * `forces` - Vector of forces acting on the system
     fn step(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>);
 
+    /// Advances the system `n` timesteps. The default calls [`Integrator::step`] `n` times;
+    /// integrators can override it to share work between steps, with the same result.
+    ///
+    /// # Arguments
+    ///
+    /// * `particles` - Vector of particles to be integrated
+    /// * `epoch` - Current simulation time, updated in-place to the new time
+    /// * `forces` - Vector of forces acting on the system
+    /// * `n` - Number of steps
+    fn steps(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>, n: usize) {
+        for _ in 0..n {
+            self.step(particles, epoch, forces);
+        }
+    }
+
     /// Returns the current timestep of the integrator
     fn timestep(&self) -> f64;
 
@@ -33,6 +48,13 @@ pub trait Integrator: Send + Sync + IntegratorClone {
     ///
     /// * `timestep` - New timestep value to use
     fn set_timestep(&mut self, timestep: f64);
+
+    /// Whether every step is exactly [`Integrator::timestep`] long (the integrator never
+    /// changes it by itself). [`Simulation::integrate`](crate::nbody::Simulation::integrate)
+    /// then hands all the full steps to [`Integrator::steps`] at once.
+    fn fixed_timestep(&self) -> bool {
+        false
+    }
 
     /// Whether [`Integrator::interpolate`] can return states between steps
     fn has_dense_output(&self) -> bool {
