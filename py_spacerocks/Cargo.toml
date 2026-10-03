@@ -9,9 +9,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 spacerocks = { path = "../" }
-pyo3 = { version = "0.27", features = ["extension-module"] }
+pyo3 = { version = "0.29", features = ["extension-module"] }
 
-numpy = "0.27"
+numpy = "0.29"
 rayon = "1.10"
 nalgebra = "0.32.2"
 

@@ -3,7 +3,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::types::PyType;
 use spacerocks::OrbitType;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 #[pyo3(name = "OrbitType")]
 pub struct PyOrbitType {
