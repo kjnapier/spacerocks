@@ -20,11 +20,12 @@ impl Force for NewtonianGravity {
         // Speed it up if you want!
 
         let mut acceleration = vec![Vector3::zeros(); entities.len()];
+        let mass: Vec<f64> = entities.iter().map(|e| e.mass()).collect();
 
         let n_entities = entities.len();
         for idx in 0..n_entities {
 
-            if entities[idx].mass() == 0.0 {
+            if mass[idx] == 0.0 {
                 break;
             }
 
@@ -34,8 +35,8 @@ impl Force for NewtonianGravity {
                 let r = r_vec.norm();
 
                 let xi = -GRAVITATIONAL_CONSTANT * r_vec / (r * r * r);
-                let idx_acceleration = xi * entities[jdx].mass();
-                let jdx_acceleration = -xi * entities[idx].mass();
+                let idx_acceleration = xi * mass[jdx];
+                let jdx_acceleration = -xi * mass[idx];
                 acceleration[idx] += idx_acceleration;
                 acceleration[jdx] += jdx_acceleration;
             }

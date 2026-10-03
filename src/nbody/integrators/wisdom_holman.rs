@@ -47,10 +47,13 @@ impl WisdomHolman {
 
 /// Democratic heliocentric state: heliocentric positions `q`, barycentric velocities `u`,
 /// and the barycenter's position and velocity. The central body's own `q` and `u` are unused.
+#[derive(Clone)]
 pub(crate) struct Democratic {
     pub(crate) central: usize,
     pub(crate) m_central: f64,
     pub(crate) m_total: f64,
+    /// Masses, read once per step.
+    pub(crate) m: Vec<f64>,
     pub(crate) q: Vec<Vector3<f64>>,
     pub(crate) u: Vec<Vector3<f64>>,
     pub(crate) x_cm: Vector3<f64>,
@@ -59,29 +62,32 @@ pub(crate) struct Democratic {
 
 impl Democratic {
     pub(crate) fn from_particles(particles: &[SpaceRock], central: usize) -> Democratic {
-        let m_total: f64 = particles.iter().map(|p| p.mass()).sum();
+        let m: Vec<f64> = particles.iter().map(|p| p.mass()).collect();
+        let m_total: f64 = m.iter().sum();
         let mut x_cm = Vector3::zeros();
         let mut v_cm = Vector3::zeros();
-        for p in particles {
-            x_cm += p.mass() * p.position;
-            v_cm += p.mass() * p.velocity;
+        for (p, &mi) in particles.iter().zip(&m) {
+            if mi != 0.0 {
+                x_cm += mi * p.position;
+                v_cm += mi * p.velocity;
+            }
         }
         x_cm /= m_total;
         v_cm /= m_total;
         let xc = particles[central].position;
         let q = particles.iter().map(|p| p.position - xc).collect();
         let u = particles.iter().map(|p| p.velocity - v_cm).collect();
-        Democratic { central, m_central: particles[central].mass(), m_total, q, u, x_cm, v_cm }
+        Democratic { central, m_central: m[central], m_total, m, q, u, x_cm, v_cm }
     }
 
     /// Write inertial positions and velocities back into `particles`.
     pub(crate) fn to_particles(&self, particles: &mut [SpaceRock]) {
         let mut mq = Vector3::zeros();
         let mut mu = Vector3::zeros();
-        for (i, p) in particles.iter().enumerate() {
-            if i != self.central {
-                mq += p.mass() * self.q[i];
-                mu += p.mass() * self.u[i];
+        for (i, &mi) in self.m.iter().enumerate() {
+            if i != self.central && mi != 0.0 {
+                mq += mi * self.q[i];
+                mu += mi * self.u[i];
             }
         }
         let xc = self.x_cm - mq / self.m_total;
@@ -121,16 +127,16 @@ impl Democratic {
             let d = self.q[j] - self.q[i];
             let r = d.norm();
             let g = GRAVITATIONAL_CONSTANT * d / (r * r * r);
-            self.u[i] -= h * particles[j].mass() * g;
-            self.u[j] += h * particles[i].mass() * g;
+            self.u[i] -= h * self.m[j] * g;
+            self.u[j] += h * self.m[i] * g;
         }
     }
 
-    pub(crate) fn jump(&mut self, particles: &[SpaceRock], h: f64) {
+    pub(crate) fn jump(&mut self, h: f64) {
         let mut p = Vector3::zeros();
-        for (i, rock) in particles.iter().enumerate() {
-            if i != self.central {
-                p += rock.mass() * self.u[i];
+        for (i, &mi) in self.m.iter().enumerate() {
+            if i != self.central && mi != 0.0 {
+                p += mi * self.u[i];
             }
         }
         let dq = h * p / self.m_central;
@@ -154,8 +160,84 @@ impl Democratic {
     }
 }
 
-/// Advance a two-body orbit by `dt` with the universal-variable f and g functions.
+/// Stumpff functions c0..c3 at `z`, by series at a reduced argument and the
+/// quadruple-argument identities (no trigonometric calls).
+#[inline]
+fn stumpff_c0123(z: f64) -> [f64; 4] {
+    let mut z = z;
+    let mut n = 0;
+    while z.abs() > 0.1 {
+        z *= 0.25;
+        n += 1;
+    }
+    // c2 = sum (-z)^j / (2j+2)!, c3 = sum (-z)^j / (2j+3)!, to z^6 (error < 1e-21 at |z| = 0.1)
+    let c2 = 1.0 / 2.0 - z * (1.0 / 24.0 - z * (1.0 / 720.0 - z * (1.0 / 40320.0 - z * (1.0 / 3628800.0 - z * (1.0 / 479001600.0 - z / 87178291200.0)))));
+    let c3 = 1.0 / 6.0 - z * (1.0 / 120.0 - z * (1.0 / 5040.0 - z * (1.0 / 362880.0 - z * (1.0 / 39916800.0 - z * (1.0 / 6227020800.0 - z / 1307674368000.0)))));
+    let (mut c0, mut c1, mut c2, mut c3) = (1.0 - z * c2, 1.0 - z * c3, c2, c3);
+    for _ in 0..n {
+        c3 = (c2 + c0 * c3) * 0.25;
+        c2 = 0.5 * c1 * c1;
+        c1 *= c0;
+        c0 = 2.0 * c0 * c0 - 1.0;
+    }
+    [c0, c1, c2, c3]
+}
+
+/// Advance a two-body orbit by `dt` with Gauss's f and g functions in universal variables
+/// (Stumpff-function form, as in Wisdom & Hernandez 2015), solving Kepler's equation with
+/// Halley's method. Falls back to the bracketing solver if that does not converge.
 pub(crate) fn kepler_drift(r0: &Vector3<f64>, v0: &Vector3<f64>, mu: f64, dt: f64) -> (Vector3<f64>, Vector3<f64>) {
+    let r0n = r0.norm();
+    let eta0 = r0.dot(v0);
+    let beta = 2.0 * mu / r0n - v0.norm_squared();
+    let zeta0 = mu - beta * r0n;
+
+    // Whole periods of a bound orbit change nothing.
+    let mut dt_red = dt;
+    if beta > 0.0 {
+        let period = std::f64::consts::TAU * mu / (beta * beta.sqrt());
+        dt_red -= period * (dt / period).trunc();
+    }
+
+    // Initial guess: the short-step series, or the orbit-averaged rate 1/a for long steps.
+    let mut x = if beta > 0.0 && dt_red.abs() * beta.sqrt() * beta / mu > 0.4 {
+        dt_red * beta / mu
+    } else {
+        dt_red / r0n - 0.5 * eta0 * dt_red * dt_red / (r0n * r0n * r0n)
+    };
+
+    let mut converged = false;
+    let mut last_dx = f64::INFINITY;
+    for _ in 0..30 {
+        let [c0, c1, c2, c3] = stumpff_c0123(beta * x * x);
+        let (g1, g2, g3) = (x * c1, x * x * c2, x * x * x * c3);
+        let f = r0n * x + eta0 * g2 + zeta0 * g3 - dt_red;
+        let fp = r0n + eta0 * g1 + zeta0 * g2;
+        let fpp = eta0 * c0 + zeta0 * g1;
+        let dx = f / (fp - 0.5 * f * fpp / fp);
+        x -= dx;
+        if dx.abs() <= 2e-16 * x.abs() || (dx.abs() >= last_dx && dx.abs() <= 1e-12 * x.abs()) {
+            converged = true;
+            break;
+        }
+        last_dx = dx.abs();
+    }
+    if !converged || !x.is_finite() {
+        return kepler_drift_bracketing(r0, v0, mu, dt);
+    }
+
+    let [_, c1, c2, c3] = stumpff_c0123(beta * x * x);
+    let (g1, g2, g3) = (x * c1, x * x * c2, x * x * x * c3);
+    let rn = r0n + eta0 * g1 + zeta0 * g2;
+    let f = 1.0 - mu / r0n * g2;
+    let g = dt_red - mu * g3;
+    let fdot = -mu / (r0n * rn) * g1;
+    let gdot = 1.0 - mu / rn * g2;
+    (f * r0 + g * v0, fdot * r0 + gdot * v0)
+}
+
+/// Kepler drift with the robust bracketing universal-anomaly solver.
+fn kepler_drift_bracketing(r0: &Vector3<f64>, v0: &Vector3<f64>, mu: f64, dt: f64) -> (Vector3<f64>, Vector3<f64>) {
     let r0n = r0.norm();
     let vr0 = r0.dot(v0) / r0n;
     let alpha = 2.0 / r0n - v0.norm_squared() / mu;
@@ -197,9 +279,9 @@ impl Integrator for WisdomHolman {
         let h = self.timestep;
         let mut s = Democratic::from_particles(particles, central);
         s.kick(particles, forces, 0.5 * h, &[]);
-        s.jump(particles, 0.5 * h);
+        s.jump(0.5 * h);
         s.kepler(h);
-        s.jump(particles, 0.5 * h);
+        s.jump(0.5 * h);
         s.kick(particles, forces, 0.5 * h, &[]);
         s.to_particles(particles);
 
@@ -215,5 +297,29 @@ impl Integrator for WisdomHolman {
 
     fn set_timestep(&mut self, timestep: f64) {
         self.timestep = timestep;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kepler_drift_matches_bracketing_solver() {
+        let mu = GRAVITATIONAL_CONSTANT;
+        let cases = [
+            (Vector3::new(1.0, 0.1, 0.0), Vector3::new(0.001, 0.017, 0.002), 30.0),   // near circular
+            (Vector3::new(0.05, 0.0, 0.0), Vector3::new(0.0, 0.1, 0.0), 5.0),         // e ~ 0.98 at pericenter
+            (Vector3::new(-4.9, 0.3, 0.0), Vector3::new(0.0, -0.0006, 0.0), 2000.0),  // near aphelion, long step
+            (Vector3::new(1.0, 0.0, 0.0), Vector3::new(0.0, 0.03, 0.0), 400.0),       // hyperbolic
+            (Vector3::new(1.0, 0.0, 0.0), Vector3::new(0.0, 0.0172, 0.0), 3650.25),   // many periods
+            (Vector3::new(1.0, 0.0, 0.0), Vector3::new(0.0, 0.0172, 0.0), -123.4),    // backwards
+        ];
+        for (r0, v0, dt) in cases {
+            let (r, v) = kepler_drift(&r0, &v0, mu, dt);
+            let (rb, vb) = kepler_drift_bracketing(&r0, &v0, mu, dt);
+            assert!((r - rb).norm() < 1e-11 * rb.norm(), "r {r:?} vs {rb:?} ({r0:?}, {v0:?}, {dt})");
+            assert!((v - vb).norm() < 1e-11 * vb.norm(), "v {v:?} vs {vb:?} ({r0:?}, {v0:?}, {dt})");
+        }
     }
 }

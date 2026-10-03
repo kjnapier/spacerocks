@@ -34,6 +34,6 @@ pub fn stumpff_c(z: f64) -> f64 {
         (1.0 - rootz.cos()) / z
     } else {
         let rootz = (-z).sqrt();
-        (rootz.cosh() - 1.0) / z
+        (rootz.cosh() - 1.0) / -z
     }
 }

@@ -87,11 +87,10 @@ impl Trace {
     /// The switching criteria of REBOUND's TRACE (`reb_integrator_trace_switch_default` and
     /// `reb_integrator_trace_switch_peri_default`), evaluated in democratic heliocentric
     /// coordinates: heliocentric positions, barycentric velocities.
-    fn flags(&self, particles: &[SpaceRock], central: usize, h: f64) -> Flags {
+    fn flags(&self, particles: &[SpaceRock], s: &Democratic, central: usize, h: f64) -> Flags {
         let m0 = particles[central].mass();
         let gm0 = GRAVITATIONAL_CONSTANT * m0;
         let n = particles.len();
-        let s = Democratic::from_particles(particles, central);
         let mut flags = Flags::default();
 
         // Pericenter: the step is longer than peri_crit_eta times the Pham, Rein & Spiegel
@@ -108,18 +107,33 @@ impl Trace {
         let hill6: Vec<f64> = (0..n)
             .map(|i| {
                 let d2 = s.q[i].norm_squared();
-                let mr = if i == central { 0.0 } else { particles[i].mass() / (3.0 * m0) };
+                let mr = if i == central { 0.0 } else { s.m[i] / (3.0 * m0) };
                 d2 * d2 * d2 * mr * mr
             })
             .collect();
+        let speed: Vec<f64> = s.u.iter().map(|u| u.norm()).collect();
+        let dcrit: Vec<f64> = hill6.iter().map(|&h6| self.r_crit_hill * h6.powf(1.0 / 6.0)).collect();
         let rc2 = self.r_crit_hill * self.r_crit_hill;
+        let rc6 = rc2 * rc2 * rc2;
         let h2 = 0.5 * h.abs();
         // Each pair with at least one massive member (test particles never meet each other).
-        for i in (0..n).filter(|&i| hill6[i] > 0.0) {
-            for j in (0..n).filter(|&j| j != i && j != central && (j > i || hill6[j] == 0.0)) {
-                let dcrit6 = rc2 * rc2 * rc2 * hill6[i].max(hill6[j]);
+        for i in 0..n {
+            if hill6[i] == 0.0 {
+                continue;
+            }
+            for j in 0..n {
+                if j == i || j == central || (j < i && hill6[j] > 0.0) {
+                    continue;
+                }
+                let dcrit6 = rc6 * hill6[i].max(hill6[j]);
                 let dx = s.q[i] - s.q[j];
                 let rp = dx.norm_squared();
+                // Conservative early out: within half a step the pair cannot close by more
+                // than (|u_i| + |u_j|) h/2, so a pair farther than that plus dcrit is not close.
+                let reach = dcrit[i].max(dcrit[j]) + (speed[i] + speed[j]) * h2;
+                if rp > reach * reach * (1.0 + 1e-12) {
+                    continue;
+                }
                 let close = if rp * rp * rp < dcrit6 {
                     true
                 } else {
@@ -144,15 +158,14 @@ impl Trace {
         flags
     }
 
-    fn try_step(&self, particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>, central: usize, flags: &Flags) {
+    fn try_step(&self, particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>, central: usize, flags: &Flags, mut s: Democratic) {
         let h = self.timestep;
         if flags.peri {
             bs_full(particles, forces, h, self.bs_epsilon);
             return;
         }
-        let mut s = Democratic::from_particles(particles, central);
         s.kick(particles, forces, 0.5 * h, &flags.pairs);
-        s.jump(particles, 0.5 * h);
+        s.jump(0.5 * h);
 
         // Drift: bodies in close pairs together with Bulirsch–Stoer, the rest analytically.
         let mut in_encounter = vec![false; particles.len()];
@@ -189,7 +202,7 @@ impl Trace {
         }
         s.x_cm += h * s.v_cm;
 
-        s.jump(particles, 0.5 * h);
+        s.jump(0.5 * h);
         s.kick(particles, forces, 0.5 * h, &flags.pairs);
         s.to_particles(particles);
     }
@@ -204,10 +217,11 @@ impl Integrator for Trace {
         };
 
         let start: Vec<_> = particles.iter().map(|p| (p.position, p.velocity)).collect();
-        let mut flags = self.flags(particles, central, self.timestep);
+        let mut s0 = Democratic::from_particles(particles, central);
+        let mut flags = self.flags(particles, &s0, central, self.timestep);
         loop {
-            self.try_step(particles, forces, central, &flags);
-            let end = self.flags(particles, central, -self.timestep);
+            self.try_step(particles, forces, central, &flags, s0);
+            let end = self.flags(particles, &Democratic::from_particles(particles, central), central, -self.timestep);
             if flags.contains(&end) {
                 break;
             }
@@ -216,6 +230,7 @@ impl Integrator for Trace {
                 p.position = x;
                 p.velocity = v;
             }
+            s0 = Democratic::from_particles(particles, central);
         }
 
         *epoch += self.timestep;
@@ -241,16 +256,10 @@ fn prs_timescale2(x: &Vector3<f64>, v: &Vector3<f64>, gm: f64) -> f64 {
     let a = -gm / (d2 * d) * x;
     let jerk = gm / (d2 * d2 * d) * (-d2 * v + 3.0 * x.dot(v) * x);
     let xv = x.dot(v);
-    // Fourth derivative, component by component as REBOUND writes it.
-    let snap = |k: usize| {
-        let (o1, o2) = ((k + 1) % 3, (k + 2) % 3);
-        let others2 = x[o1] * x[o1] + x[o2] * x[o2];
-        let inner = -a[k] * others2 + 2.0 * x[k] * x[k] * a[k] + v[k] * (x[o1] * v[o1] + x[o2] * v[o2])
-            + x[k] * (4.0 * v[k] * v[k] + 3.0 * (x[o1] * a[o1] + v[o1] * v[o1] + x[o2] * a[o2] + v[o2] * v[o2]));
-        let j = -v[k] * others2 + 2.0 * x[k] * x[k] * v[k] + 3.0 * x[k] * (x[o1] * v[o1] + x[o2] * v[o2]);
-        gm / (d2 * d2 * d2 * d) * (d2 * inner - 5.0 * xv * j)
-    };
-    let s = Vector3::new(snap(0), snap(1), snap(2));
+    // Fourth derivative (REBOUND's component expressions, in vector form).
+    let inner = -d2 * a + xv * v + 3.0 * (x.dot(&a) + v.norm_squared()) * x;
+    let j = -d2 * v + 3.0 * xv * x;
+    let s = gm / (d2 * d2 * d2 * d) * (d2 * inner - 5.0 * xv * j);
     let (an, sn) = (a.norm(), s.norm());
     2.0 * an * an / (jerk.norm_squared() + an * sn)
 }
@@ -408,6 +417,45 @@ fn bulirsch_stoer<F: FnMut(&[f64], &mut [f64])>(y: &mut Vec<f64>, mut f: F, span
                 big_h *= 0.25;
                 assert!(big_h.abs() > 1e-12 * span.abs(), "Trace: Bulirsch-Stoer step size underflow");
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// REBOUND's `reb_integrator_trace_switch_peri_default`, transcribed component by component.
+    fn prs_timescale2_rebound(p: &Vector3<f64>, q: &Vector3<f64>, gm: f64) -> f64 {
+        let (x, y, z, dx, dy, dz) = (p.x, p.y, p.z, q.x, q.y, q.z);
+        let d2 = x * x + y * y + z * z;
+        let d = d2.sqrt();
+        let prefact2 = -gm / (d2 * d);
+        let (ddx, ddy, ddz) = (prefact2 * x, prefact2 * y, prefact2 * z);
+        let dd = (ddx * ddx + ddy * ddy + ddz * ddz).sqrt();
+        let prefact3 = gm / (d2 * d2 * d);
+        let dddx = prefact3 * (-dx * (y * y + z * z) + 2. * x * x * dx + 3. * x * (y * dy + z * dz));
+        let dddy = prefact3 * (-dy * (x * x + z * z) + 2. * y * y * dy + 3. * y * (x * dx + z * dz));
+        let dddz = prefact3 * (-dz * (x * x + y * y) + 2. * z * z * dz + 3. * z * (x * dx + y * dy));
+        let ddd2 = dddx * dddx + dddy * dddy + dddz * dddz;
+        let prefact4 = gm / (d2 * d2 * d2 * d);
+        let ddddx = prefact4 * (d2 * (-ddx * (y * y + z * z) + 2. * x * x * ddx + dx * (y * dy + z * dz) + x * (4. * dx * dx + 3. * (y * ddy + dy * dy + z * ddz + dz * dz))) - 5. * (x * dx + y * dy + z * dz) * (-dx * (y * y + z * z) + 2. * x * x * dx + 3. * x * (y * dy + z * dz)));
+        let ddddy = prefact4 * (d2 * (-ddy * (x * x + z * z) + 2. * y * y * ddy + dy * (x * dx + z * dz) + y * (4. * dy * dy + 3. * (x * ddx + dx * dx + z * ddz + dz * dz))) - 5. * (y * dy + x * dx + z * dz) * (-dy * (x * x + z * z) + 2. * y * y * dy + 3. * y * (x * dx + z * dz)));
+        let ddddz = prefact4 * (d2 * (-ddz * (y * y + x * x) + 2. * z * z * ddz + dz * (y * dy + x * dx) + z * (4. * dz * dz + 3. * (y * ddy + dy * dy + x * ddx + dx * dx))) - 5. * (z * dz + y * dy + x * dx) * (-dz * (y * y + x * x) + 2. * z * z * dz + 3. * z * (y * dy + x * dx)));
+        let dddd = (ddddx * ddddx + ddddy * ddddy + ddddz * ddddz).sqrt();
+        2. * dd * dd / (ddd2 + dd * dddd)
+    }
+
+    #[test]
+    fn prs_timescale_matches_rebound() {
+        let gm = GRAVITATIONAL_CONSTANT;
+        for (x, v) in [
+            (Vector3::new(1.0, 0.2, -0.1), Vector3::new(0.003, 0.016, 0.002)),
+            (Vector3::new(0.05, 0.01, 0.0), Vector3::new(-0.01, 0.1, 0.004)),
+            (Vector3::new(-30.0, 12.0, 4.0), Vector3::new(-0.001, -0.002, 0.0005)),
+        ] {
+            let (ours, theirs) = (prs_timescale2(&x, &v, gm), prs_timescale2_rebound(&x, &v, gm));
+            assert!((ours - theirs).abs() < 1e-12 * theirs, "{ours} vs {theirs}");
         }
     }
 }
