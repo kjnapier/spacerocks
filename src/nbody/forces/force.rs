@@ -17,6 +17,22 @@ pub trait Force: Send + Sync + ForceClone {
     ///
     /// * A vector of accelerations for each spacerock.
     fn calculate_acceleration(&self, entities: &mut Vec<SpaceRock>) -> Vec<Vector3<f64>>;
+
+    /// Add the acceleration of each spacerock due to this force to `acc`, which has one entry
+    /// per spacerock. Integrators call this; the default goes through
+    /// [`Force::calculate_acceleration`], and forces can override it to skip the allocation.
+    fn add_acceleration(&self, entities: &mut Vec<SpaceRock>, acc: &mut [Vector3<f64>]) {
+        for (a, da) in acc.iter_mut().zip(self.calculate_acceleration(entities)) {
+            *a += da;
+        }
+    }
+
+    /// Whether this force is plain pairwise Newtonian gravity
+    /// ([`NewtonianGravity`](super::NewtonianGravity)). The Wisdom–Holman and TRACE kicks then
+    /// compute it from their own heliocentric coordinates instead of calling the force.
+    fn is_newtonian_gravity(&self) -> bool {
+        false
+    }
 }
 
 

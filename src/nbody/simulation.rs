@@ -436,10 +436,18 @@ impl Simulation {
 
             // if we're within a timestep of the epoch, just take a step of that size
             if dt.abs() < self.integrator.timestep().abs() {
-                let last_timestep = self.integrator.timestep().clone();
+                // Shorten one step to land on the epoch, then go back to the timestep the
+                // integrator wanted (IAS15 predicts its coefficients again for it). If IAS15
+                // rejected the short step and took an even shorter one, keep the timestep it
+                // chose instead: a rejected step comes back at most a quarter as long.
+                let full_timestep = self.integrator.timestep();
+                let start = self.epoch.tdb().jd();
                 self.integrator.set_timestep(dt);
                 self.step();
-                self.integrator.set_timestep(last_timestep);
+                let taken = self.epoch.tdb().jd() - start;
+                if (taken - dt).abs() < 0.5 * dt.abs() {
+                    self.integrator.set_timestep(full_timestep);
+                }
                 continue;
 
                 // let dt = epoch.tdb().jd() - self.epoch.tdb().jd();

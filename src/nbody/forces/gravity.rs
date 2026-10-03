@@ -16,35 +16,38 @@ impl Force for NewtonianGravity {
     /// Calculates gravitational accelerations for a system of bodies using Newton's law
     /// of universal gravitation.
     fn calculate_acceleration(&self, entities: &mut Vec<SpaceRock>) -> Vec<Vector3<f64>> {
-        // Naive implementation of Newtonian gravity. O(0.5 * n^2) complexity.
-        // Speed it up if you want!
-
         let mut acceleration = vec![Vector3::zeros(); entities.len()];
-        let mass: Vec<f64> = entities.iter().map(|e| e.mass()).collect();
-
-        let n_entities = entities.len();
-        for idx in 0..n_entities {
-
-            if mass[idx] == 0.0 {
-                break;
-            }
-
-            for jdx in (idx + 1)..n_entities {
-
-                let r_vec = entities[idx].position - entities[jdx].position;
-                let r = r_vec.norm();
-
-                let xi = -GRAVITATIONAL_CONSTANT * r_vec / (r * r * r);
-                let idx_acceleration = xi * mass[jdx];
-                let jdx_acceleration = -xi * mass[idx];
-                acceleration[idx] += idx_acceleration;
-                acceleration[jdx] += jdx_acceleration;
-            }
-        }
+        self.add_acceleration(entities, &mut acceleration);
         acceleration
     }
-}
 
+    fn add_acceleration(&self, entities: &mut Vec<SpaceRock>, acc: &mut [Vector3<f64>]) {
+        // Naive implementation of Newtonian gravity. O(0.5 * n^2) complexity. Particles are
+        // sorted by mass, so the loop stops at the first massless one: test particles don't
+        // pull on each other.
+        let n_entities = entities.len();
+        for idx in 0..n_entities {
+            let m_idx = entities[idx].mass();
+            if m_idx == 0.0 {
+                break;
+            }
+            let x_idx = entities[idx].position;
+            let mut acc_idx = Vector3::zeros();
+            for (jdx, other) in entities.iter().enumerate().skip(idx + 1) {
+                let r_vec = x_idx - other.position;
+                let r2 = r_vec.norm_squared();
+                let xi = (GRAVITATIONAL_CONSTANT / (r2 * r2.sqrt())) * r_vec;
+                acc_idx -= other.mass() * xi;
+                acc[jdx] += m_idx * xi;
+            }
+            acc[idx] += acc_idx;
+        }
+    }
+
+    fn is_newtonian_gravity(&self) -> bool {
+        true
+    }
+}
 
 
 
