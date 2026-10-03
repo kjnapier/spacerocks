@@ -6,6 +6,7 @@ use crate::nbody::forces::Force;
 use crate::transforms::universal_kepler_step;
 
 use nalgebra::Vector3;
+use rayon::prelude::*;
 
 /// A second-order Wisdom–Holman symplectic integrator in democratic heliocentric coordinates
 /// (Duncan, Levison & Lee 1998).
@@ -172,21 +173,25 @@ impl Democratic {
     /// Add the Newtonian pull between every pair of bodies other than the central one (test
     /// particles don't pull on each other).
     fn add_interactions(&self, acc: &mut [Vector3<f64>]) {
-        for &i in &self.massive {
+        // Between massive bodies, each pair once, from the first of the two.
+        for (k, &i) in self.massive.iter().enumerate() {
             let (qi, mi) = (self.q[i], self.m[i]);
             let mut acc_i = Vector3::zeros();
-            for (j, ((qj, &mj), aj)) in self.q.iter().zip(&self.m).zip(acc.iter_mut()).enumerate() {
-                // Each pair of massive bodies once, from the first of the two.
-                if j == i || j == self.central || (mj != 0.0 && j < i) {
-                    continue;
-                }
-                let d = qj - qi;
-                let r2 = d.norm_squared();
-                let g = (GRAVITATIONAL_CONSTANT / (r2 * r2.sqrt())) * d;
-                acc_i += mj * g;
-                *aj -= mi * g;
+            for &j in &self.massive[k + 1..] {
+                let g = pull(&self.q[j], &qi);
+                acc_i += self.m[j] * g;
+                acc[j] -= mi * g;
             }
             acc[i] += acc_i;
+        }
+        // On each test particle, from every massive body.
+        for (j, (aj, qj)) in acc.iter_mut().zip(&self.q).enumerate() {
+            if j == self.central || self.m[j] != 0.0 {
+                continue;
+            }
+            for &i in &self.massive {
+                *aj -= self.m[i] * pull(qj, &self.q[i]);
+            }
         }
     }
 
@@ -203,12 +208,18 @@ impl Democratic {
         self.massive.clone_from(&other.massive);
     }
 
-    pub(crate) fn jump(&mut self, h: f64) {
+    /// How far a jump of `h` moves every body: the massive bodies' momentum over the central
+    /// body's mass, times `h`.
+    fn jump_shift(&self, h: f64) -> Vector3<f64> {
         let mut p = Vector3::zeros();
         for &i in &self.massive {
             p += self.m[i] * self.u[i];
         }
-        let dq = h * p / self.m_central;
+        h * p / self.m_central
+    }
+
+    pub(crate) fn jump(&mut self, h: f64) {
+        let dq = self.jump_shift(h);
         for i in 0..self.q.len() {
             if i != self.central {
                 self.q[i] += dq;
@@ -227,6 +238,197 @@ impl Democratic {
         }
         self.x_cm += h * self.v_cm;
     }
+}
+
+/// Most steps per block in [`WisdomHolman::steps`] and [`Trace`](super::Trace)'s: the record
+/// of the massive bodies for a block takes a few hundred bytes per massive body per step.
+pub(crate) const BLOCK: usize = 512;
+
+/// Test-particle steps below which blocks aren't worth it ([`WisdomHolman::steps`] and
+/// [`Trace`](super::Trace)'s take their steps one at a time) or a block's test particles aren't
+/// worth splitting between threads (handing work to the thread pool and waiting for it costs
+/// tens of microseconds; a test-particle step takes about 0.2).
+pub(crate) const MIN_WORK: usize = 4096;
+
+/// Run `f` on every element of `items`, split between threads if `work` is at least
+/// [`MIN_WORK`].
+pub(crate) fn for_each_maybe_par<T: Send, F: Fn(&mut T) + Sync + Send>(items: &mut [T], work: usize, f: F) {
+    if work >= MIN_WORK {
+        items.par_iter_mut().for_each(f);
+    } else {
+        items.iter_mut().for_each(f);
+    }
+}
+
+/// What a test particle needs from the massive bodies for one step (see [`Democratic`]: `q`
+/// heliocentric positions, `u` barycentric velocities), besides their positions at the kicks.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct Frame {
+    /// Central body's position and the barycenter's velocity when the step loads the state.
+    xc_load: Vector3<f64>,
+    v_cm_load: Vector3<f64>,
+    /// The two jumps.
+    dq1: Vector3<f64>,
+    dq2: Vector3<f64>,
+    /// Central body's position and the barycenter's velocity when the step writes it back.
+    xc_out: Vector3<f64>,
+    v_cm_out: Vector3<f64>,
+}
+
+/// The massive bodies of a simulation stepped on their own, for integrators that then take the
+/// test particles through the same steps separately. Test particles act on nothing, so a step
+/// of the massive bodies alone does exactly the arithmetic it does with them present.
+pub(crate) struct MassiveRun {
+    /// Index of each massive body in the simulation's particles.
+    pub(crate) idx: Vec<usize>,
+    pub(crate) bodies: Vec<SpaceRock>,
+    pub(crate) central: usize,
+    pub(crate) s: Democratic,
+    /// Masses of the massive bodies other than the central one, in order.
+    pub(crate) pullers: Vec<f64>,
+    pub(crate) gm: f64,
+    /// Per recorded step: the frame, and the positions of the bodies in `pullers` at the first
+    /// and at the second kick.
+    pub(crate) frames: Vec<Frame>,
+    pub(crate) kicks: Vec<Vector3<f64>>,
+}
+
+impl MassiveRun {
+    pub(crate) fn new(particles: &[SpaceRock], central: usize) -> MassiveRun {
+        let idx: Vec<usize> = (0..particles.len()).filter(|&i| particles[i].mass() != 0.0).collect();
+        let central_m = idx.iter().position(|&i| i == central).unwrap();
+        let bodies: Vec<SpaceRock> = idx.iter().map(|&i| particles[i].clone()).collect();
+        let gm = GRAVITATIONAL_CONSTANT * bodies[central_m].mass();
+        let mut s = Democratic::default();
+        s.load(&bodies, central_m);
+        let pullers = s.massive.iter().map(|&i| s.m[i]).collect();
+        MassiveRun { idx, bodies, central: central_m, s, pullers, gm, frames: Vec::new(), kicks: Vec::new() }
+    }
+
+    /// Forget the recorded steps.
+    pub(crate) fn clear(&mut self) {
+        self.frames.clear();
+        self.kicks.clear();
+    }
+
+    /// One Wisdom–Holman step of the massive bodies (Newtonian gravity only), recorded.
+    /// `check` sees the loaded state at the start of the step (`false`) and the state after
+    /// the second kick (`true`); if it returns false the step is abandoned, nothing is recorded
+    /// and the bodies keep their states.
+    pub(crate) fn step(&mut self, forces: &Vec<Box<dyn Force + Send + Sync>>, h: f64, mut check: impl FnMut(&Democratic, bool) -> bool) -> bool {
+        let half = 0.5 * h;
+        let s = &mut self.s;
+        s.load(&self.bodies, self.central);
+        if !check(s, false) {
+            return false;
+        }
+        let mut f = Frame { xc_load: self.bodies[self.central].position, v_cm_load: s.v_cm, ..Frame::default() };
+        let mark = self.kicks.len();
+        self.kicks.extend(s.massive.iter().map(|&i| s.q[i]));
+        s.kick(&mut self.bodies, forces, half, &[]);
+        f.dq1 = s.jump_shift(half);
+        s.jump(half);
+        s.kepler(h);
+        f.dq2 = s.jump_shift(half);
+        s.jump(half);
+        self.kicks.extend(s.massive.iter().map(|&i| s.q[i]));
+        s.kick(&mut self.bodies, forces, half, &[]);
+        if !check(s, true) {
+            self.kicks.truncate(mark);
+            return false;
+        }
+        s.to_particles(&mut self.bodies);
+        f.xc_out = self.bodies[self.central].position;
+        f.v_cm_out = s.v_cm;
+        self.frames.push(f);
+        true
+    }
+
+    /// A test particle's democratic heliocentric state (`q`, `u`) as recorded step `k` loads it
+    /// from inertial `x`, `v`.
+    #[inline]
+    pub(crate) fn test_load(&self, k: usize, x: &Vector3<f64>, v: &Vector3<f64>) -> (Vector3<f64>, Vector3<f64>) {
+        let f = &self.frames[k];
+        (x - f.xc_load, v - f.v_cm_load)
+    }
+
+    /// Take a test particle (inertial `x`, `v`) through recorded step `k`, with the arithmetic
+    /// of a full step. Returns its democratic heliocentric state (`q`, `u`) as loaded at the
+    /// start of the step and after the second kick.
+    #[inline]
+    pub(crate) fn test_step(&self, k: usize, h: f64, x: &mut Vector3<f64>, v: &mut Vector3<f64>) -> [(Vector3<f64>, Vector3<f64>); 2] {
+        let half = 0.5 * h;
+        let np = self.pullers.len();
+        let f = &self.frames[k];
+        let at = &self.kicks[2 * np * k..2 * np * (k + 1)];
+        let kick = |q: &Vector3<f64>, u: &mut Vector3<f64>, at: &[Vector3<f64>]| {
+            let mut acc = Vector3::zeros();
+            for (qi, &mi) in at.iter().zip(&self.pullers) {
+                acc -= mi * pull(q, qi);
+            }
+            *u += half * acc;
+        };
+        let (mut q, mut u) = self.test_load(k, x, v);
+        let start = (q, u);
+        kick(&q, &mut u, &at[..np]);
+        q += f.dq1;
+        (q, u) = kepler_drift(&q, &u, self.gm, h);
+        q += f.dq2;
+        kick(&q, &mut u, &at[np..]);
+        *x = q + f.xc_out;
+        *v = u + f.v_cm_out;
+        [start, (q, u)]
+    }
+
+    /// Write the massive bodies' states back into `particles`.
+    pub(crate) fn write_back(&self, particles: &mut [SpaceRock]) {
+        for (&i, body) in self.idx.iter().zip(&self.bodies) {
+            particles[i].position = body.position;
+            particles[i].velocity = body.velocity;
+        }
+    }
+}
+
+impl WisdomHolman {
+    fn steps_blocked(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, central: usize, forces: &Vec<Box<dyn Force + Send + Sync>>, n: usize) {
+        let h = self.timestep;
+        let mut run = MassiveRun::new(particles, central);
+        let test_idx: Vec<usize> = (0..particles.len()).filter(|&i| particles[i].mass() == 0.0).collect();
+        let mut tests: Vec<(Vector3<f64>, Vector3<f64>)> = test_idx.iter().map(|&i| (particles[i].position, particles[i].velocity)).collect();
+        let n_tests = tests.len();
+        let mut done = 0;
+        while done < n {
+            let len = BLOCK.min(n - done);
+            run.clear();
+            for _ in 0..len {
+                run.step(forces, h, |_, _| true);
+                *epoch += h;
+            }
+            // Each test particle through the block on its own.
+            for_each_maybe_par(&mut tests, n_tests * len, |(x, v)| {
+                for k in 0..len {
+                    run.test_step(k, h, x, v);
+                }
+            });
+            done += len;
+        }
+        run.write_back(particles);
+        for (&i, (x, v)) in test_idx.iter().zip(tests) {
+            particles[i].position = x;
+            particles[i].velocity = v;
+        }
+        for particle in particles.iter_mut() {
+            particle.epoch = epoch.clone();
+        }
+    }
+}
+
+/// Newtonian pull per unit mass towards `from` felt at `at`, negated: `G (at - from) / r^3`.
+#[inline]
+fn pull(at: &Vector3<f64>, from: &Vector3<f64>) -> Vector3<f64> {
+    let d = at - from;
+    let r2 = d.norm_squared();
+    (GRAVITATIONAL_CONSTANT / (r2 * r2.sqrt())) * d
 }
 
 /// Advance a two-body orbit about a body of gravitational parameter `mu` by `dt`.
@@ -268,11 +470,35 @@ impl Integrator for WisdomHolman {
         }
     }
 
+    /// Takes `n` steps. With Newtonian gravity as the only force and some test particles, the
+    /// massive bodies are stepped first, a block of steps at a time, recording what the test
+    /// particles need from them; then each test particle is taken through the block on its own,
+    /// the particles split between threads. Test particles don't act on anything, so this does
+    /// exactly the arithmetic of `n` calls to [`Integrator::step`] and gives identical results,
+    /// with one hand-off to the thread pool per block instead of several per step.
+    fn steps(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>, n: usize) {
+        let central = central_body(particles);
+        let newtonian_only = forces.len() == 1 && forces[0].is_newtonian_gravity();
+        let n_tests = particles.iter().filter(|p| p.mass() == 0.0).count();
+        match central {
+            Some(central) if newtonian_only && n_tests * n >= MIN_WORK => self.steps_blocked(particles, epoch, central, forces, n),
+            _ => {
+                for _ in 0..n {
+                    self.step(particles, epoch, forces);
+                }
+            }
+        }
+    }
+
     fn timestep(&self) -> f64 {
         self.timestep
     }
 
     fn set_timestep(&mut self, timestep: f64) {
         self.timestep = timestep;
+    }
+
+    fn fixed_timestep(&self) -> bool {
+        true
     }
 }

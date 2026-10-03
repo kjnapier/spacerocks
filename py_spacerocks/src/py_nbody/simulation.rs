@@ -145,6 +145,12 @@ impl PySimulation {
         self.inner.step();
     }
 
+    /// Step the simulation by `n` timesteps: the same result as calling `step` `n` times, but
+    /// WisdomHolman and Trace then split test particles between threads.
+    pub fn steps(&mut self, n: usize) {
+        self.inner.steps(n);
+    }
+
     /// Move the simulation to the center of mass.
     pub fn move_to_center_of_mass(&mut self) -> PyResult<()> {
         match self.inner.move_to_center_of_mass() {

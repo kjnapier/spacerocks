@@ -253,3 +253,96 @@ fn integrate_or_interpolate_falls_back_without_dense_output() {
     let (dx, dv) = max_offset(&a, &b);
     assert!(dx == 0.0 && dv == 0.0);
 }
+
+/// Sun, Jupiter and Saturn with a population of test particles on quiet orbits, and with
+/// `encounters` also some passing close to Jupiter and a sungrazer, so TRACE flags both kinds
+/// of encounter now and then.
+fn population(integrator: Box<dyn Integrator + Send + Sync>, encounters: bool) -> Simulation {
+    let mut sim = outer_system(integrator, false);
+    let vc = |a: f64| (GRAVITATIONAL_CONSTANT / a).sqrt();
+    let mut seed: u64 = 12345;
+    let mut uniform = || {
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (seed >> 11) as f64 / (1u64 << 53) as f64
+    };
+    for k in 0..48 {
+        let a = 2.0 + 30.0 * uniform();
+        let phase = std::f64::consts::TAU * uniform();
+        let (s, c) = phase.sin_cos();
+        let v = vc(a) * (0.9 + 0.2 * uniform());
+        sim.add(rock(&format!("tp{k}"), 0.0, [a * c, a * s, 0.1 * a * (uniform() - 0.5)], [-v * s, v * c, 0.02 * v * (uniform() - 0.5)])).unwrap();
+    }
+    if !encounters {
+        return sim;
+    }
+    // Near Jupiter's orbit, close behind it.
+    let vj = vc(5.2);
+    for k in 0..8 {
+        let dy = -0.2 - 0.05 * k as f64;
+        sim.add(rock(&format!("near{k}"), 0.0, [5.2 - 0.1, dy, 0.01], [0.0, vj * 1.02 + 2e-4 * k as f64, 0.0])).unwrap();
+    }
+    sim.add(rock("comet", 0.0, [-9.5, 0.5, 0.0], [0.0, -1.2e-3, 0.0])).unwrap();
+    sim
+}
+
+fn assert_same(a: &Simulation, b: &Simulation) {
+    assert_eq!(a.epoch.tdb().jd(), b.epoch.tdb().jd());
+    for (p, q) in a.particles.iter().zip(&b.particles) {
+        assert_eq!(p.name, q.name);
+        assert_eq!((p.position, p.velocity), (q.position, q.velocity), "{}", p.name);
+        assert_eq!(p.epoch.tdb().jd(), q.epoch.tdb().jd());
+    }
+}
+
+#[test]
+fn steps_match_step_by_step() {
+    // `steps` takes test particles through blocks of steps (in parallel); it must do exactly
+    // the arithmetic of single steps, forwards and backwards, with and without encounters.
+    for dt in [20.0, -20.0, 3.0] {
+        let integrators: [fn(f64) -> Box<dyn Integrator + Send + Sync>; 2] = [|dt| Box::new(WisdomHolman::new(dt)), |dt| Box::new(Trace::new(dt))];
+        for (make, encounters) in integrators.iter().flat_map(|m| [(m, false), (m, true)]) {
+            let mut one = population(make(dt), encounters);
+            let mut many = one.clone();
+            for _ in 0..800 {
+                one.step();
+            }
+            many.steps(500);
+            many.steps(300);
+            assert_same(&one, &many);
+        }
+    }
+}
+
+#[test]
+fn steps_match_step_by_step_with_other_forces() {
+    let integrators: [Box<dyn Integrator + Send + Sync>; 2] = [Box::new(WisdomHolman::new(20.0)), Box::new(Trace::new(20.0))];
+    for integrator in integrators {
+        let mut one = population(integrator, true);
+        one.add_force(Box::new(spacerocks::nbody::forces::SolarGR));
+        let mut many = one.clone();
+        for _ in 0..300 {
+            one.step();
+        }
+        many.steps(300);
+        assert_same(&one, &many);
+    }
+}
+
+#[test]
+fn integrate_matches_stepping() {
+    // `integrate` hands a fixed-step integrator all its full steps at once.
+    for dt in [20.0, -20.0] {
+        let mut a = population(Box::new(Trace::new(dt)), true);
+        let mut b = a.clone();
+        let target = T0 + 7013.25 * dt.signum();
+        a.integrate(&Time::new(target, "tdb", "jd").unwrap());
+        while (target - b.epoch.tdb().jd()).abs() >= dt.abs() {
+            b.step();
+        }
+        b.integrator.set_timestep(target - b.epoch.tdb().jd());
+        b.step();
+        b.integrator.set_timestep(dt);
+        assert_same(&a, &b);
+        assert_eq!(a.integrator.timestep(), dt);
+    }
+}

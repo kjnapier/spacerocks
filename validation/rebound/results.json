@@ -182,12 +182,12 @@
    "n_particles": 5,
    "n_steps": 100000,
    "us_per_step": {
-    "spacerocks_wh": 0.60588,
-    "spacerocks_trace": 0.91551,
-    "rebound_whfast_dh": 1.1333382399971015,
-    "rebound_whfast_jacobi": 1.1273105100008252,
-    "rebound_trace": 1.319681740001215,
-    "rebound_trace_all_checked": 1.307201059998988
+    "spacerocks_wh": 0.67395,
+    "spacerocks_trace": 1.07685,
+    "rebound_whfast_dh": 1.2549982799987447,
+    "rebound_whfast_jacobi": 1.2794331300005979,
+    "rebound_trace": 1.826496630001202,
+    "rebound_trace_all_checked": 1.7842006000000765
    }
   },
   {
@@ -195,12 +195,12 @@
    "n_particles": 15,
    "n_steps": 10000,
    "us_per_step": {
-    "spacerocks_wh": 1.9807,
-    "spacerocks_trace": 2.8043,
-    "rebound_whfast_dh": 3.3141920999696595,
-    "rebound_whfast_jacobi": 3.3771058000183984,
-    "rebound_trace": 3.8715357999990374,
-    "rebound_trace_all_checked": 6.094812499986801
+    "spacerocks_wh": 1.8102,
+    "spacerocks_trace": 2.7655,
+    "rebound_whfast_dh": 3.764563000004273,
+    "rebound_whfast_jacobi": 3.8586015999953815,
+    "rebound_trace": 5.417942300005052,
+    "rebound_trace_all_checked": 8.7217580000015
    }
   },
   {
@@ -208,12 +208,12 @@
    "n_particles": 105,
    "n_steps": 1000,
    "us_per_step": {
-    "spacerocks_wh": 15.616,
-    "spacerocks_trace": 19.385,
-    "rebound_whfast_dh": 23.279076000108034,
-    "rebound_whfast_jacobi": 23.908254000161833,
-    "rebound_trace": 31.12784199993257,
-    "rebound_trace_all_checked": 267.5583549998919
+    "spacerocks_wh": 6.68,
+    "spacerocks_trace": 10.712,
+    "rebound_whfast_dh": 26.989239999920756,
+    "rebound_whfast_jacobi": 27.91008500003045,
+    "rebound_trace": 44.527368999979444,
+    "rebound_trace_all_checked": 358.11780899985024
    }
   },
   {
@@ -221,12 +221,12 @@
    "n_particles": 1005,
    "n_steps": 200,
    "us_per_step": {
-    "spacerocks_wh": 149.49,
-    "spacerocks_trace": 195.96,
-    "rebound_whfast_dh": 233.85131499935596,
-    "rebound_whfast_jacobi": 237.81537999866487,
-    "rebound_trace": 456.49167999954443,
-    "rebound_trace_all_checked": 27059.249024998735
+    "spacerocks_wh": 46.235,
+    "spacerocks_trace": 84.77,
+    "rebound_whfast_dh": 263.94915499963645,
+    "rebound_whfast_jacobi": 274.8108750006395,
+    "rebound_trace": 595.8889850001015,
+    "rebound_trace_all_checked": 32283.380865000025
    }
   },
   {
@@ -234,12 +234,12 @@
    "n_particles": 55,
    "n_steps": 5000,
    "us_per_step": {
-    "spacerocks_wh": 7.8278,
-    "spacerocks_trace": 11.0484,
-    "rebound_whfast_dh": 13.35069940005269,
-    "rebound_whfast_jacobi": 12.612905200057867,
-    "rebound_trace": 15.451187199960259,
-    "rebound_trace_all_checked": 64.84858660005557
+    "spacerocks_wh": 3.3196,
+    "spacerocks_trace": 10.544,
+    "rebound_whfast_dh": 14.5576427999913,
+    "rebound_whfast_jacobi": 14.573021200021685,
+    "rebound_trace": 21.96047299999009,
+    "rebound_trace_all_checked": 99.05121299998427
    }
   }
  ],
@@ -251,10 +251,10 @@
     {
      "n_outputs": 1,
      "ms": {
-      "spacerocks_integrate": 2.137,
-      "spacerocks_integrate_or_interpolate": 2.1380000000000003,
-      "rebound_exact_finish": 5.171963000066171,
-      "rebound_overshoot": 5.2043790001334855
+      "spacerocks_integrate": 3.2729999999999997,
+      "spacerocks_integrate_or_interpolate": 3.2880000000000003,
+      "rebound_exact_finish": 8.660049999889452,
+      "rebound_overshoot": 11.671592000084274
      },
      "final_pos_err_vs_rebound_one_output_au": {
       "spacerocks_integrate": 4.945721995967684e-11,
@@ -265,10 +265,10 @@
     {
      "n_outputs": 160,
      "ms": {
-      "spacerocks_integrate": 2.57,
-      "spacerocks_integrate_or_interpolate": 2.536,
-      "rebound_exact_finish": 7.539288997577387,
-      "rebound_overshoot": 6.457833001149993
+      "spacerocks_integrate": 3.692,
+      "spacerocks_integrate_or_interpolate": 3.563,
+      "rebound_exact_finish": 12.175386000080834,
+      "rebound_overshoot": 10.040332000698982
      },
      "final_pos_err_vs_rebound_one_output_au": {
       "spacerocks_integrate": 8.269290276517003e-11,
@@ -279,10 +279,10 @@
     {
      "n_outputs": 1600,
      "ms": {
-      "spacerocks_integrate": 6.158,
-      "spacerocks_integrate_or_interpolate": 2.938,
-      "rebound_exact_finish": 31.95592899919575,
-      "rebound_overshoot": 27.869615018971672
+      "spacerocks_integrate": 9.099,
+      "spacerocks_integrate_or_interpolate": 4.428999999999999,
+      "rebound_exact_finish": 49.91091200008668,
+      "rebound_overshoot": 44.22175799959405
      },
      "final_pos_err_vs_rebound_one_output_au": {
       "spacerocks_integrate": 8.840546768320514e-11,
@@ -293,10 +293,10 @@
     {
      "n_outputs": 16000,
      "ms": {
-      "spacerocks_integrate": 47.362,
-      "spacerocks_integrate_or_interpolate": 7.384,
-      "rebound_exact_finish": 256.01530799303873,
-      "rebound_overshoot": 255.42909398291158
+      "spacerocks_integrate": 67.498,
+      "spacerocks_integrate_or_interpolate": 10.344000000000001,
+      "rebound_exact_finish": 421.4236550121768,
+      "rebound_overshoot": 414.5261140047296
      },
      "final_pos_err_vs_rebound_one_output_au": {
       "spacerocks_integrate": 3.232886504449132e-11,
@@ -313,10 +313,10 @@
     {
      "n_outputs": 1,
      "ms": {
-      "spacerocks_integrate": 407.02700000000004,
-      "spacerocks_integrate_or_interpolate": 410.03000000000003,
-      "rebound_exact_finish": 767.3044920002212,
-      "rebound_overshoot": 769.4024560000798
+      "spacerocks_integrate": 618.414,
+      "spacerocks_integrate_or_interpolate": 634.029,
+      "rebound_exact_finish": 1275.1541989998714,
+      "rebound_overshoot": 1220.8739750001314
      },
      "final_pos_err_vs_rebound_one_output_au": {
       "spacerocks_integrate": 3.654099550142763e-11,
@@ -327,10 +327,10 @@
     {
      "n_outputs": 100,
      "ms": {
-      "spacerocks_integrate": 408.688,
-      "spacerocks_integrate_or_interpolate": 405.7,
-      "rebound_exact_finish": 843.6400070008858,
-      "rebound_overshoot": 768.9558259994556
+      "spacerocks_integrate": 613.98,
+      "spacerocks_integrate_or_interpolate": 629.3530000000001,
+      "rebound_exact_finish": 1334.3879700005346,
+      "rebound_overshoot": 1263.5458030003974
      },
      "final_pos_err_vs_rebound_one_output_au": {
       "spacerocks_integrate": 4.4669965530052055e-11,
@@ -341,10 +341,10 @@
     {
      "n_outputs": 1000,
      "ms": {
-      "spacerocks_integrate": 492.231,
-      "spacerocks_integrate_or_interpolate": 408.103,
-      "rebound_exact_finish": 669.5086590025312,
-      "rebound_overshoot": 784.2221549935857
+      "spacerocks_integrate": 712.759,
+      "spacerocks_integrate_or_interpolate": 620.0,
+      "rebound_exact_finish": 993.083128000535,
+      "rebound_overshoot": 1279.9469889960164
      },
      "final_pos_err_vs_rebound_one_output_au": {
       "spacerocks_integrate": 2.5969825131077878e-11,
@@ -355,10 +355,10 @@
     {
      "n_outputs": 10000,
      "ms": {
-      "spacerocks_integrate": 1035.5749999999998,
-      "spacerocks_integrate_or_interpolate": 464.038,
-      "rebound_exact_finish": 4179.873785017207,
-      "rebound_overshoot": 5189.717645991095
+      "spacerocks_integrate": 1497.459,
+      "spacerocks_integrate_or_interpolate": 596.58,
+      "rebound_exact_finish": 6732.441106016722,
+      "rebound_overshoot": 8188.5138249858755
      },
      "final_pos_err_vs_rebound_one_output_au": {
       "spacerocks_integrate": 2.740754967072241e-11,

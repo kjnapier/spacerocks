@@ -2,10 +2,13 @@ use crate::SpaceRock;
 use crate::time::Time;
 use crate::constants::GRAVITATIONAL_CONSTANT;
 use crate::nbody::integrators::{Integrator, Leapfrog};
-use crate::nbody::integrators::wisdom_holman::{central_body, kepler_drift, Democratic};
+use crate::nbody::integrators::wisdom_holman::{central_body, kepler_drift, Democratic, MassiveRun, BLOCK, MIN_WORK};
 use crate::nbody::forces::Force;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use nalgebra::Vector3;
+use rayon::prelude::*;
 
 /// TRACE: a time-reversible hybrid integrator (Lu, Hernandez & Rein 2024).
 ///
@@ -113,22 +116,11 @@ impl Trace {
         let mut flags = Flags::default();
 
         // Pericenter: the step is longer than peri_crit_eta times the Pham, Rein & Spiegel
-        // (2024) timescale of the Keplerian motion about the central body. That timescale
-        // squared is at least d^3 / (20 d v^2 + 2 GM) (bounding each derivative with the
-        // triangle inequality), which clears most bodies without computing it.
+        // (2024) timescale of the Keplerian motion about the central body.
         let eta2 = self.peri_crit_eta * self.peri_crit_eta;
         let hh = h * h;
         for i in 0..n {
-            if i == central {
-                continue;
-            }
-            let d2 = s.q[i].norm_squared();
-            let d = d2.sqrt();
-            let lower = d2 * d / (20.0 * d * s.u[i].norm_squared() + 2.0 * gm0);
-            if eta2 * lower >= hh * (1.0 + 1e-9) {
-                continue;
-            }
-            if hh > eta2 * prs_timescale2(&s.q[i], &s.u[i], gm0) {
+            if i != central && peri_close(&s.q[i], &s.u[i], gm0, eta2, hh) {
                 flags.peri = true;
                 break;
             }
@@ -165,31 +157,7 @@ impl Trace {
                 if j == i || j == central || (j < i && hill6_j > 0.0) {
                     continue;
                 }
-                let dx = qi - qj;
-                let rp = dx.norm_squared();
-                // Conservative early out: within half a step the pair cannot close by more
-                // than (|u_i| + |u_j|) h/2, so a pair farther than that plus dcrit is not close.
-                let reach = dcrit_i.max(dcrit_j) + (speed_i + speed_j) * h2;
-                if rp > reach * reach * (1.0 + 1e-12) {
-                    continue;
-                }
-                let dcrit6 = rc6 * hill6_i.max(hill6_j);
-                let close = if rp * rp * rp < dcrit6 {
-                    true
-                } else {
-                    let dv = ui - uj;
-                    let v2 = dv.norm_squared();
-                    let qv = dx.dot(&dv);
-                    if qv == 0.0 {
-                        false
-                    } else {
-                        let d = if qv < 0.0 { 1.0 } else { -1.0 };
-                        let tmin = -d * qv / v2;
-                        let dmin2 = if tmin < h2 { rp - qv * qv / v2 } else { rp + 2.0 * d * qv * h2 + v2 * h2 * h2 };
-                        dmin2 * dmin2 * dmin2 < dcrit6
-                    }
-                };
-                if close {
+                if pair_close(&(qi - qj), &(ui - uj), hill6_i.max(hill6_j), dcrit_i.max(dcrit_j), speed_i + speed_j, h2, rc6) {
                     flags.pairs.push((i.min(j), i.max(j)));
                 }
             }
@@ -294,6 +262,26 @@ impl Integrator for Trace {
         }
     }
 
+    /// Takes `n` steps. With Newtonian gravity as the only force and some test particles, runs
+    /// of steps without encounters are taken in blocks: the massive bodies are stepped first,
+    /// recording what the test particles need from them, then each test particle is taken
+    /// through the block on its own, the particles split between threads. Steps in which
+    /// anything is flagged are taken by [`Integrator::step`]. Test particles don't act on
+    /// anything, so the arithmetic is exactly that of `n` calls to `step`, and so are the results.
+    fn steps(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>, n: usize) {
+        let central = central_body(particles);
+        let newtonian_only = forces.len() == 1 && forces[0].is_newtonian_gravity();
+        let n_tests = particles.iter().filter(|p| p.mass() == 0.0).count();
+        match central {
+            Some(central) if newtonian_only && n_tests * n >= MIN_WORK => self.steps_blocked(particles, epoch, central, forces, n),
+            _ => {
+                for _ in 0..n {
+                    self.step(particles, epoch, forces);
+                }
+            }
+        }
+    }
+
     fn timestep(&self) -> f64 {
         self.timestep
     }
@@ -301,6 +289,206 @@ impl Integrator for Trace {
     fn set_timestep(&mut self, timestep: f64) {
         self.timestep = timestep;
     }
+
+    fn fixed_timestep(&self) -> bool {
+        true
+    }
+}
+
+/// What the switching criteria need of a massive body (other than the central one) to test
+/// it against a test particle.
+#[derive(Clone, Copy)]
+struct Body {
+    q: Vector3<f64>,
+    u: Vector3<f64>,
+    hill6: f64,
+    dcrit: f64,
+    speed: f64,
+}
+
+impl Trace {
+    fn steps_blocked(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, central: usize, forces: &Vec<Box<dyn Force + Send + Sync>>, n: usize) {
+        let h = self.timestep;
+        let tests: Vec<usize> = (0..particles.len()).filter(|&i| particles[i].mass() == 0.0).collect();
+        let mut run = MassiveRun::new(particles, central);
+        let mut ws = Scratch::default();
+        let np = run.pullers.len();
+        let eta2 = self.peri_crit_eta * self.peri_crit_eta;
+        let hh = h * h;
+        let h2 = 0.5 * h.abs();
+        let rc2 = self.r_crit_hill * self.r_crit_hill;
+        let rc6 = rc2 * rc2 * rc2;
+        let gm0 = run.gm;
+
+        // Per recorded step, the massive bodies (other than the central one) at the start and
+        // at the end, and their inertial states after the step.
+        let mut bodies: Vec<Body> = Vec::new();
+        let mut after: Vec<(Vector3<f64>, Vector3<f64>)> = Vec::new();
+        let nb = run.bodies.len();
+        // Blocks grow while no step is flagged and shrink when one is; after a block whose
+        // first step is flagged, steps are taken one at a time for a while.
+        let mut len_next = 32;
+        let mut single = 0;
+        let mut single_next = 1;
+        let mut done = 0;
+        while done < n {
+            if single > 0 {
+                self.step(particles, epoch, forces);
+                done += 1;
+                single -= 1;
+                if single == 0 {
+                    run = MassiveRun::new(particles, central);
+                }
+                continue;
+            }
+            let len = len_next.min(n - done);
+            run.clear();
+            bodies.clear();
+            after.clear();
+            after.extend(run.bodies.iter().map(|b| (b.position, b.velocity)));
+
+            // The massive bodies, until one of their own steps is flagged.
+            let mut m = 0;
+            while m < len {
+                let ok = run.step(forces, h, |s, end| {
+                    let flags = self.flags(s, if end { -h } else { h }, &mut ws);
+                    bodies.extend(s.massive.iter().map(|&i| Body { q: s.q[i], u: s.u[i], hill6: ws.hill6[i], dcrit: ws.dcrit[i], speed: ws.speed[i] }));
+                    !flags.peri && flags.pairs.is_empty()
+                });
+                if !ok {
+                    bodies.truncate(2 * np * m);
+                    break;
+                }
+                after.extend(run.bodies.iter().map(|b| (b.position, b.velocity)));
+                m += 1;
+            }
+
+            // Whether a test particle at `q`, `u` (democratic heliocentric) is flagged against
+            // the massive bodies `at`, as `flags` would flag it.
+            let flagged = |q: &Vector3<f64>, u: &Vector3<f64>, at: &[Body]| {
+                peri_close(q, u, gm0, eta2, hh)
+                    || at.iter().any(|b| pair_close(&(b.q - q), &(b.u - u), b.hill6.max(0.0), b.dcrit.max(0.0), b.speed + u.norm(), h2, rc6))
+            };
+            // Each test particle through the steps until one of its steps is flagged; the
+            // block then ends before the first flagged step of any particle.
+            // A particle already flagged at the start of the block (an encounter that goes on
+            // from the last step) ends it before anything is stepped.
+            let flagged_now = m > 0 && tests.iter().any(|&j| {
+                let (q, u) = run.test_load(0, &particles[j].position, &particles[j].velocity);
+                flagged(&q, &u, &bodies[..np])
+            });
+            let first = AtomicUsize::new(if flagged_now { 0 } else { m });
+            let par = tests.len() * m >= MIN_WORK && !flagged_now;
+            let through = |&j: &usize| {
+                let (mut x, mut v) = (particles[j].position, particles[j].velocity);
+                let mut k = 0;
+                while k < first.load(Ordering::Relaxed) {
+                    let (x0, v0) = (x, v);
+                    let [start, end] = run.test_step(k, h, &mut x, &mut v);
+                    let at = &bodies[2 * np * k..2 * np * (k + 1)];
+                    if flagged(&start.0, &start.1, &at[..np]) || flagged(&end.0, &end.1, &at[np..]) {
+                        (x, v) = (x0, v0);
+                        first.fetch_min(k, Ordering::Relaxed);
+                        break;
+                    }
+                    k += 1;
+                }
+                (x, v, k)
+            };
+            let ends: Vec<(Vector3<f64>, Vector3<f64>, usize)> = if par { tests.par_iter().map(through).collect() } else { tests.iter().map(through).collect() };
+            let clean = first.into_inner();
+
+            // Particles that went past the end of the block go through it again.
+            let again = |(&j, (x, v, k)): (&usize, (Vector3<f64>, Vector3<f64>, usize))| {
+                if k == clean {
+                    return (x, v);
+                }
+                let (mut x, mut v) = (particles[j].position, particles[j].velocity);
+                for k in 0..clean {
+                    run.test_step(k, h, &mut x, &mut v);
+                }
+                (x, v)
+            };
+            let ends: Vec<(Vector3<f64>, Vector3<f64>)> = if par { tests.par_iter().zip(ends).map(again).collect() } else { tests.iter().zip(ends).map(again).collect() };
+            for (&j, (x, v)) in tests.iter().zip(ends) {
+                particles[j].position = x;
+                particles[j].velocity = v;
+            }
+            for (b, &(x, v)) in run.bodies.iter_mut().zip(&after[nb * clean..nb * (clean + 1)]) {
+                b.position = x;
+                b.velocity = v;
+            }
+            run.write_back(particles);
+            for _ in 0..clean {
+                *epoch += h;
+            }
+            done += clean;
+
+            if clean < len {
+                // A flagged step.
+                self.step(particles, epoch, forces);
+                done += 1;
+                if clean == 0 {
+                    single = single_next;
+                    single_next = (2 * single_next).min(BLOCK);
+                } else {
+                    single_next = 1;
+                    run = MassiveRun::new(particles, central);
+                }
+                len_next = (len_next / 2).max(32);
+            } else {
+                len_next = (2 * len_next).min(BLOCK);
+                single_next = 1;
+            }
+        }
+        for particle in particles.iter_mut() {
+            particle.epoch = epoch.clone();
+        }
+    }
+}
+
+/// Whether a step of `h` (with `hh` = h^2) is longer than `eta2`.sqrt() Pham–Rein–Spiegel
+/// timescales of the Keplerian motion at heliocentric `q`, barycentric `u` about a body of
+/// `gm0`. That timescale squared is at least d^3 / (20 d v^2 + 2 GM) (bounding each derivative
+/// with the triangle inequality), which clears most bodies without computing it.
+#[inline]
+fn peri_close(q: &Vector3<f64>, u: &Vector3<f64>, gm0: f64, eta2: f64, hh: f64) -> bool {
+    let d2 = q.norm_squared();
+    let d = d2.sqrt();
+    let lower = d2 * d / (20.0 * d * u.norm_squared() + 2.0 * gm0);
+    if eta2 * lower >= hh * (1.0 + 1e-9) {
+        return false;
+    }
+    hh > eta2 * prs_timescale2(q, u, gm0)
+}
+
+/// Whether a pair with separation `dx` and relative velocity `dv` is closer than `dcrit` now,
+/// or at the closest point of its straight-line relative motion within `h2` (half a step)
+/// towards the approach. `hill6` is the larger Hill radius to the sixth power (with
+/// `rc6` = r_crit_hill^6), `dcrit` the larger critical distance and `speeds` the sum of the
+/// two speeds.
+#[inline]
+fn pair_close(dx: &Vector3<f64>, dv: &Vector3<f64>, hill6: f64, dcrit: f64, speeds: f64, h2: f64, rc6: f64) -> bool {
+    let rp = dx.norm_squared();
+    // Conservative early out: within half a step the pair cannot close by more than
+    // (|u_i| + |u_j|) h/2, so a pair farther than that plus dcrit is not close.
+    let reach = dcrit + speeds * h2;
+    if rp > reach * reach * (1.0 + 1e-12) {
+        return false;
+    }
+    let dcrit6 = rc6 * hill6;
+    if rp * rp * rp < dcrit6 {
+        return true;
+    }
+    let v2 = dv.norm_squared();
+    let qv = dx.dot(dv);
+    if qv == 0.0 {
+        return false;
+    }
+    let d = if qv < 0.0 { 1.0 } else { -1.0 };
+    let tmin = -d * qv / v2;
+    let dmin2 = if tmin < h2 { rp - qv * qv / v2 } else { rp + 2.0 * d * qv * h2 + v2 * h2 * h2 };
+    dmin2 * dmin2 * dmin2 < dcrit6
 }
 
 /// Squared Pham, Rein & Spiegel (2024) timescale (their eq. 16) of Keplerian motion about a

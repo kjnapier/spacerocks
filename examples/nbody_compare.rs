@@ -58,9 +58,7 @@ fn main() {
                 sim.integrate(&target);
             }
         } else {
-            for _ in 0..chunk {
-                sim.step();
-            }
+            sim.steps(chunk);
         }
         seconds += start.elapsed().as_secs_f64();
         taken += chunk;
