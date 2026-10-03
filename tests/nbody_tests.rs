@@ -206,3 +206,50 @@ fn ias15_does_not_depend_on_output_cadence() {
     let (dx, dv) = max_offset(&once, &often);
     assert!(dx < 1e-7 && dv < 1e-9, "dx = {dx:e} AU, dv = {dv:e} AU/day");
 }
+
+#[test]
+fn integrate_or_interpolate_matches_integrate() {
+    // Interpolated states agree with exact integration, and the integrator's own path doesn't
+    // depend on how many epochs are requested.
+    let mut exact = comet_system(Box::new(IAS15::new(1.0)));
+    let mut interp = comet_system(Box::new(IAS15::new(1.0)));
+    let mut once = comet_system(Box::new(IAS15::new(1.0)));
+    let mut worst: f64 = 0.0;
+    for k in 1..=1600 {
+        let epoch = Time::new(T0 + 5.0 * k as f64 + 0.37, "tdb", "jd").unwrap();
+        exact.integrate(&epoch);
+        interp.integrate_or_interpolate(&epoch);
+        assert!((interp.epoch.jd() - epoch.jd()).abs() < 1e-9);
+        worst = worst.max(max_offset(&exact, &interp).0);
+    }
+    assert!(worst < 1e-7, "worst offset {worst:e} AU");
+
+    // Going back inside the last step, then on to the end, lands where a single call does.
+    let end = Time::new(T0 + 8100.0, "tdb", "jd").unwrap();
+    interp.integrate_or_interpolate(&Time::new(T0 + 8000.0, "tdb", "jd").unwrap());
+    interp.integrate_or_interpolate(&end);
+    once.integrate_or_interpolate(&end);
+    let (dx, dv) = max_offset(&once, &interp);
+    assert!(dx == 0.0 && dv == 0.0, "dx = {dx:e} AU, dv = {dv:e} AU/day");
+}
+
+#[test]
+fn integrate_or_interpolate_runs_backwards() {
+    let mut fwd = outer_system(Box::new(IAS15::new(1.0)), true);
+    let start = fwd.clone();
+    fwd.integrate_or_interpolate(&Time::new(T0 + 3000.0, "tdb", "jd").unwrap());
+    fwd.integrate_or_interpolate(&Time::new(T0, "tdb", "jd").unwrap());
+    let (dx, dv) = max_offset(&fwd, &start);
+    assert!(dx < 1e-9 && dv < 1e-11, "dx = {dx:e} AU, dv = {dv:e} AU/day");
+}
+
+#[test]
+fn integrate_or_interpolate_falls_back_without_dense_output() {
+    let mut a = outer_system(Box::new(WisdomHolman::new(20.0)), true);
+    let mut b = outer_system(Box::new(WisdomHolman::new(20.0)), true);
+    let epoch = Time::new(T0 + 1234.5, "tdb", "jd").unwrap();
+    a.integrate(&epoch);
+    b.integrate_or_interpolate(&epoch);
+    let (dx, dv) = max_offset(&a, &b);
+    assert!(dx == 0.0 && dv == 0.0);
+}

@@ -31,6 +31,19 @@ pub struct Simulation {
 
     pub integrator: Box<dyn Integrator + Send + Sync>,
     pub forces: Vec<Box<dyn Force + Send + Sync>>,
+
+    /// The integrator's own state while `particles` hold interpolated states.
+    synced: Option<SyncedState>,
+    /// Whether the integrator's last step describes the current particles.
+    dense_valid: bool,
+}
+
+/// Where the integrator actually is, kept aside by [`Simulation::integrate_or_interpolate`].
+#[derive(Clone)]
+struct SyncedState {
+    epoch: Time,
+    positions: Vec<Vector3<f64>>,
+    velocities: Vec<Vector3<f64>>,
 }
 
 impl Default for Simulation {
@@ -55,7 +68,9 @@ impl Simulation {
             reference_plane: reference_plane,  
             origin: origin,
             integrator: Box::new(IAS15::new(1.0)),
-            particle_index_map: HashMap::new()
+            particle_index_map: HashMap::new(),
+            synced: None,
+            dense_valid: false,
         })
     }
 
@@ -164,6 +179,8 @@ impl Simulation {
     ///
     /// * `particle` - The particle to add to the simulation.
     pub fn add(&mut self, mut particle: SpaceRock) -> Result<(), Box<dyn std::error::Error>> {
+        self.synchronize();
+        self.dense_valid = false;
 
         if self.epoch.tdb().jd() != particle.epoch.tdb().jd() {
             let err = SimulationError::EpochMismatch(particle.epoch.clone(), self.epoch.clone(), particle.name.clone());
@@ -210,6 +227,8 @@ impl Simulation {
     ///
     /// * `name` - The name of the particle to remove.
     pub fn remove(&mut self, name: &str) -> Result<(), SimulationError> {
+        self.synchronize();
+        self.dense_valid = false;
         if self.particle_index_map.contains_key(name) {
             let idx = self.particle_index_map[name];
             self.particles.remove(idx);
@@ -227,6 +246,8 @@ impl Simulation {
 
     /// Move the simulation to the center of mass.
     pub fn move_to_center_of_mass(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.synchronize();
+        self.dense_valid = false;
         let mut total_mass = 0.0;
         let mut center_of_mass = Vector3::new(0.0, 0.0, 0.0);
         let mut center_of_mass_velocity = Vector3::new(0.0, 0.0, 0.0);
@@ -272,6 +293,8 @@ impl Simulation {
     ///     
     /// * `origin` - The name of the particle to set as the origin.
     pub fn change_origin(&mut self, origin: &str) -> Result<(), String> {
+        self.synchronize();
+        self.dense_valid = false;
 
         if !self.particle_index_map.contains_key(origin) {
            return Err(format!("Origin {} not found in perturbers", origin));
@@ -294,7 +317,90 @@ impl Simulation {
 
     /// Step the simulation forward in time by one timestep.
     pub fn step(&mut self) {
+        self.synchronize();
         self.integrator.step(&mut self.particles, &mut self.epoch, &self.forces);
+        self.dense_valid = true;
+    }
+
+    /// Integrate to a new epoch, or interpolate to it when the integrator supports it.
+    ///
+    /// The integrator takes its own adaptive steps until one of them brackets `epoch`, and the
+    /// particles are then interpolated to `epoch` from that step. The integrator never shortens a
+    /// step to land on `epoch`, so calling this for a sorted sequence of epochs costs no more than
+    /// integrating to the last one, and the result doesn't depend on how many epochs you ask for.
+    /// An epoch inside the last step, before or after the current one, needs no new steps.
+    ///
+    /// The particles then hold the interpolated states, and the integrator's own state is kept
+    /// aside. Any later call that steps, integrates, adds or removes particles, or changes the
+    /// origin restores it first, so changes made to interpolated particles are discarded.
+    ///
+    /// Integrators without dense output (only [`IAS15`] has it) fall back to
+    /// [`Simulation::integrate`].
+    ///
+    /// # Arguments
+    ///
+    /// * `epoch` - The epoch to integrate or interpolate to.
+    pub fn integrate_or_interpolate(&mut self, epoch: &Time) {
+        if !self.integrator.has_dense_output() {
+            self.integrate(epoch);
+            return;
+        }
+        self.synchronize();
+
+        let mut target_epoch = epoch.clone();
+        target_epoch.to_tdb();
+        let target = target_epoch.jd();
+        if (target - self.epoch.tdb().jd()).abs() < 1e-16 {
+            return;
+        }
+
+        loop {
+            if self.dense_valid {
+                if let Some((positions, velocities)) = self.integrator.interpolate(target) {
+                    let synced = SyncedState {
+                        epoch: self.epoch.clone(),
+                        positions: self.particles.iter().map(|p| p.position).collect(),
+                        velocities: self.particles.iter().map(|p| p.velocity).collect(),
+                    };
+                    for (particle, (x, v)) in self.particles.iter_mut().zip(positions.into_iter().zip(velocities)) {
+                        particle.position = x;
+                        particle.velocity = v;
+                        particle.epoch = target_epoch.clone();
+                    }
+                    self.epoch = target_epoch;
+                    self.synced = Some(synced);
+                    return;
+                }
+            }
+
+            // Step towards the target.
+            let dt = target - self.epoch.tdb().jd();
+            if self.dense_valid && dt.abs() < 1e-16 {
+                return;
+            }
+            let timestep = self.integrator.timestep();
+            if (dt < 0.0) != (timestep < 0.0) {
+                self.integrator.set_timestep(-timestep);
+            }
+            self.step();
+            if (target - self.epoch.tdb().jd()) * dt < 0.0 && self.integrator.interpolate(target).is_none() {
+                // Stepped past the target without being able to interpolate back; finish exactly.
+                self.integrate(epoch);
+                return;
+            }
+        }
+    }
+
+    /// Restore the integrator's own state if the particles hold interpolated states.
+    fn synchronize(&mut self) {
+        if let Some(synced) = self.synced.take() {
+            for (particle, (x, v)) in self.particles.iter_mut().zip(synced.positions.into_iter().zip(synced.velocities)) {
+                particle.position = x;
+                particle.velocity = v;
+                particle.epoch = synced.epoch.clone();
+            }
+            self.epoch = synced.epoch;
+        }
     }
 
     /// Integrate the simulation to a new epoch.
@@ -308,8 +414,8 @@ impl Simulation {
     ///
     /// * `epoch` - The new epoch to integrate to.
     pub fn integrate(&mut self, epoch: &Time) {
+        self.synchronize();
 
-        
         let dt = epoch.tdb().jd() - self.epoch.tdb().jd();
         if dt.abs() < 1e-16 {
             return;
