@@ -20,7 +20,7 @@ const ARCSEC: f64 = std::f64::consts::PI / (180.0 * 3600.0);
 ///
 /// Orbits are barycentric J2000 states at TDB epochs, with a covariance when one is known
 /// (fits, MPC ``mpc_orb`` records) or else the MPC uncertainty parameter U (MPCORB).
-#[pyclass(name = "Catalog", module = "spacerocks.checker")]
+#[pyclass(from_py_object, name = "Catalog", module = "spacerocks.checker")]
 #[derive(Clone)]
 pub struct PyCatalog {
     pub inner: Catalog,

@@ -3,7 +3,7 @@ use pyo3::types::PyType;
 
 use spacerocks::ReferencePlane;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "ReferencePlane")]
 #[derive(Clone, Debug, PartialEq)]
 pub struct PyReferencePlane {

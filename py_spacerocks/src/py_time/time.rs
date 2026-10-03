@@ -4,7 +4,7 @@ use pyo3::exceptions::PyValueError;
 
 use spacerocks::time::Time;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "Time")]
 #[derive(Clone)]
 pub struct PyTime {

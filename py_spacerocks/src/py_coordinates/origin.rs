@@ -3,7 +3,7 @@ use pyo3::types::PyType;
 
 use spacerocks::Origin;
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "Origin")]
 #[derive(Clone, Debug, PartialEq)]
 pub struct PyOrigin {
