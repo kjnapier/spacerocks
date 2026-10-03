@@ -1,4 +1,4 @@
-"""Compare spacerocks' WisdomHolman and Trace integrators with REBOUND's WHFast and TRACE.
+"""Compare spacerocks' WisdomHolman, Trace and IAS15 integrators with REBOUND's.
 
 Each scenario builds initial conditions with REBOUND, integrates them with both codes (the
 spacerocks side through `examples/nbody_compare.rs`) and with IAS15 in both codes as the
@@ -115,7 +115,7 @@ def run_spacerocks(integrator, parts, dt, n_steps, n_out):
     return {"states": states, "energy": energy, "seconds": seconds}
 
 
-def run_rebound(integrator, parts, dt, n_steps, n_out, n_active=False, **opts):
+def run_rebound(integrator, parts, dt, n_steps, n_out, n_active=False, exact_finish_time=1, **opts):
     sim = new_sim()
     for n, m, x, y, z, vx, vy, vz in parts:
         sim.add(m=m, x=x, y=y, z=z, vx=vx, vy=vy, vz=vz)
@@ -134,7 +134,7 @@ def run_rebound(integrator, parts, dt, n_steps, n_out, n_active=False, **opts):
         chunk = min(per_out, n_steps - taken)
         start = time.perf_counter()
         if integrator == "ias15":
-            sim.integrate((taken + chunk) * dt)
+            sim.integrate((taken + chunk) * dt, exact_finish_time=exact_finish_time)
         else:
             sim.steps(chunk)
         seconds += time.perf_counter() - start
@@ -171,6 +171,7 @@ def scenario(label, parts, dt, n_steps, compare, n_out=200):
         "spacerocks_wh": run_spacerocks("whfast", parts, dt, n_steps, n_out),
         "spacerocks_trace": run_spacerocks("trace", parts, dt, n_steps, n_out),
         "spacerocks_ias15": run_spacerocks("ias15", parts, dt, n_steps, n_out),
+        "spacerocks_ias15_interp": run_spacerocks("ias15i", parts, dt, n_steps, n_out),
         "rebound_whfast_dh": run_rebound("whfast", parts, dt, n_steps, n_out, coordinates="democraticheliocentric"),
         "rebound_trace": run_rebound("trace", parts, dt, n_steps, n_out),
         "rebound_ias15": run_rebound("ias15", parts, dt, n_steps, n_out),
@@ -181,7 +182,29 @@ def scenario(label, parts, dt, n_steps, compare, n_out=200):
     res["wh_vs_whfast_dh_au"] = pos_err(runs["spacerocks_wh"], runs["rebound_whfast_dh"], [p[0] for p in parts])
     res["trace_vs_rebound_trace_au"] = pos_err(runs["spacerocks_trace"], runs["rebound_trace"], compare)
     res["ias15_vs_ias15_au"] = pos_err(runs["spacerocks_ias15"], runs["rebound_ias15"], compare)
+    res["ias15_interp_vs_ias15_au"] = pos_err(runs["spacerocks_ias15_interp"], runs["rebound_ias15"], compare)
     return res
+
+
+def ias15_timing(label, parts, span, outputs, compare):
+    """IAS15 wall time and accuracy against output cadence. spacerocks lands on each output with
+    `integrate` or interpolates with `integrate_or_interpolate`; REBOUND lands on each output
+    (exact_finish_time=1) or overshoots it (exact_finish_time=0, no interpolation)."""
+    rows = []
+    ref = run_rebound("ias15", parts, span, 1, 1)
+    for n in outputs:
+        dt = span / n
+        runs = {
+            "spacerocks_integrate": timed(run_spacerocks, "ias15", parts, dt, n, n),
+            "spacerocks_integrate_or_interpolate": timed(run_spacerocks, "ias15i", parts, dt, n, n),
+            "rebound_exact_finish": timed(run_rebound, "ias15", parts, dt, n, n, n_active=True),
+            "rebound_overshoot": timed(run_rebound, "ias15", parts, dt, n, n, n_active=True, exact_finish_time=0),
+        }
+        rows.append({"n_outputs": n,
+                     "ms": {k: 1e3 * r["seconds"] for k, r in runs.items()},
+                     # An overshooting run doesn't end at `span`, so it has no comparable final state.
+                     "final_pos_err_vs_rebound_one_output_au": {k: pos_err(r, ref, compare) for k, r in runs.items() if k != "rebound_overshoot"}})
+    return {"label": label, "span_days": span, "rows": rows}
 
 
 def timing(label, parts, dt, n_steps):
@@ -214,6 +237,12 @@ def main():
     for n in (10, 100, 1000):
         tim.append(timing(f"Giants + {n} KBOs", giants_with_kbos(n), 120.0, max(100000 // n, 200)))
     tim.append(timing("Giants + 50 Centaurs", centaurs(50), 30.0, 5000))
+    results["ias15_timing"] = [
+        ias15_timing("Sungrazing comet, 8000 days", sungrazer(), 8000.0, (1, 160, 1600, 16000), ["comet"]),
+        ias15_timing("Giants + 100 KBOs, 1 kyr", giants_with_kbos(100), 365250.0, (1, 100, 1000, 10000), [f"kbo{k}" for k in range(100)]),
+    ]
+    for r in results["ias15_timing"]:
+        print(r["label"], file=sys.stderr)
     json.dump(results, sys.stdout, indent=1)
 
 

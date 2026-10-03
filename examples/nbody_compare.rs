@@ -2,7 +2,8 @@
 //! other codes (see `validation/rebound/compare.py`).
 //!
 //! Input: a header line `integrator dt n_steps n_out` (integrator: whfast | trace | ias15 |
-//! leapfrog; IAS15 integrates to `n_steps * dt` with its own adaptive steps), then one particle
+//! ias15i | leapfrog; IAS15 integrates to `n_steps * dt` with its own adaptive steps, landing on
+//! each output with `integrate`, or with `integrate_or_interpolate` for ias15i), then one particle
 //! per line: `name mass x y z vx vy vz` (Msun, AU, AU/day).
 //! Output: `energy t E` lines at `n_out` evenly spaced times, `state name x y z vx vy vz`
 //! for every particle at the end, and `seconds s` for the time spent stepping.
@@ -24,7 +25,7 @@ fn main() {
     let integrator: Box<dyn Integrator + Send + Sync> = match header[0] {
         "whfast" => Box::new(WisdomHolman::new(dt)),
         "trace" => Box::new(Trace::new(dt)),
-        "ias15" => Box::new(IAS15::new(dt)),
+        "ias15" | "ias15i" => Box::new(IAS15::new(dt)),
         "leapfrog" => Box::new(Leapfrog::new(dt)),
         other => panic!("unknown integrator {other}"),
     };
@@ -48,10 +49,14 @@ fn main() {
     while taken < n_steps {
         let chunk = per_out.min(n_steps - taken);
         let start = Instant::now();
-        if header[0] == "ias15" {
+        if header[0] == "ias15" || header[0] == "ias15i" {
             // Adaptive: integrate to the output time instead of counting steps.
             let target = Time::new(t0 + (taken + chunk) as f64 * dt, "tdb", "jd").unwrap();
-            sim.integrate(&target);
+            if header[0] == "ias15i" {
+                sim.integrate_or_interpolate(&target);
+            } else {
+                sim.integrate(&target);
+            }
         } else {
             for _ in 0..chunk {
                 sim.step();
