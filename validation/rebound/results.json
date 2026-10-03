@@ -8,27 +8,27 @@
    "n_steps": 3044,
    "span_days": 365280.0,
    "pos_err_vs_rebound_ias15_au": {
-    "spacerocks_wh": 0.012873179313316586,
-    "spacerocks_trace": 0.012873179313316586,
-    "spacerocks_ias15": 9.081480912787355e-11,
-    "spacerocks_ias15_interp": 7.666799420546123e-11,
+    "spacerocks_wh": 0.012873179322148284,
+    "spacerocks_trace": 0.012873179322148284,
+    "spacerocks_ias15": 5.3637605938780146e-11,
+    "spacerocks_ias15_interp": 8.941368705095074e-12,
     "rebound_whfast_dh": 0.006376354200533017,
     "rebound_trace": 0.012873179264968922,
     "rebound_ias15": 0.0
    },
    "max_rel_energy_error": {
-    "spacerocks_wh": 1.4883876948557017e-06,
-    "spacerocks_trace": 1.4883876948557017e-06,
-    "spacerocks_ias15": 1.2535566313434646e-14,
-    "spacerocks_ias15_interp": 5.9595315260590944e-15,
+    "spacerocks_wh": 1.4883876993767257e-06,
+    "spacerocks_trace": 1.4883876993767257e-06,
+    "spacerocks_ias15": 8.014542397113954e-15,
+    "spacerocks_ias15_interp": 8.836546745535898e-15,
     "rebound_whfast_dh": 7.434031134605999e-07,
     "rebound_trace": 1.4883877047197538e-06,
     "rebound_ias15": 2.05501087105486e-15
    },
-   "wh_vs_whfast_dh_au": 0.019249528501063887,
-   "trace_vs_rebound_trace_au": 4.834847211950948e-11,
-   "ias15_vs_ias15_au": 9.081480912787355e-11,
-   "ias15_interp_vs_ias15_au": 7.666799420546123e-11
+   "wh_vs_whfast_dh_au": 0.01924952850989555,
+   "trace_vs_rebound_trace_au": 5.718041254894891e-11,
+   "ias15_vs_ias15_au": 5.3637605938780146e-11,
+   "ias15_interp_vs_ias15_au": 8.941368705095074e-12
   },
   {
    "label": "Sun + 4 giants, 100 kyr (energy)",
@@ -37,27 +37,27 @@
    "n_steps": 304400,
    "span_days": 36528000.0,
    "pos_err_vs_rebound_ias15_au": {
-    "spacerocks_wh": 1.2228008486333313,
-    "spacerocks_trace": 1.2228008486333313,
-    "spacerocks_ias15": 1.6194041491586042e-08,
-    "spacerocks_ias15_interp": 8.47423843085517e-09,
+    "spacerocks_wh": 1.2228008640933765,
+    "spacerocks_trace": 1.2228008640933765,
+    "spacerocks_ias15": 1.7149010733025287e-08,
+    "spacerocks_ias15_interp": 1.3509600942913788e-08,
     "rebound_whfast_dh": 0.6412910942723529,
     "rebound_trace": 1.2228008230456773,
     "rebound_ias15": 0.0
    },
    "max_rel_energy_error": {
-    "spacerocks_wh": 1.3351423148211103e-06,
-    "spacerocks_trace": 1.3351423148211103e-06,
-    "spacerocks_ias15": 7.891241744850663e-14,
-    "spacerocks_ias15_interp": 8.466644788746023e-14,
+    "spacerocks_wh": 1.335142248033257e-06,
+    "spacerocks_trace": 1.335142248033257e-06,
+    "spacerocks_ias15": 7.418589244508045e-14,
+    "spacerocks_ias15_interp": 5.692380112821962e-14,
     "rebound_whfast_dh": 7.114093881910561e-07,
     "rebound_trace": 1.3351422237841286e-06,
     "rebound_ias15": 1.2741067400540133e-14
    },
-   "wh_vs_whfast_dh_au": 1.8622043077570356,
-   "trace_vs_rebound_trace_au": 2.5634790332632208e-08,
-   "ias15_vs_ias15_au": 1.6194041491586042e-08,
-   "ias15_interp_vs_ias15_au": 8.47423843085517e-09
+   "wh_vs_whfast_dh_au": 1.8622043231782766,
+   "trace_vs_rebound_trace_au": 5.566756981398198e-08,
+   "ias15_vs_ias15_au": 1.7149010733025287e-08,
+   "ias15_interp_vs_ias15_au": 1.3509600942913788e-08
   },
   {
    "label": "Test particle inside Jupiter's Hill sphere",
@@ -66,10 +66,10 @@
    "n_steps": 150,
    "span_days": 3000.0,
    "pos_err_vs_rebound_ias15_au": {
-    "spacerocks_wh": 0.00752129231331569,
-    "spacerocks_trace": 2.239875051396817e-05,
-    "spacerocks_ias15": 1.2315543743553552e-13,
-    "spacerocks_ias15_interp": 5.20501633765646e-12,
+    "spacerocks_wh": 0.007521292313315805,
+    "spacerocks_trace": 2.2398750513968428e-05,
+    "spacerocks_ias15": 1.2889546874957232e-13,
+    "spacerocks_ias15_interp": 2.4920578637732545e-12,
     "rebound_whfast_dh": 0.007441056480942694,
     "rebound_trace": 2.2398825711372897e-05,
     "rebound_ias15": 0.0
@@ -78,15 +78,15 @@
     "spacerocks_wh": 2.5570441206345054e-10,
     "spacerocks_trace": 2.5570441206345054e-10,
     "spacerocks_ias15": 2.6768909625658157e-15,
-    "spacerocks_ias15_interp": 1.216768619348098e-15,
+    "spacerocks_ias15_interp": 1.7034760670873371e-15,
     "rebound_whfast_dh": 1.2875930703744928e-10,
     "rebound_trace": 2.5570173517248797e-10,
     "rebound_ias15": 7.300611716088588e-16
    },
-   "wh_vs_whfast_dh_au": 0.00019329849891127287,
-   "trace_vs_rebound_trace_au": 2.778083669888013e-10,
-   "ias15_vs_ias15_au": 1.2315543743553552e-13,
-   "ias15_interp_vs_ias15_au": 5.20501633765646e-12
+   "wh_vs_whfast_dh_au": 0.00019329849891005582,
+   "trace_vs_rebound_trace_au": 2.778083671054371e-10,
+   "ias15_vs_ias15_au": 1.2889546874957232e-13,
+   "ias15_interp_vs_ias15_au": 2.4920578637732545e-12
   },
   {
    "label": "Sungrazing comet (q = 0.05 AU), 5 passages",
@@ -95,10 +95,10 @@
    "n_steps": 1600,
    "span_days": 8000.0,
    "pos_err_vs_rebound_ias15_au": {
-    "spacerocks_wh": 0.7317018454009138,
-    "spacerocks_trace": 0.0015265556118568629,
-    "spacerocks_ias15": 2.961719694339706e-09,
-    "spacerocks_ias15_interp": 5.5344220205744207e-11,
+    "spacerocks_wh": 0.7317014284312181,
+    "spacerocks_trace": 0.0015265571110592874,
+    "spacerocks_ias15": 1.3913462587344512e-10,
+    "spacerocks_ias15_interp": 3.6316579679037663e-11,
     "rebound_whfast_dh": 3.7414004738209057,
     "rebound_trace": 0.0016521534428463008,
     "rebound_ias15": 0.0
@@ -106,16 +106,16 @@
    "max_rel_energy_error": {
     "spacerocks_wh": 1.598456767551403e-11,
     "spacerocks_trace": 1.573878041440571e-11,
-    "spacerocks_ias15": 1.1072594436067691e-14,
-    "spacerocks_ias15_interp": 5.8404893728708704e-15,
+    "spacerocks_ias15": 5.8404893728708704e-15,
+    "spacerocks_ias15_interp": 2.0685066528917664e-15,
     "rebound_whfast_dh": 8.0486810632638e-12,
     "rebound_trace": 1.573415669365219e-11,
     "rebound_ias15": 7.300611716088588e-16
    },
-   "wh_vs_whfast_dh_au": 3.0692028434601473,
-   "trace_vs_rebound_trace_au": 0.00012559786892814547,
-   "ias15_vs_ias15_au": 2.961719694339706e-09,
-   "ias15_interp_vs_ias15_au": 5.5344220205744207e-11
+   "wh_vs_whfast_dh_au": 3.069203228482388,
+   "trace_vs_rebound_trace_au": 0.00012559636972484667,
+   "ias15_vs_ias15_au": 1.3913462587344512e-10,
+   "ias15_interp_vs_ias15_au": 3.6316579679037663e-11
   },
   {
    "label": "Giants + 100 KBOs, 10 kyr",
@@ -124,27 +124,27 @@
    "n_steps": 30440,
    "span_days": 3652800.0,
    "pos_err_vs_rebound_ias15_au": {
-    "spacerocks_wh": 0.054188851479861765,
-    "spacerocks_trace": 0.052081230705237486,
-    "spacerocks_ias15": 3.1174157474862768e-09,
-    "spacerocks_ias15_interp": 3.182306511151703e-09,
+    "spacerocks_wh": 0.054188847977344315,
+    "spacerocks_trace": 0.05208122713869313,
+    "spacerocks_ias15": 1.2639277801736643e-09,
+    "spacerocks_ias15_interp": 3.0338965772032193e-09,
     "rebound_whfast_dh": 0.03413128476461829,
     "rebound_trace": 0.052081228028303325,
     "rebound_ias15": 0.0
    },
    "max_rel_energy_error": {
-    "spacerocks_wh": 1.4929529664440937e-06,
-    "spacerocks_trace": 1.4929529664440937e-06,
-    "spacerocks_ias15": 3.185266850135033e-14,
-    "spacerocks_ias15_interp": 2.8153648933451585e-14,
+    "spacerocks_wh": 1.4929529358244316e-06,
+    "spacerocks_trace": 1.4929529358244316e-06,
+    "spacerocks_ias15": 2.93866554560845e-14,
+    "spacerocks_ias15_interp": 1.4590577184489506e-14,
     "rebound_whfast_dh": 7.459678558041461e-07,
     "rebound_trace": 1.4929529539085272e-06,
     "rebound_ias15": 3.904520655004234e-15
    },
-   "wh_vs_whfast_dh_au": 0.18388244622488945,
-   "trace_vs_rebound_trace_au": 2.6812149679007873e-09,
-   "ias15_vs_ias15_au": 3.1174157474862768e-09,
-   "ias15_interp_vs_ias15_au": 3.182306511151703e-09
+   "wh_vs_whfast_dh_au": 0.18388244682824031,
+   "trace_vs_rebound_trace_au": 1.4274528801776907e-09,
+   "ias15_vs_ias15_au": 1.2639277801736643e-09,
+   "ias15_interp_vs_ias15_au": 3.0338965772032193e-09
   },
   {
    "label": "Giants + 50 Centaurs, 1 kyr",
@@ -153,27 +153,27 @@
    "n_steps": 12176,
    "span_days": 365280.0,
    "pos_err_vs_rebound_ias15_au": {
-    "spacerocks_wh": 0.011383257743119733,
-    "spacerocks_trace": 0.006350813524796433,
-    "spacerocks_ias15": 2.778720103237081e-10,
-    "spacerocks_ias15_interp": 1.1944791455652628e-09,
+    "spacerocks_wh": 0.011383257744068119,
+    "spacerocks_trace": 0.006350813625081428,
+    "spacerocks_ias15": 4.4691999434898164e-10,
+    "spacerocks_ias15_interp": 1.2241541513243156e-09,
     "rebound_whfast_dh": 0.00757137010629919,
     "rebound_trace": 0.006350814389740545,
     "rebound_ias15": 0.0
    },
    "max_rel_energy_error": {
-    "spacerocks_wh": 9.288834047046146e-08,
-    "spacerocks_trace": 9.288834047046146e-08,
-    "spacerocks_ias15": 1.1713561965012702e-14,
-    "spacerocks_ias15_interp": 5.343028264742636e-15,
+    "spacerocks_wh": 9.288834416948102e-08,
+    "spacerocks_trace": 9.288834416948102e-08,
+    "spacerocks_ias15": 5.7540304389536084e-15,
+    "spacerocks_ias15_interp": 1.0891557616590758e-14,
     "rebound_whfast_dh": 4.631354161970234e-08,
     "rebound_trace": 9.288834684099515e-08,
     "rebound_ias15": 2.260511958160346e-15
    },
-   "wh_vs_whfast_dh_au": 0.005891593146134126,
-   "trace_vs_rebound_trace_au": 4.928428025863866e-09,
-   "ias15_vs_ias15_au": 2.778720103237081e-10,
-   "ias15_interp_vs_ias15_au": 1.1944791455652628e-09
+   "wh_vs_whfast_dh_au": 0.005891593256450153,
+   "trace_vs_rebound_trace_au": 4.923975702842527e-09,
+   "ias15_vs_ias15_au": 4.4691999434898164e-10,
+   "ias15_interp_vs_ias15_au": 1.2241541513243156e-09
   }
  ],
  "timing": [
@@ -182,12 +182,12 @@
    "n_particles": 5,
    "n_steps": 100000,
    "us_per_step": {
-    "spacerocks_wh": 1.2778900000000002,
-    "spacerocks_trace": 2.20718,
-    "rebound_whfast_dh": 1.2642892200000233,
-    "rebound_whfast_jacobi": 1.2985135799999625,
-    "rebound_trace": 1.825059999999894,
-    "rebound_trace_all_checked": 1.7992703900000606
+    "spacerocks_wh": 0.8339,
+    "spacerocks_trace": 1.13986,
+    "rebound_whfast_dh": 1.1261178999984622,
+    "rebound_whfast_jacobi": 1.1292825299983633,
+    "rebound_trace": 1.3702315999989878,
+    "rebound_trace_all_checked": 1.3272397199989427
    }
   },
   {
@@ -195,12 +195,12 @@
    "n_particles": 15,
    "n_steps": 10000,
    "us_per_step": {
-    "spacerocks_wh": 4.0088,
-    "spacerocks_trace": 6.2128,
-    "rebound_whfast_dh": 3.756517300001861,
-    "rebound_whfast_jacobi": 3.874689599996373,
-    "rebound_trace": 5.945811899999853,
-    "rebound_trace_all_checked": 8.663233699996908
+    "spacerocks_wh": 2.6706,
+    "spacerocks_trace": 3.432,
+    "rebound_whfast_dh": 3.3293107999952554,
+    "rebound_whfast_jacobi": 3.4119497000119736,
+    "rebound_trace": 3.8751811000111047,
+    "rebound_trace_all_checked": 6.006394899986844
    }
   },
   {
@@ -208,12 +208,12 @@
    "n_particles": 105,
    "n_steps": 1000,
    "us_per_step": {
-    "spacerocks_wh": 28.873,
-    "spacerocks_trace": 45.34,
-    "rebound_whfast_dh": 27.230653000003713,
-    "rebound_whfast_jacobi": 27.72846599998502,
-    "rebound_trace": 44.53871900000195,
-    "rebound_trace_all_checked": 361.9451580000259
+    "spacerocks_wh": 19.736,
+    "spacerocks_trace": 29.015,
+    "rebound_whfast_dh": 23.268320999932257,
+    "rebound_whfast_jacobi": 23.931035000032352,
+    "rebound_trace": 31.167307999794502,
+    "rebound_trace_all_checked": 262.3028370001066
    }
   },
   {
@@ -221,12 +221,12 @@
    "n_particles": 1005,
    "n_steps": 200,
    "us_per_step": {
-    "spacerocks_wh": 280.185,
-    "spacerocks_trace": 471.94,
-    "rebound_whfast_dh": 266.5993950000711,
-    "rebound_whfast_jacobi": 276.79259499990394,
-    "rebound_trace": 608.6423949997766,
-    "rebound_trace_all_checked": 33431.22803
+    "spacerocks_wh": 197.4,
+    "spacerocks_trace": 241.445,
+    "rebound_whfast_dh": 238.17119499994988,
+    "rebound_whfast_jacobi": 244.9758899990684,
+    "rebound_trace": 460.52982499986683,
+    "rebound_trace_all_checked": 27478.79537000017
    }
   },
   {
@@ -234,12 +234,12 @@
    "n_particles": 55,
    "n_steps": 5000,
    "us_per_step": {
-    "spacerocks_wh": 15.096,
-    "spacerocks_trace": 24.1932,
-    "rebound_whfast_dh": 14.8170976000074,
-    "rebound_whfast_jacobi": 15.025388599997314,
-    "rebound_trace": 21.447731400007797,
-    "rebound_trace_all_checked": 97.79412540000294
+    "spacerocks_wh": 10.5244,
+    "spacerocks_trace": 13.2382,
+    "rebound_whfast_dh": 12.349275599990506,
+    "rebound_whfast_jacobi": 12.628306599981443,
+    "rebound_trace": 15.660015999992538,
+    "rebound_trace_all_checked": 66.0471129999678
    }
   }
  ],
@@ -251,56 +251,56 @@
     {
      "n_outputs": 1,
      "ms": {
-      "spacerocks_integrate": 7.258,
-      "spacerocks_integrate_or_interpolate": 7.279,
-      "rebound_exact_finish": 8.096862000002147,
-      "rebound_overshoot": 8.383935999972891
+      "spacerocks_integrate": 2.17,
+      "spacerocks_integrate_or_interpolate": 2.159,
+      "rebound_exact_finish": 5.1834800001415715,
+      "rebound_overshoot": 5.147906000047442
      },
      "final_pos_err_vs_rebound_one_output_au": {
-      "spacerocks_integrate": 4.218140142332413e-11,
-      "spacerocks_integrate_or_interpolate": 4.218150920140286e-11,
+      "spacerocks_integrate": 4.945721995967684e-11,
+      "spacerocks_integrate_or_interpolate": 4.945732774430213e-11,
       "rebound_exact_finish": 0.0
      }
     },
     {
      "n_outputs": 160,
      "ms": {
-      "spacerocks_integrate": 53.525000000000006,
-      "spacerocks_integrate_or_interpolate": 7.986,
-      "rebound_exact_finish": 12.12953600054334,
-      "rebound_overshoot": 9.968368999807353
+      "spacerocks_integrate": 2.483,
+      "spacerocks_integrate_or_interpolate": 2.25,
+      "rebound_exact_finish": 7.549258000381087,
+      "rebound_overshoot": 6.330869998691924
      },
      "final_pos_err_vs_rebound_one_output_au": {
-      "spacerocks_integrate": 4.4959452860275465e-09,
-      "spacerocks_integrate_or_interpolate": 9.818364811653008e-12,
+      "spacerocks_integrate": 8.269290276517003e-11,
+      "spacerocks_integrate_or_interpolate": 4.323564782315335e-11,
       "rebound_exact_finish": 4.2223258784064073e-13
      }
     },
     {
      "n_outputs": 1600,
      "ms": {
-      "spacerocks_integrate": 69.46900000000001,
-      "spacerocks_integrate_or_interpolate": 9.001,
-      "rebound_exact_finish": 50.00882399974671,
-      "rebound_overshoot": 43.610616996488716
+      "spacerocks_integrate": 6.0600000000000005,
+      "spacerocks_integrate_or_interpolate": 3.04,
+      "rebound_exact_finish": 32.195037001883975,
+      "rebound_overshoot": 27.718005000224366
      },
      "final_pos_err_vs_rebound_one_output_au": {
-      "spacerocks_integrate": 3.0835951978211374e-10,
-      "spacerocks_integrate_or_interpolate": 5.6329136959555844e-11,
+      "spacerocks_integrate": 8.840546768320514e-11,
+      "spacerocks_integrate_or_interpolate": 3.533166611684142e-11,
       "rebound_exact_finish": 4.016801618968719e-12
      }
     },
     {
      "n_outputs": 16000,
      "ms": {
-      "spacerocks_integrate": 198.716,
-      "spacerocks_integrate_or_interpolate": 14.602,
-      "rebound_exact_finish": 421.6643179975108,
-      "rebound_overshoot": 408.87606299327217
+      "spacerocks_integrate": 45.256,
+      "spacerocks_integrate_or_interpolate": 8.595,
+      "rebound_exact_finish": 258.9913240062742,
+      "rebound_overshoot": 256.3505850253023
      },
      "final_pos_err_vs_rebound_one_output_au": {
-      "spacerocks_integrate": 1.3522080244713916e-10,
-      "spacerocks_integrate_or_interpolate": 1.2139817992004391e-11,
+      "spacerocks_integrate": 3.232886504449132e-11,
+      "spacerocks_integrate_or_interpolate": 7.364511777925145e-11,
       "rebound_exact_finish": 4.575420364624844e-11
      }
     }
@@ -313,61 +313,60 @@
     {
      "n_outputs": 1,
      "ms": {
-      "spacerocks_integrate": 1091.1109999999999,
-      "spacerocks_integrate_or_interpolate": 1076.796,
-      "rebound_exact_finish": 1204.931100000067,
-      "rebound_overshoot": 1238.710979000075
+      "spacerocks_integrate": 398.123,
+      "spacerocks_integrate_or_interpolate": 405.98,
+      "rebound_exact_finish": 778.7379020001026,
+      "rebound_overshoot": 806.7203019998033
      },
      "final_pos_err_vs_rebound_one_output_au": {
-      "spacerocks_integrate": 2.182542718363813e-11,
-      "spacerocks_integrate_or_interpolate": 2.1820406332140265e-11,
+      "spacerocks_integrate": 3.654099550142763e-11,
+      "spacerocks_integrate_or_interpolate": 3.654392674048129e-11,
       "rebound_exact_finish": 0.0
      }
     },
     {
      "n_outputs": 100,
      "ms": {
-      "spacerocks_integrate": 1180.375,
-      "spacerocks_integrate_or_interpolate": 1121.589,
-      "rebound_exact_finish": 1378.0539140001338,
-      "rebound_overshoot": 1284.752438000055
+      "spacerocks_integrate": 414.17199999999997,
+      "spacerocks_integrate_or_interpolate": 413.0,
+      "rebound_exact_finish": 831.8436079998719,
+      "rebound_overshoot": 784.1377759978059
      },
      "final_pos_err_vs_rebound_one_output_au": {
-      "spacerocks_integrate": 2.9085177320742686e-11,
-      "spacerocks_integrate_or_interpolate": 1.740646162487582e-11,
+      "spacerocks_integrate": 4.4669965530052055e-11,
+      "spacerocks_integrate_or_interpolate": 2.7695354749799846e-11,
       "rebound_exact_finish": 3.1129603236264245e-12
      }
     },
     {
      "n_outputs": 1000,
      "ms": {
-      "spacerocks_integrate": 1993.143,
-      "spacerocks_integrate_or_interpolate": 1100.095,
-      "rebound_exact_finish": 894.1802920003283,
-      "rebound_overshoot": 1260.9984969994912
+      "spacerocks_integrate": 497.21999999999997,
+      "spacerocks_integrate_or_interpolate": 414.464,
+      "rebound_exact_finish": 654.2858599987085,
+      "rebound_overshoot": 787.116406999985
      },
      "final_pos_err_vs_rebound_one_output_au": {
-      "spacerocks_integrate": 2.1124583432664312e-11,
-      "spacerocks_integrate_or_interpolate": 2.846108219752411e-11,
+      "spacerocks_integrate": 2.5969825131077878e-11,
+      "spacerocks_integrate_or_interpolate": 2.0589004803049874e-11,
       "rebound_exact_finish": 2.8498569288229424e-12
      }
     },
     {
      "n_outputs": 10000,
      "ms": {
-      "spacerocks_integrate": 5072.798,
-      "spacerocks_integrate_or_interpolate": 1126.1000000000001,
-      "rebound_exact_finish": 6822.310892004566,
-      "rebound_overshoot": 7900.406166006064
+      "spacerocks_integrate": 999.522,
+      "spacerocks_integrate_or_interpolate": 480.582,
+      "rebound_exact_finish": 4219.721574004097,
+      "rebound_overshoot": 5039.188445016862
      },
      "final_pos_err_vs_rebound_one_output_au": {
-      "spacerocks_integrate": 2.993216013258044e-11,
-      "spacerocks_integrate_or_interpolate": 1.9841378014122784e-11,
+      "spacerocks_integrate": 2.740754967072241e-11,
+      "spacerocks_integrate_or_interpolate": 3.504827581324502e-11,
       "rebound_exact_finish": 2.8607715274518793e-11
      }
     }
    ]
   }
- ],
- "rebound_python_call_overhead_us": 4.448175149997269
+ ]
 }
