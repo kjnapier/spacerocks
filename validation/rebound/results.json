@@ -1,0 +1,228 @@
+{
+ "rebound_version": "5.2.1",
+ "accuracy": [
+  {
+   "label": "Sun + 4 giants, 1000 yr",
+   "n_particles": 5,
+   "dt_days": 120.0,
+   "n_steps": 3044,
+   "span_days": 365280.0,
+   "pos_err_vs_rebound_ias15_au": {
+    "spacerocks_wh": 0.012873179286877262,
+    "spacerocks_trace": 0.012873179286877262,
+    "spacerocks_ias15": 9.081480912787355e-11,
+    "rebound_whfast_dh": 0.006376354200533017,
+    "rebound_trace": 0.012873179264968922,
+    "rebound_ias15": 0.0
+   },
+   "max_rel_energy_error": {
+    "spacerocks_wh": 1.4883877145838062e-06,
+    "spacerocks_trace": 1.4883877145838062e-06,
+    "spacerocks_ias15": 1.2535566313434646e-14,
+    "rebound_whfast_dh": 7.434031134605999e-07,
+    "rebound_trace": 1.4883877047197538e-06,
+    "rebound_ias15": 2.05501087105486e-15
+   },
+   "wh_vs_whfast_dh_au": 0.019249528474624807,
+   "trace_vs_rebound_trace_au": 4.042993403482709e-11,
+   "ias15_vs_ias15_au": 9.081480912787355e-11
+  },
+  {
+   "label": "Sun + 4 giants, 100 kyr (energy)",
+   "n_particles": 5,
+   "dt_days": 120.0,
+   "n_steps": 304400,
+   "span_days": 36528000.0,
+   "pos_err_vs_rebound_ias15_au": {
+    "spacerocks_wh": 1.222800820758508,
+    "spacerocks_trace": 1.222800820758508,
+    "spacerocks_ias15": 1.6194041491586042e-08,
+    "rebound_whfast_dh": 0.6412910942723529,
+    "rebound_trace": 1.2228008230456773,
+    "rebound_ias15": 0.0
+   },
+   "max_rel_energy_error": {
+    "spacerocks_wh": 1.3351424146946384e-06,
+    "spacerocks_trace": 1.3351424146946384e-06,
+    "spacerocks_ias15": 7.891241744850663e-14,
+    "rebound_whfast_dh": 7.114093881910561e-07,
+    "rebound_trace": 1.3351422237841286e-06,
+    "rebound_ias15": 1.2741067400540133e-14
+   },
+   "wh_vs_whfast_dh_au": 1.8622042799524805,
+   "trace_vs_rebound_trace_au": 3.1528768895216074e-07,
+   "ias15_vs_ias15_au": 1.6194041491586042e-08
+  },
+  {
+   "label": "Test particle inside Jupiter's Hill sphere",
+   "n_particles": 3,
+   "dt_days": 20.0,
+   "n_steps": 150,
+   "span_days": 3000.0,
+   "pos_err_vs_rebound_ias15_au": {
+    "spacerocks_wh": 0.007521292313331819,
+    "spacerocks_trace": 2.2398750330985852e-05,
+    "spacerocks_ias15": 1.2315543743553552e-13,
+    "rebound_whfast_dh": 0.007441056480942694,
+    "rebound_trace": 2.2398825711372897e-05,
+    "rebound_ias15": 0.0
+   },
+   "max_rel_energy_error": {
+    "spacerocks_wh": 2.557042903865886e-10,
+    "spacerocks_trace": 2.557042903865886e-10,
+    "spacerocks_ias15": 2.6768909625658157e-15,
+    "rebound_whfast_dh": 1.2875930703744928e-10,
+    "rebound_trace": 2.5570173517248797e-10,
+    "rebound_ias15": 7.300611716088588e-16
+   },
+   "wh_vs_whfast_dh_au": 0.00019329849889422674,
+   "trace_vs_rebound_trace_au": 2.785545010027981e-10,
+   "ias15_vs_ias15_au": 1.2315543743553552e-13
+  },
+  {
+   "label": "Sungrazing comet (q = 0.05 AU), 5 passages",
+   "n_particles": 3,
+   "dt_days": 5.0,
+   "n_steps": 1600,
+   "span_days": 8000.0,
+   "pos_err_vs_rebound_ias15_au": {
+    "spacerocks_wh": 0.7317013350911528,
+    "spacerocks_trace": 0.0015265568836900824,
+    "spacerocks_ias15": 215.58386822313312,
+    "rebound_whfast_dh": 3.7414004738209057,
+    "rebound_trace": 0.0016521534428463008,
+    "rebound_ias15": 0.0
+   },
+   "max_rel_energy_error": {
+    "spacerocks_wh": 1.598055233907018e-11,
+    "spacerocks_trace": 1.575520679076691e-11,
+    "spacerocks_ias15": 0.0003417725145672777,
+    "rebound_whfast_dh": 8.0486810632638e-12,
+    "rebound_trace": 1.573415669365219e-11,
+    "rebound_ias15": 7.300611716088588e-16
+   },
+   "wh_vs_whfast_dh_au": 3.0692033146709052,
+   "trace_vs_rebound_trace_au": 0.00012559659709422173,
+   "ias15_vs_ias15_au": 215.58386822313312
+  },
+  {
+   "label": "Giants + 100 KBOs, 10 kyr",
+   "n_particles": 105,
+   "dt_days": 120.0,
+   "n_steps": 30440,
+   "span_days": 3652800.0,
+   "pos_err_vs_rebound_ias15_au": {
+    "spacerocks_wh": 0.05418885229335075,
+    "spacerocks_trace": 0.05208123155435603,
+    "spacerocks_ias15": 3.1174157474862768e-09,
+    "rebound_whfast_dh": 0.03413128476461829,
+    "rebound_trace": 0.052081228028303325,
+    "rebound_ias15": 0.0
+   },
+   "max_rel_energy_error": {
+    "spacerocks_wh": 1.4929529835006839e-06,
+    "spacerocks_trace": 1.4929529835006839e-06,
+    "spacerocks_ias15": 3.185266850135033e-14,
+    "rebound_whfast_dh": 7.459678558041461e-07,
+    "rebound_trace": 1.4929529539085272e-06,
+    "rebound_ias15": 3.904520655004234e-15
+   },
+   "wh_vs_whfast_dh_au": 0.18388244633229633,
+   "trace_vs_rebound_trace_au": 3.5265063332237884e-09,
+   "ias15_vs_ias15_au": 3.1174157474862768e-09
+  },
+  {
+   "label": "Giants + 50 Centaurs, 1 kyr",
+   "n_particles": 55,
+   "dt_days": 30.0,
+   "n_steps": 12176,
+   "span_days": 365280.0,
+   "pos_err_vs_rebound_ias15_au": {
+    "spacerocks_wh": 0.011383257559610255,
+    "spacerocks_trace": 0.006350810662029365,
+    "spacerocks_ias15": 2.778720103237081e-10,
+    "rebound_whfast_dh": 0.00757137010629919,
+    "rebound_trace": 0.006350814389740545,
+    "rebound_ias15": 0.0
+   },
+   "max_rel_energy_error": {
+    "spacerocks_wh": 9.288831601583209e-08,
+    "spacerocks_trace": 9.288831601583209e-08,
+    "spacerocks_ias15": 1.1713561965012702e-14,
+    "rebound_whfast_dh": 4.631354161970234e-08,
+    "rebound_trace": 9.288834684099515e-08,
+    "rebound_ias15": 2.260511958160346e-15
+   },
+   "wh_vs_whfast_dh_au": 0.005891590418302575,
+   "trace_vs_rebound_trace_au": 4.7533711976378076e-09,
+   "ias15_vs_ias15_au": 2.778720103237081e-10
+  }
+ ],
+ "timing": [
+  {
+   "label": "Sun + 4 giants",
+   "n_particles": 5,
+   "n_steps": 100000,
+   "us_per_step": {
+    "spacerocks_wh": 1.52433,
+    "spacerocks_trace": 2.12936,
+    "rebound_whfast_dh": 1.0707764400001452,
+    "rebound_whfast_jacobi": 1.0455897399992864,
+    "rebound_trace": 1.1239704900003744,
+    "rebound_trace_all_checked": 1.2210597899991171
+   }
+  },
+  {
+   "label": "Giants + 10 KBOs",
+   "n_particles": 15,
+   "n_steps": 10000,
+   "us_per_step": {
+    "spacerocks_wh": 5.3733,
+    "spacerocks_trace": 6.9857,
+    "rebound_whfast_dh": 2.8531853999993473,
+    "rebound_whfast_jacobi": 2.842744400004449,
+    "rebound_trace": 3.1825430000026245,
+    "rebound_trace_all_checked": 4.785362500001611
+   }
+  },
+  {
+   "label": "Giants + 100 KBOs",
+   "n_particles": 105,
+   "n_steps": 1000,
+   "us_per_step": {
+    "spacerocks_wh": 42.754,
+    "spacerocks_trace": 53.284,
+    "rebound_whfast_dh": 19.89260999994258,
+    "rebound_whfast_jacobi": 20.91600500000368,
+    "rebound_trace": 24.102008999989266,
+    "rebound_trace_all_checked": 203.73542799995903
+   }
+  },
+  {
+   "label": "Giants + 1000 KBOs",
+   "n_particles": 1005,
+   "n_steps": 200,
+   "us_per_step": {
+    "spacerocks_wh": 415.93,
+    "spacerocks_trace": 557.63,
+    "rebound_whfast_dh": 233.31640999970205,
+    "rebound_whfast_jacobi": 228.559819999532,
+    "rebound_trace": 403.66946500000716,
+    "rebound_trace_all_checked": 19797.225995000077
+   }
+  },
+  {
+   "label": "Giants + 50 Centaurs",
+   "n_particles": 55,
+   "n_steps": 5000,
+   "us_per_step": {
+    "spacerocks_wh": 23.2714,
+    "spacerocks_trace": 33.2354,
+    "rebound_whfast_dh": 11.167046399987157,
+    "rebound_whfast_jacobi": 10.359186000005138,
+    "rebound_trace": 11.646718000019973,
+    "rebound_trace_all_checked": 57.40956219999589
+   }
+  }
+ ]
+}
