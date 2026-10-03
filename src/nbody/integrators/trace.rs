@@ -14,18 +14,24 @@ use nalgebra::Vector3;
 /// adaptive Bulirsch–Stoer integration:
 ///
 /// * **Close pairs.** When two bodies other than the central one come within `r_crit_hill`
-///   Hill radii (widened by the distance their relative motion covers in one step), their
+///   Hill radii, now or within half a step along their relative motion, their
 ///   mutual pull is taken out of the kicks, and the bodies in such pairs are drifted together
 ///   under the central body's Kepler potential plus their mutual pull with Bulirsch–Stoer.
 ///   Everything else still drifts analytically.
-/// * **Pericenter passages.** When a body sweeps more than `peri_crit_angle` radians around
-///   the central body in one step, where the Kepler–jump splitting loses accuracy, the whole
-///   step is integrated with Bulirsch–Stoer using the simulation's forces, with no splitting.
+/// * **Pericenter passages.** When the step is longer than `peri_crit_eta` times a body's
+///   Keplerian timescale about the central body (Pham, Rein & Spiegel 2024), where the
+///   Kepler–jump splitting loses accuracy, the whole step is integrated with Bulirsch–Stoer
+///   using the simulation's forces, with no splitting.
 ///
 /// The switching is decided reversibly: the criteria are evaluated at the start of the step,
 /// the step is taken, and they are evaluated again at the end. If the end flags anything the
 /// start did not, the step is redone from the start with both sets flagged. A step and its
 /// reverse therefore make the same choice, so the integrator stays time-reversible.
+///
+/// The switching criteria, the composition of the step and the pericenter handling follow
+/// REBOUND's TRACE (its default `FULL_BS` pericenter mode), and with no encounters a step is
+/// REBOUND's TRACE step to round-off. Unlike REBOUND, every particle is checked for pericenter
+/// passages, test particles included, as REBOUND does when `N_active` is left unset.
 ///
 /// Close-pair handling assumes the simulation's forces include Newtonian gravity (the default).
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -34,22 +40,22 @@ pub struct Trace {
     pub timestep: f64,
     /// Pairs closer than this many Hill radii (of the larger body) are close encounters.
     pub r_crit_hill: f64,
-    /// A body sweeping more than this angle (radians) about the central body in one step
-    /// triggers a pericenter step.
-    pub peri_crit_angle: f64,
+    /// A step longer than this many Pham–Rein–Spiegel timescales of any body's Keplerian
+    /// motion triggers a pericenter step.
+    pub peri_crit_eta: f64,
     /// Relative tolerance of the Bulirsch–Stoer integrations.
     pub bs_epsilon: f64,
 }
 
 impl Trace {
     /// Creates a TRACE integrator with the specified timestep and the default criteria
-    /// (3 Hill radii, 0.5 rad per step, Bulirsch–Stoer tolerance 1e-12).
+    /// (REBOUND's: 3 Hill radii and `peri_crit_eta` 1; Bulirsch–Stoer tolerance 1e-12).
     ///
     /// # Arguments
     ///
     /// * `timestep` - Fixed timestep to use for integration
     pub fn new(timestep: f64) -> Trace {
-        Trace { timestep, r_crit_hill: 3.0, peri_crit_angle: 0.5, bs_epsilon: 1e-12 }
+        Trace { timestep, r_crit_hill: 3.0, peri_crit_eta: 1.0, bs_epsilon: 1e-12 }
     }
 }
 
@@ -78,41 +84,63 @@ impl Flags {
 }
 
 impl Trace {
+    /// The switching criteria of REBOUND's TRACE (`reb_integrator_trace_switch_default` and
+    /// `reb_integrator_trace_switch_peri_default`), evaluated in democratic heliocentric
+    /// coordinates: heliocentric positions, barycentric velocities.
     fn flags(&self, particles: &[SpaceRock], central: usize, h: f64) -> Flags {
         let m0 = particles[central].mass();
-        let x0 = particles[central].position;
-        let v0 = particles[central].velocity;
+        let gm0 = GRAVITATIONAL_CONSTANT * m0;
         let n = particles.len();
+        let s = Democratic::from_particles(particles, central);
         let mut flags = Flags::default();
 
-        let mut rh = vec![0.0; n];
+        // Pericenter: the step is longer than peri_crit_eta times the Pham, Rein & Spiegel
+        // (2024) timescale of the Keplerian motion about the central body.
         for i in 0..n {
-            if i == central {
-                continue;
-            }
-            let q = particles[i].position - x0;
-            let v = particles[i].velocity - v0;
-            let r2 = q.norm_squared();
-            // Angular rate about the central body.
-            if h.abs() * q.cross(&v).norm() / r2 > self.peri_crit_angle {
+            if i != central && h * h > self.peri_crit_eta * self.peri_crit_eta * prs_timescale2(&s.q[i], &s.u[i], gm0) {
                 flags.peri = true;
             }
-            rh[i] = r2.sqrt() * (particles[i].mass() / (3.0 * m0)).cbrt();
         }
 
-        for i in 0..n {
-            for j in (i + 1)..n {
-                if i == central || j == central || (rh[i] == 0.0 && rh[j] == 0.0) {
-                    continue;
-                }
-                let dx = particles[j].position - particles[i].position;
-                let dv = particles[j].velocity - particles[i].velocity;
-                let dcrit = self.r_crit_hill * rh[i].max(rh[j]) + dv.norm() * h.abs();
-                if dx.norm() < dcrit {
-                    flags.pairs.push((i, j));
+        // Pairs: closer than r_crit_hill Hill radii (of the larger body, with heliocentric
+        // distance for the semimajor axis) now, or at the closest point of their straight-line
+        // relative motion within half a step towards the approach.
+        let hill6: Vec<f64> = (0..n)
+            .map(|i| {
+                let d2 = s.q[i].norm_squared();
+                let mr = if i == central { 0.0 } else { particles[i].mass() / (3.0 * m0) };
+                d2 * d2 * d2 * mr * mr
+            })
+            .collect();
+        let rc2 = self.r_crit_hill * self.r_crit_hill;
+        let h2 = 0.5 * h.abs();
+        // Each pair with at least one massive member (test particles never meet each other).
+        for i in (0..n).filter(|&i| hill6[i] > 0.0) {
+            for j in (0..n).filter(|&j| j != i && j != central && (j > i || hill6[j] == 0.0)) {
+                let dcrit6 = rc2 * rc2 * rc2 * hill6[i].max(hill6[j]);
+                let dx = s.q[i] - s.q[j];
+                let rp = dx.norm_squared();
+                let close = if rp * rp * rp < dcrit6 {
+                    true
+                } else {
+                    let dv = s.u[i] - s.u[j];
+                    let v2 = dv.norm_squared();
+                    let qv = dx.dot(&dv);
+                    if qv == 0.0 {
+                        false
+                    } else {
+                        let d = if qv < 0.0 { 1.0 } else { -1.0 };
+                        let tmin = -d * qv / v2;
+                        let dmin2 = if tmin < h2 { rp - qv * qv / v2 } else { rp + 2.0 * d * qv * h2 + v2 * h2 * h2 };
+                        dmin2 * dmin2 * dmin2 < dcrit6
+                    }
+                };
+                if close {
+                    flags.pairs.push((i.min(j), i.max(j)));
                 }
             }
         }
+        flags.pairs.sort();
         flags
     }
 
@@ -132,16 +160,32 @@ impl Trace {
             in_encounter[i] = true;
             in_encounter[j] = true;
         }
+        // When every flagged pair has a test particle, the massive bodies feel nothing extra
+        // and keep their analytic drift (REBOUND's `tponly_encounter`).
+        let tp_only = flags.pairs.iter().all(|&(i, j)| particles[i].mass() == 0.0 || particles[j].mass() == 0.0);
+        let analytic = |i: usize| !in_encounter[i] || (tp_only && particles[i].mass() > 0.0);
         let gm0 = GRAVITATIONAL_CONSTANT * s.m_central;
+        let before: Vec<_> = s.q.iter().zip(&s.u).map(|(q, u)| (*q, *u)).collect();
         for i in 0..particles.len() {
-            if i != central && !in_encounter[i] {
+            if i != central && analytic(i) {
                 let (q, u) = kepler_drift(&s.q[i], &s.u[i], gm0, h);
                 s.q[i] = q;
                 s.u[i] = u;
             }
         }
         if !flags.pairs.is_empty() {
+            let after: Vec<_> = s.q.iter().zip(&s.u).map(|(q, u)| (*q, *u)).collect();
+            for i in 0..particles.len() {
+                if in_encounter[i] {
+                    (s.q[i], s.u[i]) = before[i];
+                }
+            }
             bs_encounter(&mut s, particles, &in_encounter, &flags.pairs, h, self.bs_epsilon);
+            for i in 0..particles.len() {
+                if in_encounter[i] && analytic(i) {
+                    (s.q[i], s.u[i]) = after[i];
+                }
+            }
         }
         s.x_cm += h * s.v_cm;
 
@@ -159,7 +203,7 @@ impl Integrator for Trace {
             None => return Leapfrog::new(self.timestep).step(particles, epoch, forces),
         };
 
-        let start = particles.clone();
+        let start: Vec<_> = particles.iter().map(|p| (p.position, p.velocity)).collect();
         let mut flags = self.flags(particles, central, self.timestep);
         loop {
             self.try_step(particles, forces, central, &flags);
@@ -168,7 +212,10 @@ impl Integrator for Trace {
                 break;
             }
             flags = flags.union(&end);
-            particles.clone_from(&start);
+            for (p, &(x, v)) in particles.iter_mut().zip(&start) {
+                p.position = x;
+                p.velocity = v;
+            }
         }
 
         *epoch += self.timestep;
@@ -184,6 +231,28 @@ impl Integrator for Trace {
     fn set_timestep(&mut self, timestep: f64) {
         self.timestep = timestep;
     }
+}
+
+/// Squared Pham, Rein & Spiegel (2024) timescale (their eq. 16) of Keplerian motion about a
+/// body of `gm`, from the second to fourth time derivatives of the position.
+fn prs_timescale2(x: &Vector3<f64>, v: &Vector3<f64>, gm: f64) -> f64 {
+    let d2 = x.norm_squared();
+    let d = d2.sqrt();
+    let a = -gm / (d2 * d) * x;
+    let jerk = gm / (d2 * d2 * d) * (-d2 * v + 3.0 * x.dot(v) * x);
+    let xv = x.dot(v);
+    // Fourth derivative, component by component as REBOUND writes it.
+    let snap = |k: usize| {
+        let (o1, o2) = ((k + 1) % 3, (k + 2) % 3);
+        let others2 = x[o1] * x[o1] + x[o2] * x[o2];
+        let inner = -a[k] * others2 + 2.0 * x[k] * x[k] * a[k] + v[k] * (x[o1] * v[o1] + x[o2] * v[o2])
+            + x[k] * (4.0 * v[k] * v[k] + 3.0 * (x[o1] * a[o1] + v[o1] * v[o1] + x[o2] * a[o2] + v[o2] * v[o2]));
+        let j = -v[k] * others2 + 2.0 * x[k] * x[k] * v[k] + 3.0 * x[k] * (x[o1] * v[o1] + x[o2] * v[o2]);
+        gm / (d2 * d2 * d2 * d) * (d2 * inner - 5.0 * xv * j)
+    };
+    let s = Vector3::new(snap(0), snap(1), snap(2));
+    let (an, sn) = (a.norm(), s.norm());
+    2.0 * an * an / (jerk.norm_squared() + an * sn)
 }
 
 /// Drift the bodies in close pairs under the central body's Kepler potential plus the pull
