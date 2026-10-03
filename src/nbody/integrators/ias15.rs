@@ -143,11 +143,10 @@ impl Integrator for IAS15 {
             if iterations > 2 && predictor_corrector_error_last <= predictor_corrector_error {
                 break;
             }
-            if iterations >= 10 {
-                println!("At least 10 predictor corrector loops in IAS15 did not converge. This is typically an indication of the timestep being too large.");
-                self.timestep /= 2.0;
-                println!("Reducing the timestep to {}", self.timestep);
-                self.step(particles, epoch, forces);
+            // Like REBOUND, give up on convergence after 12 iterations and let the timestep control
+            // below decide whether to accept the step.
+            if iterations >= 12 {
+                break;
             }
 
             predictor_corrector_error_last = predictor_corrector_error;
@@ -334,14 +333,14 @@ impl Integrator for IAS15 {
             }
 
             if self.last_timestep != 0.0 {
-                // let ratio = self.timestep / self.last_timestep;
-                // predict_next_coefficients(&timestep_ratio, &mut self.es, &mut self.bs);
-                predict_next_coefficients(&timestep_ratio, &self.es_last, &self.bs_last, &mut self.es, &mut self.bs);
+                let ratio = self.timestep / self.last_timestep;
+                predict_next_coefficients(&ratio, &self.es_last, &self.bs_last, &mut self.es, &mut self.bs);
             }
 
-            // recursively call step with the new timestep
+            // Redo the step with the new timestep. The retry advances the particles and the
+            // epoch, so this attempt must not.
             self.step(particles, epoch, forces);
-            // return;
+            return;
         }
 
         // The timestep was accepted

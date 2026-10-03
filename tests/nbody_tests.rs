@@ -193,3 +193,16 @@ fn trace_is_time_reversible() {
         assert!(dx < 1e-8 && dv < 1e-10, "dx = {dx:e} AU, dv = {dv:e} AU/day");
     }
 }
+
+#[test]
+fn ias15_does_not_depend_on_output_cadence() {
+    // Frequent outputs force short final steps, which used to make rejected steps apply twice.
+    let mut once = comet_system(Box::new(IAS15::new(1.0)));
+    let mut often = comet_system(Box::new(IAS15::new(1.0)));
+    once.integrate(&Time::new(T0 + 8000.0, "tdb", "jd").unwrap());
+    for k in 1..=1600 {
+        often.integrate(&Time::new(T0 + 5.0 * k as f64, "tdb", "jd").unwrap());
+    }
+    let (dx, dv) = max_offset(&once, &often);
+    assert!(dx < 1e-7 && dv < 1e-9, "dx = {dx:e} AU, dv = {dv:e} AU/day");
+}
