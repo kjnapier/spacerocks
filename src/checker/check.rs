@@ -12,7 +12,7 @@ use crate::constants::SPEED_OF_LIGHT;
 use crate::orbfit::predict::predict_with_states;
 use crate::orbfit::{Astrometry, FitOptions};
 use crate::spacerock::hg_magnitude;
-use crate::transforms::{solve_for_universal_anomaly, stumpff_c, stumpff_s};
+use crate::transforms::universal_kepler_step;
 use crate::{Origin, SpiceKernel};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -158,48 +158,13 @@ fn angle(a: &Vector3<f64>, b: &Vector3<f64>) -> f64 {
     2.0 * ((a - b).norm() / 2.0).clamp(0.0, 1.0).asin()
 }
 
-/// Two-body motion (heliocentric) by `dt` days, universal variables: Newton's method from the
-/// mean-motion guess, falling back to the bracketing solver.
+/// Two-body motion (heliocentric) by `dt` days, universal variables.
 #[inline]
 fn kepler(p: &Vector3<f64>, v: &Vector3<f64>, mu: f64, dt: f64) -> Option<(Vector3<f64>, Vector3<f64>)> {
     if dt == 0.0 {
         return Some((*p, *v));
     }
-    let r = p.norm();
-    let vr = v.dot(p) / r;
-    let alpha = 2.0 / r - v.norm_squared() / mu;
-    let smu = mu.sqrt();
-    let k1 = r * vr / smu;
-    let k2 = 1.0 - alpha * r;
-    let mut chi = if alpha > 1e-6 { smu * dt * alpha } else { smu * dt / r };
-    let mut ok = false;
-    for _ in 0..30 {
-        let z = alpha * chi * chi;
-        let (c, s) = (stumpff_c(z), stumpff_s(z));
-        let f = k1 * chi * chi * c + k2 * chi.powi(3) * s + r * chi - smu * dt;
-        let df = k1 * chi * (1.0 - z * s) + k2 * chi * chi * c + r;
-        let step = f / df;
-        if !step.is_finite() {
-            break;
-        }
-        chi -= step;
-        if step.abs() <= 1e-13 * chi.abs().max(1e-8) {
-            ok = true;
-            break;
-        }
-    }
-    if !ok {
-        chi = solve_for_universal_anomaly(r, vr, alpha, mu, dt, 1e-10, 200).ok()?;
-    }
-    let z = alpha * chi * chi;
-    let (c, s) = (stumpff_c(z), stumpff_s(z));
-    let f = 1.0 - chi * chi / r * c;
-    let g = dt - chi.powi(3) / smu * s;
-    let p1 = p * f + v * g;
-    let r1 = p1.norm();
-    let fdot = smu / (r1 * r) * chi * (z * s - 1.0);
-    let gdot = 1.0 - chi * chi / r1 * c;
-    let v1 = p * fdot + v * gdot;
+    let (p1, v1) = universal_kepler_step(p, v, mu, dt).ok()?;
     (p1.iter().all(|x| x.is_finite())).then_some((p1, v1))
 }
 
