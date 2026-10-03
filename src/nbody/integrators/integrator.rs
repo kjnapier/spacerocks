@@ -2,6 +2,8 @@ use crate::SpaceRock;
 use crate::time::Time;
 use crate::nbody::forces::Force;
 
+use nalgebra::Vector3;
+
 
 /// A numerical integrator for advancing a system of particles forward in time.
 /// 
@@ -31,6 +33,21 @@ pub trait Integrator: Send + Sync + IntegratorClone {
     ///
     /// * `timestep` - New timestep value to use
     fn set_timestep(&mut self, timestep: f64);
+
+    /// Whether [`Integrator::interpolate`] can return states between steps
+    fn has_dense_output(&self) -> bool {
+        false
+    }
+
+    /// Positions and velocities of every particle at the TDB Julian date `jd`, if `jd` falls
+    /// within the last completed step. Integrators without dense output return `None`.
+    ///
+    /// # Arguments
+    ///
+    /// * `jd` - TDB Julian date to interpolate to
+    fn interpolate(&self, _jd: f64) -> Option<(Vec<Vector3<f64>>, Vec<Vector3<f64>>)> {
+        None
+    }
 }
 
 

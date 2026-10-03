@@ -337,4 +337,14 @@ mod tests {
         let o = r.observe(&ob).unwrap();
         assert!((o.mag.unwrap() - (7.0 + 5.0 * 2f64.log10())).abs() < 1e-6);
     }
+
+    #[test]
+    fn test_stumpff_hyperbolic() {
+        use spacerocks::transforms::{stumpff_c, stumpff_s};
+        // C(z) = (cosh sqrt(-z) - 1) / (-z), S(z) = (sinh sqrt(-z) - sqrt(-z)) / sqrt(-z)^3 for z < 0
+        assert!((stumpff_c(-1.0) - (1f64.cosh() - 1.0)).abs() < 1e-15);
+        assert!((stumpff_s(-1.0) - (1f64.sinh() - 1.0)).abs() < 1e-15);
+        // Continuous through z = 0
+        assert!((stumpff_c(-1e-6) - 0.5).abs() < 1e-7 && (stumpff_c(1e-6) - 0.5).abs() < 1e-7);
+    }
 }

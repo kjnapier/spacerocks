@@ -1,0 +1,373 @@
+{
+ "rebound_version": "5.2.1",
+ "accuracy": [
+  {
+   "label": "Sun + 4 giants, 1000 yr",
+   "n_particles": 5,
+   "dt_days": 120.0,
+   "n_steps": 3044,
+   "span_days": 365280.0,
+   "pos_err_vs_rebound_ias15_au": {
+    "spacerocks_wh": 0.012873179313316586,
+    "spacerocks_trace": 0.012873179313316586,
+    "spacerocks_ias15": 9.081480912787355e-11,
+    "spacerocks_ias15_interp": 7.666799420546123e-11,
+    "rebound_whfast_dh": 0.006376354200533017,
+    "rebound_trace": 0.012873179264968922,
+    "rebound_ias15": 0.0
+   },
+   "max_rel_energy_error": {
+    "spacerocks_wh": 1.4883876948557017e-06,
+    "spacerocks_trace": 1.4883876948557017e-06,
+    "spacerocks_ias15": 1.2535566313434646e-14,
+    "spacerocks_ias15_interp": 5.9595315260590944e-15,
+    "rebound_whfast_dh": 7.434031134605999e-07,
+    "rebound_trace": 1.4883877047197538e-06,
+    "rebound_ias15": 2.05501087105486e-15
+   },
+   "wh_vs_whfast_dh_au": 0.019249528501063887,
+   "trace_vs_rebound_trace_au": 4.834847211950948e-11,
+   "ias15_vs_ias15_au": 9.081480912787355e-11,
+   "ias15_interp_vs_ias15_au": 7.666799420546123e-11
+  },
+  {
+   "label": "Sun + 4 giants, 100 kyr (energy)",
+   "n_particles": 5,
+   "dt_days": 120.0,
+   "n_steps": 304400,
+   "span_days": 36528000.0,
+   "pos_err_vs_rebound_ias15_au": {
+    "spacerocks_wh": 1.2228008486333313,
+    "spacerocks_trace": 1.2228008486333313,
+    "spacerocks_ias15": 1.6194041491586042e-08,
+    "spacerocks_ias15_interp": 8.47423843085517e-09,
+    "rebound_whfast_dh": 0.6412910942723529,
+    "rebound_trace": 1.2228008230456773,
+    "rebound_ias15": 0.0
+   },
+   "max_rel_energy_error": {
+    "spacerocks_wh": 1.3351423148211103e-06,
+    "spacerocks_trace": 1.3351423148211103e-06,
+    "spacerocks_ias15": 7.891241744850663e-14,
+    "spacerocks_ias15_interp": 8.466644788746023e-14,
+    "rebound_whfast_dh": 7.114093881910561e-07,
+    "rebound_trace": 1.3351422237841286e-06,
+    "rebound_ias15": 1.2741067400540133e-14
+   },
+   "wh_vs_whfast_dh_au": 1.8622043077570356,
+   "trace_vs_rebound_trace_au": 2.5634790332632208e-08,
+   "ias15_vs_ias15_au": 1.6194041491586042e-08,
+   "ias15_interp_vs_ias15_au": 8.47423843085517e-09
+  },
+  {
+   "label": "Test particle inside Jupiter's Hill sphere",
+   "n_particles": 3,
+   "dt_days": 20.0,
+   "n_steps": 150,
+   "span_days": 3000.0,
+   "pos_err_vs_rebound_ias15_au": {
+    "spacerocks_wh": 0.00752129231331569,
+    "spacerocks_trace": 2.239875051396817e-05,
+    "spacerocks_ias15": 1.2315543743553552e-13,
+    "spacerocks_ias15_interp": 5.20501633765646e-12,
+    "rebound_whfast_dh": 0.007441056480942694,
+    "rebound_trace": 2.2398825711372897e-05,
+    "rebound_ias15": 0.0
+   },
+   "max_rel_energy_error": {
+    "spacerocks_wh": 2.5570441206345054e-10,
+    "spacerocks_trace": 2.5570441206345054e-10,
+    "spacerocks_ias15": 2.6768909625658157e-15,
+    "spacerocks_ias15_interp": 1.216768619348098e-15,
+    "rebound_whfast_dh": 1.2875930703744928e-10,
+    "rebound_trace": 2.5570173517248797e-10,
+    "rebound_ias15": 7.300611716088588e-16
+   },
+   "wh_vs_whfast_dh_au": 0.00019329849891127287,
+   "trace_vs_rebound_trace_au": 2.778083669888013e-10,
+   "ias15_vs_ias15_au": 1.2315543743553552e-13,
+   "ias15_interp_vs_ias15_au": 5.20501633765646e-12
+  },
+  {
+   "label": "Sungrazing comet (q = 0.05 AU), 5 passages",
+   "n_particles": 3,
+   "dt_days": 5.0,
+   "n_steps": 1600,
+   "span_days": 8000.0,
+   "pos_err_vs_rebound_ias15_au": {
+    "spacerocks_wh": 0.7317018454009138,
+    "spacerocks_trace": 0.0015265556118568629,
+    "spacerocks_ias15": 2.961719694339706e-09,
+    "spacerocks_ias15_interp": 5.5344220205744207e-11,
+    "rebound_whfast_dh": 3.7414004738209057,
+    "rebound_trace": 0.0016521534428463008,
+    "rebound_ias15": 0.0
+   },
+   "max_rel_energy_error": {
+    "spacerocks_wh": 1.598456767551403e-11,
+    "spacerocks_trace": 1.573878041440571e-11,
+    "spacerocks_ias15": 1.1072594436067691e-14,
+    "spacerocks_ias15_interp": 5.8404893728708704e-15,
+    "rebound_whfast_dh": 8.0486810632638e-12,
+    "rebound_trace": 1.573415669365219e-11,
+    "rebound_ias15": 7.300611716088588e-16
+   },
+   "wh_vs_whfast_dh_au": 3.0692028434601473,
+   "trace_vs_rebound_trace_au": 0.00012559786892814547,
+   "ias15_vs_ias15_au": 2.961719694339706e-09,
+   "ias15_interp_vs_ias15_au": 5.5344220205744207e-11
+  },
+  {
+   "label": "Giants + 100 KBOs, 10 kyr",
+   "n_particles": 105,
+   "dt_days": 120.0,
+   "n_steps": 30440,
+   "span_days": 3652800.0,
+   "pos_err_vs_rebound_ias15_au": {
+    "spacerocks_wh": 0.054188851479861765,
+    "spacerocks_trace": 0.052081230705237486,
+    "spacerocks_ias15": 3.1174157474862768e-09,
+    "spacerocks_ias15_interp": 3.182306511151703e-09,
+    "rebound_whfast_dh": 0.03413128476461829,
+    "rebound_trace": 0.052081228028303325,
+    "rebound_ias15": 0.0
+   },
+   "max_rel_energy_error": {
+    "spacerocks_wh": 1.4929529664440937e-06,
+    "spacerocks_trace": 1.4929529664440937e-06,
+    "spacerocks_ias15": 3.185266850135033e-14,
+    "spacerocks_ias15_interp": 2.8153648933451585e-14,
+    "rebound_whfast_dh": 7.459678558041461e-07,
+    "rebound_trace": 1.4929529539085272e-06,
+    "rebound_ias15": 3.904520655004234e-15
+   },
+   "wh_vs_whfast_dh_au": 0.18388244622488945,
+   "trace_vs_rebound_trace_au": 2.6812149679007873e-09,
+   "ias15_vs_ias15_au": 3.1174157474862768e-09,
+   "ias15_interp_vs_ias15_au": 3.182306511151703e-09
+  },
+  {
+   "label": "Giants + 50 Centaurs, 1 kyr",
+   "n_particles": 55,
+   "dt_days": 30.0,
+   "n_steps": 12176,
+   "span_days": 365280.0,
+   "pos_err_vs_rebound_ias15_au": {
+    "spacerocks_wh": 0.011383257743119733,
+    "spacerocks_trace": 0.006350813524796433,
+    "spacerocks_ias15": 2.778720103237081e-10,
+    "spacerocks_ias15_interp": 1.1944791455652628e-09,
+    "rebound_whfast_dh": 0.00757137010629919,
+    "rebound_trace": 0.006350814389740545,
+    "rebound_ias15": 0.0
+   },
+   "max_rel_energy_error": {
+    "spacerocks_wh": 9.288834047046146e-08,
+    "spacerocks_trace": 9.288834047046146e-08,
+    "spacerocks_ias15": 1.1713561965012702e-14,
+    "spacerocks_ias15_interp": 5.343028264742636e-15,
+    "rebound_whfast_dh": 4.631354161970234e-08,
+    "rebound_trace": 9.288834684099515e-08,
+    "rebound_ias15": 2.260511958160346e-15
+   },
+   "wh_vs_whfast_dh_au": 0.005891593146134126,
+   "trace_vs_rebound_trace_au": 4.928428025863866e-09,
+   "ias15_vs_ias15_au": 2.778720103237081e-10,
+   "ias15_interp_vs_ias15_au": 1.1944791455652628e-09
+  }
+ ],
+ "timing": [
+  {
+   "label": "Sun + 4 giants",
+   "n_particles": 5,
+   "n_steps": 100000,
+   "us_per_step": {
+    "spacerocks_wh": 1.2778900000000002,
+    "spacerocks_trace": 2.20718,
+    "rebound_whfast_dh": 1.2642892200000233,
+    "rebound_whfast_jacobi": 1.2985135799999625,
+    "rebound_trace": 1.825059999999894,
+    "rebound_trace_all_checked": 1.7992703900000606
+   }
+  },
+  {
+   "label": "Giants + 10 KBOs",
+   "n_particles": 15,
+   "n_steps": 10000,
+   "us_per_step": {
+    "spacerocks_wh": 4.0088,
+    "spacerocks_trace": 6.2128,
+    "rebound_whfast_dh": 3.756517300001861,
+    "rebound_whfast_jacobi": 3.874689599996373,
+    "rebound_trace": 5.945811899999853,
+    "rebound_trace_all_checked": 8.663233699996908
+   }
+  },
+  {
+   "label": "Giants + 100 KBOs",
+   "n_particles": 105,
+   "n_steps": 1000,
+   "us_per_step": {
+    "spacerocks_wh": 28.873,
+    "spacerocks_trace": 45.34,
+    "rebound_whfast_dh": 27.230653000003713,
+    "rebound_whfast_jacobi": 27.72846599998502,
+    "rebound_trace": 44.53871900000195,
+    "rebound_trace_all_checked": 361.9451580000259
+   }
+  },
+  {
+   "label": "Giants + 1000 KBOs",
+   "n_particles": 1005,
+   "n_steps": 200,
+   "us_per_step": {
+    "spacerocks_wh": 280.185,
+    "spacerocks_trace": 471.94,
+    "rebound_whfast_dh": 266.5993950000711,
+    "rebound_whfast_jacobi": 276.79259499990394,
+    "rebound_trace": 608.6423949997766,
+    "rebound_trace_all_checked": 33431.22803
+   }
+  },
+  {
+   "label": "Giants + 50 Centaurs",
+   "n_particles": 55,
+   "n_steps": 5000,
+   "us_per_step": {
+    "spacerocks_wh": 15.096,
+    "spacerocks_trace": 24.1932,
+    "rebound_whfast_dh": 14.8170976000074,
+    "rebound_whfast_jacobi": 15.025388599997314,
+    "rebound_trace": 21.447731400007797,
+    "rebound_trace_all_checked": 97.79412540000294
+   }
+  }
+ ],
+ "ias15_timing": [
+  {
+   "label": "Sungrazing comet, 8000 days",
+   "span_days": 8000.0,
+   "rows": [
+    {
+     "n_outputs": 1,
+     "ms": {
+      "spacerocks_integrate": 7.258,
+      "spacerocks_integrate_or_interpolate": 7.279,
+      "rebound_exact_finish": 8.096862000002147,
+      "rebound_overshoot": 8.383935999972891
+     },
+     "final_pos_err_vs_rebound_one_output_au": {
+      "spacerocks_integrate": 4.218140142332413e-11,
+      "spacerocks_integrate_or_interpolate": 4.218150920140286e-11,
+      "rebound_exact_finish": 0.0
+     }
+    },
+    {
+     "n_outputs": 160,
+     "ms": {
+      "spacerocks_integrate": 53.525000000000006,
+      "spacerocks_integrate_or_interpolate": 7.986,
+      "rebound_exact_finish": 12.12953600054334,
+      "rebound_overshoot": 9.968368999807353
+     },
+     "final_pos_err_vs_rebound_one_output_au": {
+      "spacerocks_integrate": 4.4959452860275465e-09,
+      "spacerocks_integrate_or_interpolate": 9.818364811653008e-12,
+      "rebound_exact_finish": 4.2223258784064073e-13
+     }
+    },
+    {
+     "n_outputs": 1600,
+     "ms": {
+      "spacerocks_integrate": 69.46900000000001,
+      "spacerocks_integrate_or_interpolate": 9.001,
+      "rebound_exact_finish": 50.00882399974671,
+      "rebound_overshoot": 43.610616996488716
+     },
+     "final_pos_err_vs_rebound_one_output_au": {
+      "spacerocks_integrate": 3.0835951978211374e-10,
+      "spacerocks_integrate_or_interpolate": 5.6329136959555844e-11,
+      "rebound_exact_finish": 4.016801618968719e-12
+     }
+    },
+    {
+     "n_outputs": 16000,
+     "ms": {
+      "spacerocks_integrate": 198.716,
+      "spacerocks_integrate_or_interpolate": 14.602,
+      "rebound_exact_finish": 421.6643179975108,
+      "rebound_overshoot": 408.87606299327217
+     },
+     "final_pos_err_vs_rebound_one_output_au": {
+      "spacerocks_integrate": 1.3522080244713916e-10,
+      "spacerocks_integrate_or_interpolate": 1.2139817992004391e-11,
+      "rebound_exact_finish": 4.575420364624844e-11
+     }
+    }
+   ]
+  },
+  {
+   "label": "Giants + 100 KBOs, 1 kyr",
+   "span_days": 365250.0,
+   "rows": [
+    {
+     "n_outputs": 1,
+     "ms": {
+      "spacerocks_integrate": 1091.1109999999999,
+      "spacerocks_integrate_or_interpolate": 1076.796,
+      "rebound_exact_finish": 1204.931100000067,
+      "rebound_overshoot": 1238.710979000075
+     },
+     "final_pos_err_vs_rebound_one_output_au": {
+      "spacerocks_integrate": 2.182542718363813e-11,
+      "spacerocks_integrate_or_interpolate": 2.1820406332140265e-11,
+      "rebound_exact_finish": 0.0
+     }
+    },
+    {
+     "n_outputs": 100,
+     "ms": {
+      "spacerocks_integrate": 1180.375,
+      "spacerocks_integrate_or_interpolate": 1121.589,
+      "rebound_exact_finish": 1378.0539140001338,
+      "rebound_overshoot": 1284.752438000055
+     },
+     "final_pos_err_vs_rebound_one_output_au": {
+      "spacerocks_integrate": 2.9085177320742686e-11,
+      "spacerocks_integrate_or_interpolate": 1.740646162487582e-11,
+      "rebound_exact_finish": 3.1129603236264245e-12
+     }
+    },
+    {
+     "n_outputs": 1000,
+     "ms": {
+      "spacerocks_integrate": 1993.143,
+      "spacerocks_integrate_or_interpolate": 1100.095,
+      "rebound_exact_finish": 894.1802920003283,
+      "rebound_overshoot": 1260.9984969994912
+     },
+     "final_pos_err_vs_rebound_one_output_au": {
+      "spacerocks_integrate": 2.1124583432664312e-11,
+      "spacerocks_integrate_or_interpolate": 2.846108219752411e-11,
+      "rebound_exact_finish": 2.8498569288229424e-12
+     }
+    },
+    {
+     "n_outputs": 10000,
+     "ms": {
+      "spacerocks_integrate": 5072.798,
+      "spacerocks_integrate_or_interpolate": 1126.1000000000001,
+      "rebound_exact_finish": 6822.310892004566,
+      "rebound_overshoot": 7900.406166006064
+     },
+     "final_pos_err_vs_rebound_one_output_au": {
+      "spacerocks_integrate": 2.993216013258044e-11,
+      "spacerocks_integrate_or_interpolate": 1.9841378014122784e-11,
+      "rebound_exact_finish": 2.8607715274518793e-11
+     }
+    }
+   ]
+  }
+ ],
+ "rebound_python_call_overhead_us": 4.448175149997269
+}

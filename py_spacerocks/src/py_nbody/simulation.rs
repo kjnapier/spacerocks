@@ -127,6 +127,18 @@ impl PySimulation {
     pub fn integrate(&mut self, epoch: &PyTime) {
         self.inner.integrate(&epoch.inner.clone());
     }
+
+    /// Integrate to an epoch with the integrator's own steps, then interpolate to it.
+    ///
+    /// Much faster than `integrate` for many output epochs. Falls back to `integrate` for
+    /// integrators without dense output (only IAS15 has it).
+    ///
+    /// # Arguments
+    ///
+    /// * `epoch` - The epoch to integrate or interpolate to.
+    pub fn integrate_or_interpolate(&mut self, epoch: &PyTime) {
+        self.inner.integrate_or_interpolate(&epoch.inner);
+    }
     
     /// Step the simulation by one timestep.
     pub fn step(&mut self) {

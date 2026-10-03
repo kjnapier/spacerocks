@@ -61,6 +61,21 @@ pub struct IAS15 {
     bs_last: Vec<CoefficientSeptet>,
     /// Previous error estimate coefficients
     es_last: Vec<CoefficientSeptet>,
+    /// The last completed step, for dense output
+    dense: Option<DenseOutput>,
+}
+
+/// The start of the last completed step. With that step's coefficients (`bs_last`) it gives the
+/// trajectory anywhere within the step.
+#[derive(Debug, Clone)]
+struct DenseOutput {
+    /// TDB Julian date at the start of the step
+    t0: f64,
+    /// Length of the step
+    dt: f64,
+    x0: Vec<Vector3<f64>>,
+    v0: Vec<Vector3<f64>>,
+    a0: Vec<Vector3<f64>>,
 }
 
 impl IAS15 {
@@ -73,7 +88,7 @@ impl IAS15 {
     /// The integrator will automatically adjust this timestep based on the 
     /// local truncation error to maintain the specified precision (epsilon).
     pub fn new(timestep: f64) -> IAS15 {
-        IAS15 { timestep, epsilon: 1e-9, last_timestep: 0.0, bs: vec![], gs: vec![], es: vec![], bs_last: vec![], es_last: vec![] }
+        IAS15 { timestep, epsilon: 1e-9, last_timestep: 0.0, bs: vec![], gs: vec![], es: vec![], bs_last: vec![], es_last: vec![], dense: None }
     }
 
     /// Resets all coefficient vectors to zero for the specified number of particles
@@ -90,6 +105,7 @@ impl IAS15 {
         self.es = vec![CoefficientSeptet::zeros(); n];
         self.bs_last = vec![CoefficientSeptet::zeros(); n];
         self.es_last = vec![CoefficientSeptet::zeros(); n];
+        self.dense = None;
     }
 }
 
@@ -143,11 +159,10 @@ impl Integrator for IAS15 {
             if iterations > 2 && predictor_corrector_error_last <= predictor_corrector_error {
                 break;
             }
-            if iterations >= 10 {
-                println!("At least 10 predictor corrector loops in IAS15 did not converge. This is typically an indication of the timestep being too large.");
-                self.timestep /= 2.0;
-                println!("Reducing the timestep to {}", self.timestep);
-                self.step(particles, epoch, forces);
+            // Like REBOUND, give up on convergence after 12 iterations and let the timestep control
+            // below decide whether to accept the step.
+            if iterations >= 12 {
+                break;
             }
 
             predictor_corrector_error_last = predictor_corrector_error;
@@ -334,14 +349,14 @@ impl Integrator for IAS15 {
             }
 
             if self.last_timestep != 0.0 {
-                // let ratio = self.timestep / self.last_timestep;
-                // predict_next_coefficients(&timestep_ratio, &mut self.es, &mut self.bs);
-                predict_next_coefficients(&timestep_ratio, &self.es_last, &self.bs_last, &mut self.es, &mut self.bs);
+                let ratio = self.timestep / self.last_timestep;
+                predict_next_coefficients(&ratio, &self.es_last, &self.bs_last, &mut self.es, &mut self.bs);
             }
 
-            // recursively call step with the new timestep
+            // Redo the step with the new timestep. The retry advances the particles and the
+            // epoch, so this attempt must not.
             self.step(particles, epoch, forces);
-            // return;
+            return;
         }
 
         // The timestep was accepted
@@ -354,6 +369,8 @@ impl Integrator for IAS15 {
         }
 
         
+
+        let t0 = epoch.tdb().jd();
 
         // Update the epoch
         *epoch += self.timestep; //self.timestep;
@@ -370,6 +387,8 @@ impl Integrator for IAS15 {
         }
 
         
+
+        self.dense = Some(DenseOutput { t0, dt: self.timestep, x0: initial_positions, v0: initial_velocities, a0: initial_accelerations });
 
         self.last_timestep = self.timestep.clone();
         self.timestep = new_timestep;
@@ -389,6 +408,52 @@ impl Integrator for IAS15 {
 
     fn set_timestep(&mut self, timestep: f64) {
         self.timestep = timestep;
+    }
+
+    fn has_dense_output(&self) -> bool {
+        true
+    }
+
+    /// Evaluates the last step's Gauss–Radau polynomial at `jd`, as REBOUND and ASSIST do. The
+    /// result is as accurate as the step itself.
+    fn interpolate(&self, jd: f64) -> Option<(Vec<Vector3<f64>>, Vec<Vector3<f64>>)> {
+        let d = self.dense.as_ref()?;
+        let h = (jd - d.t0) / d.dt;
+        // The tolerance absorbs round-off in Julian dates at the ends of the step.
+        if !(-1e-8..=1.0 + 1e-8).contains(&h) || self.bs_last.len() != d.x0.len() {
+            return None;
+        }
+
+        // s[k] and u[k] multiply the position and velocity series terms.
+        let mut s = [0.0; 9];
+        s[0] = d.dt * h;
+        s[1] = s[0] * s[0] / 2.0;
+        s[2] = s[1] * h / 3.0;
+        s[3] = s[2] * h / 2.0;
+        s[4] = 3.0 * s[3] * h / 5.0;
+        s[5] = 2.0 * s[4] * h / 3.0;
+        s[6] = 5.0 * s[5] * h / 7.0;
+        s[7] = 3.0 * s[6] * h / 4.0;
+        s[8] = 7.0 * s[7] * h / 9.0;
+
+        let mut u = [0.0; 8];
+        u[0] = d.dt * h;
+        u[1] = u[0] * h / 2.0;
+        u[2] = 2.0 * u[1] * h / 3.0;
+        u[3] = 3.0 * u[2] * h / 4.0;
+        u[4] = 4.0 * u[3] * h / 5.0;
+        u[5] = 5.0 * u[4] * h / 6.0;
+        u[6] = 6.0 * u[5] * h / 7.0;
+        u[7] = 7.0 * u[6] * h / 8.0;
+
+        let mut positions = Vec::with_capacity(d.x0.len());
+        let mut velocities = Vec::with_capacity(d.x0.len());
+        for (idx, b) in self.bs_last.iter().enumerate() {
+            let (x0, v0, a0) = (d.x0[idx], d.v0[idx], d.a0[idx]);
+            positions.push(x0 + s[8] * b.p6 + s[7] * b.p5 + s[6] * b.p4 + s[5] * b.p3 + s[4] * b.p2 + s[3] * b.p1 + s[2] * b.p0 + s[1] * a0 + s[0] * v0);
+            velocities.push(v0 + u[7] * b.p6 + u[6] * b.p5 + u[5] * b.p4 + u[4] * b.p3 + u[3] * b.p2 + u[2] * b.p1 + u[1] * b.p0 + u[0] * a0);
+        }
+        Some((positions, velocities))
     }
 }
 
