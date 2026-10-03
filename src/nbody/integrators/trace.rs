@@ -34,7 +34,7 @@ use nalgebra::Vector3;
 /// passages, test particles included, as REBOUND does when `N_active` is left unset.
 ///
 /// Close-pair handling assumes the simulation's forces include Newtonian gravity (the default).
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Trace {
     /// Current timestep in simulation time units
     pub timestep: f64,
@@ -45,6 +45,24 @@ pub struct Trace {
     pub peri_crit_eta: f64,
     /// Relative tolerance of the Bulirsch–Stoer integrations.
     pub bs_epsilon: f64,
+    /// Buffers reused from step to step
+    scratch: Scratch,
+}
+
+#[derive(PartialEq, Debug, Clone, Default)]
+struct Scratch {
+    /// Inertial positions and velocities at the start of the step
+    start: Vec<(Vector3<f64>, Vector3<f64>)>,
+    /// Democratic heliocentric state at the start of the step, and the one being stepped
+    s0: Democratic,
+    s: Democratic,
+    /// Per body: Hill radius to the sixth power (zero for test particles and the central
+    /// body), critical distance, and speed
+    hill6: Vec<f64>,
+    dcrit: Vec<f64>,
+    speed: Vec<f64>,
+    /// Per body: the mass ratio to the central body over 3, and its cube root
+    cbrt_mr: Vec<(f64, f64)>,
 }
 
 impl Trace {
@@ -55,7 +73,7 @@ impl Trace {
     ///
     /// * `timestep` - Fixed timestep to use for integration
     pub fn new(timestep: f64) -> Trace {
-        Trace { timestep, r_crit_hill: 3.0, peri_crit_eta: 1.0, bs_epsilon: 1e-12 }
+        Trace { timestep, r_crit_hill: 3.0, peri_crit_eta: 1.0, bs_epsilon: 1e-12, scratch: Scratch::default() }
     }
 }
 
@@ -87,57 +105,79 @@ impl Trace {
     /// The switching criteria of REBOUND's TRACE (`reb_integrator_trace_switch_default` and
     /// `reb_integrator_trace_switch_peri_default`), evaluated in democratic heliocentric
     /// coordinates: heliocentric positions, barycentric velocities.
-    fn flags(&self, particles: &[SpaceRock], s: &Democratic, central: usize, h: f64) -> Flags {
-        let m0 = particles[central].mass();
+    fn flags(&self, s: &Democratic, h: f64, ws: &mut Scratch) -> Flags {
+        let central = s.central;
+        let m0 = s.m_central;
         let gm0 = GRAVITATIONAL_CONSTANT * m0;
-        let n = particles.len();
+        let n = s.q.len();
         let mut flags = Flags::default();
 
         // Pericenter: the step is longer than peri_crit_eta times the Pham, Rein & Spiegel
-        // (2024) timescale of the Keplerian motion about the central body.
+        // (2024) timescale of the Keplerian motion about the central body. That timescale
+        // squared is at least d^3 / (20 d v^2 + 2 GM) (bounding each derivative with the
+        // triangle inequality), which clears most bodies without computing it.
+        let eta2 = self.peri_crit_eta * self.peri_crit_eta;
+        let hh = h * h;
         for i in 0..n {
-            if i != central && h * h > self.peri_crit_eta * self.peri_crit_eta * prs_timescale2(&s.q[i], &s.u[i], gm0) {
+            if i == central {
+                continue;
+            }
+            let d2 = s.q[i].norm_squared();
+            let d = d2.sqrt();
+            let lower = d2 * d / (20.0 * d * s.u[i].norm_squared() + 2.0 * gm0);
+            if eta2 * lower >= hh * (1.0 + 1e-9) {
+                continue;
+            }
+            if hh > eta2 * prs_timescale2(&s.q[i], &s.u[i], gm0) {
                 flags.peri = true;
+                break;
             }
         }
 
         // Pairs: closer than r_crit_hill Hill radii (of the larger body, with heliocentric
         // distance for the semimajor axis) now, or at the closest point of their straight-line
         // relative motion within half a step towards the approach.
-        let hill6: Vec<f64> = (0..n)
-            .map(|i| {
-                let d2 = s.q[i].norm_squared();
-                let mr = if i == central { 0.0 } else { s.m[i] / (3.0 * m0) };
-                d2 * d2 * d2 * mr * mr
-            })
-            .collect();
-        let speed: Vec<f64> = s.u.iter().map(|u| u.norm()).collect();
-        let dcrit: Vec<f64> = hill6.iter().map(|&h6| self.r_crit_hill * h6.powf(1.0 / 6.0)).collect();
+        ws.hill6.clear();
+        ws.hill6.resize(n, 0.0);
+        ws.dcrit.clear();
+        ws.dcrit.resize(n, 0.0);
+        ws.cbrt_mr.resize(n, (f64::NAN, 0.0));
+        for &i in &s.massive {
+            let d2 = s.q[i].norm_squared();
+            let mr = s.m[i] / (3.0 * m0);
+            // The cube root of the mass ratio, kept from step to step.
+            if ws.cbrt_mr[i].0 != mr {
+                ws.cbrt_mr[i] = (mr, mr.cbrt());
+            }
+            ws.hill6[i] = d2 * d2 * d2 * mr * mr;
+            ws.dcrit[i] = self.r_crit_hill * d2.sqrt() * ws.cbrt_mr[i].1;
+        }
+        ws.speed.clear();
+        ws.speed.extend(s.u.iter().map(|u| u.norm()));
         let rc2 = self.r_crit_hill * self.r_crit_hill;
         let rc6 = rc2 * rc2 * rc2;
         let h2 = 0.5 * h.abs();
         // Each pair with at least one massive member (test particles never meet each other).
-        for i in 0..n {
-            if hill6[i] == 0.0 {
-                continue;
-            }
-            for j in 0..n {
-                if j == i || j == central || (j < i && hill6[j] > 0.0) {
+        for &i in &s.massive {
+            let (qi, ui, hill6_i, dcrit_i, speed_i) = (s.q[i], s.u[i], ws.hill6[i], ws.dcrit[i], ws.speed[i]);
+            let others = s.q.iter().zip(&s.u).zip(&ws.hill6).zip(&ws.dcrit).zip(&ws.speed).enumerate();
+            for (j, ((((qj, uj), &hill6_j), &dcrit_j), &speed_j)) in others {
+                if j == i || j == central || (j < i && hill6_j > 0.0) {
                     continue;
                 }
-                let dcrit6 = rc6 * hill6[i].max(hill6[j]);
-                let dx = s.q[i] - s.q[j];
+                let dx = qi - qj;
                 let rp = dx.norm_squared();
                 // Conservative early out: within half a step the pair cannot close by more
                 // than (|u_i| + |u_j|) h/2, so a pair farther than that plus dcrit is not close.
-                let reach = dcrit[i].max(dcrit[j]) + (speed[i] + speed[j]) * h2;
+                let reach = dcrit_i.max(dcrit_j) + (speed_i + speed_j) * h2;
                 if rp > reach * reach * (1.0 + 1e-12) {
                     continue;
                 }
+                let dcrit6 = rc6 * hill6_i.max(hill6_j);
                 let close = if rp * rp * rp < dcrit6 {
                     true
                 } else {
-                    let dv = s.u[i] - s.u[j];
+                    let dv = ui - uj;
                     let v2 = dv.norm_squared();
                     let qv = dx.dot(&dv);
                     if qv == 0.0 {
@@ -158,7 +198,7 @@ impl Trace {
         flags
     }
 
-    fn try_step(&self, particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>, central: usize, flags: &Flags, mut s: Democratic) {
+    fn try_step(&self, particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>, flags: &Flags, s: &mut Democratic) {
         let h = self.timestep;
         if flags.peri {
             bs_full(particles, forces, h, self.bs_epsilon);
@@ -167,40 +207,43 @@ impl Trace {
         s.kick(particles, forces, 0.5 * h, &flags.pairs);
         s.jump(0.5 * h);
 
-        // Drift: bodies in close pairs together with Bulirsch–Stoer, the rest analytically.
-        let mut in_encounter = vec![false; particles.len()];
-        for &(i, j) in &flags.pairs {
-            in_encounter[i] = true;
-            in_encounter[j] = true;
-        }
-        // When every flagged pair has a test particle, the massive bodies feel nothing extra
-        // and keep their analytic drift (REBOUND's `tponly_encounter`).
-        let tp_only = flags.pairs.iter().all(|&(i, j)| particles[i].mass() == 0.0 || particles[j].mass() == 0.0);
-        let analytic = |i: usize| !in_encounter[i] || (tp_only && particles[i].mass() > 0.0);
-        let gm0 = GRAVITATIONAL_CONSTANT * s.m_central;
-        let before: Vec<_> = s.q.iter().zip(&s.u).map(|(q, u)| (*q, *u)).collect();
-        for i in 0..particles.len() {
-            if i != central && analytic(i) {
-                let (q, u) = kepler_drift(&s.q[i], &s.u[i], gm0, h);
-                s.q[i] = q;
-                s.u[i] = u;
+        if flags.pairs.is_empty() {
+            s.kepler(h);
+        } else {
+            // Drift: bodies in close pairs together with Bulirsch–Stoer, the rest analytically.
+            let central = s.central;
+            let mut in_encounter = vec![false; particles.len()];
+            for &(i, j) in &flags.pairs {
+                in_encounter[i] = true;
+                in_encounter[j] = true;
             }
-        }
-        if !flags.pairs.is_empty() {
+            // When every flagged pair has a test particle, the massive bodies feel nothing extra
+            // and keep their analytic drift (REBOUND's `tponly_encounter`).
+            let tp_only = flags.pairs.iter().all(|&(i, j)| s.m[i] == 0.0 || s.m[j] == 0.0);
+            let analytic: Vec<bool> = (0..particles.len()).map(|i| !in_encounter[i] || (tp_only && s.m[i] > 0.0)).collect();
+            let gm0 = GRAVITATIONAL_CONSTANT * s.m_central;
+            let before: Vec<_> = s.q.iter().zip(&s.u).map(|(q, u)| (*q, *u)).collect();
+            for i in 0..particles.len() {
+                if i != central && analytic[i] {
+                    let (q, u) = kepler_drift(&s.q[i], &s.u[i], gm0, h);
+                    s.q[i] = q;
+                    s.u[i] = u;
+                }
+            }
             let after: Vec<_> = s.q.iter().zip(&s.u).map(|(q, u)| (*q, *u)).collect();
             for i in 0..particles.len() {
                 if in_encounter[i] {
                     (s.q[i], s.u[i]) = before[i];
                 }
             }
-            bs_encounter(&mut s, particles, &in_encounter, &flags.pairs, h, self.bs_epsilon);
+            bs_encounter(s, particles, &in_encounter, &flags.pairs, h, self.bs_epsilon);
             for i in 0..particles.len() {
-                if in_encounter[i] && analytic(i) {
+                if in_encounter[i] && analytic[i] {
                     (s.q[i], s.u[i]) = after[i];
                 }
             }
+            s.x_cm += h * s.v_cm;
         }
-        s.x_cm += h * s.v_cm;
 
         s.jump(0.5 * h);
         s.kick(particles, forces, 0.5 * h, &flags.pairs);
@@ -216,22 +259,34 @@ impl Integrator for Trace {
             None => return Leapfrog::new(self.timestep).step(particles, epoch, forces),
         };
 
-        let start: Vec<_> = particles.iter().map(|p| (p.position, p.velocity)).collect();
-        let mut s0 = Democratic::from_particles(particles, central);
-        let mut flags = self.flags(particles, &s0, central, self.timestep);
+        let mut ws = std::mem::take(&mut self.scratch);
+        ws.start.clear();
+        ws.start.extend(particles.iter().map(|p| (p.position, p.velocity)));
+        let mut s0 = std::mem::take(&mut ws.s0);
+        let mut s = std::mem::take(&mut ws.s);
+        s0.load(particles, central);
+        let mut flags = self.flags(&s0, self.timestep, &mut ws);
         loop {
-            self.try_step(particles, forces, central, &flags, s0);
-            let end = self.flags(particles, &Democratic::from_particles(particles, central), central, -self.timestep);
+            s.copy_from(&s0);
+            self.try_step(particles, forces, &flags, &mut s);
+            if flags.peri {
+                // The Bulirsch–Stoer step moved the particles, not `s`.
+                s.load(particles, central);
+            }
+            let end = self.flags(&s, -self.timestep, &mut ws);
             if flags.contains(&end) {
                 break;
             }
             flags = flags.union(&end);
-            for (p, &(x, v)) in particles.iter_mut().zip(&start) {
+            for (p, &(x, v)) in particles.iter_mut().zip(&ws.start) {
                 p.position = x;
                 p.velocity = v;
             }
-            s0 = Democratic::from_particles(particles, central);
+            s0.load(particles, central);
         }
+        ws.s0 = s0;
+        ws.s = s;
+        self.scratch = ws;
 
         *epoch += self.timestep;
         for particle in particles.iter_mut() {
@@ -315,16 +370,15 @@ fn bs_full(particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + S
         y.extend_from_slice(p.velocity.as_slice());
     }
     let mut scratch = particles.clone();
+    let mut acc = vec![Vector3::zeros(); n];
     let rhs = |y: &[f64], dy: &mut [f64]| {
         for (k, p) in scratch.iter_mut().enumerate() {
             p.position = Vector3::new(y[6 * k], y[6 * k + 1], y[6 * k + 2]);
             p.velocity = Vector3::new(y[6 * k + 3], y[6 * k + 4], y[6 * k + 5]);
         }
-        let mut acc = vec![Vector3::zeros(); n];
+        acc.fill(Vector3::zeros());
         for force in forces {
-            for (a, da) in acc.iter_mut().zip(force.calculate_acceleration(&mut scratch)) {
-                *a += da;
-            }
+            force.add_acceleration(&mut scratch, &mut acc);
         }
         for k in 0..n {
             dy[6 * k..6 * k + 3].copy_from_slice(&y[6 * k + 3..6 * k + 6]);

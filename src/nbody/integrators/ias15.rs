@@ -63,6 +63,8 @@ pub struct IAS15 {
     es_last: Vec<CoefficientSeptet>,
     /// The last completed step, for dense output
     dense: Option<DenseOutput>,
+    /// Scratch buffer for the accelerations at each substep
+    accelerations: Vec<Vector3<f64>>,
 }
 
 /// The start of the last completed step. With that step's coefficients (`bs_last`) it gives the
@@ -88,7 +90,7 @@ impl IAS15 {
     /// The integrator will automatically adjust this timestep based on the 
     /// local truncation error to maintain the specified precision (epsilon).
     pub fn new(timestep: f64) -> IAS15 {
-        IAS15 { timestep, epsilon: 1e-9, last_timestep: 0.0, bs: vec![], gs: vec![], es: vec![], bs_last: vec![], es_last: vec![], dense: None }
+        IAS15 { timestep, epsilon: 1e-9, last_timestep: 0.0, bs: vec![], gs: vec![], es: vec![], bs_last: vec![], es_last: vec![], dense: None, accelerations: vec![] }
     }
 
     /// Resets all coefficient vectors to zero for the specified number of particles
@@ -113,24 +115,21 @@ impl Integrator for IAS15 {
 
     /// Advances the system by one step using the IAS15 algorithm.
     fn step(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>) {
-        // for now I'll only integrate the particles, just to keep things simple
-
-        let mut accelerations: Vec<Vector3<f64>> = vec![Vector3::zeros(); particles.len()];
-        for force in forces {
-            let acc = force.calculate_acceleration(particles);
-            for (idx, a) in acc.iter().enumerate() {
-                accelerations[idx] += a;
-            }
-        }
-
-        // We don't want to clone the original SpaceRock objects because some of the contents are heap allocated, making the clone operation expensive.
-        let initial_positions: Vec<Vector3<f64>> = particles.iter().map(|p| p.position).collect();
-        let initial_velocities: Vec<Vector3<f64>> = particles.iter().map(|p| p.velocity).collect();
-        let initial_accelerations: Vec<Vector3<f64>> = accelerations.clone();
-        let initial_epoch = particles[0].epoch.clone();
-
         // Number of particles
         let n = particles.len();
+
+        // The start of the step, in the buffers of the previous step's dense output. We don't
+        // clone the SpaceRocks themselves because some of their contents are heap allocated.
+        let (mut initial_positions, mut initial_velocities, mut initial_accelerations) = match self.dense.take() {
+            Some(d) => (d.x0, d.v0, d.a0),
+            None => (Vec::new(), Vec::new(), Vec::new()),
+        };
+        initial_positions.clear();
+        initial_positions.extend(particles.iter().map(|p| p.position));
+        initial_velocities.clear();
+        initial_velocities.extend(particles.iter().map(|p| p.velocity));
+        total_acceleration(particles, forces, &mut initial_accelerations);
+        let initial_epoch = particles[0].epoch.clone();
 
         if (self.bs.len() != n) || (self.gs.len() != n) {
             self.reset_coefficients(n);
@@ -145,6 +144,10 @@ impl Integrator for IAS15 {
             g.p5 = b.p6 * D[20] + b.p5;
             g.p6 = b.p6;
         }
+
+        // Multiplying by these is cheaper than dividing by RR for every particle and substep.
+        let rri = RR.map(|r| 1.0 / r);
+        let mut accelerations = std::mem::take(&mut self.accelerations);
 
         let mut predictor_corrector_error = 1e300;
         let mut predictor_corrector_error_last = 2.0;
@@ -170,33 +173,29 @@ impl Integrator for IAS15 {
             iterations += 1;
 
             for substep in 1..8 {
+                let hh = H[substep];
+                // Factors of the nested position and velocity series at this substep.
+                let xf = [7.0 * hh / 9.0, 3.0 * hh / 4.0, 5.0 * hh / 7.0, 2.0 * hh / 3.0, 3.0 * hh / 5.0, hh / 2.0, hh / 3.0, self.timestep * hh / 2.0, self.timestep * hh];
+                let vf = [7.0 * hh / 8.0, 6.0 * hh / 7.0, 5.0 * hh / 6.0, 4.0 * hh / 5.0, 3.0 * hh / 4.0, 2.0 * hh / 3.0, hh / 2.0, self.timestep * hh];
+                let substep_epoch = initial_epoch.clone() + self.timestep * hh;
                 for idx in 0..n {
                     let a0 = initial_accelerations[idx];
                     let v0 = initial_velocities[idx];
-
                     let b = &self.bs[idx];
-                    // let g = &self.gs[idx];
-                    let hh = H[substep];
 
                     // Calculate the position
-                    let d_position = ((((((((b.p6 * 7.0 * hh / 9.0 + b.p5) * 3.0 * hh / 4.0 + b.p4) * 5.0 * hh / 7.0 + b.p3) * 2.0 * hh / 3.0 + b.p2) * 3.0 * hh / 5.0 + b.p1) * hh / 2.0 + b.p0) * hh / 3.0 + a0) * self.timestep * hh / 2.0 + v0) * self.timestep * hh;
-                    particles[idx].position = initial_positions[idx] + d_position;
+                    let d_position = ((((((((b.p6 * xf[0] + b.p5) * xf[1] + b.p4) * xf[2] + b.p3) * xf[3] + b.p2) * xf[4] + b.p1) * xf[5] + b.p0) * xf[6] + a0) * xf[7] + v0) * xf[8];
+                    let particle = &mut particles[idx];
+                    particle.position = initial_positions[idx] + d_position;
 
                     // Calculate the velocity
-                    let d_velocity = (((((((b.p6 * 7.0 * hh / 8.0 + b.p5) * 6.0 * hh / 7.0 + b.p4) * 5.0 * hh / 6.0 + b.p3) * 4.0 * hh / 5.0 + b.p2) * 3.0 * hh / 4.0 + b.p1) * 2.0 * hh / 3.0 + b.p0) * hh / 2.0 + a0) * self.timestep * hh;
-                    particles[idx].velocity = initial_velocities[idx] + d_velocity;
+                    let d_velocity = (((((((b.p6 * vf[0] + b.p5) * vf[1] + b.p4) * vf[2] + b.p3) * vf[3] + b.p2) * vf[4] + b.p1) * vf[5] + b.p0) * vf[6] + a0) * vf[7];
+                    particle.velocity = v0 + d_velocity;
 
-                    // particles[idx].epoch += self.timestep * hh;
-                    particles[idx].epoch = initial_epoch.clone() + self.timestep * hh;
+                    particle.epoch = substep_epoch.clone();
                 }
 
-                let mut accelerations: Vec<Vector3<f64>> = vec![Vector3::zeros(); particles.len()];
-                for force in forces {
-                    let acc = force.calculate_acceleration(particles);
-                    for (idx, a) in acc.iter().enumerate() {
-                        accelerations[idx] += a;
-                    }
-                }
+                total_acceleration(particles, forces, &mut accelerations);
 
                 match substep {
                     1 => {
@@ -206,7 +205,7 @@ impl Integrator for IAS15 {
 
                             let temp = self.gs[idx].p0;
 
-                            self.gs[idx].p0 = (a_new - a_old) / RR[0];
+                            self.gs[idx].p0 = (a_new - a_old) * rri[0];
                             self.bs[idx].p0 += self.gs[idx].p0 - temp;
                         }
                     },
@@ -216,7 +215,7 @@ impl Integrator for IAS15 {
                             let a_new = accelerations[idx];
 
                             let mut temp = self.gs[idx].p1;
-                            self.gs[idx].p1 = ((a_new - a_old) / RR[1] - self.gs[idx].p0) / RR[2];
+                            self.gs[idx].p1 = ((a_new - a_old) * rri[1] - self.gs[idx].p0) * rri[2];
                             temp = self.gs[idx].p1 - temp;
 
                             self.bs[idx].p0 += temp * C[0];
@@ -229,7 +228,7 @@ impl Integrator for IAS15 {
                             let a_new = accelerations[idx];
 
                             let mut temp = self.gs[idx].p2;
-                            self.gs[idx].p2 = (((a_new - a_old) / RR[3] - self.gs[idx].p0) / RR[4] - self.gs[idx].p1) / RR[5];
+                            self.gs[idx].p2 = (((a_new - a_old) * rri[3] - self.gs[idx].p0) * rri[4] - self.gs[idx].p1) * rri[5];
                             temp = self.gs[idx].p2 - temp;
 
                             self.bs[idx].p0 += temp * C[1];
@@ -243,7 +242,7 @@ impl Integrator for IAS15 {
                             let a_new = accelerations[idx];
 
                             let mut temp = self.gs[idx].p3;
-                            self.gs[idx].p3 = ((((a_new - a_old) / RR[6] - self.gs[idx].p0) / RR[7] - self.gs[idx].p1) / RR[8] - self.gs[idx].p2) / RR[9];
+                            self.gs[idx].p3 = ((((a_new - a_old) * rri[6] - self.gs[idx].p0) * rri[7] - self.gs[idx].p1) * rri[8] - self.gs[idx].p2) * rri[9];
                             temp = self.gs[idx].p3 - temp;
 
                             self.bs[idx].p0 += temp * C[3];
@@ -258,7 +257,7 @@ impl Integrator for IAS15 {
                             let a_new = accelerations[idx];
 
                             let mut temp = self.gs[idx].p4;
-                            self.gs[idx].p4 = (((((a_new - a_old) / RR[10] - self.gs[idx].p0) / RR[11] - self.gs[idx].p1) / RR[12] - self.gs[idx].p2) / RR[13] - self.gs[idx].p3) / RR[14];
+                            self.gs[idx].p4 = (((((a_new - a_old) * rri[10] - self.gs[idx].p0) * rri[11] - self.gs[idx].p1) * rri[12] - self.gs[idx].p2) * rri[13] - self.gs[idx].p3) * rri[14];
                             temp = self.gs[idx].p4 - temp;
 
                             self.bs[idx].p0 += temp * C[6];
@@ -274,7 +273,7 @@ impl Integrator for IAS15 {
                             let a_new = accelerations[idx];
 
                             let mut temp = self.gs[idx].p5;
-                            self.gs[idx].p5 = ((((((a_new - a_old) / RR[15] - self.gs[idx].p0) / RR[16] - self.gs[idx].p1) / RR[17] - self.gs[idx].p2) / RR[18] - self.gs[idx].p3) / RR[19] - self.gs[idx].p4) / RR[20];
+                            self.gs[idx].p5 = ((((((a_new - a_old) * rri[15] - self.gs[idx].p0) * rri[16] - self.gs[idx].p1) * rri[17] - self.gs[idx].p2) * rri[18] - self.gs[idx].p3) * rri[19] - self.gs[idx].p4) * rri[20];
                             temp = self.gs[idx].p5 - temp;
 
                             self.bs[idx].p0 += temp * C[10];
@@ -286,15 +285,15 @@ impl Integrator for IAS15 {
                         }
                     },
                     7 => {
-
-                        let mut max_acceleration = 0.0;
-                        let mut max_b6_temp = 0.0;
+                        // The error is the largest b6 correction over the largest acceleration.
+                        let mut max_acceleration2: f64 = 0.0;
+                        let mut max_b6_temp2: f64 = 0.0;
                         for idx in 0..n {
                             let a_old = initial_accelerations[idx];
                             let a_new = accelerations[idx];
 
                             let mut temp = self.gs[idx].p6;
-                            self.gs[idx].p6 = (((((((a_new - a_old) / RR[21] - self.gs[idx].p0) / RR[22] - self.gs[idx].p1) / RR[23] - self.gs[idx].p2) / RR[24] - self.gs[idx].p3) / RR[25] - self.gs[idx].p4) / RR[26] - self.gs[idx].p5) / RR[27];
+                            self.gs[idx].p6 = (((((((a_new - a_old) * rri[21] - self.gs[idx].p0) * rri[22] - self.gs[idx].p1) * rri[23] - self.gs[idx].p2) * rri[24] - self.gs[idx].p3) * rri[25] - self.gs[idx].p4) * rri[26] - self.gs[idx].p5) * rri[27];
                             temp = self.gs[idx].p6 - temp;
 
                             self.bs[idx].p0 += temp * C[15];
@@ -305,28 +304,25 @@ impl Integrator for IAS15 {
                             self.bs[idx].p5 += temp * C[20];
                             self.bs[idx].p6 += temp;
 
-                            if true {
-                                let temp_norm = temp.norm();
-                                if temp_norm > max_b6_temp && temp_norm.is_normal() {
-                                    max_b6_temp = temp_norm;
-                                }
-                                let a_new_norm = a_new.norm();
-                                if a_new_norm > max_acceleration && a_new_norm.is_normal() {
-                                    max_acceleration = a_new.norm();
-                                }
-                                let error = max_b6_temp / max_acceleration;
-                                if (error.is_normal()) & (error > predictor_corrector_error) {
-                                    predictor_corrector_error = error;
-                                }
-                            } else {
-                                predictor_corrector_error = temp.norm() / a_new.norm();
+                            let temp2 = temp.norm_squared();
+                            if temp2 > max_b6_temp2 && temp2.is_normal() {
+                                max_b6_temp2 = temp2;
                             }
+                            let a_new2 = a_new.norm_squared();
+                            if a_new2 > max_acceleration2 && a_new2.is_normal() {
+                                max_acceleration2 = a_new2;
+                            }
+                        }
+                        let error = (max_b6_temp2 / max_acceleration2).sqrt();
+                        if error.is_normal() {
+                            predictor_corrector_error = error;
                         }
                     },
                     _ => {}
                 }
             }
         }
+        self.accelerations = accelerations;
 
         let old_timestep = self.timestep;
         let mut new_timestep = calculate_new_timestep(particles, &initial_accelerations, &self.bs, &old_timestep, &self.epsilon);
@@ -343,7 +339,6 @@ impl Integrator for IAS15 {
                 let perturber = &mut particles[idx];
                 perturber.position = initial_positions[idx];
                 perturber.velocity = initial_velocities[idx];
-                accelerations[idx] = initial_accelerations[idx];
                 // perturber.epoch.epoch = epoch.epoch;
                 perturber.epoch = initial_epoch.clone();
             }
@@ -395,8 +390,8 @@ impl Integrator for IAS15 {
         let ratio = self.timestep / self.last_timestep;
 
 
-        self.es_last = self.es.clone();
-        self.bs_last = self.bs.clone();
+        self.es_last.clone_from(&self.es);
+        self.bs_last.clone_from(&self.bs);
 
         predict_next_coefficients(&ratio, &self.es_last, &self.bs_last, &mut self.es, &mut self.bs);        
 
@@ -407,6 +402,13 @@ impl Integrator for IAS15 {
     }
 
     fn set_timestep(&mut self, timestep: f64) {
+        // The predicted coefficients are scaled to the step they were predicted for; predict
+        // them again for the new one, or the predictor-corrector starts from a poor guess
+        // (shortening a step to land on an output would otherwise take up to 12 iterations).
+        if timestep != self.timestep && self.last_timestep != 0.0 && self.bs_last.len() == self.bs.len() {
+            let ratio = timestep / self.last_timestep;
+            predict_next_coefficients(&ratio, &self.es_last, &self.bs_last, &mut self.es, &mut self.bs);
+        }
         self.timestep = timestep;
     }
 
@@ -457,6 +459,15 @@ impl Integrator for IAS15 {
     }
 }
 
+/// Sum the accelerations from all `forces` into `acc`, resized to one entry per particle.
+fn total_acceleration(particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>, acc: &mut Vec<Vector3<f64>>) {
+    acc.clear();
+    acc.resize(particles.len(), Vector3::zeros());
+    for force in forces {
+        force.add_acceleration(particles, acc);
+    }
+}
+
 /// A 7-element coefficient set used by the IAS15 integrator to represent series expansions
 /// of position, velocity and acceleration for each body. Each component (p0 through p6) 
 /// represents a term in the series approximation (third through ninth order derivatives of position).
@@ -498,7 +509,7 @@ fn predict_next_coefficients(ratio: &f64, es_last: &Vec<CoefficientSeptet>, bs_l
 
     let rat = *ratio;
 
-    if rat > 20.0 {
+    if rat.abs() > 20.0 {
         for e in es.iter_mut() {
             e.p0 = Vector3::zeros();
             e.p1 = Vector3::zeros();
