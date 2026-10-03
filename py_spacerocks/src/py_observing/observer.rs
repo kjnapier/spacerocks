@@ -10,7 +10,7 @@ use crate::py_time::time::PyTime;
 
 use numpy::{PyArray1, IntoPyArray};
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "Observer")]
 #[derive(Clone)]
 pub struct PyObserver {

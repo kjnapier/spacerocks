@@ -49,7 +49,7 @@ use crate::py_observing::observatory::PyObservatory;
 /// This struct is used to manage and manipulate a collection of 
 /// `SpaceRock` objects, including operations such as filtering, 
 /// observing, and converting formats.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RockCollection {
     /// A vector holding all `SpaceRock` instances.
