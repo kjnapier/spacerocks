@@ -47,18 +47,18 @@ impl WisdomHolman {
 
 /// Democratic heliocentric state: heliocentric positions `q`, barycentric velocities `u`,
 /// and the barycenter's position and velocity. The central body's own `q` and `u` are unused.
-struct Democratic {
-    central: usize,
-    m_central: f64,
-    m_total: f64,
-    q: Vec<Vector3<f64>>,
-    u: Vec<Vector3<f64>>,
-    x_cm: Vector3<f64>,
-    v_cm: Vector3<f64>,
+pub(crate) struct Democratic {
+    pub(crate) central: usize,
+    pub(crate) m_central: f64,
+    pub(crate) m_total: f64,
+    pub(crate) q: Vec<Vector3<f64>>,
+    pub(crate) u: Vec<Vector3<f64>>,
+    pub(crate) x_cm: Vector3<f64>,
+    pub(crate) v_cm: Vector3<f64>,
 }
 
 impl Democratic {
-    fn from_particles(particles: &[SpaceRock], central: usize) -> Democratic {
+    pub(crate) fn from_particles(particles: &[SpaceRock], central: usize) -> Democratic {
         let m_total: f64 = particles.iter().map(|p| p.mass()).sum();
         let mut x_cm = Vector3::zeros();
         let mut v_cm = Vector3::zeros();
@@ -75,7 +75,7 @@ impl Democratic {
     }
 
     /// Write inertial positions and velocities back into `particles`.
-    fn to_particles(&self, particles: &mut [SpaceRock]) {
+    pub(crate) fn to_particles(&self, particles: &mut [SpaceRock]) {
         let mut mq = Vector3::zeros();
         let mut mu = Vector3::zeros();
         for (i, p) in particles.iter().enumerate() {
@@ -97,7 +97,10 @@ impl Democratic {
         }
     }
 
-    fn kick(&mut self, particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>, h: f64) {
+    /// Kick the barycentric velocities by the forces minus the central body's Keplerian pull.
+    /// The Newtonian pull between each pair in `skip` is left out too (TRACE moves those pairs
+    /// into the drift), which assumes the forces include Newtonian gravity.
+    pub(crate) fn kick(&mut self, particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>, h: f64, skip: &[(usize, usize)]) {
         self.to_particles(particles);
         let mut acc = vec![Vector3::zeros(); particles.len()];
         for force in forces {
@@ -114,9 +117,16 @@ impl Democratic {
             let a_kepler = -gm * self.q[i] / (r * r * r);
             self.u[i] += h * (acc[i] - a_kepler);
         }
+        for &(i, j) in skip {
+            let d = self.q[j] - self.q[i];
+            let r = d.norm();
+            let g = GRAVITATIONAL_CONSTANT * d / (r * r * r);
+            self.u[i] -= h * particles[j].mass() * g;
+            self.u[j] += h * particles[i].mass() * g;
+        }
     }
 
-    fn jump(&mut self, particles: &[SpaceRock], h: f64) {
+    pub(crate) fn jump(&mut self, particles: &[SpaceRock], h: f64) {
         let mut p = Vector3::zeros();
         for (i, rock) in particles.iter().enumerate() {
             if i != self.central {
@@ -131,7 +141,7 @@ impl Democratic {
         }
     }
 
-    fn kepler(&mut self, h: f64) {
+    pub(crate) fn kepler(&mut self, h: f64) {
         let gm = GRAVITATIONAL_CONSTANT * self.m_central;
         for i in 0..self.q.len() {
             if i != self.central {
@@ -145,7 +155,7 @@ impl Democratic {
 }
 
 /// Advance a two-body orbit by `dt` with the universal-variable f and g functions.
-fn kepler_drift(r0: &Vector3<f64>, v0: &Vector3<f64>, mu: f64, dt: f64) -> (Vector3<f64>, Vector3<f64>) {
+pub(crate) fn kepler_drift(r0: &Vector3<f64>, v0: &Vector3<f64>, mu: f64, dt: f64) -> (Vector3<f64>, Vector3<f64>) {
     let r0n = r0.norm();
     let vr0 = r0.dot(v0) / r0n;
     let alpha = 2.0 / r0n - v0.norm_squared() / mu;
@@ -166,27 +176,31 @@ fn kepler_drift(r0: &Vector3<f64>, v0: &Vector3<f64>, mu: f64, dt: f64) -> (Vect
     (r, fdot * r0 + gdot * v0)
 }
 
+/// The most massive particle (the first, on ties), if any has mass.
+pub(crate) fn central_body(particles: &[SpaceRock]) -> Option<usize> {
+    let best = particles.iter().enumerate().fold(None, |best: Option<(usize, f64)>, (i, p)| match best {
+        Some((_, m)) if m >= p.mass() => best,
+        _ => Some((i, p.mass())),
+    });
+    best.filter(|&(_, m)| m > 0.0).map(|(i, _)| i)
+}
+
 impl Integrator for WisdomHolman {
     fn step(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>) {
         // The central body is the most massive particle (the first, on ties).
-        let central = particles.iter().enumerate()
-            .fold(None, |best: Option<(usize, f64)>, (i, p)| match best {
-                Some((_, m)) if m >= p.mass() => best,
-                _ => Some((i, p.mass())),
-            });
-        let central = match central {
-            Some((i, m)) if m > 0.0 => i,
+        let central = match central_body(particles) {
+            Some(i) => i,
             // Nothing to orbit: fall back to a plain drift-kick-drift step.
             _ => return Leapfrog::new(self.timestep).step(particles, epoch, forces),
         };
 
         let h = self.timestep;
         let mut s = Democratic::from_particles(particles, central);
-        s.kick(particles, forces, 0.5 * h);
+        s.kick(particles, forces, 0.5 * h, &[]);
         s.jump(particles, 0.5 * h);
         s.kepler(h);
         s.jump(particles, 0.5 * h);
-        s.kick(particles, forces, 0.5 * h);
+        s.kick(particles, forces, 0.5 * h, &[]);
         s.to_particles(particles);
 
         *epoch += h;

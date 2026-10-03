@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use spacerocks::nbody::integrators::{Integrator, Leapfrog, IAS15, WisdomHolman};
+use spacerocks::nbody::integrators::{Integrator, Leapfrog, IAS15, Trace, WisdomHolman};
 
 #[pyclass]
 #[pyo3(name = "Integrator")]
@@ -21,6 +21,11 @@ impl PyIntegrator {
     #[classmethod]
     pub fn wisdom_holman(_cls: Py<PyType>, timestep: f64) -> PyResult<Self> {
         Ok(PyIntegrator { inner: Box::new(WisdomHolman::new(timestep)) })
+    }
+
+    #[classmethod]
+    pub fn trace(_cls: Py<PyType>, timestep: f64) -> PyResult<Self> {
+        Ok(PyIntegrator { inner: Box::new(Trace::new(timestep)) })
     }
 
     #[classmethod]
