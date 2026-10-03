@@ -220,7 +220,7 @@ impl RockCollection {
         })
         .map_err(PyValueError::new_err)?;
 
-        let arr = ndarray::Array2::from_shape_vec((n, 2), data).unwrap();
+        let arr = numpy::ndarray::Array2::from_shape_vec((n, 2), data).unwrap();
         Ok(arr.into_pyarray(py))
     }
 
