@@ -8,7 +8,7 @@ use crate::assist::SpiceSimulation;
 
 
 
-use crate::transforms::{calc_conic_anomaly_from_true_anomaly, calc_mean_anomaly_from_conic_anomaly, solve_for_universal_anomaly, stumpff_c, stumpff_s};
+use crate::transforms::{calc_conic_anomaly_from_true_anomaly, calc_mean_anomaly_from_conic_anomaly, universal_kepler_step};
 
 use nalgebra::Vector3;
 
@@ -465,30 +465,8 @@ impl SpaceRock {
     pub fn analytic_propagate(&mut self, epoch: &Time) -> Result<(), Box<dyn std::error::Error>> {
 
         let dt = epoch.tdb().jd() - self.epoch.tdb().jd();
-        let mu = self.origin.mu();
-        let r = self.position.norm();
-        let vr = self.velocity.dot(&self.position) / r;
-        let energy = self.v_squared() / 2.0 - mu / r;
-        let alpha = -2.0 * energy / mu;
-
-        let chi = solve_for_universal_anomaly(r, vr, alpha, mu, dt, 1e-10, 1000)?;
-        let z = alpha * chi.powi(2);
-
-        let gauss_f = 1.0 - chi.powi(2) / r * stumpff_c(z);
-        let gauss_g = dt - chi.powi(3) / mu.sqrt() * stumpff_s(z);
-
-        let r_new = self.position * gauss_f + self.velocity * gauss_g;
-
-        // let gauss_fdot = (chi * mu.sqrt() / (r * vr)) * (z * stumpff_s(z) - 1.0);
-        let gauss_fdot = (chi * mu.sqrt() / (r_new.norm() * r)) * (z * stumpff_s(z) - 1.0);
-        // let gauss_gdot = 1.0 - (chi.powi(2) / r) * stumpff_c(z);
-        let gauss_gdot = 1.0 - (chi.powi(2) / r_new.norm()) * stumpff_c(z);
-        let velocity = self.position * gauss_fdot + self.velocity * gauss_gdot;
-
-        // let position = self.position * gauss_f + self.velocity * gauss_g;
-        // let velocity = self.position * gauss_fdot + self.velocity * gauss_gdot;
-
-        self.position = r_new;
+        let (position, velocity) = universal_kepler_step(&self.position, &self.velocity, self.origin.mu(), dt)?;
+        self.position = position;
         self.velocity = velocity;
         self.epoch = epoch.clone();
 
