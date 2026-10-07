@@ -1,22 +1,38 @@
 # Batch propagation and ephemerides (Rust)
 
-`spacerocks::batch` is the fast path for many rocks and many epochs.
+`spacerocks::batch` is the fast path for many rocks and many epochs. Each function takes a
+`Population` (one reference plane and origin for all its bodies), and has a `_rocks` / `_batch`
+twin for a slice of `SpaceRock`s that may each have their own. Both forms run the same code and
+give identical results.
 
 ```rust
 use spacerocks::batch::{self, BatchOptions, Method};
-use spacerocks::{Observatory, SpaceRock, SpiceKernel, Time};
+use spacerocks::{Observatory, Population, SpaceRock, SpiceKernel, Time};
 
 let kernel = SpiceKernel::defaults()?;
+let mut pop = Population::from_rocks(rocks)?;
 
-// Move a population to one epoch (in place; planes and SUN/SSB origins are kept).
-batch::propagate_batch(&mut rocks, &Time::new(2461000.5, "tdb", "jd")?, &kernel, &BatchOptions::default())?;
+// Move a population to one epoch (in place; its plane and SUN/SSB origin are kept).
+batch::propagate(&mut pop, &Time::new(2461000.5, "tdb", "jd")?, &kernel, &BatchOptions::default())?;
 
 // Ephemerides: one observer per epoch, epochs in any order.
 let w84 = Observatory::from_obscode("W84")?;
 let observers: Vec<_> = epochs.iter().map(|t| w84.at(t, "J2000", "SSB", &kernel)).collect::<Result<_, _>>()?;
-let eph = batch::ephemeris(&rocks, &observers, &kernel, &BatchOptions::default())?;
+let eph = batch::ephemeris(&pop, &observers, &kernel, &BatchOptions::default())?;
 let a = eph.get(rock_index, epoch_index);   // Apparent { ra, dec, ra_rate, dec_rate, range, ... }
+
+// Barycentric J2000 states only, row-major [body][target].
+let states = batch::states_at(&pop, &[2461000.5, 2461010.5], &kernel, &BatchOptions::default())?;
 ```
+
+| Population | Slice of rocks |
+|---|---|
+| `propagate(&mut pop, ...)` | `propagate_batch(&mut rocks, ...)` |
+| `ephemeris(&pop, ...)` | `ephemeris_rocks(&rocks, ...)` |
+| `states_at(&pop, ...)` | `states_at_rocks(&rocks, ...)` |
+
+`propagate` on a population with a custom origin is an error for N-body (the rocks form returns
+such rocks about the SSB instead).
 
 `BatchOptions`:
 

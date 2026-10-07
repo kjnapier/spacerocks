@@ -171,7 +171,7 @@ impl PyCatalog {
 
     /// Index of the orbit named ``name`` (KeyError if absent).
     fn index(&self, name: &str) -> PyResult<usize> {
-        self.inner.name.iter().position(|n| n == name).ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(name.to_string()))
+        self.inner.orbits.names.iter().position(|n| n == name).ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(name.to_string()))
     }
 
     /// The orbit at index ``i`` as a barycentric J2000 SpaceRock at its epoch.
@@ -184,19 +184,19 @@ impl PyCatalog {
 
     #[getter]
     fn names(&self) -> Vec<String> {
-        self.inner.name.clone()
+        self.inner.orbits.names.clone()
     }
 
     /// TDB Julian dates of the orbits.
     #[getter]
     fn epoch<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
-        self.inner.epoch.clone().into_pyarray(py)
+        self.inner.orbits.epochs.clone().into_pyarray(py)
     }
 
     /// Barycentric J2000 states (n, 6), AU and AU/day.
     #[getter]
     fn states<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f64>> {
-        let s = &self.inner.state;
+        let s = &self.inner.orbits.states;
         numpy::ndarray::Array2::from_shape_fn((s.len(), 6), |(i, j)| s[i][j]).into_pyarray(py)
     }
 
@@ -306,7 +306,7 @@ pub fn check<'py>(
     let col = |f: &dyn Fn(&checker::Match) -> f64| m.iter().map(f).collect::<Vec<f64>>();
     d.set_item("detection", m.iter().map(|x| x.detection as i64).collect::<Vec<_>>().into_pyarray(py))?;
     d.set_item("object", m.iter().map(|x| x.object as i64).collect::<Vec<_>>().into_pyarray(py))?;
-    d.set_item("name", PyList::new(py, m.iter().map(|x| cat.name[x.object].as_str()))?)?;
+    d.set_item("name", PyList::new(py, m.iter().map(|x| cat.orbits.names[x.object].as_str()))?)?;
     d.set_item("ra", col(&|x| x.ra).into_pyarray(py))?;
     d.set_item("dec", col(&|x| x.dec).into_pyarray(py))?;
     d.set_item("dra", col(&|x| x.offset[0] / ARCSEC).into_pyarray(py))?;
@@ -330,7 +330,7 @@ pub fn check<'py>(
     d.set_item("mag", col(&|x| x.mag).into_pyarray(py))?;
     d.set_item("from_covariance", m.iter().map(|x| x.from_covariance).collect::<Vec<_>>().into_pyarray(py))?;
     if !out.failed.is_empty() {
-        let list: Vec<String> = out.failed.iter().take(10).map(|(i, e)| format!("{}: {}", cat.name[*i], e)).collect();
+        let list: Vec<String> = out.failed.iter().take(10).map(|(i, e)| format!("{}: {}", cat.orbits.names[*i], e)).collect();
         let msg = format!("{} object(s) could not be predicted and were skipped: {}{}", out.failed.len(), list.join("; "), if out.failed.len() > 10 { "; ..." } else { "" });
         py.import("warnings")?.call_method1("warn", (msg,))?;
     }

@@ -205,12 +205,7 @@ impl RockCollection {
         let ep = epoch.inner.clone();
         let k = &kernel.inner;
         let pop = &mut self.inner;
-        py.detach(|| {
-            let mut rocks = pop.to_rocks();
-            batch::propagate_batch(&mut rocks, &ep, k, &opts).map_err(|e| e.to_string())?;
-            pop.update_from_rocks(&rocks).map_err(|e| e.to_string())
-        })
-        .map_err(PyValueError::new_err)
+        py.detach(|| batch::propagate(pop, &ep, k, &opts).map_err(|e| e.to_string())).map_err(PyValueError::new_err)
     }
 
     /// Ephemerides of every rock at many epochs.
@@ -278,7 +273,7 @@ impl RockCollection {
         };
         let pop = &self.inner;
         let eph = py
-            .detach(|| batch::ephemeris(&pop.to_rocks(), &observers, k, &opts).map_err(|e| e.to_string()))
+            .detach(|| batch::ephemeris(pop, &observers, k, &opts).map_err(|e| e.to_string()))
             .map_err(PyValueError::new_err)?;
 
         let d = apparent_dict(py, &eph.apparent, &[eph.n_rocks, eph.n_epochs])?;
@@ -428,9 +423,14 @@ impl RockCollection {
         self.mapped_or_err(py, state::conic_anomaly)
     }
 
+    /// Epoch of each rock (TDB).
     #[getter]
-    pub fn epoch(&self) -> Vec<PyTime> {
-        self.inner.epochs.iter().map(|t| PyTime { inner: t.clone() }).collect()
+    pub fn epoch(&self) -> PyResult<Vec<PyTime>> {
+        self.inner
+            .epochs
+            .iter()
+            .map(|&jd| Time::new(jd, "tdb", "jd").map(|t| PyTime { inner: t }).map_err(|e| PyValueError::new_err(e.to_string())))
+            .collect()
     }
 
     pub fn get(&self, name: &str) -> PyResult<PySpaceRock> {

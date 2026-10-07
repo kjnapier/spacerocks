@@ -8,7 +8,7 @@ use std::path::Path;
 use crate::batch::{states_at, BatchOptions};
 use crate::checker::mpc::{self, MpcElements, MpcOrb};
 use crate::orbfit::{FitFlag, OrbitFit};
-use crate::{Origin, ReferencePlane, SpaceRock, SpiceKernel, Time};
+use crate::{Origin, Population, Properties, ReferencePlane, SpaceRock, SpiceKernel, Time};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -23,13 +23,11 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// The check moves objects by two-body motion from whichever reference (the orbit's own epoch
 /// or the snapshot) is closest in time, so a snapshot near the detections saves integrating the
 /// whole catalog on every call. Snapshots are kept by [`Catalog::save`].
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Catalog {
-    pub name: Vec<String>,
-    /// TDB Julian date of `state`.
-    pub epoch: Vec<f64>,
-    /// Barycentric J2000 state.
-    pub state: Vec<[f64; 6]>,
+    /// Names, epochs (TDB Julian dates) and barycentric J2000 states of the orbits; the other
+    /// columns line up with these.
+    pub orbits: Population,
     /// Non-gravitational parameters A1–A3 (AU/day²).
     pub nongrav: Vec<[f64; 3]>,
     /// Which of `nongrav` have rows in `covariance`.
@@ -50,6 +48,23 @@ pub struct Catalog {
     /// Barycentric J2000 states at `snapshot_epoch` (empty if there is none; NaN rows where the
     /// integration failed).
     pub snapshot: Vec<[f64; 6]>,
+}
+
+impl Default for Catalog {
+    fn default() -> Self {
+        Catalog {
+            orbits: Population::new(ReferencePlane::J2000, Origin::SSB),
+            nongrav: Vec::new(),
+            fit_nongrav: Vec::new(),
+            covariance: Vec::new(),
+            h: Vec::new(),
+            g: Vec::new(),
+            u: Vec::new(),
+            last_obs: Vec::new(),
+            snapshot_epoch: f64::NAN,
+            snapshot: Vec::new(),
+        }
+    }
 }
 
 struct SunStates<'a> {
@@ -78,11 +93,11 @@ fn add6(a: &[f64; 6], b: &[f64; 6]) -> [f64; 6] {
 
 impl Catalog {
     pub fn len(&self) -> usize {
-        self.name.len()
+        self.orbits.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.name.is_empty()
+        self.orbits.is_empty()
     }
 
     pub fn has_snapshot(&self) -> bool {
@@ -91,9 +106,10 @@ impl Catalog {
 
     #[allow(clippy::too_many_arguments)]
     fn push(&mut self, name: String, epoch: f64, state: [f64; 6], nongrav: [f64; 3], fit_nongrav: [bool; 3], covariance: Vec<f64>, h: f64, g: f64, u: f64, last_obs: f64) {
-        self.name.push(name);
-        self.epoch.push(epoch);
-        self.state.push(state);
+        self.orbits.names.push(name);
+        self.orbits.epochs.push(epoch);
+        self.orbits.states.push(state);
+        self.orbits.properties.push(None);
         self.nongrav.push(nongrav);
         self.fit_nongrav.push(fit_nongrav);
         self.covariance.push(covariance);
@@ -106,7 +122,7 @@ impl Catalog {
     /// Orbits from MPC elements (heliocentric ecliptic, TT), made barycentric J2000. Orbits
     /// whose elements do not give a state (e.g. e >= 1 with a > 0) are left out.
     pub fn from_mpc_elements(elements: &[MpcElements], kernel: &SpiceKernel) -> Result<Catalog, BoxError> {
-        let mut cat = Catalog { snapshot_epoch: f64::NAN, ..Default::default() };
+        let mut cat = Catalog::default();
         let mut sun = SunStates::new(kernel);
         for el in elements {
             let Some(helio) = el.helio_j2000() else { continue };
@@ -155,7 +171,7 @@ impl Catalog {
 
     /// Orbits from MPC `mpc_orb` JSON records (with covariances).
     pub fn from_mpc_orbs(orbs: &[MpcOrb], kernel: &SpiceKernel) -> Result<Catalog, BoxError> {
-        let mut cat = Catalog { snapshot_epoch: f64::NAN, ..Default::default() };
+        let mut cat = Catalog::default();
         let mut sun = SunStates::new(kernel);
         for o in orbs {
             let s = add6(&o.helio_j2000, &sun.get(o.epoch_tdb)?);
@@ -172,7 +188,7 @@ impl Catalog {
         if names.len() != fits.len() {
             return Err(format!("{} names for {} fits", names.len(), fits.len()).into());
         }
-        let mut cat = Catalog { snapshot_epoch: f64::NAN, ..Default::default() };
+        let mut cat = Catalog::default();
         for (k, (name, f)) in names.iter().zip(fits).enumerate() {
             if !f.state.iter().all(|x| x.is_finite()) || !f.epoch.is_finite() {
                 continue;
@@ -191,9 +207,10 @@ impl Catalog {
     /// epoch).
     pub fn extend(&mut self, other: &Catalog) {
         let keep = self.has_snapshot() && other.has_snapshot() && self.snapshot_epoch == other.snapshot_epoch;
-        self.name.extend_from_slice(&other.name);
-        self.epoch.extend_from_slice(&other.epoch);
-        self.state.extend_from_slice(&other.state);
+        self.orbits.names.extend_from_slice(&other.orbits.names);
+        self.orbits.epochs.extend_from_slice(&other.orbits.epochs);
+        self.orbits.states.extend_from_slice(&other.orbits.states);
+        self.orbits.properties.extend_from_slice(&other.orbits.properties);
         self.nongrav.extend_from_slice(&other.nongrav);
         self.fit_nongrav.extend_from_slice(&other.fit_nongrav);
         self.covariance.extend_from_slice(&other.covariance);
@@ -213,9 +230,7 @@ impl Catalog {
     pub fn select(&self, indices: &[usize]) -> Catalog {
         let pick = |v: &Vec<f64>| indices.iter().map(|&i| v[i]).collect::<Vec<_>>();
         Catalog {
-            name: indices.iter().map(|&i| self.name[i].clone()).collect(),
-            epoch: pick(&self.epoch),
-            state: indices.iter().map(|&i| self.state[i]).collect(),
+            orbits: self.orbits.select(indices),
             nongrav: indices.iter().map(|&i| self.nongrav[i]).collect(),
             fit_nongrav: indices.iter().map(|&i| self.fit_nongrav[i]).collect(),
             covariance: indices.iter().map(|&i| self.covariance[i].clone()).collect(),
@@ -231,7 +246,7 @@ impl Catalog {
     /// The most frequent epoch, if there are orbits.
     pub fn common_epoch(&self) -> Option<f64> {
         let mut counts: HashMap<u64, usize> = HashMap::new();
-        for t in &self.epoch {
+        for t in &self.orbits.epochs {
             *counts.entry(t.to_bits()).or_default() += 1;
         }
         counts.into_iter().max_by_key(|&(_, c)| c).map(|(t, _)| f64::from_bits(t))
@@ -240,7 +255,7 @@ impl Catalog {
     /// Index of each name (the first, if a name repeats).
     pub fn index(&self) -> HashMap<&str, usize> {
         let mut m = HashMap::with_capacity(self.len());
-        for (i, n) in self.name.iter().enumerate().rev() {
+        for (i, n) in self.orbits.names.iter().enumerate().rev() {
             m.insert(n.as_str(), i);
         }
         m
@@ -248,9 +263,9 @@ impl Catalog {
 
     /// Object `i` as a barycentric J2000 SpaceRock at its epoch (with H, G and non-grav).
     pub fn rock(&self, i: usize) -> Result<SpaceRock, BoxError> {
-        let t = Time::new(self.epoch[i], "tdb", "jd").map_err(|e| e.to_string())?;
-        let s = self.state[i];
-        let mut r = SpaceRock::from_xyz(&self.name[i], s[0], s[1], s[2], s[3], s[4], s[5], t, "J2000", "SSB").map_err(|e| e.to_string())?;
+        let t = Time::new(self.orbits.epochs[i], "tdb", "jd").map_err(|e| e.to_string())?;
+        let s = self.orbits.states[i];
+        let mut r = SpaceRock::from_xyz(&self.orbits.names[i], s[0], s[1], s[2], s[3], s[4], s[5], t, "J2000", "SSB").map_err(|e| e.to_string())?;
         if self.nongrav[i].iter().any(|&a| a != 0.0) {
             r.set_nongrav(self.nongrav[i][0], self.nongrav[i][1], self.nongrav[i][2]);
         }
@@ -298,48 +313,41 @@ impl Catalog {
         let mid = 0.5 * (targets.iter().copied().fold(f64::INFINITY, f64::min) + targets.iter().copied().fold(f64::NEG_INFINITY, f64::max));
         let snap = nearest && self.has_snapshot();
         let start = |i: usize| -> (f64, [f64; 6]) {
-            if snap && self.snapshot[i][0].is_finite() && (self.snapshot_epoch - mid).abs() < (self.epoch[i] - mid).abs() {
+            if snap && self.snapshot[i][0].is_finite() && (self.snapshot_epoch - mid).abs() < (self.orbits.epochs[i] - mid).abs() {
                 (self.snapshot_epoch, self.snapshot[i])
             } else {
-                (self.epoch[i], self.state[i])
+                (self.orbits.epochs[i], self.orbits.states[i])
             }
         };
-        // Lightweight rocks: no names.
+        // The orbits with finite starting states, unnamed, carrying their non-gravitational
+        // parameters.
         let mut ok = Vec::with_capacity(indices.len());
-        let mut rocks = Vec::with_capacity(indices.len());
+        let mut pop = Population::new(ReferencePlane::J2000, Origin::SSB);
         for (k, &i) in indices.iter().enumerate() {
             let (t0, s) = start(i);
             if !(t0.is_finite() && s.iter().all(|x| x.is_finite())) {
                 continue;
             }
-            let Ok(t) = Time::new(t0, "tdb", "jd") else { continue };
-            let mut r = SpaceRock {
-                name: String::new(),
-                epoch: t,
-                reference_plane: ReferencePlane::J2000,
-                origin: Origin::SSB,
-                position: nalgebra::Vector3::new(s[0], s[1], s[2]),
-                velocity: nalgebra::Vector3::new(s[3], s[4], s[5]),
-                properties: None,
-            };
-            if self.nongrav[i].iter().any(|&a| a != 0.0) {
-                r.set_nongrav(self.nongrav[i][0], self.nongrav[i][1], self.nongrav[i][2]);
-            }
+            let ng = self.nongrav[i];
+            let properties = ng.iter().any(|&a| a != 0.0).then(|| Properties { nongrav: Some(ng), ..Default::default() });
+            pop.states.push(s);
+            pop.epochs.push(t0);
+            pop.names.push(String::new());
+            pop.properties.push(properties);
             ok.push(k);
-            rocks.push(r);
         }
-        match states_at(&rocks, targets, kernel, opts) {
+        match states_at(&pop, targets, kernel, opts) {
             Ok(s) => {
                 for (j, &k) in ok.iter().enumerate() {
                     out[k * m..(k + 1) * m].copy_from_slice(&s[j * m..(j + 1) * m]);
                 }
             }
-            Err(_) if rocks.len() > 1 => {
+            Err(_) if pop.len() > 1 => {
                 // One bad orbit (e.g. out of the ephemeris' range) fails its whole chunk: retry
                 // one by one.
                 use rayon::prelude::*;
                 let single = BatchOptions { parallel: false, ..opts.clone() };
-                let each: Vec<Option<Vec<[f64; 6]>>> = rocks.par_iter().map(|r| states_at(std::slice::from_ref(r), targets, kernel, &single).ok()).collect();
+                let each: Vec<Option<Vec<[f64; 6]>>> = (0..pop.len()).into_par_iter().map(|j| states_at(&pop.select(&[j]), targets, kernel, &single).ok()).collect();
                 for (j, &k) in ok.iter().enumerate() {
                     if let Some(s) = &each[j] {
                         out[k * m..(k + 1) * m].copy_from_slice(s);
@@ -358,8 +366,8 @@ impl Catalog {
         let n = self.len();
         let block = block.max(1);
         // Orbits already at the epoch are copied.
-        let mut snap: Vec<[f64; 6]> = (0..n).map(|i| if self.epoch[i] == epoch { self.state[i] } else { [f64::NAN; 6] }).collect();
-        let todo: Vec<usize> = (0..n).filter(|&i| self.epoch[i] != epoch).collect();
+        let mut snap: Vec<[f64; 6]> = (0..n).map(|i| if self.orbits.epochs[i] == epoch { self.orbits.states[i] } else { [f64::NAN; 6] }).collect();
+        let todo: Vec<usize> = (0..n).filter(|&i| self.orbits.epochs[i] != epoch).collect();
         for idx in todo.chunks(block) {
             for (k, s) in idx.iter().zip(self.states_at(idx, &[epoch], kernel, opts)) {
                 snap[*k] = s;
@@ -379,11 +387,11 @@ impl Catalog {
         w.write_all(&[snap as u8])?;
         let f = |w: &mut BufWriter<File>, x: f64| w.write_all(&x.to_le_bytes());
         for i in 0..self.len() {
-            let b = self.name[i].as_bytes();
+            let b = self.orbits.names[i].as_bytes();
             w.write_all(&(b.len() as u32).to_le_bytes())?;
             w.write_all(b)?;
-            f(&mut w, self.epoch[i])?;
-            for x in self.state[i] {
+            f(&mut w, self.orbits.epochs[i])?;
+            for x in self.orbits.states[i] {
                 f(&mut w, x)?;
             }
             for x in self.nongrav[i] {

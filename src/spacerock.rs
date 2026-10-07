@@ -825,14 +825,13 @@ impl SpaceRock {
     /// 
     /// # Errors
     /// Returns an error if:
-    /// * Observer and SpaceRock have different epochs
+    /// * Observer and SpaceRock have different epochs (by more than 1 µs)
     /// * Observer and SpaceRock have different reference planes
     pub fn observe(&mut self, observer: &Observer) -> Result<Observation, Box<dyn std::error::Error>> {
 
         // self.change_reference_plane("J2000")?;
 
-        // throw an error if the observer and self have different epochs
-        if self.epoch.utc().jd() != observer.epoch.utc().jd() {
+        if (self.epoch.tdb().jd() - observer.epoch.tdb().jd()).abs() > 1e-6 / 86400.0 {
             return Err("Observer and SpaceRock have different epochs".into());
         }
 

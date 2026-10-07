@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use nalgebra::Vector3;
 use spacerocks::assist::{PerturberCache, SpiceSimulation};
 use spacerocks::batch::{self, BatchOptions, Method};
-use spacerocks::{Observer, Origin, ReferencePlane, SpaceRock, SpiceKernel, Time};
+use spacerocks::{Observer, Origin, Population, ReferencePlane, SpaceRock, SpiceKernel, Time};
 
 const T0: f64 = 2460300.5;
 
@@ -157,7 +157,7 @@ fn ephemeris_matches_propagate_and_observe() {
     let jds = [T0 + 30.0, T0 - 25.0, T0, T0 + 30.0, T0 + 3.5, T0 - 60.0];
     let observers: Vec<Observer> = jds.iter().map(|&t| observer_at(t, &k)).collect();
     let opts = BatchOptions { with_states: true, ..Default::default() };
-    let eph = batch::ephemeris(&input, &observers, &k, &opts).unwrap();
+    let eph = batch::ephemeris_rocks(&input, &observers, &k, &opts).unwrap();
     assert_eq!((eph.n_rocks, eph.n_epochs), (input.len(), jds.len()));
     assert_eq!(eph.epochs, jds.to_vec());
     let states = eph.states.as_ref().unwrap();
@@ -184,7 +184,7 @@ fn ephemeris_matches_propagate_and_observe() {
     assert!(worst.to_degrees() * 3.6e6 < 0.1, "worst offset {} mas", worst.to_degrees() * 3.6e6);
 
     // Two-body ephemeris agrees with analytic propagation + observe exactly in structure.
-    let eph2 = batch::ephemeris(&input, &observers, &k, &BatchOptions { method: Method::TwoBody, ..Default::default() }).unwrap();
+    let eph2 = batch::ephemeris_rocks(&input, &observers, &k, &BatchOptions { method: Method::TwoBody, ..Default::default() }).unwrap();
     for (i, r) in input.iter().enumerate() {
         for (j, o) in observers.iter().enumerate() {
             let mut x = r.clone();
@@ -232,4 +232,50 @@ fn perturber_cache_reproduces_kernel_and_falls_back() {
     without.integrate_jd(T0 + 60.0, &k).unwrap();
     let d = (with.state.particles[0].position - without.state.particles[0].position).norm();
     assert!(d < 1e-10, "{:e}", d);
+}
+
+/// The Population forms run the same code as the rock forms: identical results for a population
+/// in one plane and origin, both methods.
+#[test]
+fn population_forms_match_rock_forms() {
+    let Some(k) = kernel() else {
+        eprintln!("kernels not available; skipping");
+        return;
+    };
+    for (plane, origin) in [("ECLIPJ2000", "SUN"), ("J2000", "SSB")] {
+        let mut input = rocks(T0);
+        for r in input.iter_mut() {
+            r.change_reference_plane(plane).unwrap();
+            if origin == "SSB" {
+                r.to_ssb(&k).unwrap();
+            } else {
+                r.to_helio(&k).unwrap();
+            }
+        }
+        let pop = Population::from_rocks(input.clone()).unwrap();
+        let jds = [T0 + 30.0, T0 - 25.0, T0 + 3.5];
+        let observers: Vec<Observer> = jds.iter().map(|&t| observer_at(t, &k)).collect();
+        for method in [Method::NBody, Method::TwoBody] {
+            let opts = BatchOptions { method, with_states: true, ..Default::default() };
+            let a = batch::ephemeris(&pop, &observers, &k, &opts).unwrap();
+            let b = batch::ephemeris_rocks(&input, &observers, &k, &opts).unwrap();
+            assert_eq!(a.states, b.states);
+            for i in 0..input.len() {
+                for j in 0..jds.len() {
+                    // Debug strings, so NaN fields compare equal.
+                    assert_eq!(format!("{:?}", a.get(i, j)), format!("{:?}", b.get(i, j)));
+                }
+            }
+
+            let t1 = tdb(T0 + 40.0);
+            let mut p = pop.clone();
+            batch::propagate(&mut p, &t1, &k, &opts).unwrap();
+            let mut rs = input.clone();
+            batch::propagate_batch(&mut rs, &t1, &k, &opts).unwrap();
+            for (i, r) in rs.iter().enumerate() {
+                assert_eq!(p.states[i], r.state(), "{plane} {origin} {method:?} {i}");
+                assert_eq!(p.epochs[i], r.epoch.tdb().jd());
+            }
+        }
+    }
 }

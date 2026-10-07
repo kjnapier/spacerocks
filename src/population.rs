@@ -11,8 +11,8 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// Many bodies stored as a dense state array plus metadata.
 ///
 /// The reference plane and origin are shared by every body, so they are stored once and checked
-/// when bodies are added. Epochs, names and physical properties are per body and kept in
-/// separate (cold) columns that the numerical code never touches. The physics is done by the
+/// when bodies are added. Epochs (TDB Julian dates), names and physical properties are per body
+/// and kept in separate columns; names and properties are never touched by the numerical code. The physics is done by the
 /// free functions in [`crate::state`], mapped over [`Population::states`].
 ///
 /// [`SpaceRock`] stays the one-body type: [`Population::push`] takes one and
@@ -23,7 +23,8 @@ pub struct Population {
     pub origin: Origin,
     /// `[x, y, z, vx, vy, vz]` per body, AU and AU/day.
     pub states: Vec<State>,
-    pub epochs: Vec<Time>,
+    /// TDB Julian date of each state.
+    pub epochs: Vec<f64>,
     pub names: Vec<String>,
     pub properties: Vec<Option<Properties>>,
 }
@@ -72,7 +73,7 @@ impl Population {
             rock.change_reference_plane(self.reference_plane.as_str()).map_err(|e| e.to_string())?;
         }
         self.states.push(rock.state());
-        self.epochs.push(rock.epoch);
+        self.epochs.push(rock.epoch.tdb().jd());
         self.names.push(rock.name);
         self.properties.push(rock.properties);
         Ok(())
@@ -83,7 +84,7 @@ impl Population {
         let (position, velocity) = state::pv(self.states.get(i)?);
         Some(SpaceRock {
             name: self.names[i].clone(),
-            epoch: self.epochs[i].clone(),
+            epoch: tdb(self.epochs[i]),
             reference_plane: self.reference_plane.clone(),
             origin: self.origin.clone(),
             position,
@@ -114,7 +115,7 @@ impl Population {
                 return Err(format!("{} changed reference plane or origin", rock.name).into());
             }
             self.states[i] = rock.state();
-            self.epochs[i] = rock.epoch.clone();
+            self.epochs[i] = rock.epoch.tdb().jd();
         }
         Ok(())
     }
@@ -124,16 +125,20 @@ impl Population {
         if mask.len() != self.len() {
             return Err("Mask length must match the number of rocks.".into());
         }
-        let keep = |i: &usize| mask[*i];
-        let idx: Vec<usize> = (0..self.len()).filter(keep).collect();
-        Ok(Population {
+        let idx: Vec<usize> = (0..self.len()).filter(|&i| mask[i]).collect();
+        Ok(self.select(&idx))
+    }
+
+    /// The bodies at `idx`, in that order, with the same plane and origin.
+    pub fn select(&self, idx: &[usize]) -> Population {
+        Population {
             reference_plane: self.reference_plane.clone(),
             origin: self.origin.clone(),
             states: idx.iter().map(|&i| self.states[i]).collect(),
-            epochs: idx.iter().map(|&i| self.epochs[i].clone()).collect(),
+            epochs: idx.iter().map(|&i| self.epochs[i]).collect(),
             names: idx.iter().map(|&i| self.names[i].clone()).collect(),
             properties: idx.iter().map(|&i| self.properties[i].clone()).collect(),
-        })
+        }
     }
 
     /// Osculating elements of every body about the origin, in one pass per body.
@@ -170,10 +175,10 @@ impl Population {
             .zip(self.epochs.par_iter())
             .enumerate()
             .try_for_each(|(i, (s, ep))| {
-                *s = state::kepler_step(s, mu, t - ep.tdb().jd()).map_err(|e| format!("{}: {}", names[i], e))?;
+                *s = state::kepler_step(s, mu, t - ep).map_err(|e| format!("{}: {}", names[i], e))?;
                 Ok::<(), String>(())
             })?;
-        self.epochs.iter_mut().for_each(|ep| *ep = epoch.clone());
+        self.epochs.iter_mut().for_each(|ep| *ep = t);
         Ok(())
     }
 
@@ -190,7 +195,7 @@ impl Population {
         (0..self.len())
             .into_par_iter()
             .map(|i| {
-                if (self.epochs[i].tdb().jd() - t_obs).abs() > 1e-6 / 86400.0 {
+                if (self.epochs[i] - t_obs).abs() > 1e-6 / 86400.0 {
                     return Err(format!("{}: Observer and SpaceRock have different epochs", self.names[i]).into());
                 }
                 let (h, g) = match &self.properties[i] {
@@ -202,4 +207,9 @@ impl Population {
             })
             .collect()
     }
+}
+
+/// A TDB Julian date as a [`Time`].
+pub(crate) fn tdb(jd: f64) -> Time {
+    Time::new(jd, "tdb", "jd").expect("TDB JD is a valid time")
 }

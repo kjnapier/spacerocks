@@ -233,7 +233,7 @@ fn main() {
         ("nbody", BatchOptions::default()),
         ("twobody", BatchOptions { method: Method::TwoBody, ..Default::default() }),
     ] {
-        let (eph, d) = time(|| batch::ephemeris(&pop, &observers, &k, &opts).unwrap());
+        let (eph, d) = time(|| batch::ephemeris_rocks(&pop, &observers, &k, &opts).unwrap());
         let mut worst = 0.0f64;
         for i in 0..n {
             for j in 0..m {
