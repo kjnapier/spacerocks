@@ -11,6 +11,12 @@ pub mod spice;
 pub mod orbit_type;
     pub use orbit_type::OrbitType;
 
+pub mod state;
+    pub use state::{Elements, State};
+
+pub mod population;
+    pub use population::Population;
+
 pub mod spacerock;
     pub use spacerock::SpaceRock;
 

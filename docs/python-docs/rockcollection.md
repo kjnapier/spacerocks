@@ -35,7 +35,12 @@ class RockCollection:
 
 ### Constructor Methods
 ---
-**`new()`**
+**`new(reference_plane=None, origin=None)`**
+
+A collection stores its rocks as one `(n, 6)` state array and has a single reference plane and
+origin shared by every rock. Without arguments, the first rock added sets both. Rocks added in
+another reference plane are rotated into the collection's; adding a rock about another origin
+raises `ValueError` (move it with `to_ssb` or `to_helio` first).
 
 **Returns:**
 - New RockCollection instance
@@ -43,7 +48,16 @@ class RockCollection:
 *Example:*
 ```python
 collection = RockCollection()
+helio = RockCollection(reference_plane="ECLIPJ2000", origin="SUN")
 ```
+
+**Columns and elements**
+
+`collection.states` is an `(n, 6)` array of `x, y, z, vx, vy, vz`; `x` ... `vz` are its columns.
+`collection.elements()` returns a dict of arrays (`a`, `e`, `q`, `inc`, `node`, `arg`,
+`true_anomaly`, `conic_anomaly`, `mean_anomaly`) computed in one pass per rock, which is cheaper
+than calling `a()`, `e()`, ... one by one. `collection.reference_plane` and `collection.origin`
+are single strings, and `collection.name` is the list of names.
 
 **`from_mpc()`**
 ```python
@@ -91,7 +105,7 @@ any member's own, so results differ from `SpaceRock.propagate` only at the integ
 (typically metres after months) and are at least as accurate. `chunk_size=1` integrates every
 rock on its own, exactly like `SpaceRock.propagate`.
 
-Each rock keeps its reference plane and origin (SUN or SSB; a custom origin is returned as SSB).
+The collection keeps its reference plane and origin (SUN or SSB).
 Raises `ValueError` if a rock cannot be integrated (for example, when the kernel does not cover the
 requested epoch).
 

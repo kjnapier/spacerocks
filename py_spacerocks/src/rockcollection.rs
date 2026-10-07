@@ -1,174 +1,128 @@
 use pyo3::prelude::*;
-use pyo3::exceptions::{PyIndexError,PyValueError};
-use pyo3::{PyErr, Python, PyResult};
-// use pyo3::types::{PyList, PyType, IntoPyDict};
+use pyo3::exceptions::{PyIndexError, PyValueError};
+use pyo3::{Python, PyResult};
 use rayon::prelude::*;
-// use pyo3::types::PySequence;
 
-use spacerocks::spacerock::SpaceRock;
-// use spacerocks::Time;
-use spacerocks::ReferencePlane;
+use nalgebra::Vector3;
+use numpy::{PyArray1, IntoPyArray, PyArray2};
+use pyo3::types::PyDict;
+
+use spacerocks::observing::{Apparent, Observer};
+use spacerocks::batch::{self, BatchOptions, Method};
+use spacerocks::state::{self, Elements, State};
+use spacerocks::transforms::correct_for_ltt_vectors;
+use spacerocks::{Origin, Population, ReferencePlane, Time};
 
 use crate::py_time::time::PyTime;
 use crate::PySpaceRock;
 use crate::py_spice::spicekernel::PySpiceKernel;
 use crate::py_observing::observer::PyObserver;
 use crate::py_observing::observation::PyObservation;
-
-use numpy::{PyArray1, IntoPyArray, PyArray2};
-use pyo3::types::PyDict;
-use spacerocks::observing::{Apparent, Observer};
-use spacerocks::batch::{self, BatchOptions, Method};
-use spacerocks::Time;
 use crate::py_observing::observatory::PyObservatory;
 
-// use std::fs;
-// use serde::{Serialize, Deserialize};
-// use nalgebra::Vector3;
-// use arrow::array::{Float64Array, StringArray};
-// use crate::mpc::MPCHandler;
-// use ndarray;
-
-
-// use pyo3::impl_::pymethods::AsyncIterBaseKind;
-
-// use numpy::{PyArray1, IntoPyArray, PyArray};
-
-// pub fn create_mixed_array<T: pyo3::IntoPyObject>(data: Vec<Option<T>>, py: Python) -> pyo3::Bound<'_, PyArray<pyo3::Py<PyAny>, numpy::ndarray::Dim<[usize; 1]>>> {
-//     let numpy_array: Vec<_> = data.into_iter()
-//             .map(|opt| match opt {
-//                     Some(value) => value.to_object(py),
-//                     None => py.None(),
-//                 }
-//             ).collect();
-//     numpy_array.into_pyarray(py).to_owned()
-// }
-
-/// Represents a collection of space rocks.
+/// A collection of space rocks in one reference plane, about one origin.
 ///
-/// This struct is used to manage and manipulate a collection of 
-/// `SpaceRock` objects, including operations such as filtering, 
-/// observing, and converting formats.
+/// The rocks are stored as a dense `(n, 6)` state array plus per-rock epochs, names and
+/// properties (see `spacerocks::Population`). The reference plane and origin are shared: the
+/// first rock added sets them unless they were given to the constructor, rocks in another
+/// reference plane are rotated into the collection's, and adding a rock about another origin is
+/// an error. Indexing builds a `SpaceRock` on demand.
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RockCollection {
-    /// A vector holding all `SpaceRock` instances.
-    pub rocks: Vec<SpaceRock>,
+    pub inner: Population,
+    /// Whether the reference plane and origin were set by the constructor (otherwise the first
+    /// rock added sets them).
+    fixed: bool,
+}
+
+impl RockCollection {
+    pub fn from_population(inner: Population) -> Self {
+        RockCollection { inner, fixed: true }
+    }
+
+    fn column<'py>(&self, py: Python<'py>, k: usize) -> Bound<'py, PyArray1<f64>> {
+        let v: Vec<f64> = self.inner.states.iter().map(|s| s[k]).collect();
+        v.into_pyarray(py)
+    }
+
+    fn mapped<'py>(&self, py: Python<'py>, f: fn(&State, f64) -> f64) -> Bound<'py, PyArray1<f64>> {
+        let pop = &self.inner;
+        py.detach(|| pop.map(f)).into_pyarray(py)
+    }
+
+    fn mapped_or_err<'py>(&self, py: Python<'py>, f: fn(&State, f64) -> Result<f64, Box<dyn std::error::Error>>) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        let pop = &self.inner;
+        let v = py
+            .detach(|| {
+                pop.map(|s, mu| f(s, mu).map_err(|e| e.to_string()))
+                    .into_iter()
+                    .collect::<Result<Vec<f64>, String>>()
+            })
+            .map_err(PyValueError::new_err)?;
+        Ok(v.into_pyarray(py))
+    }
 }
 
 #[pymethods]
 impl RockCollection {
-    /// Creates a new, empty `RockCollection`.
-    
+    /// Creates a new, empty `RockCollection`. With `reference_plane` and `origin` given, rocks
+    /// added later are rotated into that plane and must have that origin; otherwise the first
+    /// rock added sets both.
     #[new]
-    pub fn new() -> Self {
-        RockCollection { rocks: Vec::new() }
+    #[pyo3(signature = (reference_plane = None, origin = None))]
+    pub fn new(reference_plane: Option<&str>, origin: Option<&str>) -> PyResult<Self> {
+        let fixed = reference_plane.is_some() || origin.is_some();
+        let plane = match reference_plane {
+            Some(p) => ReferencePlane::from_str(p).map_err(PyValueError::new_err)?,
+            None => ReferencePlane::J2000,
+        };
+        let origin = match origin {
+            Some(o) => Origin::from_str(o).map_err(|e| PyValueError::new_err(e.to_string()))?,
+            None => Origin::SSB,
+        };
+        Ok(RockCollection { inner: Population::new(plane, origin), fixed })
     }
 
-    /// Constructs a `RockCollection` from MPC data.
-    ///
-    /// This method fetches and reads data from the Minor Planet Center (MPC)
-    /// and constructs a `RockCollection` from the data.
-    ///
-    /// # Arguments
-    /// * `mpc_path` - The path to the directory where the MPC data will be stored.
-    /// * `catalog` - The name of the MPC catalog to fetch (i.e, mpcorb_extended).
-    /// * `download_data` - A boolean flag indicating whether to download the data if it is not already present.
-    ///
-    /// # Returns
-    /// A `RockCollection` instance.
-    ///
-    /// # Example
-    /// ```python
-    /// from spacerocks import RockCollection
-    ///
-    /// rocks = RockCollection.from_mpc("data/mpc", "mpcorb_extended", download_data=True)
-    /// ```
-    // #[staticmethod]
-    // #[pyo3(signature = (catalog, download_data=false, mpc_path=None, orbit_type=None))]
-    // pub fn from_mpc(catalog: String, download_data: bool, mpc_path: Option<PathBuf>, orbit_type: Option<String>) -> PyResult<Self> {
-    //     let default_path = home_dir()
-    //         .unwrap_or_default()
-    //         .join(".spacerocks")
-    //         .join("mpc");
-        
-    //     let final_path = mpc_path.unwrap_or(default_path);
-
-    //     MPCHandler::create_rock_collection(
-    //         final_path,
-    //         catalog,
-    //         download_data,
-    //         orbit_type 
-    //     )
-    // }
-
-    
-
-    // #[classmethod]
-    // pub fn random(_cls: &PyType, n: usize) -> Self {
-    //     let rocks: Vec<SpaceRock> = (0..n).into_par_iter().map(|_| SpaceRock::random()).collect();
-    //     RockCollection { rocks: rocks }
-    // }
-
-
-    pub fn add(&mut self, rock: PyRef<PySpaceRock>) {
-        self.rocks.push(rock.inner.clone());
-    }
-
-
-    fn __getitem__(&self, index: usize) -> PyResult<PySpaceRock> {
-        if index < self.rocks.len() {
-            Ok(PySpaceRock { inner: self.rocks[index].clone() })
-        } else {
-            Err(PyIndexError::new_err("Index out of range!"))
+    /// Add a rock (a copy of it).
+    pub fn add(&mut self, rock: PyRef<PySpaceRock>) -> PyResult<()> {
+        if self.inner.is_empty() && !self.fixed {
+            self.inner.reference_plane = rock.inner.reference_plane.clone();
+            self.inner.origin = rock.inner.origin.clone();
         }
+        self.inner.push(rock.inner.clone()).map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
+    fn __getitem__(&self, index: isize) -> PyResult<PySpaceRock> {
+        let n = self.inner.len() as isize;
+        let i = if index < 0 { index + n } else { index };
+        if i < 0 || i >= n {
+            return Err(PyIndexError::new_err("Index out of range!"));
+        }
+        Ok(PySpaceRock { inner: self.inner.get(i as usize).unwrap() })
+    }
 
-    // function to filter rocks by a boolean array, and then return a new RockCollection of clones of the rocks that are True
+    /// A new RockCollection with the rocks where `indices` (a boolean mask) is True.
     pub fn filter(&self, indices: Vec<bool>) -> PyResult<Self> {
-        if indices.len() != self.rocks.len() {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Mask length must match the number of rocks.",
-            ));
-        }
-
-        let filtered_rocks = self
-            .rocks
-            .iter()
-            .zip(indices.iter())
-            .filter_map(|(rock, &keep)| if keep { Some(rock.clone()) } else { None })
-            .collect();
-
-        Ok(Self {
-            rocks: filtered_rocks,
-        })
+        let inner = self.inner.filter(&indices).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(RockCollection { inner, fixed: self.fixed })
     }
-
-
-    // pub fn calculate_orbit(&mut self) {
-    //     self.rocks.par_iter_mut().for_each(|rock| rock.calculate_orbit());
-    // }
 
     pub fn observe(&mut self, py: Python<'_>, observer: PyRef<PyObserver>) -> PyResult<Vec<PyObservation>> {
-        let o = observer.inner.clone();
-
-        // if o.reference_plane != ReferencePlane::J2000 {
-        //     return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Observer frame is not J2000. Cannot observe rocks.")));
-        // }
-
-        let rocks = &mut self.rocks;
+        let o = &observer.inner;
+        let pop = &self.inner;
         let observations = py
             .detach(|| {
-                rocks
-                    .par_iter_mut()
-                    .map(|rock| rock.observe(&o).map_err(|e| format!("{}: {}", rock.name, e)))
+                (0..pop.len())
+                    .into_par_iter()
+                    .map(|i| {
+                        let mut rock = pop.get(i).unwrap();
+                        rock.observe(o).map_err(|e| format!("{}: {}", rock.name, e))
+                    })
                     .collect::<Result<Vec<_>, String>>()
             })
             .map_err(PyValueError::new_err)?;
-        let py_observations: Vec<_> = observations.into_iter().map(|obs| PyObservation { inner: obs }).collect();
-        Ok(py_observations)
-           
+        Ok(observations.into_iter().map(|obs| PyObservation { inner: obs }).collect())
     }
 
     /// Observe every rock from `observer` and return the results as NumPy arrays.
@@ -180,18 +134,13 @@ impl RockCollection {
     /// (NaN for rocks without an absolute magnitude).
     pub fn observe_arrays<'py>(&self, py: Python<'py>, observer: PyRef<PyObserver>) -> PyResult<Bound<'py, PyDict>> {
         let o = &observer.inner;
-        let rocks = &self.rocks;
-        let apps = py
-            .detach(|| {
-                rocks
-                    .par_iter()
-                    .map(|rock| rock.apparent(o).map_err(|e| format!("{}: {}", rock.name, e)))
-                    .collect::<Result<Vec<_>, String>>()
-            })
-            .map_err(PyValueError::new_err)?;
+        let pop = &self.inner;
+        let apps = py.detach(|| pop.apparent(o).map_err(|e| e.to_string())).map_err(PyValueError::new_err)?;
         apparent_dict(py, &apps, &[apps.len()])
     }
 
+    /// Light-time corrected RA and Dec (radians) of every rock seen by `observer`, as an
+    /// `(n, 2)` array. The collection and the observer must both be in J2000.
     pub fn calc_radec<'py>(
         &self,
         py: Python<'py>,
@@ -200,116 +149,45 @@ impl RockCollection {
         let o = &observer.inner;
 
         if o.reference_plane != ReferencePlane::J2000 {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Observer frame is not J2000. Cannot calculate RA/Dec.",
-            ));
+            return Err(PyValueError::new_err("Observer frame is not J2000. Cannot calculate RA/Dec."));
+        }
+        if self.inner.reference_plane != ReferencePlane::J2000 {
+            return Err(PyValueError::new_err("Collection frame is not J2000. Cannot calculate RA/Dec."));
         }
 
-        let n = self.rocks.len();
+        let n = self.inner.len();
         let mut data = vec![0.0f64; 2 * n];
-        let rocks = &self.rocks;
+        let states = &self.inner.states;
+        let obs_vel = o.velocity.unwrap_or_else(Vector3::zeros);
         py.detach(|| {
-            data.par_chunks_mut(2)
-                .zip(rocks.par_iter())
-                .try_for_each(|(row, rock)| {
-                    let (ra, dec) = rock.calc_radec(o).map_err(|e| format!("{}: {}", rock.name, e))?;
-                    row[0] = ra;
-                    row[1] = dec;
-                    Ok::<(), String>(())
-                })
-        })
-        .map_err(PyValueError::new_err)?;
+            data.par_chunks_mut(2).zip(states.par_iter()).for_each(|(row, s)| {
+                let (r, v) = state::pv(s);
+                let (p, _) = correct_for_ltt_vectors(&r, &v, &o.position, &obs_vel);
+                let mut ra = p.y.atan2(p.x);
+                if ra < 0.0 {
+                    ra += 2.0 * std::f64::consts::PI;
+                }
+                row[0] = ra;
+                row[1] = (p.z / p.norm()).asin();
+            })
+        });
 
         let arr = numpy::ndarray::Array2::from_shape_vec((n, 2), data).unwrap();
         Ok(arr.into_pyarray(py))
     }
 
-
-    // pub fn calc_radec_no_light_time<'py>(
-    //     &self,
-    //     py: Python<'py>,
-    //     observer: PyRef<PyObserver>,
-    // ) -> PyResult<Bound<'py, PyArray2<f64>>> {
-    //     let o = &observer.inner;
-
-    //     if o.reference_plane != ReferencePlane::J2000 {
-    //         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-    //             "Observer frame is not J2000. Cannot calculate RA/Dec.",
-    //         ));
-    //     }
-
-    //     let n = self.rocks.len();
-    //     let mut data = vec![0.0f64; 2 * n];
-
-    //     data.par_chunks_mut(2)
-    //         .zip(self.rocks.par_iter())
-    //         .for_each(|(row, rock)| {
-    //             let (ra, dec) = rock.calc_radec_no_light_time(o).unwrap();
-    //             row[0] = ra;
-    //             row[1] = dec;
-    //         });
-
-    //     let arr = ndarray::Array2::from_shape_vec((n, 2), data).unwrap();
-    //     Ok(arr.into_pyarray(py))
-    // }
-
-
-
-
-    // pub fn calc_radec_no_light_time(&self, observer: PyRef<PyObserver>) -> PyResult<Vec<(f64, f64)>> {
-    //     let o = &observer.inner;
-
-    //     if o.reference_plane != ReferencePlane::J2000 {
-    //         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-    //             "Observer frame is not J2000. Cannot calculate RA/Dec."
-    //         ));
-    //     }
-
-    //     let radec_values: Vec<_> = self
-    //         .rocks
-    //         .par_iter()
-    //         .map(|rock| rock.calc_radec_no_light_time(o).unwrap())
-    //         .collect();
-
-    //     Ok(radec_values)
-    // }
-
-    // pub fn calc_radec_no_light_time(&mut self, observer: PyRef<PyObserver>) -> PyResult<Vec<(f64, f64)>> {
-    //     let o = observer.inner.clone();
-
-    //     if o.reference_plane != ReferencePlane::J2000 {
-    //         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Observer frame is not J2000. Cannot calculate RA/Dec.")));
-    //     }
-
-    //     let radec_values: Vec<_> = self.rocks.par_iter_mut().map(|rock| rock.calc_radec_no_light_time(&o).unwrap()).collect();   
-    //     Ok(radec_values)
-           
-    // }
-
-    pub fn analytic_propagate(&mut self, epoch: PyRef<PyTime>) -> PyResult<()> {
+    /// Move every rock to `epoch` along its Keplerian orbit about the collection's origin.
+    pub fn analytic_propagate(&mut self, py: Python<'_>, epoch: PyRef<PyTime>) -> PyResult<()> {
         let ep = &epoch.inner;
-    
-        if let Some(error) = self.rocks
-            .par_iter_mut()
-            .filter_map(|rock| {
-                match rock.analytic_propagate(ep) {
-                    Err(e) => Some(format!("Failed to propagate rock: {}", e)),
-                    Ok(_) => None
-                }
-            })
-            .find_first(|_| true) {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(error));
-        }
-        
-        Ok(())
+        let pop = &mut self.inner;
+        py.detach(|| pop.analytic_propagate(ep).map_err(|e| format!("Failed to propagate rock: {}", e)))
+            .map_err(PyValueError::new_err)
     }
 
+    /// Rotate every rock into `reference_plane`.
     pub fn change_reference_plane(&mut self, reference_plane: &str) -> PyResult<()> {
-        ReferencePlane::from_str(reference_plane).map_err(PyValueError::new_err)?;
-        self.rocks
-            .par_iter_mut()
-            .try_for_each(|rock| rock.change_reference_plane(reference_plane).map_err(|e| e.to_string()))
-            .map_err(PyValueError::new_err)
+        let plane = ReferencePlane::from_str(reference_plane).map_err(PyValueError::new_err)?;
+        self.inner.change_reference_plane(&plane).map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
     /// Propagate every rock to `epoch`.
@@ -320,15 +198,19 @@ impl RockCollection {
     /// (then `kernel` is not used). Rocks are integrated together in groups of up to
     /// `chunk_size` (grouped by epoch and perihelion distance), with groups run in parallel;
     /// `chunk_size=1` integrates every rock on its own, exactly like `SpaceRock.propagate`.
-    /// Each rock keeps its reference plane and origin (SUN or SSB).
+    /// The collection keeps its reference plane and origin (SUN or SSB).
     #[pyo3(signature = (epoch, kernel, method = "nbody", chunk_size = 64))]
     pub fn propagate(&mut self, py: Python<'_>, epoch: PyRef<PyTime>, kernel: PyRef<PySpiceKernel>, method: &str, chunk_size: usize) -> PyResult<()> {
         let opts = BatchOptions { method: Method::from_str(method).map_err(PyValueError::new_err)?, chunk_size, ..Default::default() };
         let ep = epoch.inner.clone();
         let k = &kernel.inner;
-        let rocks = &mut self.rocks;
-        py.detach(|| batch::propagate_batch(rocks, &ep, k, &opts).map_err(|e| e.to_string()))
-            .map_err(PyValueError::new_err)
+        let pop = &mut self.inner;
+        py.detach(|| {
+            let mut rocks = pop.to_rocks();
+            batch::propagate_batch(&mut rocks, &ep, k, &opts).map_err(|e| e.to_string())?;
+            pop.update_from_rocks(&rocks).map_err(|e| e.to_string())
+        })
+        .map_err(PyValueError::new_err)
     }
 
     /// Ephemerides of every rock at many epochs.
@@ -394,9 +276,9 @@ impl RockCollection {
             with_states: return_states,
             ..Default::default()
         };
-        let rocks = &self.rocks;
+        let pop = &self.inner;
         let eph = py
-            .detach(|| batch::ephemeris(rocks, &observers, k, &opts).map_err(|e| e.to_string()))
+            .detach(|| batch::ephemeris(&pop.to_rocks(), &observers, k, &opts).map_err(|e| e.to_string()))
             .map_err(PyValueError::new_err)?;
 
         let d = apparent_dict(py, &eph.apparent, &[eph.n_rocks, eph.n_epochs])?;
@@ -410,136 +292,151 @@ impl RockCollection {
         Ok(d)
     }
 
+    /// The collection's reference plane (shared by every rock).
     #[getter]
-    pub fn reference_plane(&self) -> Vec<String> {
-        let reference_planes = self.rocks.par_iter().map(|rock| rock.reference_plane.to_string()).collect::<Vec<String>>();
-        reference_planes
+    pub fn reference_plane(&self) -> String {
+        self.inner.reference_plane.to_string()
     }
 
-    
+    /// The collection's origin (shared by every rock).
+    #[getter]
+    pub fn origin(&self) -> String {
+        self.inner.origin.to_string()
+    }
+
     fn __len__(&self) -> usize {
-        self.rocks.len()
+        self.inner.len()
     }
 
     pub fn len(&self) -> usize {
-        self.rocks.len()
+        self.inner.len()
     }
 
     pub fn __repr__(&self) -> String {
-        format!("RockCollection: {} rocks", self.rocks.len())
+        format!("RockCollection: {} rocks ({}, {})", self.inner.len(), self.inner.reference_plane, self.inner.origin)
+    }
+
+    /// The states of all rocks as an `(n, 6)` array of `x, y, z` (AU) and `vx, vy, vz`
+    /// (AU/day). A copy: changing it does not change the collection.
+    #[getter]
+    pub fn states<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f64>> {
+        let n = self.inner.len();
+        let flat: Vec<f64> = self.inner.states.as_flattened().to_vec();
+        numpy::ndarray::Array2::from_shape_vec((n, 6), flat).unwrap().into_pyarray(py)
     }
 
     #[getter]
-    pub fn x(&self, py: Python) -> Py<PyArray1<f64>> {
-        let x: Vec<f64> = self.rocks.par_iter().map(|rock| rock.position[0]).collect();
-        x.into_pyarray(py).to_owned().into()
+    pub fn x<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.column(py, 0)
     }
 
     #[getter]
-    pub fn y(&self, py: Python) -> Py<PyArray1<f64>> {
-        let y: Vec<f64> = self.rocks.par_iter().map(|rock| rock.position[1]).collect();
-        y.into_pyarray(py).to_owned().into()
+    pub fn y<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.column(py, 1)
     }
 
     #[getter]
-    pub fn z(&self, py: Python) -> Py<PyArray1<f64>> {
-        let z: Vec<f64> = self.rocks.par_iter().map(|rock| rock.position[2]).collect();
-        z.into_pyarray(py).to_owned().into()
+    pub fn z<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.column(py, 2)
     }
 
     #[getter]
-    pub fn vx(&self, py: Python) -> Py<PyArray1<f64>> {
-        let vx: Vec<f64> = self.rocks.par_iter().map(|rock| rock.velocity[0]).collect();
-        vx.into_pyarray(py).to_owned().into()
+    pub fn vx<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.column(py, 3)
     }
 
     #[getter]
-    pub fn vy(&self, py: Python) -> Py<PyArray1<f64>> {
-        let vy: Vec<f64> = self.rocks.par_iter().map(|rock| rock.velocity[1]).collect();
-        vy.into_pyarray(py).to_owned().into()
+    pub fn vy<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.column(py, 4)
     }
 
     #[getter]
-    pub fn vz(&self, py: Python) -> Py<PyArray1<f64>> {
-        let vz: Vec<f64> = self.rocks.par_iter().map(|rock| rock.velocity[2]).collect();
-        vz.into_pyarray(py).to_owned().into()
+    pub fn vz<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.column(py, 5)
     }
 
-    // #[getter]
-    pub fn r(&self, py: Python) -> Py<PyArray1<f64>> {
-        let r: Vec<f64> = self.rocks.par_iter().map(|rock| rock.r()).collect();
-        r.into_pyarray(py).to_owned().into()
+    pub fn r<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.mapped(py, |s, _| state::position(s).norm())
     }
 
-    // #[getter]
-    // pub fn name(&self) -> Vec<String> {
-    //     self.rocks.par_iter().map(|rock| rock.name.clone()).collect()
-    // }
-
-    // #[getter] 
-    // pub fn name(&self, py: Python) -> PyResult<Py<PyArray1<PyObject>>> {
-    //     let names: Vec<Option<String>> = self.rocks.par_iter().map(|rock| Some((*rock.name).clone())).collect();
-    //     create_mixed_array(names, py)
-    // }
-
-    pub fn a(&self, py: Python) -> Py<PyArray1<f64>> {
-        let a_values: Vec<f64> = self.rocks.par_iter().map(|rock| rock.a()).collect();
-        a_values.into_pyarray(py).to_owned().into()
+    /// Names of the rocks.
+    #[getter]
+    pub fn name(&self) -> Vec<String> {
+        self.inner.names.clone()
     }
 
-    pub fn q(&self, py: Python) -> Py<PyArray1<f64>> {
-        let q_values: Vec<f64> = self.rocks.par_iter().map(|rock| rock.q()).collect();
-        q_values.into_pyarray(py).to_owned().into()
+    /// All osculating elements of every rock, computed in one pass per rock, as a dict of
+    /// arrays: `a`, `e`, `q` (AU), `inc`, `node`, `arg`, `true_anomaly`, `conic_anomaly` and
+    /// `mean_anomaly` (radians; anomalies that cannot be computed are NaN).
+    pub fn elements<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let pop = &self.inner;
+        let fields: [(&str, fn(&Elements) -> f64); 9] = [
+            ("a", |e| e.a),
+            ("e", |e| e.e),
+            ("q", |e| e.q),
+            ("inc", |e| e.inc),
+            ("node", |e| e.node),
+            ("arg", |e| e.arg),
+            ("true_anomaly", |e| e.true_anomaly),
+            ("conic_anomaly", |e| e.conic_anomaly),
+            ("mean_anomaly", |e| e.mean_anomaly),
+        ];
+        let columns: Vec<Vec<f64>> = py.detach(|| {
+            let els = pop.elements();
+            fields.par_iter().map(|(_, f)| els.iter().map(f).collect()).collect()
+        });
+        let d = PyDict::new(py);
+        for ((name, _), v) in fields.iter().zip(columns) {
+            d.set_item(*name, v.into_pyarray(py))?;
+        }
+        Ok(d)
     }
 
-    pub fn e(&self, py: Python) -> Py<PyArray1<f64>> {
-        let e_values: Vec<f64> = self.rocks.par_iter().map(|rock| rock.e()).collect();
-        e_values.into_pyarray(py).to_owned().into()
+    pub fn a<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.mapped(py, state::semi_major_axis)
     }
 
-    pub fn inc(&self, py: Python) -> Py<PyArray1<f64>> {
-        let inc_values: Vec<f64> = self.rocks.par_iter().map(|rock| rock.inc()).collect();
-        inc_values.into_pyarray(py).to_owned().into()
+    pub fn q<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.mapped(py, state::perihelion)
     }
 
-    pub fn node(&self, py: Python) -> Py<PyArray1<f64>> {
-        let node_values: Vec<f64> = self.rocks.par_iter().map(|rock| rock.node()).collect();
-        node_values.into_pyarray(py).to_owned().into()
+    pub fn e<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.mapped(py, state::eccentricity)
     }
 
-    pub fn arg(&self, py: Python) -> Py<PyArray1<f64>> {
-        let arg_values: Vec<f64> = self.rocks.par_iter().map(|rock| rock.arg()).collect();
-        arg_values.into_pyarray(py).to_owned().into()
+    pub fn inc<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.mapped(py, |s, _| state::inclination(s))
     }
 
-    pub fn true_anomaly(&self, py: Python) -> Py<PyArray1<f64>> {
-        let true_anomaly_values: Vec<f64> = self.rocks.par_iter().map(|rock| rock.true_anomaly()).collect();
-        true_anomaly_values.into_pyarray(py).to_owned().into()
+    pub fn node<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.mapped(py, |s, _| state::node(s))
     }
 
-    pub fn mean_anomaly(&self, py: Python) -> Py<PyArray1<f64>> {
-        let mean_anomaly_values: Vec<f64> = self.rocks.par_iter().map(|rock| rock.mean_anomaly()).collect();
-        mean_anomaly_values.into_pyarray(py).to_owned().into()
+    pub fn arg<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.mapped(py, state::argument_of_perihelion)
     }
 
-    pub fn conic_anomaly(&self, py: Python) -> Py<PyArray1<f64>> {
-        let conic_anomaly_values: Vec<f64> = self.rocks.par_iter().map(|rock| rock.conic_anomaly()).collect();
-        conic_anomaly_values.into_pyarray(py).to_owned().into()
+    pub fn true_anomaly<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.mapped(py, state::true_anomaly)
     }
 
+    pub fn mean_anomaly<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        self.mapped_or_err(py, state::mean_anomaly)
+    }
+
+    pub fn conic_anomaly<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<f64>>> {
+        self.mapped_or_err(py, state::conic_anomaly)
+    }
 
     #[getter]
     pub fn epoch(&self) -> Vec<PyTime> {
-        self.rocks.par_iter().map(|rock| PyTime { inner: rock.epoch.clone() }).collect()
+        self.inner.epochs.iter().map(|t| PyTime { inner: t.clone() }).collect()
     }
 
     pub fn get(&self, name: &str) -> PyResult<PySpaceRock> {
-        let rock = self.rocks.iter().find(|rock| rock.name == name);
-        match rock {
-            Some(rock) => Ok(PySpaceRock { inner: rock.clone() }),
-            None => Err(PyErr::new::<PyValueError, _>(
-                format!("No rock found with name: {}", name)
-            ))
+        match self.inner.index_of(name) {
+            Some(i) => Ok(PySpaceRock { inner: self.inner.get(i).unwrap() }),
+            None => Err(PyValueError::new_err(format!("No rock found with name: {}", name))),
         }
     }
 }
