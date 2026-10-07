@@ -8,7 +8,7 @@ use crate::assist::SpiceSimulation;
 
 
 
-use crate::transforms::{calc_conic_anomaly_from_true_anomaly, calc_mean_anomaly_from_conic_anomaly, universal_kepler_step};
+use crate::state::{self, Elements, State};
 
 use nalgebra::Vector3;
 
@@ -382,38 +382,8 @@ impl SpaceRock {
     /// * The origin string is invalid
     pub fn from_kepler(name: &str, q: f64, e: f64, inc: f64, arg: f64, node: f64, true_anomaly: f64, epoch: Time, reference_plane: &str, origin: &str) -> Result<Self, Box<dyn std::error::Error>> {
 
-        // first check that the eccentricity and true anomaly are commensurate
-        if e >= 1.0 {
-            let max_true_anomaly = (-1.0 / e).acos();
-            if true_anomaly.abs() > max_true_anomaly {
-                return Err("True anomaly is not commensurate with eccentricity".into());
-            }
-        }
-
-        let o = Origin::from_str(origin)?;
-        let mu = o.mu();
-
-        let p = q * (1.0 + e);
-        let h = (p * mu).sqrt();
-        let r = p / (1.0 + e * true_anomaly.cos());
-        let vr = mu * true_anomaly.sin() * e / h;
-
-        let rot_x = node.cos() * (arg + true_anomaly).cos() - node.sin() * (arg + true_anomaly).sin() * inc.cos();
-        let rot_y = node.sin() * (arg + true_anomaly).cos() + node.cos() * (arg + true_anomaly).sin() * inc.cos();
-        let rot_z = (arg + true_anomaly).sin() * inc.sin();
-
-        let x = r * rot_x;
-        let y = r * rot_y;
-        let z = r * rot_z;
-
-        let rot_x2 = node.cos() * (arg + true_anomaly).sin() + node.sin() * (arg + true_anomaly).cos() * inc.cos();
-        let rot_y2 = node.sin() * (arg + true_anomaly).sin() - node.cos() * (arg + true_anomaly).cos() * inc.cos();
-        let rot_z2 = (arg + true_anomaly).cos() * inc.sin();
-
-        let nudot = h / r.powi(2);
-        let vx = vr * rot_x - r * nudot * rot_x2;
-        let vy = vr * rot_y - r * nudot * rot_y2;
-        let vz = vr * rot_z + r * nudot * rot_z2;
+        let mu = Origin::from_str(origin)?.mu();
+        let [x, y, z, vx, vy, vz] = state::from_kepler(q, e, inc, arg, node, true_anomaly, mu)?;
 
         let rock = SpaceRock::from_xyz(name, x, y, z, vx, vy, vz, epoch, reference_plane, origin)?;
         Ok(rock)
@@ -465,9 +435,8 @@ impl SpaceRock {
     pub fn analytic_propagate(&mut self, epoch: &Time) -> Result<(), Box<dyn std::error::Error>> {
 
         let dt = epoch.tdb().jd() - self.epoch.tdb().jd();
-        let (position, velocity) = universal_kepler_step(&self.position, &self.velocity, self.origin.mu(), dt)?;
-        self.position = position;
-        self.velocity = velocity;
+        let s = state::kepler_step(&self.state(), self.origin.mu(), dt)?;
+        self.set_state(&s);
         self.epoch = epoch.clone();
 
         Ok(())
@@ -498,9 +467,7 @@ impl SpaceRock {
             return Ok(());
         }
 
-        let inv = self.reference_plane.get_rotation_matrix().try_inverse().ok_or("Could not invert rotation matrix")?; // gets you back to J2000
-        let rot = reference_plane.get_rotation_matrix() * inv;
-
+        let rot = state::rotation(&self.reference_plane, &reference_plane)?;
         self.position = rot * self.position;
         self.velocity = rot * self.velocity;
         self.reference_plane = reference_plane;
@@ -682,44 +649,39 @@ impl SpaceRock {
     }
 
     pub fn hvec(&self) -> Vector3<f64> {
-        self.position.cross(&self.velocity)
+        state::angular_momentum(&self.state())
     }
 
     pub fn nvec(&self) -> Vector3<f64> {
         let hvec = self.hvec();
-        // Vector3::new(0.0, 0.0, 1.0).cross(&self.hvec())
         Vector3::new(-hvec.y, hvec.x, 0.0)
     }
 
     pub fn h(&self) -> f64 {
         self.hvec().norm()
-    }    
+    }
 
     pub fn evec(&self) -> Vector3<f64> {
-        let hvec = self.hvec();
-        self.velocity.cross(&hvec) / self.origin.mu() - self.position / self.r()
+        state::eccentricity_vector(&self.state(), self.origin.mu())
     }
 
     /// Calculate the eccentricity (dimensionless)
     pub fn e(&self) -> f64 {
-        self.evec().norm()
+        state::eccentricity(&self.state(), self.origin.mu())
     }
 
     pub fn specific_energy(&self) -> f64 {
-        self.v_squared() / 2.0 - self.origin.mu() / self.r()
+        state::specific_energy(&self.state(), self.origin.mu())
     }
 
     /// Calculate the semi-major axis in AU
     pub fn a(&self) -> f64 {
-        -self.origin.mu() / (2.0 * self.specific_energy())
+        state::semi_major_axis(&self.state(), self.origin.mu())
     }
 
     /// Calculate the periapsis distance in AU
     pub fn q(&self) -> f64 {
-        let h = self.h();
-        let e = self.e();
-        let mu = self.origin.mu();
-        h.powi(2) / (mu * (1.0 + e))
+        state::perihelion(&self.state(), self.origin.mu())
     }
 
     /// Calculate the semi-latus rectum in AU
@@ -729,64 +691,50 @@ impl SpaceRock {
 
     /// Calculate the inclination in radians
     pub fn inc(&self) -> f64 {
-        let h = self.hvec();
-        (h.x.hypot(h.y)).atan2(h.z)
-    }
-
-    /// Reference direction in the orbital plane from which the argument of perihelion and the
-    /// argument of latitude are measured: the ascending node, or the x-axis for (near-)
-    /// equatorial orbits, where the node is undefined and taken to be 0.
-    fn node_direction(&self) -> Vector3<f64> {
-        let n = self.nvec();
-        let h = self.hvec().norm();
-        if n.norm() <= 1e-11 * h {
-            Vector3::new(1.0, 0.0, 0.0)
-        } else {
-            n / n.norm()
-        }
-    }
-
-    /// Signed angle from `a` to `b` about the orbit normal, in [0, 2π).
-    fn angle_in_plane(&self, a: &Vector3<f64>, b: &Vector3<f64>) -> f64 {
-        let hhat = self.hvec().normalize();
-        let ang = a.cross(b).dot(&hhat).atan2(a.dot(b));
-        ang.rem_euclid(2.0 * std::f64::consts::PI)
+        state::inclination(&self.state())
     }
 
     /// Calculate the argument of perihelion in radians (0 for circular orbits; for equatorial
     /// orbits this is the longitude of perihelion)
     pub fn arg(&self) -> f64 {
-        let evec = self.evec();
-        if evec.norm() < 1e-10 {
-            return 0.0;
-        }
-        self.angle_in_plane(&self.node_direction(), &evec)
+        state::argument_of_perihelion(&self.state(), self.origin.mu())
     }
 
     /// Calculate the longitude of the ascending node in radians (0 for equatorial orbits)
     pub fn node(&self) -> f64 {
-        let n = self.nvec();
-        if n.norm() <= 1e-11 * self.h() {
-            return 0.0;
-        }
-        n.y.atan2(n.x).rem_euclid(2.0 * std::f64::consts::PI)
+        state::node(&self.state())
     }
 
     /// Calculate the true anomaly in radians. For circular orbits (where perihelion is
     /// undefined) this is the argument of latitude, consistent with `arg() == 0`.
     pub fn true_anomaly(&self) -> f64 {
-        let evec = self.evec();
-        let reference = if evec.norm() < 1e-10 { self.node_direction() } else { evec };
-        self.angle_in_plane(&reference, &self.position)
+        state::true_anomaly(&self.state(), self.origin.mu())
     }
 
     pub fn mean_anomaly(&self) -> f64 {
-        let conic_anomaly = calc_conic_anomaly_from_true_anomaly(self.e(), self.true_anomaly()).expect("Invalid eccentricity");
-        calc_mean_anomaly_from_conic_anomaly(self.e(), conic_anomaly).expect("Invalid eccentricity")
+        state::mean_anomaly(&self.state(), self.origin.mu()).expect("Invalid eccentricity")
     }
 
     pub fn conic_anomaly(&self) -> f64 {
-        calc_conic_anomaly_from_true_anomaly(self.e(), self.true_anomaly()).expect("Invalid eccentricity")
+        state::conic_anomaly(&self.state(), self.origin.mu()).expect("Invalid eccentricity")
+    }
+
+    /// All osculating elements in one pass (cheaper than calling the individual methods when
+    /// more than one is needed). Anomalies that cannot be computed are NaN.
+    pub fn elements(&self) -> Elements {
+        state::elements(&self.state(), self.origin.mu())
+    }
+
+    /// The state vector `[x, y, z, vx, vy, vz]` (AU, AU/day).
+    pub fn state(&self) -> State {
+        state::from_pv(&self.position, &self.velocity)
+    }
+
+    /// Replace the position and velocity, keeping the epoch, frame and origin.
+    pub fn set_state(&mut self, s: &State) {
+        let (r, v) = state::pv(s);
+        self.position = r;
+        self.velocity = v;
     }
 
     // calculate the osculating elements and return a KeplerOrbit object. This is more expensive than the other 

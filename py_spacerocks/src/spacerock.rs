@@ -320,6 +320,26 @@ impl PySpaceRock {
         self.inner.origin.mu()
     }
 
+    /// All osculating elements in one pass, as a dict: `a`, `e`, `q` (AU), `inc`, `node`,
+    /// `arg`, `true_anomaly`, `conic_anomaly` and `mean_anomaly` (radians; NaN if an anomaly
+    /// cannot be computed).
+    pub fn elements(&self) -> std::collections::HashMap<&'static str, f64> {
+        let e = self.inner.elements();
+        [
+            ("a", e.a), ("e", e.e), ("q", e.q), ("inc", e.inc), ("node", e.node), ("arg", e.arg),
+            ("true_anomaly", e.true_anomaly), ("conic_anomaly", e.conic_anomaly), ("mean_anomaly", e.mean_anomaly),
+        ]
+        .into_iter()
+        .collect()
+    }
+
+    /// The state `(x, y, z, vx, vy, vz)` in AU and AU/day.
+    #[getter]
+    fn state(&self) -> (f64, f64, f64, f64, f64, f64) {
+        let [x, y, z, vx, vy, vz] = self.inner.state();
+        (x, y, z, vx, vy, vz)
+    }
+
     pub fn a(&self) -> f64 {
         self.inner.a()
     }

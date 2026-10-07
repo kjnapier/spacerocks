@@ -1,7 +1,7 @@
 name: spacerocks
 on:
   push:
-    branches: ['v3']
+    branches: ['v3', 'v4']
   pull_request:
   workflow_dispatch:
 
