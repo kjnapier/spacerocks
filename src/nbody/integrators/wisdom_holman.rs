@@ -1,8 +1,7 @@
-use crate::SpaceRock;
-use crate::time::Time;
 use crate::constants::GRAVITATIONAL_CONSTANT;
 use crate::nbody::integrators::{Integrator, Leapfrog};
-use crate::nbody::forces::Force;
+use crate::nbody::forces::{central_body, Force};
+use crate::state::{from_pv, position, pv, velocity, State};
 use crate::transforms::universal_kepler_step;
 
 use nalgebra::Vector3;
@@ -68,36 +67,36 @@ pub(crate) struct Democratic {
 }
 
 impl Democratic {
-    /// Load the state of `particles`, reusing this state's buffers.
-    pub(crate) fn load(&mut self, particles: &[SpaceRock], central: usize) {
+    /// Load inertial `states` with `masses`, reusing this state's buffers.
+    pub(crate) fn load(&mut self, states: &[State], masses: &[f64], central: usize) {
         self.m.clear();
-        self.m.extend(particles.iter().map(|p| p.mass()));
+        self.m.extend_from_slice(masses);
         self.m_total = self.m.iter().sum();
         let mut x_cm = Vector3::zeros();
         let mut v_cm = Vector3::zeros();
-        for (p, &mi) in particles.iter().zip(&self.m) {
+        for (p, &mi) in states.iter().zip(&self.m) {
             if mi != 0.0 {
-                x_cm += mi * p.position;
-                v_cm += mi * p.velocity;
+                x_cm += mi * position(p);
+                v_cm += mi * velocity(p);
             }
         }
         x_cm /= self.m_total;
         v_cm /= self.m_total;
-        let xc = particles[central].position;
+        let xc = position(&states[central]);
         self.q.clear();
-        self.q.extend(particles.iter().map(|p| p.position - xc));
+        self.q.extend(states.iter().map(|p| position(p) - xc));
         self.u.clear();
-        self.u.extend(particles.iter().map(|p| p.velocity - v_cm));
+        self.u.extend(states.iter().map(|p| velocity(p) - v_cm));
         self.massive.clear();
-        self.massive.extend((0..particles.len()).filter(|&i| i != central && self.m[i] != 0.0));
+        self.massive.extend((0..states.len()).filter(|&i| i != central && self.m[i] != 0.0));
         self.central = central;
         self.m_central = self.m[central];
         self.x_cm = x_cm;
         self.v_cm = v_cm;
     }
 
-    /// Write inertial positions and velocities back into `particles`.
-    pub(crate) fn to_particles(&self, particles: &mut [SpaceRock]) {
+    /// Write inertial states back into `states`.
+    pub(crate) fn to_inertial(&self, states: &mut [State]) {
         let mut mq = Vector3::zeros();
         let mut mu = Vector3::zeros();
         for &i in &self.massive {
@@ -106,21 +105,20 @@ impl Democratic {
         }
         let xc = self.x_cm - mq / self.m_total;
         let vc = self.v_cm - mu / self.m_central;
-        for (i, p) in particles.iter_mut().enumerate() {
+        for (i, p) in states.iter_mut().enumerate() {
             if i == self.central {
-                p.position = xc;
-                p.velocity = vc;
+                *p = from_pv(&xc, &vc);
             } else {
-                p.position = self.q[i] + xc;
-                p.velocity = self.u[i] + self.v_cm;
+                *p = from_pv(&(self.q[i] + xc), &(self.u[i] + self.v_cm));
             }
         }
     }
 
     /// Kick the barycentric velocities by the forces minus the central body's Keplerian pull.
     /// The Newtonian pull between each pair in `skip` is left out too (TRACE moves those pairs
-    /// into the drift), which assumes the forces include Newtonian gravity.
-    pub(crate) fn kick(&mut self, particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>, h: f64, skip: &[(usize, usize)]) {
+    /// into the drift), which assumes the forces include Newtonian gravity. Forces other than
+    /// Newtonian gravity see the inertial state, written into `states` first.
+    pub(crate) fn kick(&mut self, states: &mut [State], forces: &[Box<dyn Force + Send + Sync>], h: f64, skip: &[(usize, usize)]) {
         let n = self.q.len();
         let mut acc = std::mem::take(&mut self.acc);
         acc.clear();
@@ -137,10 +135,10 @@ impl Democratic {
                 n_gravity += 1;
             } else {
                 if !synced {
-                    self.to_particles(particles);
+                    self.to_inertial(states);
                     synced = true;
                 }
-                force.add_acceleration(particles, &mut acc);
+                force.add_acceleration(states, &self.m, &mut acc);
             }
         }
         // Without exactly one gravity force, the Keplerian pull the drift adds is still taken
@@ -281,7 +279,9 @@ pub(crate) struct Frame {
 pub(crate) struct MassiveRun {
     /// Index of each massive body in the simulation's particles.
     pub(crate) idx: Vec<usize>,
-    pub(crate) bodies: Vec<SpaceRock>,
+    /// Inertial states and masses of the massive bodies.
+    pub(crate) bodies: Vec<State>,
+    pub(crate) masses: Vec<f64>,
     pub(crate) central: usize,
     pub(crate) s: Democratic,
     /// Masses of the massive bodies other than the central one, in order.
@@ -294,15 +294,16 @@ pub(crate) struct MassiveRun {
 }
 
 impl MassiveRun {
-    pub(crate) fn new(particles: &[SpaceRock], central: usize) -> MassiveRun {
-        let idx: Vec<usize> = (0..particles.len()).filter(|&i| particles[i].mass() != 0.0).collect();
+    pub(crate) fn new(states: &[State], masses: &[f64], central: usize) -> MassiveRun {
+        let idx: Vec<usize> = (0..states.len()).filter(|&i| masses[i] != 0.0).collect();
         let central_m = idx.iter().position(|&i| i == central).unwrap();
-        let bodies: Vec<SpaceRock> = idx.iter().map(|&i| particles[i].clone()).collect();
-        let gm = GRAVITATIONAL_CONSTANT * bodies[central_m].mass();
+        let bodies: Vec<State> = idx.iter().map(|&i| states[i]).collect();
+        let masses: Vec<f64> = idx.iter().map(|&i| masses[i]).collect();
+        let gm = GRAVITATIONAL_CONSTANT * masses[central_m];
         let mut s = Democratic::default();
-        s.load(&bodies, central_m);
+        s.load(&bodies, &masses, central_m);
         let pullers = s.massive.iter().map(|&i| s.m[i]).collect();
-        MassiveRun { idx, bodies, central: central_m, s, pullers, gm, frames: Vec::new(), kicks: Vec::new() }
+        MassiveRun { idx, bodies, masses, central: central_m, s, pullers, gm, frames: Vec::new(), kicks: Vec::new() }
     }
 
     /// Forget the recorded steps.
@@ -315,14 +316,14 @@ impl MassiveRun {
     /// `check` sees the loaded state at the start of the step (`false`) and the state after
     /// the second kick (`true`); if it returns false the step is abandoned, nothing is recorded
     /// and the bodies keep their states.
-    pub(crate) fn step(&mut self, forces: &Vec<Box<dyn Force + Send + Sync>>, h: f64, mut check: impl FnMut(&Democratic, bool) -> bool) -> bool {
+    pub(crate) fn step(&mut self, forces: &[Box<dyn Force + Send + Sync>], h: f64, mut check: impl FnMut(&Democratic, bool) -> bool) -> bool {
         let half = 0.5 * h;
         let s = &mut self.s;
-        s.load(&self.bodies, self.central);
+        s.load(&self.bodies, &self.masses, self.central);
         if !check(s, false) {
             return false;
         }
-        let mut f = Frame { xc_load: self.bodies[self.central].position, v_cm_load: s.v_cm, ..Frame::default() };
+        let mut f = Frame { xc_load: position(&self.bodies[self.central]), v_cm_load: s.v_cm, ..Frame::default() };
         let mark = self.kicks.len();
         self.kicks.extend(s.massive.iter().map(|&i| s.q[i]));
         s.kick(&mut self.bodies, forces, half, &[]);
@@ -337,8 +338,8 @@ impl MassiveRun {
             self.kicks.truncate(mark);
             return false;
         }
-        s.to_particles(&mut self.bodies);
-        f.xc_out = self.bodies[self.central].position;
+        s.to_inertial(&mut self.bodies);
+        f.xc_out = position(&self.bodies[self.central]);
         f.v_cm_out = s.v_cm;
         self.frames.push(f);
         true
@@ -380,21 +381,20 @@ impl MassiveRun {
         [start, (q, u)]
     }
 
-    /// Write the massive bodies' states back into `particles`.
-    pub(crate) fn write_back(&self, particles: &mut [SpaceRock]) {
+    /// Write the massive bodies' states back into `states`.
+    pub(crate) fn write_back(&self, states: &mut [State]) {
         for (&i, body) in self.idx.iter().zip(&self.bodies) {
-            particles[i].position = body.position;
-            particles[i].velocity = body.velocity;
+            states[i] = *body;
         }
     }
 }
 
 impl WisdomHolman {
-    fn steps_blocked(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, central: usize, forces: &Vec<Box<dyn Force + Send + Sync>>, n: usize) {
+    fn steps_blocked(&mut self, states: &mut [State], masses: &[f64], t: &mut f64, central: usize, forces: &[Box<dyn Force + Send + Sync>], n: usize) {
         let h = self.timestep;
-        let mut run = MassiveRun::new(particles, central);
-        let test_idx: Vec<usize> = (0..particles.len()).filter(|&i| particles[i].mass() == 0.0).collect();
-        let mut tests: Vec<(Vector3<f64>, Vector3<f64>)> = test_idx.iter().map(|&i| (particles[i].position, particles[i].velocity)).collect();
+        let mut run = MassiveRun::new(states, masses, central);
+        let test_idx: Vec<usize> = (0..states.len()).filter(|&i| masses[i] == 0.0).collect();
+        let mut tests: Vec<(Vector3<f64>, Vector3<f64>)> = test_idx.iter().map(|&i| pv(&states[i])).collect();
         let n_tests = tests.len();
         let mut done = 0;
         while done < n {
@@ -402,7 +402,7 @@ impl WisdomHolman {
             run.clear();
             for _ in 0..len {
                 run.step(forces, h, |_, _| true);
-                *epoch += h;
+                *t += h;
             }
             // Each test particle through the block on its own.
             for_each_maybe_par(&mut tests, n_tests * len, |(x, v)| {
@@ -412,13 +412,9 @@ impl WisdomHolman {
             });
             done += len;
         }
-        run.write_back(particles);
+        run.write_back(states);
         for (&i, (x, v)) in test_idx.iter().zip(tests) {
-            particles[i].position = x;
-            particles[i].velocity = v;
-        }
-        for particle in particles.iter_mut() {
-            particle.epoch = epoch.clone();
+            states[i] = from_pv(&x, &v);
         }
     }
 }
@@ -436,38 +432,26 @@ pub(crate) fn kepler_drift(r0: &Vector3<f64>, v0: &Vector3<f64>, mu: f64, dt: f6
     universal_kepler_step(r0, v0, mu, dt).expect("WisdomHolman: universal Kepler solve failed")
 }
 
-/// The most massive particle (the first, on ties), if any has mass.
-pub(crate) fn central_body(particles: &[SpaceRock]) -> Option<usize> {
-    let best = particles.iter().enumerate().fold(None, |best: Option<(usize, f64)>, (i, p)| match best {
-        Some((_, m)) if m >= p.mass() => best,
-        _ => Some((i, p.mass())),
-    });
-    best.filter(|&(_, m)| m > 0.0).map(|(i, _)| i)
-}
-
 impl Integrator for WisdomHolman {
-    fn step(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>) {
+    fn step(&mut self, states: &mut [State], masses: &[f64], t: &mut f64, forces: &[Box<dyn Force + Send + Sync>]) {
         // The central body is the most massive particle (the first, on ties).
-        let central = match central_body(particles) {
+        let central = match central_body(masses) {
             Some(i) => i,
             // Nothing to orbit: fall back to a plain drift-kick-drift step.
-            _ => return Leapfrog::new(self.timestep).step(particles, epoch, forces),
+            _ => return Leapfrog::new(self.timestep).step(states, masses, t, forces),
         };
 
         let h = self.timestep;
         let s = &mut self.state;
-        s.load(particles, central);
-        s.kick(particles, forces, 0.5 * h, &[]);
+        s.load(states, masses, central);
+        s.kick(states, forces, 0.5 * h, &[]);
         s.jump(0.5 * h);
         s.kepler(h);
         s.jump(0.5 * h);
-        s.kick(particles, forces, 0.5 * h, &[]);
-        s.to_particles(particles);
+        s.kick(states, forces, 0.5 * h, &[]);
+        s.to_inertial(states);
 
-        *epoch += h;
-        for particle in particles.iter_mut() {
-            particle.epoch = epoch.clone();
-        }
+        *t += h;
     }
 
     /// Takes `n` steps. With Newtonian gravity as the only force and some test particles, the
@@ -476,15 +460,15 @@ impl Integrator for WisdomHolman {
     /// the particles split between threads. Test particles don't act on anything, so this does
     /// exactly the arithmetic of `n` calls to [`Integrator::step`] and gives identical results,
     /// with one hand-off to the thread pool per block instead of several per step.
-    fn steps(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>, n: usize) {
-        let central = central_body(particles);
+    fn steps(&mut self, states: &mut [State], masses: &[f64], t: &mut f64, forces: &[Box<dyn Force + Send + Sync>], n: usize) {
+        let central = central_body(masses);
         let newtonian_only = forces.len() == 1 && forces[0].is_newtonian_gravity();
-        let n_tests = particles.iter().filter(|p| p.mass() == 0.0).count();
+        let n_tests = masses.iter().filter(|&&m| m == 0.0).count();
         match central {
-            Some(central) if newtonian_only && n_tests * n >= MIN_WORK => self.steps_blocked(particles, epoch, central, forces, n),
+            Some(central) if newtonian_only && n_tests * n >= MIN_WORK => self.steps_blocked(states, masses, t, central, forces, n),
             _ => {
                 for _ in 0..n {
-                    self.step(particles, epoch, forces);
+                    self.step(states, masses, t, forces);
                 }
             }
         }

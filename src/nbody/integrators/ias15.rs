@@ -1,7 +1,6 @@
 use crate::nbody::integrators::Integrator;
-use crate::nbody::forces::Force;
-use crate::SpaceRock;
-use crate::time::Time;
+use crate::nbody::forces::{total_acceleration, Force};
+use crate::state::{from_pv, pv, State};
 
 use nalgebra::Vector3;
 
@@ -71,7 +70,7 @@ pub struct IAS15 {
 /// trajectory anywhere within the step.
 #[derive(Debug, Clone)]
 struct DenseOutput {
-    /// TDB Julian date at the start of the step
+    /// Time at the start of the step
     t0: f64,
     /// Length of the step
     dt: f64,
@@ -114,22 +113,20 @@ impl IAS15 {
 impl Integrator for IAS15 {
 
     /// Advances the system by one step using the IAS15 algorithm.
-    fn step(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>) {
+    fn step(&mut self, states: &mut [State], masses: &[f64], t: &mut f64, forces: &[Box<dyn Force + Send + Sync>]) {
         // Number of particles
-        let n = particles.len();
+        let n = states.len();
 
-        // The start of the step, in the buffers of the previous step's dense output. We don't
-        // clone the SpaceRocks themselves because some of their contents are heap allocated.
+        // The start of the step, in the buffers of the previous step's dense output.
         let (mut initial_positions, mut initial_velocities, mut initial_accelerations) = match self.dense.take() {
             Some(d) => (d.x0, d.v0, d.a0),
             None => (Vec::new(), Vec::new(), Vec::new()),
         };
         initial_positions.clear();
-        initial_positions.extend(particles.iter().map(|p| p.position));
+        initial_positions.extend(states.iter().map(|p| pv(p).0));
         initial_velocities.clear();
-        initial_velocities.extend(particles.iter().map(|p| p.velocity));
-        total_acceleration(particles, forces, &mut initial_accelerations);
-        let initial_epoch = particles[0].epoch.clone();
+        initial_velocities.extend(states.iter().map(|p| pv(p).1));
+        total_acceleration(forces, states, masses, &mut initial_accelerations);
 
         if (self.bs.len() != n) || (self.gs.len() != n) {
             self.reset_coefficients(n);
@@ -177,7 +174,6 @@ impl Integrator for IAS15 {
                 // Factors of the nested position and velocity series at this substep.
                 let xf = [7.0 * hh / 9.0, 3.0 * hh / 4.0, 5.0 * hh / 7.0, 2.0 * hh / 3.0, 3.0 * hh / 5.0, hh / 2.0, hh / 3.0, self.timestep * hh / 2.0, self.timestep * hh];
                 let vf = [7.0 * hh / 8.0, 6.0 * hh / 7.0, 5.0 * hh / 6.0, 4.0 * hh / 5.0, 3.0 * hh / 4.0, 2.0 * hh / 3.0, hh / 2.0, self.timestep * hh];
-                let substep_epoch = initial_epoch.clone() + self.timestep * hh;
                 for idx in 0..n {
                     let a0 = initial_accelerations[idx];
                     let v0 = initial_velocities[idx];
@@ -185,17 +181,13 @@ impl Integrator for IAS15 {
 
                     // Calculate the position
                     let d_position = ((((((((b.p6 * xf[0] + b.p5) * xf[1] + b.p4) * xf[2] + b.p3) * xf[3] + b.p2) * xf[4] + b.p1) * xf[5] + b.p0) * xf[6] + a0) * xf[7] + v0) * xf[8];
-                    let particle = &mut particles[idx];
-                    particle.position = initial_positions[idx] + d_position;
 
                     // Calculate the velocity
                     let d_velocity = (((((((b.p6 * vf[0] + b.p5) * vf[1] + b.p4) * vf[2] + b.p3) * vf[3] + b.p2) * vf[4] + b.p1) * vf[5] + b.p0) * vf[6] + a0) * vf[7];
-                    particle.velocity = v0 + d_velocity;
-
-                    particle.epoch = substep_epoch.clone();
+                    states[idx] = from_pv(&(initial_positions[idx] + d_position), &(v0 + d_velocity));
                 }
 
-                total_acceleration(particles, forces, &mut accelerations);
+                total_acceleration(forces, states, masses, &mut accelerations);
 
                 match substep {
                     1 => {
@@ -325,7 +317,7 @@ impl Integrator for IAS15 {
         self.accelerations = accelerations;
 
         let old_timestep = self.timestep;
-        let mut new_timestep = calculate_new_timestep(particles, &initial_accelerations, &self.bs, &old_timestep, &self.epsilon);
+        let mut new_timestep = calculate_new_timestep(&initial_accelerations, &self.bs, &old_timestep, &self.epsilon);
         let timestep_ratio = (new_timestep / old_timestep).abs();
         
 
@@ -336,11 +328,7 @@ impl Integrator for IAS15 {
 
             // reset particles
             for idx in 0..n {
-                let perturber = &mut particles[idx];
-                perturber.position = initial_positions[idx];
-                perturber.velocity = initial_velocities[idx];
-                // perturber.epoch.epoch = epoch.epoch;
-                perturber.epoch = initial_epoch.clone();
+                states[idx] = from_pv(&initial_positions[idx], &initial_velocities[idx]);
             }
 
             if self.last_timestep != 0.0 {
@@ -350,7 +338,7 @@ impl Integrator for IAS15 {
 
             // Redo the step with the new timestep. The retry advances the particles and the
             // epoch, so this attempt must not.
-            self.step(particles, epoch, forces);
+            self.step(states, masses, t, forces);
             return;
         }
 
@@ -365,20 +353,17 @@ impl Integrator for IAS15 {
 
         
 
-        let t0 = epoch.tdb().jd();
+        let t0 = *t;
 
-        // Update the epoch
-        *epoch += self.timestep; //self.timestep;
+        // Update the time
+        *t += self.timestep;
 
         // Update the particles
         for idx in 0..n {
             let b = &self.bs[idx];
-            // let g = &self.gs[idx];
-            let particle = &mut particles[idx];
-
-            particle.epoch = epoch.clone();
-            particle.position = initial_positions[idx] + self.timestep * initial_velocities[idx] + self.timestep.powi(2) * (initial_accelerations[idx] / 2.0 + b.p0 / 6.0 + b.p1 / 12.0 + b.p2 / 20.0 + b.p3 / 30.0 + b.p4 / 42.0 + b.p5 / 56.0 + b.p6 / 72.0);
-            particle.velocity = initial_velocities[idx] + self.timestep * (initial_accelerations[idx] + b.p0 / 2.0 + b.p1 / 3.0 + b.p2 / 4.0 + b.p3 / 5.0 + b.p4 / 6.0 + b.p5 / 7.0 + b.p6 / 8.0);
+            let position = initial_positions[idx] + self.timestep * initial_velocities[idx] + self.timestep.powi(2) * (initial_accelerations[idx] / 2.0 + b.p0 / 6.0 + b.p1 / 12.0 + b.p2 / 20.0 + b.p3 / 30.0 + b.p4 / 42.0 + b.p5 / 56.0 + b.p6 / 72.0);
+            let velocity = initial_velocities[idx] + self.timestep * (initial_accelerations[idx] + b.p0 / 2.0 + b.p1 / 3.0 + b.p2 / 4.0 + b.p3 / 5.0 + b.p4 / 6.0 + b.p5 / 7.0 + b.p6 / 8.0);
+            states[idx] = from_pv(&position, &velocity);
         }
 
         
@@ -416,11 +401,11 @@ impl Integrator for IAS15 {
         true
     }
 
-    /// Evaluates the last step's Gauss–Radau polynomial at `jd`, as REBOUND and ASSIST do. The
+    /// Evaluates the last step's Gauss–Radau polynomial at `t`, as REBOUND and ASSIST do. The
     /// result is as accurate as the step itself.
-    fn interpolate(&self, jd: f64) -> Option<(Vec<Vector3<f64>>, Vec<Vector3<f64>>)> {
+    fn interpolate(&self, t: f64) -> Option<Vec<State>> {
         let d = self.dense.as_ref()?;
-        let h = (jd - d.t0) / d.dt;
+        let h = (t - d.t0) / d.dt;
         // The tolerance absorbs round-off in Julian dates at the ends of the step.
         if !(-1e-8..=1.0 + 1e-8).contains(&h) || self.bs_last.len() != d.x0.len() {
             return None;
@@ -448,25 +433,17 @@ impl Integrator for IAS15 {
         u[6] = 6.0 * u[5] * h / 7.0;
         u[7] = 7.0 * u[6] * h / 8.0;
 
-        let mut positions = Vec::with_capacity(d.x0.len());
-        let mut velocities = Vec::with_capacity(d.x0.len());
+        let mut states = Vec::with_capacity(d.x0.len());
         for (idx, b) in self.bs_last.iter().enumerate() {
             let (x0, v0, a0) = (d.x0[idx], d.v0[idx], d.a0[idx]);
-            positions.push(x0 + s[8] * b.p6 + s[7] * b.p5 + s[6] * b.p4 + s[5] * b.p3 + s[4] * b.p2 + s[3] * b.p1 + s[2] * b.p0 + s[1] * a0 + s[0] * v0);
-            velocities.push(v0 + u[7] * b.p6 + u[6] * b.p5 + u[5] * b.p4 + u[4] * b.p3 + u[3] * b.p2 + u[2] * b.p1 + u[1] * b.p0 + u[0] * a0);
+            let position = x0 + s[8] * b.p6 + s[7] * b.p5 + s[6] * b.p4 + s[5] * b.p3 + s[4] * b.p2 + s[3] * b.p1 + s[2] * b.p0 + s[1] * a0 + s[0] * v0;
+            let velocity = v0 + u[7] * b.p6 + u[6] * b.p5 + u[5] * b.p4 + u[4] * b.p3 + u[3] * b.p2 + u[2] * b.p1 + u[1] * b.p0 + u[0] * a0;
+            states.push(from_pv(&position, &velocity));
         }
-        Some((positions, velocities))
+        Some(states)
     }
 }
 
-/// Sum the accelerations from all `forces` into `acc`, resized to one entry per particle.
-fn total_acceleration(particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>, acc: &mut Vec<Vector3<f64>>) {
-    acc.clear();
-    acc.resize(particles.len(), Vector3::zeros());
-    for force in forces {
-        force.add_acceleration(particles, acc);
-    }
-}
 
 /// A 7-element coefficient set used by the IAS15 integrator to represent series expansions
 /// of position, velocity and acceleration for each body. Each component (p0 through p6) 
@@ -595,9 +572,9 @@ fn predict_next_coefficients(ratio: &f64, es_last: &Vec<CoefficientSeptet>, bs_l
 /// will be reduced. If the error is well below the tolerance, the timestep may be 
 /// increased to improve efficiency.
 
-pub fn calculate_new_timestep(particles: &Vec<SpaceRock>, accelerations: &Vec<Vector3<f64>>, bs: &Vec<CoefficientSeptet>, last_timestep: &f64, epsilon: &f64) -> f64 {
+pub fn calculate_new_timestep(accelerations: &[Vector3<f64>], bs: &[CoefficientSeptet], last_timestep: &f64, epsilon: &f64) -> f64 {
     let mut min_timescale2 = f64::INFINITY;
-    for idx in 0..particles.len() {
+    for idx in 0..accelerations.len() {
         // let particle = &particles[idx];
         let b = &bs[idx];
         let a0 = accelerations[idx].norm_squared();

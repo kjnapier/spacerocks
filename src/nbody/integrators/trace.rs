@@ -1,9 +1,8 @@
-use crate::SpaceRock;
-use crate::time::Time;
 use crate::constants::GRAVITATIONAL_CONSTANT;
 use crate::nbody::integrators::{Integrator, Leapfrog};
-use crate::nbody::integrators::wisdom_holman::{central_body, kepler_drift, Democratic, MassiveRun, BLOCK, MIN_WORK};
-use crate::nbody::forces::Force;
+use crate::nbody::integrators::wisdom_holman::{kepler_drift, Democratic, MassiveRun, BLOCK, MIN_WORK};
+use crate::nbody::forces::{central_body, Force};
+use crate::state::{from_pv, pv, State};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -54,8 +53,8 @@ pub struct Trace {
 
 #[derive(PartialEq, Debug, Clone, Default)]
 struct Scratch {
-    /// Inertial positions and velocities at the start of the step
-    start: Vec<(Vector3<f64>, Vector3<f64>)>,
+    /// Inertial states at the start of the step
+    start: Vec<State>,
     /// Democratic heliocentric state at the start of the step, and the one being stepped
     s0: Democratic,
     s: Democratic,
@@ -166,13 +165,13 @@ impl Trace {
         flags
     }
 
-    fn try_step(&self, particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>, flags: &Flags, s: &mut Democratic) {
+    fn try_step(&self, states: &mut [State], masses: &[f64], forces: &[Box<dyn Force + Send + Sync>], flags: &Flags, s: &mut Democratic) {
         let h = self.timestep;
         if flags.peri {
-            bs_full(particles, forces, h, self.bs_epsilon);
+            bs_full(states, masses, forces, h, self.bs_epsilon);
             return;
         }
-        s.kick(particles, forces, 0.5 * h, &flags.pairs);
+        s.kick(states, forces, 0.5 * h, &flags.pairs);
         s.jump(0.5 * h);
 
         if flags.pairs.is_empty() {
@@ -180,7 +179,7 @@ impl Trace {
         } else {
             // Drift: bodies in close pairs together with Bulirsch–Stoer, the rest analytically.
             let central = s.central;
-            let mut in_encounter = vec![false; particles.len()];
+            let mut in_encounter = vec![false; states.len()];
             for &(i, j) in &flags.pairs {
                 in_encounter[i] = true;
                 in_encounter[j] = true;
@@ -188,10 +187,10 @@ impl Trace {
             // When every flagged pair has a test particle, the massive bodies feel nothing extra
             // and keep their analytic drift (REBOUND's `tponly_encounter`).
             let tp_only = flags.pairs.iter().all(|&(i, j)| s.m[i] == 0.0 || s.m[j] == 0.0);
-            let analytic: Vec<bool> = (0..particles.len()).map(|i| !in_encounter[i] || (tp_only && s.m[i] > 0.0)).collect();
+            let analytic: Vec<bool> = (0..states.len()).map(|i| !in_encounter[i] || (tp_only && s.m[i] > 0.0)).collect();
             let gm0 = GRAVITATIONAL_CONSTANT * s.m_central;
             let before: Vec<_> = s.q.iter().zip(&s.u).map(|(q, u)| (*q, *u)).collect();
-            for i in 0..particles.len() {
+            for i in 0..states.len() {
                 if i != central && analytic[i] {
                     let (q, u) = kepler_drift(&s.q[i], &s.u[i], gm0, h);
                     s.q[i] = q;
@@ -199,13 +198,13 @@ impl Trace {
                 }
             }
             let after: Vec<_> = s.q.iter().zip(&s.u).map(|(q, u)| (*q, *u)).collect();
-            for i in 0..particles.len() {
+            for i in 0..states.len() {
                 if in_encounter[i] {
                     (s.q[i], s.u[i]) = before[i];
                 }
             }
-            bs_encounter(s, particles, &in_encounter, &flags.pairs, h, self.bs_epsilon);
-            for i in 0..particles.len() {
+            bs_encounter(s, masses, &in_encounter, &flags.pairs, h, self.bs_epsilon);
+            for i in 0..states.len() {
                 if in_encounter[i] && analytic[i] {
                     (s.q[i], s.u[i]) = after[i];
                 }
@@ -214,52 +213,46 @@ impl Trace {
         }
 
         s.jump(0.5 * h);
-        s.kick(particles, forces, 0.5 * h, &flags.pairs);
-        s.to_particles(particles);
+        s.kick(states, forces, 0.5 * h, &flags.pairs);
+        s.to_inertial(states);
     }
 }
 
 impl Integrator for Trace {
-    fn step(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>) {
-        let central = match central_body(particles) {
+    fn step(&mut self, states: &mut [State], masses: &[f64], t: &mut f64, forces: &[Box<dyn Force + Send + Sync>]) {
+        let central = match central_body(masses) {
             Some(i) => i,
             // Nothing to orbit: fall back to a plain drift-kick-drift step.
-            None => return Leapfrog::new(self.timestep).step(particles, epoch, forces),
+            None => return Leapfrog::new(self.timestep).step(states, masses, t, forces),
         };
 
         let mut ws = std::mem::take(&mut self.scratch);
         ws.start.clear();
-        ws.start.extend(particles.iter().map(|p| (p.position, p.velocity)));
+        ws.start.extend_from_slice(states);
         let mut s0 = std::mem::take(&mut ws.s0);
         let mut s = std::mem::take(&mut ws.s);
-        s0.load(particles, central);
+        s0.load(states, masses, central);
         let mut flags = self.flags(&s0, self.timestep, &mut ws);
         loop {
             s.copy_from(&s0);
-            self.try_step(particles, forces, &flags, &mut s);
+            self.try_step(states, masses, forces, &flags, &mut s);
             if flags.peri {
-                // The Bulirsch–Stoer step moved the particles, not `s`.
-                s.load(particles, central);
+                // The Bulirsch–Stoer step moved the states, not `s`.
+                s.load(states, masses, central);
             }
             let end = self.flags(&s, -self.timestep, &mut ws);
             if flags.contains(&end) {
                 break;
             }
             flags = flags.union(&end);
-            for (p, &(x, v)) in particles.iter_mut().zip(&ws.start) {
-                p.position = x;
-                p.velocity = v;
-            }
-            s0.load(particles, central);
+            states.copy_from_slice(&ws.start);
+            s0.load(states, masses, central);
         }
         ws.s0 = s0;
         ws.s = s;
         self.scratch = ws;
 
-        *epoch += self.timestep;
-        for particle in particles.iter_mut() {
-            particle.epoch = epoch.clone();
-        }
+        *t += self.timestep;
     }
 
     /// Takes `n` steps. With Newtonian gravity as the only force and some test particles, runs
@@ -268,15 +261,15 @@ impl Integrator for Trace {
     /// through the block on its own, the particles split between threads. Steps in which
     /// anything is flagged are taken by [`Integrator::step`]. Test particles don't act on
     /// anything, so the arithmetic is exactly that of `n` calls to `step`, and so are the results.
-    fn steps(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>, n: usize) {
-        let central = central_body(particles);
+    fn steps(&mut self, states: &mut [State], masses: &[f64], t: &mut f64, forces: &[Box<dyn Force + Send + Sync>], n: usize) {
+        let central = central_body(masses);
         let newtonian_only = forces.len() == 1 && forces[0].is_newtonian_gravity();
-        let n_tests = particles.iter().filter(|p| p.mass() == 0.0).count();
+        let n_tests = masses.iter().filter(|&&m| m == 0.0).count();
         match central {
-            Some(central) if newtonian_only && n_tests * n >= MIN_WORK => self.steps_blocked(particles, epoch, central, forces, n),
+            Some(central) if newtonian_only && n_tests * n >= MIN_WORK => self.steps_blocked(states, masses, t, central, forces, n),
             _ => {
                 for _ in 0..n {
-                    self.step(particles, epoch, forces);
+                    self.step(states, masses, t, forces);
                 }
             }
         }
@@ -307,10 +300,10 @@ struct Body {
 }
 
 impl Trace {
-    fn steps_blocked(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, central: usize, forces: &Vec<Box<dyn Force + Send + Sync>>, n: usize) {
+    fn steps_blocked(&mut self, states: &mut [State], masses: &[f64], t: &mut f64, central: usize, forces: &[Box<dyn Force + Send + Sync>], n: usize) {
         let h = self.timestep;
-        let tests: Vec<usize> = (0..particles.len()).filter(|&i| particles[i].mass() == 0.0).collect();
-        let mut run = MassiveRun::new(particles, central);
+        let tests: Vec<usize> = (0..states.len()).filter(|&i| masses[i] == 0.0).collect();
+        let mut run = MassiveRun::new(states, masses, central);
         let mut ws = Scratch::default();
         let np = run.pullers.len();
         let eta2 = self.peri_crit_eta * self.peri_crit_eta;
@@ -323,7 +316,7 @@ impl Trace {
         // Per recorded step, the massive bodies (other than the central one) at the start and
         // at the end, and their inertial states after the step.
         let mut bodies: Vec<Body> = Vec::new();
-        let mut after: Vec<(Vector3<f64>, Vector3<f64>)> = Vec::new();
+            let mut after: Vec<(Vector3<f64>, Vector3<f64>)> = Vec::new();
         let nb = run.bodies.len();
         // Blocks grow while no step is flagged and shrink when one is; after a block whose
         // first step is flagged, steps are taken one at a time for a while.
@@ -333,11 +326,11 @@ impl Trace {
         let mut done = 0;
         while done < n {
             if single > 0 {
-                self.step(particles, epoch, forces);
+                self.step(states, masses, t, forces);
                 done += 1;
                 single -= 1;
                 if single == 0 {
-                    run = MassiveRun::new(particles, central);
+                    run = MassiveRun::new(states, masses, central);
                 }
                 continue;
             }
@@ -345,7 +338,7 @@ impl Trace {
             run.clear();
             bodies.clear();
             after.clear();
-            after.extend(run.bodies.iter().map(|b| (b.position, b.velocity)));
+            after.extend(run.bodies.iter().map(pv));
 
             // The massive bodies, until one of their own steps is flagged.
             let mut m = 0;
@@ -359,7 +352,7 @@ impl Trace {
                     bodies.truncate(2 * np * m);
                     break;
                 }
-                after.extend(run.bodies.iter().map(|b| (b.position, b.velocity)));
+                after.extend(run.bodies.iter().map(pv));
                 m += 1;
             }
 
@@ -374,13 +367,14 @@ impl Trace {
             // A particle already flagged at the start of the block (an encounter that goes on
             // from the last step) ends it before anything is stepped.
             let flagged_now = m > 0 && tests.iter().any(|&j| {
-                let (q, u) = run.test_load(0, &particles[j].position, &particles[j].velocity);
+                let (x, v) = pv(&states[j]);
+                let (q, u) = run.test_load(0, &x, &v);
                 flagged(&q, &u, &bodies[..np])
             });
             let first = AtomicUsize::new(if flagged_now { 0 } else { m });
             let par = tests.len() * m >= MIN_WORK && !flagged_now;
             let through = |&j: &usize| {
-                let (mut x, mut v) = (particles[j].position, particles[j].velocity);
+                let (mut x, mut v) = pv(&states[j]);
                 let mut k = 0;
                 while k < first.load(Ordering::Relaxed) {
                     let (x0, v0) = (x, v);
@@ -403,7 +397,7 @@ impl Trace {
                 if k == clean {
                     return (x, v);
                 }
-                let (mut x, mut v) = (particles[j].position, particles[j].velocity);
+                let (mut x, mut v) = pv(&states[j]);
                 for k in 0..clean {
                     run.test_step(k, h, &mut x, &mut v);
                 }
@@ -411,38 +405,33 @@ impl Trace {
             };
             let ends: Vec<(Vector3<f64>, Vector3<f64>)> = if par { tests.par_iter().zip(ends).map(again).collect() } else { tests.iter().zip(ends).map(again).collect() };
             for (&j, (x, v)) in tests.iter().zip(ends) {
-                particles[j].position = x;
-                particles[j].velocity = v;
+                states[j] = from_pv(&x, &v);
             }
-            for (b, &(x, v)) in run.bodies.iter_mut().zip(&after[nb * clean..nb * (clean + 1)]) {
-                b.position = x;
-                b.velocity = v;
+            for (b, (x, v)) in run.bodies.iter_mut().zip(&after[nb * clean..nb * (clean + 1)]) {
+                *b = from_pv(x, v);
             }
-            run.write_back(particles);
+            run.write_back(states);
             for _ in 0..clean {
-                *epoch += h;
+                *t += h;
             }
             done += clean;
 
             if clean < len {
                 // A flagged step.
-                self.step(particles, epoch, forces);
+                self.step(states, masses, t, forces);
                 done += 1;
                 if clean == 0 {
                     single = single_next;
                     single_next = (2 * single_next).min(BLOCK);
                 } else {
                     single_next = 1;
-                    run = MassiveRun::new(particles, central);
+                    run = MassiveRun::new(states, masses, central);
                 }
                 len_next = (len_next / 2).max(32);
             } else {
                 len_next = (2 * len_next).min(BLOCK);
                 single_next = 1;
             }
-        }
-        for particle in particles.iter_mut() {
-            particle.epoch = epoch.clone();
         }
     }
 }
@@ -510,11 +499,11 @@ fn prs_timescale2(x: &Vector3<f64>, v: &Vector3<f64>, gm: f64) -> f64 {
 /// Drift the bodies in close pairs under the central body's Kepler potential plus the pull
 /// within each flagged pair (the Hamiltonian the kicks left out), in democratic heliocentric
 /// coordinates.
-fn bs_encounter(s: &mut Democratic, particles: &[SpaceRock], in_encounter: &[bool], pairs: &[(usize, usize)], h: f64, eps: f64) {
-    let idx: Vec<usize> = (0..particles.len()).filter(|&i| in_encounter[i]).collect();
+fn bs_encounter(s: &mut Democratic, masses: &[f64], in_encounter: &[bool], pairs: &[(usize, usize)], h: f64, eps: f64) {
+    let idx: Vec<usize> = (0..masses.len()).filter(|&i| in_encounter[i]).collect();
     let slot = |i: usize| idx.iter().position(|&k| k == i).unwrap();
     let local_pairs: Vec<(usize, usize, f64, f64)> = pairs.iter()
-        .map(|&(i, j)| (slot(i), slot(j), particles[i].mass(), particles[j].mass()))
+        .map(|&(i, j)| (slot(i), slot(j), masses[i], masses[j]))
         .collect();
     let gm0 = GRAVITATIONAL_CONSTANT * s.m_central;
 
@@ -550,23 +539,15 @@ fn bs_encounter(s: &mut Democratic, particles: &[SpaceRock], in_encounter: &[boo
 }
 
 /// Integrate every particle in inertial coordinates under the simulation's forces.
-fn bs_full(particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + Sync>>, h: f64, eps: f64) {
-    let n = particles.len();
-    let mut y = Vec::with_capacity(6 * n);
-    for p in particles.iter() {
-        y.extend_from_slice(p.position.as_slice());
-        y.extend_from_slice(p.velocity.as_slice());
-    }
-    let mut scratch = particles.clone();
+fn bs_full(states: &mut [State], masses: &[f64], forces: &[Box<dyn Force + Send + Sync>], h: f64, eps: f64) {
+    let n = states.len();
+    let mut y: Vec<f64> = states.as_flattened().to_vec();
     let mut acc = vec![Vector3::zeros(); n];
     let rhs = |y: &[f64], dy: &mut [f64]| {
-        for (k, p) in scratch.iter_mut().enumerate() {
-            p.position = Vector3::new(y[6 * k], y[6 * k + 1], y[6 * k + 2]);
-            p.velocity = Vector3::new(y[6 * k + 3], y[6 * k + 4], y[6 * k + 5]);
-        }
+        let (scratch, _) = y.as_chunks::<6>();
         acc.fill(Vector3::zeros());
         for force in forces {
-            force.add_acceleration(&mut scratch, &mut acc);
+            force.add_acceleration(scratch, masses, &mut acc);
         }
         for k in 0..n {
             dy[6 * k..6 * k + 3].copy_from_slice(&y[6 * k + 3..6 * k + 6]);
@@ -574,10 +555,7 @@ fn bs_full(particles: &mut Vec<SpaceRock>, forces: &Vec<Box<dyn Force + Send + S
         }
     };
     bulirsch_stoer(&mut y, rhs, h, eps);
-    for (k, p) in particles.iter_mut().enumerate() {
-        p.position = Vector3::new(y[6 * k], y[6 * k + 1], y[6 * k + 2]);
-        p.velocity = Vector3::new(y[6 * k + 3], y[6 * k + 4], y[6 * k + 5]);
-    }
+    states.as_flattened_mut().copy_from_slice(&y);
 }
 
 /// Advance `y' = f(y)` by `span` with adaptive Bulirsch–Stoer (Gragg's modified midpoint and

@@ -332,6 +332,15 @@ def get_particle(self, name: str) -> SpaceRock
 jupiter = sim.get_particle("jupiter barycenter")
 ```
 
+**State arrays**
+
+A simulation stores its particles as one state array, massive particles first (by decreasing
+mass), and the integrator works on that array directly. `sim.states` is an `(n, 6)` array of
+`x, y, z, vx, vy, vz`, `sim.masses` and `sim.names` the matching masses and names, and
+`sim.particles()` every particle as a SpaceRock. The epoch is kept as a TDB Julian date.
+`Force.solar_gr()` and `Force.solar_j2()` act about the most massive particle (the Sun in a
+solar system simulation).
+
 <h2 style="border-bottom: 3px solid white;">Examples</h2>
 
 ### Basic Integration

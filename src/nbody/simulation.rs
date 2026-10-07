@@ -4,8 +4,9 @@ use std::collections::HashMap;
 use crate::SpaceRock;
 use crate::constants::GRAVITATIONAL_CONSTANT;
 use crate::time::Time;
-use crate::{ReferencePlane, Origin};
+use crate::{Properties, ReferencePlane, Origin};
 use crate::errors::SimulationError;
+use crate::state::{self, State};
 
 
 use crate::nbody::forces::{Force, NewtonianGravity};
@@ -16,18 +17,29 @@ use crate::spice::SpiceKernel;
 use nalgebra::Vector3;
 
 /// A simulation maintains:
-/// - A collection of particles and their states
-/// - The current simulation epoch
-/// - Reference frame and origin specifications
+/// - The states of its particles as one array of `[x, y, z, vx, vy, vz]`, with their masses,
+///   names and properties in columns beside it (massive particles first, by decreasing mass)
+/// - The current simulation epoch (TDB), shared by every particle
+/// - Reference frame and origin specifications, shared by every particle
 /// - Integration method and forces
+///
+/// The integrator and forces see only the state array and the masses. Particles go in as
+/// [`SpaceRock`]s ([`Simulation::add`]) and come out as `SpaceRock`s built on demand
+/// ([`Simulation::get_particle`], [`Simulation::particles`]).
 #[derive(Clone)]
 pub struct Simulation {
-    pub particles: Vec<SpaceRock>,
+    /// The epoch of every particle. Kept as a TDB Julian date (an epoch set in another
+    /// timescale or format is converted at the next step).
     pub epoch: Time,
     pub particle_index_map: HashMap<String, usize>,
 
     pub reference_plane: ReferencePlane,
     pub origin: Origin,
+
+    states: Vec<State>,
+    masses: Vec<f64>,
+    names: Vec<String>,
+    properties: Vec<Option<Properties>>,
 
     pub integrator: Box<dyn Integrator + Send + Sync>,
     pub forces: Vec<Box<dyn Force + Send + Sync>>,
@@ -42,8 +54,7 @@ pub struct Simulation {
 #[derive(Clone)]
 struct SyncedState {
     epoch: Time,
-    positions: Vec<Vector3<f64>>,
-    velocities: Vec<Vector3<f64>>,
+    states: Vec<State>,
 }
 
 impl Default for Simulation {
@@ -53,17 +64,18 @@ impl Default for Simulation {
 }
 
 impl Simulation {
-    /// Creates a new simulation at the specified epoch and reference frame.
+    /// Creates a new simulation at the specified epoch (kept as a TDB Julian date) and
+    /// reference frame.
     pub fn new(epoch: &Time, reference_plane: &str, origin: &str) -> Result<Simulation, Box<dyn std::error::Error>> {
-        let mut t = Time::now();
-        t.to_tdb();
-
         let reference_plane = ReferencePlane::from_str(reference_plane)?;
         let origin = Origin::from_str(origin)?;
 
         Ok(Simulation {
-            particles: Vec::new(), 
-            epoch: epoch.clone(),
+            states: Vec::new(),
+            masses: Vec::new(),
+            names: Vec::new(),
+            properties: Vec::new(),
+            epoch: tdb_jd(epoch),
             forces: vec![Box::new(NewtonianGravity)],
             reference_plane: reference_plane,  
             origin: origin,
@@ -88,8 +100,6 @@ impl Simulation {
     pub fn giants(epoch: &Time, reference_plane: &str, origin: &str, kernel: &SpiceKernel) -> Result<Simulation, Box<dyn std::error::Error>> {
 
         let mut sim = Simulation::new(epoch, reference_plane, origin)?;
-        sim.epoch = epoch.clone();
-        sim.epoch.to_tdb();
         sim.integrator = Box::new(IAS15::new(1.0));
 
         // add sun, jupiter barycenter, saturn barycenter, uranus barycenter, neptune barycenter.
@@ -114,8 +124,6 @@ impl Simulation {
     /// * `Result<Simulation, Box<dyn std::error::Error>>` - The simulation with the solar system planets.
     pub fn planets(epoch: &Time, reference_plane: &str, origin: &str, kernel: &SpiceKernel) -> Result<Simulation, Box<dyn std::error::Error>> {
         let mut sim = Simulation::new(epoch, reference_plane, origin)?;
-        sim.epoch = epoch.clone();
-        sim.epoch.to_tdb();
         sim.integrator = Box::new(IAS15::new(1.0));
 
         let names = ["sun", "mercury barycenter", "venus barycenter", "earth barycenter", "mars barycenter", "jupiter barycenter", 
@@ -141,8 +149,6 @@ impl Simulation {
     /// * `Result<Simulation, Box<dyn std::error::Error>>` - The simulation with the solar system planets and moons.
     pub fn horizons(epoch: &Time, reference_plane: &str, origin: &str, kernel: &SpiceKernel) -> Result<Simulation, Box<dyn std::error::Error>> {
         let mut sim = Simulation::new(epoch, reference_plane, origin)?;
-        sim.epoch = epoch.clone();
-        sim.epoch.to_tdb();
         sim.integrator = Box::new(IAS15::new(0.001));
 
         let names = ["sun", "mercury barycenter", "venus barycenter", "earth", "moon", "mars barycenter", "jupiter barycenter", 
@@ -192,30 +198,31 @@ impl Simulation {
                 let err = SimulationError::OriginMismatch(particle.origin.clone(), self.origin.clone(), particle.name.clone());
                 return Err(err.into());
             }
-            let origin = &self.particles[self.particle_index_map[&particle.origin.to_string()]];
-            particle.change_origin(origin);
+            let origin = self.particle(self.particle_index_map[&particle.origin.to_string()]);
+            particle.change_origin(&origin);
             println!("Changing origin of {} from {} to {}", particle.name, particle.origin, origin.name);
         }
 
         particle.change_reference_plane(self.reference_plane.as_str())?;
-        particle.epoch.to_tdb();
-        // self.particle_index_map.insert((*particle.name).to_string(), self.particles.len());
-        // self.particles.push(particle);
 
-        if particle.mass() == 0.0 {
-            self.particle_index_map.insert((*particle.name).to_string(), self.particles.len());
-            self.particles.push(particle);
-            return Ok(());
-        }
+        let massive = particle.mass() != 0.0;
+        self.particle_index_map.insert(particle.name.clone(), self.states.len());
+        self.states.push(particle.state());
+        self.masses.push(particle.mass());
+        self.names.push(particle.name);
+        self.properties.push(particle.properties);
 
-        self.particle_index_map.insert((*particle.name).to_string(), self.particles.len());
-        self.particles.push(particle);
-        
-        // make sure to sort the particles by mass
-        self.particles.sort_by(|a, b| b.mass().partial_cmp(&a.mass()).unwrap());
-        // update the particle index map
-        for (idx, particle) in self.particles.iter().enumerate() {
-            self.particle_index_map.insert((*particle.name).to_string(), idx);
+        if massive {
+            // Keep the particles sorted by decreasing mass (a stable sort).
+            let mut order: Vec<usize> = (0..self.states.len()).collect();
+            order.sort_by(|&a, &b| self.masses[b].partial_cmp(&self.masses[a]).unwrap());
+            self.states = order.iter().map(|&i| self.states[i]).collect();
+            self.masses = order.iter().map(|&i| self.masses[i]).collect();
+            self.names = order.iter().map(|&i| self.names[i].clone()).collect();
+            self.properties = order.iter().map(|&i| self.properties[i].clone()).collect();
+            for (idx, name) in self.names.iter().enumerate() {
+                self.particle_index_map.insert(name.clone(), idx);
+            }
         }
 
         Ok(())
@@ -231,7 +238,10 @@ impl Simulation {
         self.dense_valid = false;
         if self.particle_index_map.contains_key(name) {
             let idx = self.particle_index_map[name];
-            self.particles.remove(idx);
+            self.states.remove(idx);
+            self.masses.remove(idx);
+            self.names.remove(idx);
+            self.properties.remove(idx);
             self.particle_index_map.remove(name);
             for value in self.particle_index_map.values_mut() {
                 if *value > idx {
@@ -252,34 +262,22 @@ impl Simulation {
         let mut center_of_mass = Vector3::new(0.0, 0.0, 0.0);
         let mut center_of_mass_velocity = Vector3::new(0.0, 0.0, 0.0);
 
-        for particle in &self.particles {
-            if particle.mass() == 0.0 {
+        for (s, &m) in self.states.iter().zip(&self.masses) {
+            if m == 0.0 {
                 continue;
             }
-            center_of_mass += particle.mass() * particle.position;
-            center_of_mass_velocity += particle.mass() * particle.velocity;
-            total_mass += particle.mass();
+            let (x, v) = state::pv(s);
+            center_of_mass += m * x;
+            center_of_mass_velocity += m * v;
+            total_mass += m;
         }
 
         center_of_mass /= total_mass;
         center_of_mass_velocity /= total_mass;
 
-        let x = center_of_mass.x;
-        let y = center_of_mass.y;
-        let z = center_of_mass.z;
-        let vx = center_of_mass_velocity.x;
-        let vy = center_of_mass_velocity.y;
-        let vz = center_of_mass_velocity.z;
-       
-        let mut origin_rock = SpaceRock::from_xyz("simulation_barycenter", 
-                                                  x, y, z, vx, vy, vz, 
-                                                  self.epoch.clone(), 
-                                                  self.reference_plane.as_str(),
-                                                  self.origin.as_str())?;
-        origin_rock.set_mass(total_mass);
-
-        for particle in &mut self.particles {
-            particle.change_origin(&origin_rock);
+        for s in &mut self.states {
+            let (x, v) = state::pv(s);
+            *s = state::from_pv(&(x - center_of_mass), &(v - center_of_mass_velocity));
         }
 
         let origin = Origin::new_custom(total_mass * GRAVITATIONAL_CONSTANT, "simulation_barycenter");
@@ -300,16 +298,13 @@ impl Simulation {
            return Err(format!("Origin {} not found in perturbers", origin));
         }
 
-        let new_origin = Origin::new_custom(self.particles[self.particle_index_map[origin]].mass() * GRAVITATIONAL_CONSTANT, origin);
+        let idx = self.particle_index_map[origin];
+        self.origin = Origin::new_custom(self.masses[idx] * GRAVITATIONAL_CONSTANT, origin);
 
-        self.origin = new_origin;
-
-        let origin_position = self.particles[self.particle_index_map[origin]].position;
-        let origin_velocity = self.particles[self.particle_index_map[origin]].velocity;
-
-        for particle in &mut self.particles {
-            particle.position -= origin_position;
-            particle.velocity -= origin_velocity;
+        let (origin_position, origin_velocity) = state::pv(&self.states[idx]);
+        for s in &mut self.states {
+            let (x, v) = state::pv(s);
+            *s = state::from_pv(&(x - origin_position), &(v - origin_velocity));
         }
 
         Ok(())
@@ -318,7 +313,11 @@ impl Simulation {
     /// Step the simulation forward in time by one timestep.
     pub fn step(&mut self) {
         self.synchronize();
-        self.integrator.step(&mut self.particles, &mut self.epoch, &self.forces);
+        // The integrators' clock is the TDB Julian date.
+        self.epoch = tdb_jd(&self.epoch);
+        let mut t = self.epoch.epoch;
+        self.integrator.step(&mut self.states, &self.masses, &mut t, &self.forces);
+        self.epoch.epoch = t;
         self.dense_valid = true;
     }
 
@@ -330,7 +329,11 @@ impl Simulation {
             return;
         }
         self.synchronize();
-        self.integrator.steps(&mut self.particles, &mut self.epoch, &self.forces, n);
+        // The integrators' clock is the TDB Julian date.
+        self.epoch = tdb_jd(&self.epoch);
+        let mut t = self.epoch.epoch;
+        self.integrator.steps(&mut self.states, &self.masses, &mut t, &self.forces, n);
+        self.epoch.epoch = t;
         self.dense_valid = true;
     }
 
@@ -359,8 +362,7 @@ impl Simulation {
         }
         self.synchronize();
 
-        let mut target_epoch = epoch.clone();
-        target_epoch.to_tdb();
+        let target_epoch = tdb_jd(epoch);
         let target = target_epoch.jd();
         if (target - self.epoch.tdb().jd()).abs() < 1e-16 {
             return;
@@ -368,17 +370,8 @@ impl Simulation {
 
         loop {
             if self.dense_valid {
-                if let Some((positions, velocities)) = self.integrator.interpolate(target) {
-                    let synced = SyncedState {
-                        epoch: self.epoch.clone(),
-                        positions: self.particles.iter().map(|p| p.position).collect(),
-                        velocities: self.particles.iter().map(|p| p.velocity).collect(),
-                    };
-                    for (particle, (x, v)) in self.particles.iter_mut().zip(positions.into_iter().zip(velocities)) {
-                        particle.position = x;
-                        particle.velocity = v;
-                        particle.epoch = target_epoch.clone();
-                    }
+                if let Some(states) = self.integrator.interpolate(target) {
+                    let synced = SyncedState { epoch: self.epoch.clone(), states: std::mem::replace(&mut self.states, states) };
                     self.epoch = target_epoch;
                     self.synced = Some(synced);
                     return;
@@ -406,11 +399,7 @@ impl Simulation {
     /// Restore the integrator's own state if the particles hold interpolated states.
     fn synchronize(&mut self) {
         if let Some(synced) = self.synced.take() {
-            for (particle, (x, v)) in self.particles.iter_mut().zip(synced.positions.into_iter().zip(synced.velocities)) {
-                particle.position = x;
-                particle.velocity = v;
-                particle.epoch = synced.epoch.clone();
-            }
+            self.states = synced.states;
             self.epoch = synced.epoch;
         }
     }
@@ -514,22 +503,67 @@ impl Simulation {
         }
     }
 
+    /// The `idx`-th particle as a [`SpaceRock`] (at the simulation's epoch, in its frame and
+    /// about its origin).
+    pub fn particle(&self, idx: usize) -> SpaceRock {
+        let (position, velocity) = state::pv(&self.states[idx]);
+        SpaceRock {
+            name: self.names[idx].clone(),
+            epoch: self.epoch.clone(),
+            reference_plane: self.reference_plane.clone(),
+            origin: self.origin.clone(),
+            position,
+            velocity,
+            properties: self.properties[idx].clone(),
+        }
+    }
+
+    /// Every particle as a [`SpaceRock`], in the simulation's order (massive particles first).
+    pub fn particles(&self) -> Vec<SpaceRock> {
+        (0..self.states.len()).map(|i| self.particle(i)).collect()
+    }
+
     /// Get a particle from the simulation by name.
     ///
     /// # Arguments
     ///
     /// * `name` - The name of the particle to get.
-    ///
-    /// # Returns
-    ///
-    /// * `Result<&SpaceRock, SimulationError>` - The particle with the given name.
-    pub fn get_particle(&self, name: &str) -> Result<&SpaceRock, SimulationError> {
-        if self.particle_index_map.contains_key(name) { 
-            let idx = self.particle_index_map[name];
-            let p = &self.particles[idx];
-            return Ok(p);
+    pub fn get_particle(&self, name: &str) -> Result<SpaceRock, SimulationError> {
+        match self.particle_index_map.get(name) {
+            Some(&idx) => Ok(self.particle(idx)),
+            None => Err(SimulationError::ParticleNotFound(name.to_string())),
         }
-        Err(SimulationError::ParticleNotFound(name.to_string()))
+    }
+
+    /// Number of particles.
+    pub fn len(&self) -> usize {
+        self.states.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
+    }
+
+    /// States of the particles `[x, y, z, vx, vy, vz]`, in the simulation's order.
+    pub fn states(&self) -> &[State] {
+        &self.states
+    }
+
+    /// Mutable states of the particles. Changing them restarts the integrator's dense output.
+    pub fn states_mut(&mut self) -> &mut [State] {
+        self.synchronize();
+        self.dense_valid = false;
+        &mut self.states
+    }
+
+    /// Masses of the particles (solar masses), in the simulation's order.
+    pub fn masses(&self) -> &[f64] {
+        &self.masses
+    }
+
+    /// Names of the particles, in the simulation's order.
+    pub fn names(&self) -> &[String] {
+        &self.names
     }
 
     /// Get the energy of the simulation.
@@ -537,11 +571,13 @@ impl Simulation {
         let mut kinetic_energy = 0.0;
         let mut potential_energy = 0.0;
 
-        for idx in 0..self.particles.len() {
-            kinetic_energy += 0.5 * self.particles[idx].mass() * self.particles[idx].velocity.norm_squared();
-            for jdx in (idx + 1)..self.particles.len() {
-                let r = (self.particles[idx].position - self.particles[jdx].position).norm();
-                potential_energy -= GRAVITATIONAL_CONSTANT * self.particles[idx].mass() * self.particles[jdx].mass() / r;
+        let n = self.states.len();
+        for idx in 0..n {
+            let (x_i, v_i) = state::pv(&self.states[idx]);
+            kinetic_energy += 0.5 * self.masses[idx] * v_i.norm_squared();
+            for jdx in (idx + 1)..n {
+                let r = (x_i - state::position(&self.states[jdx])).norm();
+                potential_energy -= GRAVITATIONAL_CONSTANT * self.masses[idx] * self.masses[jdx] / r;
             }
         }
         kinetic_energy + potential_energy
@@ -556,4 +592,14 @@ impl Simulation {
         self.forces.push(force);
     }
 
+}
+
+/// `epoch` as a TDB Julian date.
+fn tdb_jd(epoch: &Time) -> Time {
+    let t = epoch.tdb();
+    if t.format == crate::time::TimeFormat::JD {
+        t
+    } else {
+        Time::new(t.jd(), "tdb", "jd").expect("valid time")
+    }
 }
