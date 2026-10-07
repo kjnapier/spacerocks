@@ -1,5 +1,4 @@
 use crate::constants::*;
-use crate::StateVector;
 use crate::SpaceRock;
 use crate::Observer;
 use nalgebra::Vector3;
@@ -11,16 +10,15 @@ use nalgebra::Vector3;
 /// * `observer` - An Observer object representing the observer.
 ///
 /// # Returns
-/// * A StateVector object representing the observer-centric state vector of the rock.
+/// * The observer-centric position and velocity of the rock.
 ///
 /// The rock's position at the emission time is found by a second-order Taylor expansion
 /// (velocity plus a central-force acceleration), iterated twice on the light time; its velocity
 /// at emission is corrected to first order. If the observer has no velocity, it is taken as zero
 /// (the position is unaffected; the relative velocity then refers to a stationary observer).
-pub fn correct_for_ltt(rock: &SpaceRock, observer: &Observer) -> StateVector {
+pub fn correct_for_ltt(rock: &SpaceRock, observer: &Observer) -> (Vector3<f64>, Vector3<f64>) {
     let obs_vel = observer.velocity.unwrap_or_else(Vector3::zeros);
-    let (d_pos, d_vel) = correct_for_ltt_vectors(&rock.position, &rock.velocity, &observer.position, &obs_vel);
-    StateVector::new(d_pos, d_vel)
+    correct_for_ltt_vectors(&rock.position, &rock.velocity, &observer.position, &obs_vel)
 }
 
 /// Vector form of [`correct_for_ltt`]: returns the observer-centric position and velocity of an

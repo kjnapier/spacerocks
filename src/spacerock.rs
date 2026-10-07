@@ -737,12 +737,6 @@ impl SpaceRock {
         self.velocity = v;
     }
 
-    // calculate the osculating elements and return a KeplerOrbit object. This is more expensive than the other 
-    // individual methods, but cheaper if you need multiple elements
-    // pub fn calculate_orbit(&self) -> KeplerOrbit {
-    //     OrbitType::from_eccentricity(e, 1e-10).expect("Invalid eccentricity");
-    // }
-
     /// Compute observational quantities for this object as seen by an observer
     /// 
     /// Calculates topocentric coordinates including light-time correction. The observer
@@ -771,14 +765,14 @@ impl SpaceRock {
         //     return Err("Observer and SpaceRock have different reference planes".into());
         // }
         // Calculate the topocentric state, correct for light travel time
-        let cr = correct_for_ltt(&self, observer);
+        let (position, _) = correct_for_ltt(self, observer);
 
         // Calaculate the ra, and dec
-        let mut ra = cr.position.y.atan2(cr.position.x);
+        let mut ra = position.y.atan2(position.x);
         if ra < 0.0 {
             ra += 2.0 * std::f64::consts::PI;
         }
-        let dec = (cr.position.z / cr.position.norm()).asin();
+        let dec = (position.z / position.norm()).asin();
 
         Ok((ra, dec))
         

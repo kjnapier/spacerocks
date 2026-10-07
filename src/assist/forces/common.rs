@@ -2,7 +2,7 @@
 
 use nalgebra::{Matrix3, Vector3};
 
-use crate::assist::spice_simulation::{SimulationParticle, SimulationState};
+use crate::assist::spice_simulation::{Partials, SimulationState};
 use crate::constants::GRAVITATIONAL_CONSTANT;
 
 /// NAIF codes of the Sun, planets (barycenters), Earth, Moon and Pluto, in ASSIST's order
@@ -27,7 +27,7 @@ pub fn body(state: &SimulationState, i: usize) -> (f64, Vector3<f64>, Vector3<f6
 
 /// Add position and velocity partials to a particle's acceleration Jacobian.
 #[inline]
-pub fn add_jacobian(p: &mut SimulationParticle, dadr: &Matrix3<f64>, dadv: Option<&Matrix3<f64>>) {
+pub fn add_jacobian(p: &mut Partials, dadr: &Matrix3<f64>, dadv: Option<&Matrix3<f64>>) {
     for i in 0..3 {
         for j in 0..3 {
             p.stm[3 + i][j] += dadr[(i, j)];

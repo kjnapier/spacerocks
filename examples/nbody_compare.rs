@@ -63,12 +63,12 @@ fn main() {
         seconds += start.elapsed().as_secs_f64();
         taken += chunk;
         if n_out > 0 {
-            println!("energy {} {:.17e}", sim.epoch.tdb().jd() - t0, sim.energy());
+            println!("energy {} {:.17e}", sim.epoch().tdb().jd() - t0, sim.energy());
         }
     }
     for (name, [x, y, z, vx, vy, vz]) in sim.names().iter().zip(sim.states()) {
         println!("state {} {:.17e} {:.17e} {:.17e} {:.17e} {:.17e} {:.17e}", name, x, y, z, vx, vy, vz);
     }
-    println!("time {:.17e}", sim.epoch.tdb().jd() - t0);
+    println!("time {:.17e}", sim.epoch().tdb().jd() - t0);
     println!("seconds {seconds:.6}");
 }

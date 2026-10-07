@@ -99,15 +99,15 @@ impl Force for NewtonianGravity {
                 let dydz = GRAVITATIONAL_CONSTANT * p2.mass * 3.0 * r_vec.y * r_vec.z / r5;
                 let dxdz = GRAVITATIONAL_CONSTANT * p2.mass * 3.0 * r_vec.x * r_vec.z / r5;
 
-                particle.stm[3][0] += dxdx;
-                particle.stm[3][1] += dxdy;
-                particle.stm[3][2] += dxdz;
-                particle.stm[4][0] += dxdy;
-                particle.stm[4][1] += dydy;
-                particle.stm[4][2] += dydz;
-                particle.stm[5][0] += dxdz;
-                particle.stm[5][1] += dydz;
-                particle.stm[5][2] += dzdz;
+                state.partials[idx].stm[3][0] += dxdx;
+                state.partials[idx].stm[3][1] += dxdy;
+                state.partials[idx].stm[3][2] += dxdz;
+                state.partials[idx].stm[4][0] += dxdy;
+                state.partials[idx].stm[4][1] += dydy;
+                state.partials[idx].stm[4][2] += dydz;
+                state.partials[idx].stm[5][0] += dxdz;
+                state.partials[idx].stm[5][1] += dydz;
+                state.partials[idx].stm[5][2] += dzdz;
 
             }
         }

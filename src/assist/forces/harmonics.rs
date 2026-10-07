@@ -45,7 +45,7 @@ impl EarthHarmonics {
         let re = self.radius;
         let (j2, j3, j4) = (self.j2, self.j3, self.j4);
 
-        for p in state.particles_1.iter_mut() {
+        for (ip, p) in state.particles_1.iter_mut().enumerate() {
             let d0 = p.position - xe;
             let r2 = d0.norm_squared();
             let r = r2.sqrt();
@@ -116,7 +116,7 @@ impl EarthHarmonics {
             let (xx, yy, zz) = (dxdx + dxdx3 + dxdx4, dydy + dydy3 + dydy4, dzdz + dzdz3 + dzdz4);
             let (xy, yz, xz) = (dxdy + dxdy3 + dxdy4, dydz + dydz3 + dydz4, dxdz + dxdz3 + dxdz4);
             let m = Matrix3::new(xx, xy, xz, xy, yy, yz, xz, yz, zz);
-            add_jacobian(p, &(rot_t * m * rot), None);
+            add_jacobian(&mut state.partials[ip], &(rot_t * m * rot), None);
         }
     }
 }
@@ -152,7 +152,7 @@ impl SolarJ2 {
         let rot_t = rot.transpose();
         let rs = self.radius;
 
-        for p in state.particles_1.iter_mut() {
+        for (ip, p) in state.particles_1.iter_mut().enumerate() {
             let d0 = p.position - xs;
             let r2 = d0.norm_squared();
             let r = r2.sqrt();
@@ -178,7 +178,7 @@ impl SolarJ2 {
             let dydz = k * (-5.0) * (fac2 - 2.0) * dy * dz / r2;
             let dxdz = k * (-5.0) * (fac2 - 2.0) * dx * dz / r2;
             let m = Matrix3::new(dxdx, dxdy, dxdz, dxdy, dydy, dydz, dxdz, dydz, dzdz);
-            add_jacobian(p, &(rot_t * m * rot), None);
+            add_jacobian(&mut state.partials[ip], &(rot_t * m * rot), None);
         }
     }
 }

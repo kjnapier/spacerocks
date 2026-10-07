@@ -1,6 +1,6 @@
 use crate::spice::SpiceKernel;
 
-use crate::assist::{SimulationParticle, SimulationState};
+use crate::assist::{Partials, SimulationParticle, SimulationState};
 use crate::assist::spice_simulation::VariationalParticle;
 use crate::assist::integrators::Integrator;
 use crate::assist::forces::Force;
@@ -902,9 +902,9 @@ pub fn update_accelerations(state: &mut SimulationState, forces: &Vec<Box<dyn Fo
 pub fn update_accelerations_and_stms(state: &mut SimulationState, forces: &Vec<Box<dyn Force + Send + Sync>>) {
     for p in state.particles_1.iter_mut() {
         p.acceleration = Vector3::zeros();
-        p.stm = [[0.0; 6]; 6];
-        p.nongrav_partials = [[0.0; 3]; 3];
     }
+    state.partials.clear();
+    state.partials.resize(state.particles_1.len(), Partials::default());
     for force in forces {
         force.apply_acceleration_and_stm(state);
     }
@@ -914,9 +914,9 @@ pub fn update_accelerations_and_stms(state: &mut SimulationState, forces: &Vec<B
 /// da = (da/dr) dr + (da/dv) dv + (da/dA) dA.
 pub fn update_variational_accelerations(state: &mut SimulationState) {
     for p in state.variational_particles_1.iter_mut() {
-        let parent = &state.particles_1[p.parent];
+        let parent = &state.partials[p.parent];
         let j = &parent.stm;
-        let g = &parent.nongrav_partials;
+        let g = &parent.nongrav;
         let (r, v, dk) = (p.position, p.velocity, p.nongrav);
         let mut a = [0.0; 3];
         for i in 0..3 {

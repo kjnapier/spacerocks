@@ -8,7 +8,7 @@ use nalgebra::Vector3;
 use spacerocks::assist::forces::{
     assist_default_forces, EarthHarmonics, Force, GrEih, GrPotential, GrSimple, NewtonianGravity, NonGravitational, SolarJ2,
 };
-use spacerocks::assist::{EphemerisConstants, SimulationState, SpiceSimulation};
+use spacerocks::assist::{EphemerisConstants, Partials, SimulationState, SpiceSimulation};
 use spacerocks::{SpaceRock, SpiceKernel, Time};
 
 const T0: f64 = 2460300.5;
@@ -44,13 +44,12 @@ fn check_jacobian(name: &str, force: &dyn Force, state: &SimulationState) {
     let mut s = state.clone();
     for p in s.particles_1.iter_mut() {
         p.acceleration = Vector3::zeros();
-        p.stm = [[0.0; 6]; 6];
-        p.nongrav_partials = [[0.0; 3]; 3];
     }
+    s.partials = vec![Partials::default(); s.particles_1.len()];
     force.apply_acceleration_and_stm(&mut s);
     let a0 = s.particles_1[0].acceleration;
-    let jac = s.particles_1[0].stm;
-    let dadk = s.particles_1[0].nongrav_partials;
+    let jac = s.partials[0].stm;
+    let dadk = s.partials[0].nongrav;
     assert!(a0.norm() > 0.0, "{}: no acceleration", name);
     assert_eq!(a0, accel(force, &mut state.clone()), "{}: apply_acceleration and apply_acceleration_and_stm differ", name);
 

@@ -11,6 +11,7 @@
 pub mod spice_simulation;
     pub use self::spice_simulation::SpiceSimulation;
     pub use self::spice_simulation::SimulationParticle;
+    pub use self::spice_simulation::Partials;
     pub use self::spice_simulation::SimulationState;
 
     

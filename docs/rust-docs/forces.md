@@ -19,10 +19,11 @@ to DE440.
 
 ## Jacobians and variational particles
 
-`Force::apply_acceleration_and_stm` adds each particle's acceleration partials to
-`SimulationParticle::stm` (rows 3..6: d a/d r in columns 0..3, d a/d v in columns 3..6) and
-`SimulationParticle::nongrav_partials` (d a/d(A1, A2, A3)). IAS15 computes them only when the
-simulation has variational particles. Variational accelerations are then
+`Force::apply_acceleration_and_stm` adds each particle's acceleration partials to its entry in
+`SimulationState::partials`: `Partials::stm` (rows 3..6: d a/d r in columns 0..3, d a/d v in
+columns 3..6) and `Partials::nongrav` (d a/d(A1, A2, A3)). The array exists, one entry per
+particle, only while the simulation has variational particles, and IAS15 computes the partials
+only then. Variational accelerations are then
 `J_r dr + J_v dv + J_A dA` (`update_variational_accelerations`), so velocity-dependent forces
 (relativity, non-gravitational) and non-gravitational parameter partials are handled.
 

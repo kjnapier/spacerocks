@@ -51,6 +51,10 @@ class Origin:
 | `SUN` | Solar center |
 | `SSB` | Solar System Barycenter |
 
+An origin is a body id and μ. `Origin(name, mu)` makes any other origin. A name SPICE knows
+gets that body's NAIF id (`Origin("earth", mu).id == 399`), and any other name gets an id of
+its own. The properties are `name`, `mu` and `id` (10 for the Sun, 0 for the SSB).
+
 <h2 style="border-bottom: 3px solid white;">Methods</h2>
 
 ### ReferencePlane Methods

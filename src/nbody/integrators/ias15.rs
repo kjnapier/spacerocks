@@ -406,7 +406,7 @@ impl Integrator for IAS15 {
     fn interpolate(&self, t: f64) -> Option<Vec<State>> {
         let d = self.dense.as_ref()?;
         let h = (t - d.t0) / d.dt;
-        // The tolerance absorbs round-off in Julian dates at the ends of the step.
+        // The tolerance absorbs round-off in the step's end times.
         if !(-1e-8..=1.0 + 1e-8).contains(&h) || self.bs_last.len() != d.x0.len() {
             return None;
         }

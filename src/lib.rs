@@ -41,10 +41,6 @@ pub mod errors;
 pub mod nbody;
     pub use nbody::Simulation;
 
-pub mod structs;
-    pub use structs::KeplerOrbit;
-    pub use structs::StateVector;
-
 pub mod observing;
     pub use observing::{Observatory, Observer, Observation};
 

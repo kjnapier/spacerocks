@@ -52,7 +52,7 @@ fn wisdom_holman_two_body_is_exact() {
     }
     let (dx, dv) = max_offset(&sim, &start);
     assert!(dx < 1e-10 && dv < 1e-12, "dx = {dx:e} AU, dv = {dv:e} AU/day");
-    assert!((sim.epoch.tdb().jd() - (T0 + 100.0 * period)).abs() < 1e-6);
+    assert!((sim.epoch().tdb().jd() - (T0 + 100.0 * period)).abs() < 1e-6);
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn wisdom_holman_matches_ias15() {
     let mut ias = outer_system(Box::new(IAS15::new(1.0)), true);
     wh.integrate(&target);
     ias.integrate(&target);
-    assert!((wh.epoch.tdb().jd() - target.tdb().jd()).abs() < 1e-9);
+    assert!((wh.epoch().tdb().jd() - target.tdb().jd()).abs() < 1e-9);
     let (dx, _) = max_offset(&wh, &ias);
     assert!(dx < 1e-5, "max position difference = {dx:e} AU");
 }
@@ -219,7 +219,7 @@ fn integrate_or_interpolate_matches_integrate() {
         let epoch = Time::new(T0 + 5.0 * k as f64 + 0.37, "tdb", "jd").unwrap();
         exact.integrate(&epoch);
         interp.integrate_or_interpolate(&epoch);
-        assert!((interp.epoch.jd() - epoch.jd()).abs() < 1e-9);
+        assert!((interp.epoch().jd() - epoch.jd()).abs() < 1e-9);
         worst = worst.max(max_offset(&exact, &interp).0);
     }
     assert!(worst < 1e-7, "worst offset {worst:e} AU");
@@ -286,7 +286,7 @@ fn population(integrator: Box<dyn Integrator + Send + Sync>, encounters: bool) -
 }
 
 fn assert_same(a: &Simulation, b: &Simulation) {
-    assert_eq!(a.epoch.tdb().jd(), b.epoch.tdb().jd());
+    assert_eq!(a.epoch().tdb().jd(), b.epoch().tdb().jd());
     for (p, q) in a.particles().iter().zip(&b.particles()) {
         assert_eq!(p.name, q.name);
         assert_eq!((p.position, p.velocity), (q.position, q.velocity), "{}", p.name);
@@ -336,10 +336,12 @@ fn integrate_matches_stepping() {
         let mut b = a.clone();
         let target = T0 + 7013.25 * dt.signum();
         a.integrate(&Time::new(target, "tdb", "jd").unwrap());
-        while (target - b.epoch.tdb().jd()).abs() >= dt.abs() {
+        // The simulation's clock counts days since its starting epoch.
+        let days = target - T0;
+        while (days - b.t()).abs() >= dt.abs() {
             b.step();
         }
-        b.integrator.set_timestep(target - b.epoch.tdb().jd());
+        b.integrator.set_timestep(days - b.t());
         b.step();
         b.integrator.set_timestep(dt);
         assert_same(&a, &b);

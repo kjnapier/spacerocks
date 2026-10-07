@@ -135,7 +135,7 @@ impl SunCache {
 
 /// Barycentric J2000 state of a rock at its own epoch.
 fn rock_to_ssb_j2000(rock: &SpaceRock, suns: &SunCache, kernel: &SpiceKernel) -> Result<[f64; 6], BoxError> {
-    match &rock.origin {
+    match rock.origin {
         Origin::SSB | Origin::SUN => {
             let m = to_j2000(&rock.reference_plane);
             let mut p = m * rock.position;
@@ -147,7 +147,7 @@ fn rock_to_ssb_j2000(rock: &SpaceRock, suns: &SunCache, kernel: &SpiceKernel) ->
             }
             Ok(state6(&p, &v))
         }
-        Origin::Custom { .. } => {
+        _ => {
             let mut r = rock.clone();
             r.change_reference_plane("J2000").map_err(|e| e.to_string())?;
             r.to_ssb(kernel).map_err(|e| format!("{}: {}", rock.name, e))?;
@@ -188,8 +188,8 @@ impl Bodies for [SpaceRock] {
     }
     fn two_body_ssb_j2000(&self, i: usize, targets: &[f64], times: &[Time], suns: &SunCache, row: &mut [State]) -> Result<(), BoxError> {
         let rock = &self[i];
-        if let Origin::Custom { name, .. } = &rock.origin {
-            return Err(format!("{}: two-body batch propagation needs a SUN or SSB origin, not '{}'", rock.name, name).into());
+        if rock.origin.is_custom() {
+            return Err(format!("{}: two-body batch propagation needs a SUN or SSB origin, not '{}'", rock.name, rock.origin).into());
         }
         let m_rot = to_j2000(&rock.reference_plane);
         for (j, t) in times.iter().enumerate() {
@@ -226,17 +226,17 @@ impl Bodies for PopulationView<'_> {
         self.pop.properties[i].as_ref()
     }
     fn ssb_j2000(&self, i: usize, suns: &SunCache, kernel: &SpiceKernel) -> Result<State, BoxError> {
-        match &self.pop.origin {
+        match self.pop.origin {
             Origin::SSB | Origin::SUN => {
                 let (p, v) = pv(&self.pop.states[i]);
                 Ok(helio_to_ssb(&self.pop.origin, &self.m_rot, &p, &v, suns, self.pop.epochs[i]))
             }
-            Origin::Custom { .. } => rock_to_ssb_j2000(&self.pop.get(i).unwrap(), suns, kernel),
+            _ => rock_to_ssb_j2000(&self.pop.get(i).unwrap(), suns, kernel),
         }
     }
     fn two_body_ssb_j2000(&self, i: usize, targets: &[f64], _times: &[Time], suns: &SunCache, row: &mut [State]) -> Result<(), BoxError> {
-        if let Origin::Custom { name, .. } = &self.pop.origin {
-            return Err(format!("{}: two-body batch propagation needs a SUN or SSB origin, not '{}'", self.pop.names[i], name).into());
+        if self.pop.origin.is_custom() {
+            return Err(format!("{}: two-body batch propagation needs a SUN or SSB origin, not '{}'", self.pop.names[i], self.pop.origin).into());
         }
         let mu = self.pop.origin.mu();
         let (s0, t0) = (&self.pop.states[i], self.pop.epochs[i]);
@@ -270,14 +270,14 @@ fn observer_to_ssb_j2000(o: &Observer, kernel: &SpiceKernel) -> Result<(Vector3<
     let mut v = m * o.velocity.unwrap_or_else(Vector3::zeros);
     let jd = o.epoch.tdb().jd();
     let (sun_p, sun_v) = pv(&kernel.state_au(10, 0, jd)?);
-    match &o.origin {
+    match o.origin {
         Origin::SSB => {}
         Origin::SUN => {
             p += sun_p;
             v += sun_v;
         }
-        Origin::Custom { name, .. } => {
-            return Err(format!("observers with a custom origin ('{}') are not supported; use SSB or SUN", name).into())
+        other => {
+            return Err(format!("observers with a custom origin ('{}') are not supported; use SSB or SUN", other).into())
         }
     }
     Ok((p, v, sun_p))
@@ -510,8 +510,8 @@ pub fn propagate(pop: &mut Population, epoch: &Time, kernel: &SpiceKernel, opts:
         };
     }
 
-    if let Origin::Custom { name, .. } = &pop.origin {
-        return Err(format!("N-body batch propagation needs a SUN or SSB origin, not '{}'", name).into());
+    if pop.origin.is_custom() {
+        return Err(format!("N-body batch propagation needs a SUN or SSB origin, not '{}'", pop.origin).into());
     }
     let subset = pop.select(&active);
     let states = states_at(&subset, &[t], kernel, opts)?;

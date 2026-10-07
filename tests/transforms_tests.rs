@@ -270,11 +270,11 @@ mod tests {
         let rock = SpaceRock::from_kepler("neo", 0.9, 0.3, 0.2, 1.0, 0.5, 0.3, epoch.clone(), "J2000", "SSB").unwrap();
         let obs = Observer::from_xyz(rock.position + Vector3::new(0.15, -0.1, 0.05), Some(Vector3::new(0.0, 0.017, 0.0)),
             epoch.clone(), spacerocks::ReferencePlane::J2000, spacerocks::Origin::SSB, None);
-        let cr = correct_for_ltt(&rock, &obs);
-        let tau = cr.position.norm() / SPEED_OF_LIGHT;
+        let (position, velocity) = correct_for_ltt(&rock, &obs);
+        let tau = position.norm() / SPEED_OF_LIGHT;
         let exact = rock.analytic_at(&(epoch - tau)).unwrap();
-        assert!((cr.position - (exact.position - obs.position)).norm() < 1e-10);
-        assert!((cr.velocity - (exact.velocity - obs.velocity.unwrap())).norm() < 1e-10);
+        assert!((position - (exact.position - obs.position)).norm() < 1e-10);
+        assert!((velocity - (exact.velocity - obs.velocity.unwrap())).norm() < 1e-10);
     }
 
     #[test]
