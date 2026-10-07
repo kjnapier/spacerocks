@@ -66,8 +66,8 @@ fn main() {
             println!("energy {} {:.17e}", sim.epoch.tdb().jd() - t0, sim.energy());
         }
     }
-    for p in &sim.particles {
-        println!("state {} {:.17e} {:.17e} {:.17e} {:.17e} {:.17e} {:.17e}", p.name, p.position.x, p.position.y, p.position.z, p.velocity.x, p.velocity.y, p.velocity.z);
+    for (name, [x, y, z, vx, vy, vz]) in sim.names().iter().zip(sim.states()) {
+        println!("state {} {:.17e} {:.17e} {:.17e} {:.17e} {:.17e} {:.17e}", name, x, y, z, vx, vy, vz);
     }
     println!("time {:.17e}", sim.epoch.tdb().jd() - t0);
     println!("seconds {seconds:.6}");

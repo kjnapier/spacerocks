@@ -1,11 +1,6 @@
-use crate::SpaceRock;
-use crate::time::Time;
 use crate::nbody::integrators::Integrator;
-use crate::nbody::forces::Force;
-
-use nalgebra::Vector3;
-
-// use rayon::prelude::*;
+use crate::nbody::forces::{total_acceleration, Force};
+use crate::state::{from_pv, pv, State};
 
 /// A leapfrog-style integrator for N-body simulations.
 /// 
@@ -41,37 +36,23 @@ impl Integrator for Leapfrog {
     /// 1. Half-step position update
     /// 2. Full-step velocity update using calculated accelerations
     /// 3. Final half-step position update
-    fn step(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>) {
+    fn step(&mut self, states: &mut [State], masses: &[f64], t: &mut f64, forces: &[Box<dyn Force + Send + Sync>]) {
         // drift
-        for particle in &mut *particles {
-            particle.position += particle.velocity * 0.5 * self.timestep;
-            particle.epoch += 0.5 * self.timestep;
-        }
-      
-        let mut accelerations = vec![Vector3::new(0.0, 0.0, 0.0); particles.len()];
-        for force in forces {
-            let acc = force.calculate_acceleration(particles);
-            for (idx, a) in acc.iter().enumerate() {
-                accelerations[idx] += a;
-            }
+        for s in states.iter_mut() {
+            let (x, v) = pv(s);
+            *s = from_pv(&(x + v * 0.5 * self.timestep), &v);
         }
 
-        // for particle in &mut *particles {
-        //     particle.velocity += self.timestep * particle.acceleration;
-        //     particle.position += particle.velocity * 0.5 * self.timestep;
-        //     particle.epoch += 0.5 * self.timestep;
-        // }
+        let mut accelerations = Vec::new();
+        total_acceleration(forces, states, masses, &mut accelerations);
 
-        *epoch += self.timestep;
+        *t += self.timestep;
 
-        for (particle, acceleration) in particles.iter_mut().zip(accelerations.iter()) {
-            particle.velocity += self.timestep * acceleration;
-            particle.position += particle.velocity * 0.5 * self.timestep;
-            particle.epoch = epoch.clone();
+        for (s, acceleration) in states.iter_mut().zip(accelerations.iter()) {
+            let (x, v) = pv(s);
+            let v = v + self.timestep * acceleration;
+            *s = from_pv(&(x + v * 0.5 * self.timestep), &v);
         }
-
-        
-
     }
 
     fn timestep(&self) -> f64 {

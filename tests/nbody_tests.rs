@@ -27,7 +27,7 @@ fn outer_system(integrator: Box<dyn Integrator + Send + Sync>, test_particle: bo
 }
 
 fn max_offset(a: &Simulation, b: &Simulation) -> (f64, f64) {
-    a.particles.iter().zip(&b.particles).fold((0.0, 0.0), |(dx, dv), (p, q)| {
+    a.particles().iter().zip(&b.particles()).fold((0.0, 0.0), |(dx, dv), (p, q)| {
         (f64::max(dx, (p.position - q.position).norm()), f64::max(dv, (p.velocity - q.velocity).norm()))
     })
 }
@@ -147,7 +147,7 @@ fn errors_vs_ias15(system: fn(Box<dyn Integrator + Send + Sync>) -> Simulation, 
     for sim in [&mut ias, &mut wh, &mut tr] {
         sim.integrate(&target);
     }
-    let err = |s: &Simulation| (s.particles[idx].position - ias.particles[idx].position).norm();
+    let err = |s: &Simulation| (s.particle(idx).position - ias.particle(idx).position).norm();
     (err(&wh), err(&tr))
 }
 
@@ -287,7 +287,7 @@ fn population(integrator: Box<dyn Integrator + Send + Sync>, encounters: bool) -
 
 fn assert_same(a: &Simulation, b: &Simulation) {
     assert_eq!(a.epoch.tdb().jd(), b.epoch.tdb().jd());
-    for (p, q) in a.particles.iter().zip(&b.particles) {
+    for (p, q) in a.particles().iter().zip(&b.particles()) {
         assert_eq!(p.name, q.name);
         assert_eq!((p.position, p.velocity), (q.position, q.velocity), "{}", p.name);
         assert_eq!(p.epoch.tdb().jd(), q.epoch.tdb().jd());

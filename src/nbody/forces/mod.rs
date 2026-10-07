@@ -9,7 +9,7 @@
 //! on a system of bodies.
 
 pub mod force;
-    pub use self::force::Force;
+    pub use self::force::{central_body, total_acceleration, Force};
 
 pub mod gravity;
     pub use self::gravity::NewtonianGravity;

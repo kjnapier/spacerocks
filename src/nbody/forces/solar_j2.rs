@@ -1,15 +1,13 @@
-use crate::nbody::forces::Force;
+use crate::nbody::forces::{central_body, Force};
+use crate::constants::GRAVITATIONAL_CONSTANT;
+use crate::state::{position, State};
 
-use crate::spacerock::SpaceRock;
-use crate::constants::{GRAVITATIONAL_CONSTANT};
-
-// use rayon::prelude::*;
 use nalgebra::Vector3;
-
 
 /// Implementation of perturbations due to the Sun's oblateness (J2).
 /// Accounts for the Sun's slight equatorial bulge which creates
-/// a non-spherical component to its gravitational field.
+/// a non-spherical component to its gravitational field. The Sun is the central body (the
+/// most massive one).
 #[derive(Debug, Clone, Copy)]
 pub struct SolarJ2;
 
@@ -17,26 +15,18 @@ const SUN_J2: f64 = 2.17e-7;
 const SUN_RADIUS: f64 = 696_342.0 / 149_597_870.7;
 
 impl Force for SolarJ2 {
-    /// Calculates acceleration due to the Sun's oblateness (J₂).
-    /// Note: This perturbation depends on latitude with respect to the solar equator 
-    /// (through the z-component) and falls off as r⁻⁵.
-    fn calculate_acceleration(&self, entities: &mut Vec<SpaceRock>) -> Vec<Vector3<f64>> {
+    /// Acceleration due to the Sun's oblateness (J₂). This perturbation depends on latitude
+    /// with respect to the solar equator (through the z-component) and falls off as r⁻⁵.
+    fn add_acceleration(&self, states: &[State], masses: &[f64], acc: &mut [Vector3<f64>]) {
+        let Some(sun) = central_body(masses) else { return };
+        let mu = GRAVITATIONAL_CONSTANT * masses[sun];
+        let sun_x = position(&states[sun]);
 
-        let mut acceleration = vec![Vector3::zeros(); entities.len()];
-
-        let sun_index = entities.iter().position(|x| x.name == *"sun").unwrap();
-        let sun = entities[sun_index].clone();
-        let mu = GRAVITATIONAL_CONSTANT * sun.mass();
-
-        for idx in 0..entities.len() {
-            if idx == sun_index {
-                acceleration[idx] = Vector3::zeros();
+        for (idx, s) in states.iter().enumerate() {
+            if idx == sun {
                 continue;
             }
-
-            let entity = &mut entities[idx];
-
-            let r_vec = entity.position - sun.position;
+            let r_vec = position(s) - sun_x;
             let r = r_vec.norm();
             let z2_r2 = r_vec[2] * r_vec[2] / (r * r);
 
@@ -44,10 +34,8 @@ impl Force for SolarJ2 {
             let ax = factor * r_vec.x * (5.0 * z2_r2 - 1.0);
             let ay = factor * r_vec.y * (5.0 * z2_r2 - 1.0);
             let az = factor * r_vec.z * (5.0 * z2_r2 - 3.0);
-        
-            // entity.acceleration += xi;
-            acceleration[idx] = Vector3::new(ax, ay, az);
+
+            acc[idx] += Vector3::new(ax, ay, az);
         }
-        acceleration
     }
 }

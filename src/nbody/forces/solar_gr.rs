@@ -1,49 +1,36 @@
-use crate::nbody::forces::Force;
-
-use crate::spacerock::SpaceRock;
+use crate::nbody::forces::{central_body, Force};
 use crate::constants::{GRAVITATIONAL_CONSTANT, SPEED_OF_LIGHT};
+use crate::state::{pv, State};
 
-// use rayon::prelude::*;
 use nalgebra::Vector3;
 
-
 #[derive(Debug, Clone, Copy)]
-/// Implementation of general relativistic corrections to solar gravity.
+/// Post-Newtonian correction to the gravity of the central body (the most massive one, the
+/// Sun in a solar system simulation).
 pub struct SolarGR;
 
 impl Force for SolarGR {
-    
-    /// Calculates relativistic acceleration.
-    fn calculate_acceleration(&self, entities: &mut Vec<SpaceRock>) -> Vec<Vector3<f64>> {
+    fn add_acceleration(&self, states: &[State], masses: &[f64], acc: &mut [Vector3<f64>]) {
+        let Some(sun) = central_body(masses) else { return };
+        let mu = GRAVITATIONAL_CONSTANT * masses[sun];
+        let (sun_x, sun_v) = pv(&states[sun]);
 
-        let mut acceleration = vec![Vector3::zeros(); entities.len()];
-
-        let sun_index = entities.iter().position(|x| x.name == *"sun").unwrap();
-        let sun = entities[sun_index].clone();
-        let mu = GRAVITATIONAL_CONSTANT * sun.mass();
-
-        for idx in 0..entities.len() {
-            if idx == sun_index {
-                acceleration[idx] = Vector3::zeros();
+        for (idx, s) in states.iter().enumerate() {
+            if idx == sun {
                 continue;
             }
-
-            let entity = &mut entities[idx];
-
-            let r_vec = entity.position - sun.position;
+            let (x, v) = pv(s);
+            let r_vec = x - sun_x;
             let r = r_vec.norm();
 
-            let v_vec = entity.velocity - sun.velocity;
+            let v_vec = v - sun_v;
             let v = v_vec.norm();
 
             let s0 = mu / (SPEED_OF_LIGHT.powi(2) * r * r * r);
             let s1 = ((4.0 * mu) / r - v * v) * r_vec;
             let s2 = 4.0 * (r_vec.dot(&v_vec)) * v_vec;
 
-            let xi = s0 * (s1 + s2);
-            // entity.acceleration += xi;
-            acceleration[idx] = xi;
+            acc[idx] += s0 * (s1 + s2);
         }
-        acceleration
     }
 }

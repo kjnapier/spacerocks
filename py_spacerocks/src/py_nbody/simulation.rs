@@ -3,7 +3,8 @@ use pyo3::types::PyType;
 
 use spacerocks::nbody::Simulation;
 use spacerocks::coordinates::{ReferencePlane, Origin};
-use spacerocks::Time;   
+use spacerocks::Time;
+use numpy::{IntoPyArray, PyArray1, PyArray2};   
 
 use crate::PySpaceRock;
 // use crate::py_spacerock::rockcollection::RockCollection;
@@ -234,6 +235,36 @@ impl PySimulation {
     /// Calculate the total energy of the simulation.
     pub fn energy(&self) -> f64 {
         self.inner.energy()
+    }
+
+    /// States of the particles as an `(n, 6)` array of `x, y, z` (AU) and `vx, vy, vz`
+    /// (AU/day), massive particles first. A copy.
+    #[getter]
+    pub fn states<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f64>> {
+        let n = self.inner.len();
+        let flat = self.inner.states().as_flattened().to_vec();
+        numpy::ndarray::Array2::from_shape_vec((n, 6), flat).unwrap().into_pyarray(py)
+    }
+
+    /// Masses of the particles (solar masses), in the order of `states`.
+    #[getter]
+    pub fn masses<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.inner.masses().to_vec().into_pyarray(py)
+    }
+
+    /// Names of the particles, in the order of `states`.
+    #[getter]
+    pub fn names(&self) -> Vec<String> {
+        self.inner.names().to_vec()
+    }
+
+    /// Every particle as a SpaceRock, in the order of `states`.
+    pub fn particles(&self) -> Vec<PySpaceRock> {
+        self.inner.particles().into_iter().map(|r| PySpaceRock { inner: r }).collect()
+    }
+
+    fn __len__(&self) -> usize {
+        self.inner.len()
     }
 
     /// Get a single particle from the simulation by name.

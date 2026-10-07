@@ -1,41 +1,38 @@
-use crate::SpaceRock;
-use crate::time::Time;
 use crate::nbody::forces::Force;
-
-use nalgebra::Vector3;
+use crate::state::State;
 
 
 /// A numerical integrator for advancing a system of particles forward in time.
-/// 
-/// This trait defines the core functionality required for any numerical integrator
-/// in the system. Implementors must be thread-safe (Send + Sync) and clonable.
-/// 
-/// The integrator is responsible for:
-/// - Advancing particle states (positions and velocities) through time
-/// - Managing timestep size
-/// - Coordinating force calculations
+///
+/// Integrators work on plain state: a slice of states `[x, y, z, vx, vy, vz]` (AU, AU/day),
+/// updated in place, the bodies' masses (solar masses, massive bodies first, 0 for test
+/// particles), and the time `t` in days (the TDB Julian date in a
+/// [`Simulation`](crate::nbody::Simulation)). Names, epochs, origins and reference planes are
+/// the simulation's business. Implementors must be thread-safe (Send + Sync) and clonable.
 pub trait Integrator: Send + Sync + IntegratorClone {
     /// Advances the system one timestep forward
     ///
     /// # Arguments
     ///
-    /// * `particles` - Vector of particles to be integrated
-    /// * `epoch` - Current simulation time, updated in-place to the new time
-    /// * `forces` - Vector of forces acting on the system
-    fn step(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>);
+    /// * `states` - States of the bodies, updated in place
+    /// * `masses` - Masses of the bodies
+    /// * `t` - Current time, advanced in place
+    /// * `forces` - Forces acting on the system
+    fn step(&mut self, states: &mut [State], masses: &[f64], t: &mut f64, forces: &[Box<dyn Force + Send + Sync>]);
 
     /// Advances the system `n` timesteps. The default calls [`Integrator::step`] `n` times;
     /// integrators can override it to share work between steps, with the same result.
     ///
     /// # Arguments
     ///
-    /// * `particles` - Vector of particles to be integrated
-    /// * `epoch` - Current simulation time, updated in-place to the new time
-    /// * `forces` - Vector of forces acting on the system
+    /// * `states` - States of the bodies, updated in place
+    /// * `masses` - Masses of the bodies
+    /// * `t` - Current time, advanced in place
+    /// * `forces` - Forces acting on the system
     /// * `n` - Number of steps
-    fn steps(&mut self, particles: &mut Vec<SpaceRock>, epoch: &mut Time, forces: &Vec<Box<dyn Force + Send + Sync>>, n: usize) {
+    fn steps(&mut self, states: &mut [State], masses: &[f64], t: &mut f64, forces: &[Box<dyn Force + Send + Sync>], n: usize) {
         for _ in 0..n {
-            self.step(particles, epoch, forces);
+            self.step(states, masses, t, forces);
         }
     }
 
@@ -61,13 +58,9 @@ pub trait Integrator: Send + Sync + IntegratorClone {
         false
     }
 
-    /// Positions and velocities of every particle at the TDB Julian date `jd`, if `jd` falls
-    /// within the last completed step. Integrators without dense output return `None`.
-    ///
-    /// # Arguments
-    ///
-    /// * `jd` - TDB Julian date to interpolate to
-    fn interpolate(&self, _jd: f64) -> Option<(Vec<Vector3<f64>>, Vec<Vector3<f64>>)> {
+    /// States of every body at time `t` (on the same clock as [`Integrator::step`]'s), if `t`
+    /// falls within the last completed step. Integrators without dense output return `None`.
+    fn interpolate(&self, _t: f64) -> Option<Vec<State>> {
         None
     }
 }
