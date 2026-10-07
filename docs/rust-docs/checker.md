@@ -6,7 +6,9 @@ the validation results are in `docs/python-docs/checker.md`.
 ## Types
 
 - **`Catalog`**: orbits stored as columns.
-  - `name`, `epoch` (TDB JD), `state` (barycentric J2000), `nongrav`, `fit_nongrav`.
+  - `orbits`: a J2000 / SSB `Population` with the names, epochs (TDB JD) and barycentric
+    states, the same type `batch` works on.
+  - `nongrav`, `fit_nongrav`.
   - `covariance`: row-major npar×npar (the state, then the fitted A1–A3), empty if unknown.
   - `h`, `g`, `u` (the MPC's uncertainty parameter), `last_obs`.
   - An optional `snapshot`: every orbit integrated to `snapshot_epoch`.

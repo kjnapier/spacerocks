@@ -138,8 +138,8 @@ fn elements(name: &str, a: f64, e: f64, inc: f64, node: f64, peri: f64, m: f64, 
 /// catalog's own (N-body) orbit.
 fn detect(cat: &Catalog, i: usize, times: &[f64], k: &SpiceKernel) -> Astrometry {
     let mut fit = OrbitFit::failed(FitFlag::Converged);
-    fit.epoch = cat.epoch[i];
-    fit.state = cat.state[i];
+    fit.epoch = cat.orbits.epochs[i];
+    fit.state = cat.orbits.states[i];
     let codes = vec!["X05".to_string(); times.len()];
     let obs = orbfit::observer_positions(&codes, times, k).unwrap();
     let p = orbfit::predict(&fit, times, &obs, k, &FitOptions::default()).unwrap();
@@ -176,7 +176,7 @@ fn test_catalog(k: &SpiceKernel) -> Catalog {
 fn identifies_detections_of_catalog_objects() {
     let Some(k) = kernel() else { return };
     let cat = test_catalog(&k);
-    let t0 = cat.epoch[0];
+    let t0 = cat.orbits.epochs[0];
     // Near the epoch (two-body from the orbits), and 200 days later (integrated first).
     let times = [t0 + 3.0, t0 + 3.02, t0 + 5.0, t0 + 200.0, t0 + 200.02];
     let mut det = Astrometry::default();
@@ -217,11 +217,11 @@ fn identifies_detections_of_catalog_objects() {
 fn covariance_orbits_and_snapshots() {
     let Some(k) = kernel() else { return };
     let base = test_catalog(&k);
-    let t0 = base.epoch[0];
+    let t0 = base.orbits.epochs[0];
     // Object 0 as a "fit" with a covariance: 1000 km in position, 1 cm/s in velocity.
     let mut fit = OrbitFit::failed(FitFlag::Converged);
     fit.epoch = t0;
-    fit.state = base.state[0];
+    fit.state = base.orbits.states[0];
     fit.covariance = vec![0.0; 36];
     for i in 0..3 {
         fit.covariance[i * 7] = (1000.0 / 1.495978707e8f64).powi(2);

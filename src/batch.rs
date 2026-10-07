@@ -1,5 +1,10 @@
 //! Batch propagation and ephemerides for many rocks and many epochs.
 //!
+//! Each function comes in two forms: on a [`Population`] ([`states_at`], [`propagate`],
+//! [`ephemeris`]), which has one reference plane and origin for all its bodies, and on a slice
+//! of [`SpaceRock`]s ([`states_at_rocks`], [`propagate_batch`], [`ephemeris_rocks`]), where
+//! every rock may have its own. Both run the same code and give identical results.
+//!
 //! The functions here are the fast path for population-scale work. Compared with calling
 //! [`SpaceRock::propagate`] and [`SpaceRock::observe`] in a loop they
 //!
@@ -25,7 +30,8 @@ use rayon::prelude::*;
 
 use crate::assist::{PerturberCache, SpiceSimulation};
 use crate::observing::{apparent, Apparent};
-use crate::{Observer, Origin, ReferencePlane, SpaceRock, SpiceKernel, Time};
+use crate::state::{self as st, State};
+use crate::{Observer, Origin, Population, Properties, ReferencePlane, SpaceRock, SpiceKernel, Time};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -150,6 +156,113 @@ fn rock_to_ssb_j2000(rock: &SpaceRock, suns: &SunCache, kernel: &SpiceKernel) ->
     }
 }
 
+/// What the batch code needs of the bodies it moves, wherever they are stored.
+trait Bodies: Sync {
+    fn len(&self) -> usize;
+    /// TDB Julian date of body `i`'s state.
+    fn epoch(&self, i: usize) -> f64;
+    fn name(&self, i: usize) -> &str;
+    fn properties(&self, i: usize) -> Option<&Properties>;
+    /// Barycentric J2000 state of body `i` at its epoch (`suns` holds the Sun at every epoch).
+    fn ssb_j2000(&self, i: usize, suns: &SunCache, kernel: &SpiceKernel) -> Result<State, BoxError>;
+    /// Barycentric J2000 states of body `i` moved on its two-body orbit about its origin to each
+    /// of `targets` (`times` the same as [`Time`]s; `suns` holds the Sun at every target).
+    fn two_body_ssb_j2000(&self, i: usize, targets: &[f64], times: &[Time], suns: &SunCache, row: &mut [State]) -> Result<(), BoxError>;
+}
+
+impl Bodies for [SpaceRock] {
+    fn len(&self) -> usize {
+        <[SpaceRock]>::len(self)
+    }
+    fn epoch(&self, i: usize) -> f64 {
+        self[i].epoch.tdb().jd()
+    }
+    fn name(&self, i: usize) -> &str {
+        &self[i].name
+    }
+    fn properties(&self, i: usize) -> Option<&Properties> {
+        self[i].properties.as_ref()
+    }
+    fn ssb_j2000(&self, i: usize, suns: &SunCache, kernel: &SpiceKernel) -> Result<State, BoxError> {
+        rock_to_ssb_j2000(&self[i], suns, kernel)
+    }
+    fn two_body_ssb_j2000(&self, i: usize, targets: &[f64], times: &[Time], suns: &SunCache, row: &mut [State]) -> Result<(), BoxError> {
+        let rock = &self[i];
+        if let Origin::Custom { name, .. } = &rock.origin {
+            return Err(format!("{}: two-body batch propagation needs a SUN or SSB origin, not '{}'", rock.name, name).into());
+        }
+        let m_rot = to_j2000(&rock.reference_plane);
+        for (j, t) in times.iter().enumerate() {
+            let r = rock.analytic_at(t).map_err(|e| format!("{}: {}", rock.name, e))?;
+            row[j] = helio_to_ssb(&rock.origin, &m_rot, &r.position, &r.velocity, suns, targets[j]);
+        }
+        Ok(())
+    }
+}
+
+/// A [`Population`] with its rotation to J2000 worked out once.
+struct PopulationView<'a> {
+    pop: &'a Population,
+    m_rot: Matrix3<f64>,
+}
+
+impl<'a> PopulationView<'a> {
+    fn new(pop: &'a Population) -> Self {
+        PopulationView { pop, m_rot: to_j2000(&pop.reference_plane) }
+    }
+}
+
+impl Bodies for PopulationView<'_> {
+    fn len(&self) -> usize {
+        self.pop.len()
+    }
+    fn epoch(&self, i: usize) -> f64 {
+        self.pop.epochs[i]
+    }
+    fn name(&self, i: usize) -> &str {
+        &self.pop.names[i]
+    }
+    fn properties(&self, i: usize) -> Option<&Properties> {
+        self.pop.properties[i].as_ref()
+    }
+    fn ssb_j2000(&self, i: usize, suns: &SunCache, kernel: &SpiceKernel) -> Result<State, BoxError> {
+        match &self.pop.origin {
+            Origin::SSB | Origin::SUN => {
+                let (p, v) = pv(&self.pop.states[i]);
+                Ok(helio_to_ssb(&self.pop.origin, &self.m_rot, &p, &v, suns, self.pop.epochs[i]))
+            }
+            Origin::Custom { .. } => rock_to_ssb_j2000(&self.pop.get(i).unwrap(), suns, kernel),
+        }
+    }
+    fn two_body_ssb_j2000(&self, i: usize, targets: &[f64], _times: &[Time], suns: &SunCache, row: &mut [State]) -> Result<(), BoxError> {
+        if let Origin::Custom { name, .. } = &self.pop.origin {
+            return Err(format!("{}: two-body batch propagation needs a SUN or SSB origin, not '{}'", self.pop.names[i], name).into());
+        }
+        let mu = self.pop.origin.mu();
+        let (s0, t0) = (&self.pop.states[i], self.pop.epochs[i]);
+        for (j, &t) in targets.iter().enumerate() {
+            let s = st::kepler_step(s0, mu, t - t0).map_err(|e| format!("{}: {}", self.pop.names[i], e))?;
+            let (p, v) = pv(&s);
+            row[j] = helio_to_ssb(&self.pop.origin, &self.m_rot, &p, &v, suns, t);
+        }
+        Ok(())
+    }
+}
+
+/// Rotate a state about `origin` (SUN or SSB) to J2000 with `m_rot`, and make it barycentric
+/// with the Sun's state at `jd` from `suns`.
+#[inline]
+fn helio_to_ssb(origin: &Origin, m_rot: &Matrix3<f64>, p: &Vector3<f64>, v: &Vector3<f64>, suns: &SunCache, jd: f64) -> State {
+    let mut p = m_rot * p;
+    let mut v = m_rot * v;
+    if *origin == Origin::SUN {
+        let (sp, sv) = pv(&suns.get(jd));
+        p += sp;
+        v += sv;
+    }
+    state6(&p, &v)
+}
+
 /// Barycentric J2000 observer (position, velocity, Sun position) at its epoch.
 fn observer_to_ssb_j2000(o: &Observer, kernel: &SpiceKernel) -> Result<(Vector3<f64>, Vector3<f64>, Vector3<f64>), BoxError> {
     let m = to_j2000(&o.reference_plane);
@@ -210,9 +323,9 @@ fn make_chunks(t0s: &[f64], states: &[[f64; 6]], active: &[usize], chunk_size: u
 
 /// Integrate one chunk through the (unique, sorted) target epochs. Returns the states as
 /// `[rock_in_chunk][target]`.
-fn run_nbody_chunk(
+fn run_nbody_chunk<B: Bodies + ?Sized>(
     chunk: &Chunk,
-    rocks: &[SpaceRock],
+    bodies: &B,
     states: &[[f64; 6]],
     targets: &[f64],
     kernel: &SpiceKernel,
@@ -246,7 +359,7 @@ fn run_nbody_chunk(
                 position: p,
                 velocity: v,
                 // Physical properties carry non-gravitational parameters (and mass).
-                properties: rocks[i].properties.clone(),
+                properties: bodies.properties(i).cloned(),
             };
             sim.add(rock).map_err(|e| e.to_string())?;
         }
@@ -292,21 +405,31 @@ fn build_cache(
         .map(Arc::new)
 }
 
-/// Barycentric J2000 states of every rock at every target epoch (TDB Julian dates), row-major
-/// `[rock][target]`, by `opts.method`. Each rock is integrated once through all targets.
-pub fn states_at(
-    rocks: &[SpaceRock],
+/// Barycentric J2000 states of every body of `pop` at every target epoch (TDB Julian dates),
+/// row-major `[body][target]`, by `opts.method`. Each body is integrated once through all
+/// targets.
+pub fn states_at(pop: &Population, targets: &[f64], kernel: &SpiceKernel, opts: &BatchOptions) -> Result<Vec<[f64; 6]>, BoxError> {
+    states_at_bodies(&PopulationView::new(pop), targets, kernel, opts)
+}
+
+/// [`states_at`] for rocks that may each have their own reference plane and origin.
+pub fn states_at_rocks(rocks: &[SpaceRock], targets: &[f64], kernel: &SpiceKernel, opts: &BatchOptions) -> Result<Vec<[f64; 6]>, BoxError> {
+    states_at_bodies(rocks, targets, kernel, opts)
+}
+
+fn states_at_bodies<B: Bodies + ?Sized>(
+    bodies: &B,
     targets: &[f64],
     kernel: &SpiceKernel,
     opts: &BatchOptions,
 ) -> Result<Vec<[f64; 6]>, BoxError> {
-    let n = rocks.len();
+    let n = bodies.len();
     let m = targets.len();
     let mut out = vec![[f64::NAN; 6]; n * m];
     if n == 0 || m == 0 {
         return Ok(out);
     }
-    let t0s: Vec<f64> = rocks.iter().map(|r| r.epoch.tdb().jd()).collect();
+    let t0s: Vec<f64> = (0..n).map(|i| bodies.epoch(i)).collect();
 
     match opts.method {
         Method::TwoBody => {
@@ -316,25 +439,7 @@ pub fn states_at(
                 .map(|&t| Time::new(t, "tdb", "jd"))
                 .collect::<Result<_, _>>()
                 .map_err(|e| e.to_string())?;
-            let work = |(i, row): (usize, &mut [[f64; 6]])| -> Result<(), BoxError> {
-                let rock = &rocks[i];
-                if let Origin::Custom { name, .. } = &rock.origin {
-                    return Err(format!("{}: two-body batch propagation needs a SUN or SSB origin, not '{}'", rock.name, name).into());
-                }
-                let m_rot = to_j2000(&rock.reference_plane);
-                for (j, t) in target_times.iter().enumerate() {
-                    let r = rock.analytic_at(t).map_err(|e| format!("{}: {}", rock.name, e))?;
-                    let mut p = m_rot * r.position;
-                    let mut v = m_rot * r.velocity;
-                    if rock.origin == Origin::SUN {
-                        let (sp, sv) = pv(&suns.get(targets[j]));
-                        p += sp;
-                        v += sv;
-                    }
-                    row[j] = state6(&p, &v);
-                }
-                Ok(())
-            };
+            let work = |(i, row): (usize, &mut [[f64; 6]])| bodies.two_body_ssb_j2000(i, targets, &target_times, &suns, row);
             if opts.parallel {
                 out.par_chunks_mut(m).enumerate().try_for_each(work)?;
             } else {
@@ -344,16 +449,16 @@ pub fn states_at(
         Method::NBody => {
             let suns = SunCache::new(t0s.iter().copied(), kernel)?;
             let states: Vec<[f64; 6]> = if opts.parallel {
-                rocks.par_iter().map(|r| rock_to_ssb_j2000(r, &suns, kernel)).collect::<Result<_, _>>()?
+                (0..n).into_par_iter().map(|i| bodies.ssb_j2000(i, &suns, kernel)).collect::<Result<_, _>>()?
             } else {
-                rocks.iter().map(|r| rock_to_ssb_j2000(r, &suns, kernel)).collect::<Result<_, _>>()?
+                (0..n).map(|i| bodies.ssb_j2000(i, &suns, kernel)).collect::<Result<_, _>>()?
             };
             let all: Vec<usize> = (0..n).collect();
             let chunks = make_chunks(&t0s, &states, &all, opts.chunk_size, opts.parallel);
             let cache = build_cache(&t0s, targets, kernel, opts, chunks.len());
             let run = |c: &Chunk| {
-                run_nbody_chunk(c, rocks, &states, targets, kernel, cache.as_ref()).map_err(|e| -> BoxError {
-                    let names: Vec<&str> = c.rocks.iter().take(3).map(|&i| rocks[i].name.as_str()).collect();
+                run_nbody_chunk(c, bodies, &states, targets, kernel, cache.as_ref()).map_err(|e| -> BoxError {
+                    let names: Vec<&str> = c.rocks.iter().take(3).map(|&i| bodies.name(i)).collect();
                     let more = if c.rocks.len() > 3 { format!(" and {} more", c.rocks.len() - 3) } else { String::new() };
                     format!("integrating {}{}: {}", names.join(", "), more, e).into()
                 })
@@ -371,6 +476,59 @@ pub fn states_at(
         }
     }
     Ok(out)
+}
+
+/// Propagate every body of `pop` to `epoch`.
+///
+/// Equivalent to calling [`SpaceRock::propagate`] (for [`Method::NBody`]) or
+/// [`SpaceRock::analytic_propagate`] (for [`Method::TwoBody`]) on each body, but much faster for
+/// large populations. The population keeps its reference plane; a SUN or SSB origin is kept (a
+/// custom origin is an error for N-body propagation). Bodies already at `epoch` are left
+/// untouched.
+pub fn propagate(pop: &mut Population, epoch: &Time, kernel: &SpiceKernel, opts: &BatchOptions) -> Result<(), BoxError> {
+    let t = epoch.tdb().jd();
+    let active: Vec<usize> = (0..pop.len()).filter(|&i| pop.epochs[i] != t).collect();
+    if active.is_empty() {
+        return Ok(());
+    }
+
+    if opts.method == Method::TwoBody {
+        let mu = pop.origin.mu();
+        let names = &pop.names;
+        let work = |(i, (s, ep)): (usize, (&mut State, &mut f64))| -> Result<(), BoxError> {
+            if *ep == t {
+                return Ok(());
+            }
+            *s = st::kepler_step(s, mu, t - *ep).map_err(|e| BoxError::from(format!("{}: {}", names[i], e)))?;
+            *ep = t;
+            Ok(())
+        };
+        return if opts.parallel {
+            pop.states.par_iter_mut().zip(pop.epochs.par_iter_mut()).enumerate().try_for_each(work)
+        } else {
+            pop.states.iter_mut().zip(pop.epochs.iter_mut()).enumerate().try_for_each(work)
+        };
+    }
+
+    if let Origin::Custom { name, .. } = &pop.origin {
+        return Err(format!("N-body batch propagation needs a SUN or SSB origin, not '{}'", name).into());
+    }
+    let subset = pop.select(&active);
+    let states = states_at(&subset, &[t], kernel, opts)?;
+    let (sun_p, sun_v) = pv(&kernel.state_au(10, 0, t)?);
+    let m = pop.reference_plane.get_rotation_matrix();
+    let helio = pop.origin == Origin::SUN;
+
+    for (k, &i) in active.iter().enumerate() {
+        let (mut p, mut v) = pv(&states[k]);
+        if helio {
+            p -= sun_p;
+            v -= sun_v;
+        }
+        pop.states[i] = state6(&(m * p), &(m * v));
+        pop.epochs[i] = t;
+    }
+    Ok(())
 }
 
 /// Propagate many rocks to one epoch.
@@ -402,7 +560,7 @@ pub fn propagate_batch(rocks: &mut [SpaceRock], epoch: &Time, kernel: &SpiceKern
     }
 
     let subset: Vec<SpaceRock> = active.iter().map(|&i| rocks[i].clone()).collect();
-    let states = states_at(&subset, &[t], kernel, opts)?;
+    let states = states_at_rocks(&subset, &[t], kernel, opts)?;
     let (sun_p, sun_v) = pv(&kernel.state_au(10, 0, t)?);
 
     for (k, &i) in active.iter().enumerate() {
@@ -425,15 +583,24 @@ pub fn propagate_batch(rocks: &mut [SpaceRock], epoch: &Time, kernel: &SpiceKern
     Ok(())
 }
 
-/// Ephemerides of many rocks at many epochs.
+/// Ephemerides of every body of `pop` at many epochs.
 ///
 /// `observers` gives one observer per epoch (for example from
 /// [`crate::Observatory::at`]); their epochs are the output epochs, in any order, and may be
-/// before or after the rocks' epochs. Each rock is integrated once through all epochs.
-/// RA/Dec are in the J2000 (ICRF) equator regardless of the rocks' or observers' reference
-/// planes. The rocks themselves are not modified.
-pub fn ephemeris(rocks: &[SpaceRock], observers: &[Observer], kernel: &SpiceKernel, opts: &BatchOptions) -> Result<Ephemeris, BoxError> {
-    let n = rocks.len();
+/// before or after the bodies' epochs. Each body is integrated once through all epochs.
+/// RA/Dec are in the J2000 (ICRF) equator regardless of the population's or observers'
+/// reference planes. The population itself is not modified.
+pub fn ephemeris(pop: &Population, observers: &[Observer], kernel: &SpiceKernel, opts: &BatchOptions) -> Result<Ephemeris, BoxError> {
+    ephemeris_bodies(&PopulationView::new(pop), observers, kernel, opts)
+}
+
+/// [`ephemeris`] for rocks that may each have their own reference plane and origin.
+pub fn ephemeris_rocks(rocks: &[SpaceRock], observers: &[Observer], kernel: &SpiceKernel, opts: &BatchOptions) -> Result<Ephemeris, BoxError> {
+    ephemeris_bodies(rocks, observers, kernel, opts)
+}
+
+fn ephemeris_bodies<B: Bodies + ?Sized>(bodies: &B, observers: &[Observer], kernel: &SpiceKernel, opts: &BatchOptions) -> Result<Ephemeris, BoxError> {
+    let n = bodies.len();
     let m = observers.len();
     let epochs: Vec<f64> = observers.iter().map(|o| o.epoch.tdb().jd()).collect();
     let (targets, target_index) = unique_sorted(&epochs);
@@ -441,15 +608,14 @@ pub fn ephemeris(rocks: &[SpaceRock], observers: &[Observer], kernel: &SpiceKern
     let obs: Vec<(Vector3<f64>, Vector3<f64>, Vector3<f64>)> =
         observers.iter().map(|o| observer_to_ssb_j2000(o, kernel)).collect::<Result<_, _>>()?;
 
-    let states = states_at(rocks, &targets, kernel, opts)?;
+    let states = states_at_bodies(bodies, &targets, kernel, opts)?;
     let mt = targets.len();
 
     let mut apps = vec![Apparent::NAN; n * m];
     let mut out_states = if opts.with_states { Some(vec![[f64::NAN; 6]; n * m]) } else { None };
 
     let fill = |(i, row): (usize, &mut [Apparent])| {
-        let rock = &rocks[i];
-        let (h, g) = match &rock.properties {
+        let (h, g) = match bodies.properties(i) {
             Some(p) => (p.absolute_magnitude, p.gslope.unwrap_or(0.15)),
             None => (None, 0.15),
         };

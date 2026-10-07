@@ -301,7 +301,7 @@ fn has_covariance(cat: &Catalog, i: usize) -> bool {
 fn sigma_hint(cat: &Catalog, i: usize, t: f64, r_h: f64) -> f64 {
     let c = &cat.covariance[i];
     if has_covariance(cat, i) {
-        let dt = (t - cat.epoch[i]).abs();
+        let dt = (t - cat.orbits.epochs[i]).abs();
         let n = (c.len() as f64).sqrt().round() as usize;
         let sp = (c[0] + c[n + 1] + c[2 * n + 2]).max(0.0).sqrt();
         let sv = (c[3 * n + 3] + c[4 * n + 4] + c[5 * n + 5]).max(0.0).sqrt();
@@ -360,7 +360,7 @@ fn within(x: [f64; 2], cov: &[[f64; 2]; 2], nsigma: f64, slack: f64) -> bool {
 fn longitude_sigma(cat: &Catalog, i: usize, t: f64) -> f64 {
     let u = cat.u[i];
     let runoff = runoff_from_u(if u.is_finite() { u } else { 9.0 });
-    let mut dt = (t - cat.epoch[i]).abs();
+    let mut dt = (t - cat.orbits.epochs[i]).abs();
     if cat.last_obs[i].is_finite() {
         dt = dt.max(t - cat.last_obs[i]);
     }
@@ -469,7 +469,7 @@ pub fn check(catalog: &Catalog, detections: &Astrometry, correlation: &[f64], ke
         let mut need: Vec<Vec<usize>> = vec![Vec::new(); clusters.len()];
         for &i in block {
             for (c, cl) in clusters.iter().enumerate() {
-                let own = age(catalog.epoch[i], cl);
+                let own = age(catalog.orbits.epochs[i], cl);
                 let sn = if snap && catalog.snapshot[i][0].is_finite() { age(catalog.snapshot_epoch, cl) } else { f64::INFINITY };
                 if own.min(sn) > opts.max_age {
                     need[c].push(i);
@@ -488,7 +488,7 @@ pub fn check(catalog: &Catalog, detections: &Astrometry, correlation: &[f64], ke
 
         // The Sun at every reference epoch.
         let mut suns: HashMap<u64, [f64; 6]> = HashMap::new();
-        let mut ref_epochs: Vec<f64> = block.iter().map(|&i| catalog.epoch[i]).collect();
+        let mut ref_epochs: Vec<f64> = block.iter().map(|&i| catalog.orbits.epochs[i]).collect();
         ref_epochs.extend(&targets);
         if snap {
             ref_epochs.push(catalog.snapshot_epoch);
@@ -509,7 +509,7 @@ pub fn check(catalog: &Catalog, detections: &Astrometry, correlation: &[f64], ke
             let Some((p_w, v_w)) = kepler(p_r, v_r, mu, t - t_r) else { return false };
             let rho_w = p_w + Vector3::new(sun[0], sun[1], sun[2]) - obs;
             let delta_w = rho_w.norm();
-            let t_far = if (t + half - catalog.epoch[i]).abs() > (t - half - catalog.epoch[i]).abs() { t + half } else { t - half };
+            let t_far = if (t + half - catalog.orbits.epochs[i]).abs() > (t - half - catalog.orbits.epochs[i]).abs() { t + half } else { t - half };
             let sigma_obj = sigma_hint(catalog, i, t_far, p_w.norm()) / delta_w;
             let dt_max = (t - t_r).abs() + half;
             // Objects too uncertain to be matched are still reported within `radius`.
@@ -534,9 +534,9 @@ pub fn check(catalog: &Catalog, detections: &Astrometry, correlation: &[f64], ke
                 let (t_r, s_r) = if let (Some(&k), Some(&col)) = (obj_row.get(&i), tgt_col.get(&c)) {
                     (targets[col], integrated[k * mt + col])
                 } else {
-                    let own = age(catalog.epoch[i], cl);
+                    let own = age(catalog.orbits.epochs[i], cl);
                     let sn = if snap && catalog.snapshot[i][0].is_finite() { age(catalog.snapshot_epoch, cl) } else { f64::INFINITY };
-                    if sn < own { (catalog.snapshot_epoch, catalog.snapshot[i]) } else { (catalog.epoch[i], catalog.state[i]) }
+                    if sn < own { (catalog.snapshot_epoch, catalog.snapshot[i]) } else { (catalog.orbits.epochs[i], catalog.orbits.states[i]) }
                 };
                 if !s_r.iter().all(|x| x.is_finite()) {
                     continue;
@@ -626,10 +626,10 @@ pub fn check(catalog: &Catalog, detections: &Astrometry, correlation: &[f64], ke
         // Start from the orbit's own state (where its covariance is defined), or, without a
         // covariance, from the snapshot if that is closer to the detections.
         let t_mid = 0.5 * (detections.epoch[dets[0]] + detections.epoch[*dets.last().unwrap()]);
-        let (t0, s0) = if !has_cov && snap && catalog.snapshot[i][0].is_finite() && (catalog.snapshot_epoch - t_mid).abs() < (catalog.epoch[i] - t_mid).abs() {
+        let (t0, s0) = if !has_cov && snap && catalog.snapshot[i][0].is_finite() && (catalog.snapshot_epoch - t_mid).abs() < (catalog.orbits.epochs[i] - t_mid).abs() {
             (catalog.snapshot_epoch, catalog.snapshot[i])
         } else {
-            (catalog.epoch[i], catalog.state[i])
+            (catalog.orbits.epochs[i], catalog.orbits.states[i])
         };
         let fit = catalog.orbit_fit(i, s0, t0);
         let epochs: Vec<f64> = dets.iter().map(|&j| detections.epoch[j]).collect();

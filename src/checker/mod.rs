@@ -19,7 +19,7 @@
 //! # let detections = Astrometry::default();
 //! let found = check(&catalog, &detections, &[], &kernel, &CheckOptions::default())?;
 //! for m in found.matches.iter().filter(|m| m.consistent) {
-//!     println!("detection {} is {} ({:.2} sigma)", m.detection, catalog.name[m.object], m.distance);
+//!     println!("detection {} is {} ({:.2} sigma)", m.detection, catalog.orbits.names[m.object], m.distance);
 //! }
 //! # Ok(()) }
 //! ```
