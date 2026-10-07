@@ -19,7 +19,8 @@ use nalgebra::Vector3;
 /// A simulation maintains:
 /// - The states of its particles as one array of `[x, y, z, vx, vy, vz]`, with their masses,
 ///   names and properties in columns beside it (massive particles first, by decreasing mass)
-/// - The current simulation epoch (TDB), shared by every particle
+/// - The current simulation epoch (TDB), shared by every particle, kept as a reference Julian
+///   date plus the days since it (as ASSIST does), so steps of any length add up exactly
 /// - Reference frame and origin specifications, shared by every particle
 /// - Integration method and forces
 ///
@@ -28,9 +29,10 @@ use nalgebra::Vector3;
 /// ([`Simulation::get_particle`], [`Simulation::particles`]).
 #[derive(Clone)]
 pub struct Simulation {
-    /// The epoch of every particle. Kept as a TDB Julian date (an epoch set in another
-    /// timescale or format is converted at the next step).
-    pub epoch: Time,
+    /// TDB Julian date the simulation's clock counts from.
+    jd_ref: f64,
+    /// Days since `jd_ref` of every particle; the integrators' clock.
+    t: f64,
     pub particle_index_map: HashMap<String, usize>,
 
     pub reference_plane: ReferencePlane,
@@ -53,7 +55,7 @@ pub struct Simulation {
 /// Where the integrator actually is, kept aside by [`Simulation::integrate_or_interpolate`].
 #[derive(Clone)]
 struct SyncedState {
-    epoch: Time,
+    t: f64,
     states: Vec<State>,
 }
 
@@ -75,7 +77,8 @@ impl Simulation {
             masses: Vec::new(),
             names: Vec::new(),
             properties: Vec::new(),
-            epoch: tdb_jd(epoch),
+            jd_ref: epoch.tdb().jd(),
+            t: 0.0,
             forces: vec![Box::new(NewtonianGravity)],
             reference_plane: reference_plane,  
             origin: origin,
@@ -84,6 +87,29 @@ impl Simulation {
             synced: None,
             dense_valid: false,
         })
+    }
+
+    /// The simulation's epoch (TDB Julian date).
+    pub fn epoch(&self) -> Time {
+        Time::new(self.jd_ref + self.t, "tdb", "jd").expect("valid time")
+    }
+
+    /// Days since the reference epoch, the integrators' clock.
+    pub fn t(&self) -> f64 {
+        self.t
+    }
+
+    /// Set the epoch without moving the particles (it becomes the new reference epoch).
+    pub fn set_epoch(&mut self, epoch: &Time) {
+        self.synchronize();
+        self.dense_valid = false;
+        self.jd_ref = epoch.tdb().jd();
+        self.t = 0.0;
+    }
+
+    /// `epoch` in days since the reference epoch.
+    fn days_since_ref(&self, epoch: &Time) -> f64 {
+        epoch.tdb().jd() - self.jd_ref
     }
 
     /// Instantiate a simulation with the solar system giants.
@@ -188,8 +214,8 @@ impl Simulation {
         self.synchronize();
         self.dense_valid = false;
 
-        if self.epoch.tdb().jd() != particle.epoch.tdb().jd() {
-            let err = SimulationError::EpochMismatch(particle.epoch.clone(), self.epoch.clone(), particle.name.clone());
+        if (self.days_since_ref(&particle.epoch) - self.t).abs() > EPOCH_TOLERANCE {
+            let err = SimulationError::EpochMismatch(particle.epoch.clone(), self.epoch(), particle.name.clone());
             return Err(err.into());
         }
 
@@ -313,11 +339,7 @@ impl Simulation {
     /// Step the simulation forward in time by one timestep.
     pub fn step(&mut self) {
         self.synchronize();
-        // The integrators' clock is the TDB Julian date.
-        self.epoch = tdb_jd(&self.epoch);
-        let mut t = self.epoch.epoch;
-        self.integrator.step(&mut self.states, &self.masses, &mut t, &self.forces);
-        self.epoch.epoch = t;
+        self.integrator.step(&mut self.states, &self.masses, &mut self.t, &self.forces);
         self.dense_valid = true;
     }
 
@@ -329,11 +351,7 @@ impl Simulation {
             return;
         }
         self.synchronize();
-        // The integrators' clock is the TDB Julian date.
-        self.epoch = tdb_jd(&self.epoch);
-        let mut t = self.epoch.epoch;
-        self.integrator.steps(&mut self.states, &self.masses, &mut t, &self.forces, n);
-        self.epoch.epoch = t;
+        self.integrator.steps(&mut self.states, &self.masses, &mut self.t, &self.forces, n);
         self.dense_valid = true;
     }
 
@@ -362,24 +380,23 @@ impl Simulation {
         }
         self.synchronize();
 
-        let target_epoch = tdb_jd(epoch);
-        let target = target_epoch.jd();
-        if (target - self.epoch.tdb().jd()).abs() < 1e-16 {
+        let target = self.days_since_ref(epoch);
+        if (target - self.t).abs() < 1e-16 {
             return;
         }
 
         loop {
             if self.dense_valid {
                 if let Some(states) = self.integrator.interpolate(target) {
-                    let synced = SyncedState { epoch: self.epoch.clone(), states: std::mem::replace(&mut self.states, states) };
-                    self.epoch = target_epoch;
+                    let synced = SyncedState { t: self.t, states: std::mem::replace(&mut self.states, states) };
+                    self.t = target;
                     self.synced = Some(synced);
                     return;
                 }
             }
 
             // Step towards the target.
-            let dt = target - self.epoch.tdb().jd();
+            let dt = target - self.t;
             if self.dense_valid && dt.abs() < 1e-16 {
                 return;
             }
@@ -388,7 +405,7 @@ impl Simulation {
                 self.integrator.set_timestep(-timestep);
             }
             self.step();
-            if (target - self.epoch.tdb().jd()) * dt < 0.0 && self.integrator.interpolate(target).is_none() {
+            if (target - self.t) * dt < 0.0 && self.integrator.interpolate(target).is_none() {
                 // Stepped past the target without being able to interpolate back; finish exactly.
                 self.integrate(epoch);
                 return;
@@ -400,7 +417,7 @@ impl Simulation {
     fn synchronize(&mut self) {
         if let Some(synced) = self.synced.take() {
             self.states = synced.states;
-            self.epoch = synced.epoch;
+            self.t = synced.t;
         }
     }
 
@@ -417,7 +434,8 @@ impl Simulation {
     pub fn integrate(&mut self, epoch: &Time) {
         self.synchronize();
 
-        let dt = epoch.tdb().jd() - self.epoch.tdb().jd();
+        let target = self.days_since_ref(epoch);
+        let dt = target - self.t;
         if dt.abs() < 1e-16 {
             return;
         }
@@ -428,7 +446,7 @@ impl Simulation {
 
 
         loop {
-            let dt = epoch.tdb().jd() - self.epoch.tdb().jd();
+            let dt = target - self.t;
 
             // done integrating
             if dt.abs() < 1e-16 {
@@ -442,10 +460,10 @@ impl Simulation {
                 // rejected the short step and took an even shorter one, keep the timestep it
                 // chose instead: a rejected step comes back at most a quarter as long.
                 let full_timestep = self.integrator.timestep();
-                let start = self.epoch.tdb().jd();
+                let start = self.t;
                 self.integrator.set_timestep(dt);
                 self.step();
-                let taken = self.epoch.tdb().jd() - start;
+                let taken = self.t - start;
                 if (taken - dt).abs() < 0.5 * dt.abs() {
                     self.integrator.set_timestep(full_timestep);
                 }
@@ -469,7 +487,7 @@ impl Simulation {
             }
             // A fixed-step integrator takes every full step this loop would take before the last,
             // shorter one, together; an adaptive one may change its timestep at each step.
-            let n = if self.integrator.fixed_timestep() { self.full_steps_to(epoch) } else { 1 };
+            let n = if self.integrator.fixed_timestep() { self.full_steps_to(target) } else { 1 };
             self.steps(n.max(1));
         }
         
@@ -486,15 +504,14 @@ impl Simulation {
         // self.integrator.set_timestep(old_timestep);
     }
 
-    /// How many steps of the current timestep fit before `epoch` (as the loop in
-    /// [`Simulation::integrate`] counts them, on the same epoch arithmetic).
-    fn full_steps_to(&self, epoch: &Time) -> usize {
+    /// How many steps of the current timestep fit before `target` (days since the reference
+    /// epoch), as the loop in [`Simulation::integrate`] counts them, on the same arithmetic.
+    fn full_steps_to(&self, target: f64) -> usize {
         let h = self.integrator.timestep();
-        let target = epoch.tdb().jd();
-        let mut t = self.epoch.clone();
+        let mut t = self.t;
         let mut n = 0;
         loop {
-            let dt = target - t.tdb().jd();
+            let dt = target - t;
             if dt.abs() < 1e-16 || dt.abs() < h.abs() || (dt < 0.0) != (h < 0.0) {
                 return n;
             }
@@ -509,7 +526,7 @@ impl Simulation {
         let (position, velocity) = state::pv(&self.states[idx]);
         SpaceRock {
             name: self.names[idx].clone(),
-            epoch: self.epoch.clone(),
+            epoch: self.epoch(),
             reference_plane: self.reference_plane.clone(),
             origin: self.origin.clone(),
             position,
@@ -594,12 +611,6 @@ impl Simulation {
 
 }
 
-/// `epoch` as a TDB Julian date.
-fn tdb_jd(epoch: &Time) -> Time {
-    let t = epoch.tdb();
-    if t.format == crate::time::TimeFormat::JD {
-        t
-    } else {
-        Time::new(t.jd(), "tdb", "jd").expect("valid time")
-    }
-}
+/// How close (days) a particle's epoch must be to the simulation's to be added: about two
+/// rounding steps of a Julian date.
+const EPOCH_TOLERANCE: f64 = 1e-9;

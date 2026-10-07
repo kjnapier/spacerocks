@@ -16,7 +16,7 @@ use serde::{Serialize, Deserialize};
 /// - ECLIPJ2000 
 /// - GALACTIC 
 /// - INVARIABLE 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy, Serialize, Deserialize)]
 #[derive(Default)]
 pub enum ReferencePlane {
     /// Earth's mean equator and equinox at J2000.0 epoch (JD 2451545.0)

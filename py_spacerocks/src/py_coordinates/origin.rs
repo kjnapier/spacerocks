@@ -37,6 +37,13 @@ impl PyOrigin {
         self.inner.mu()
     }
 
+    /// NAIF id of the origin (10 for the Sun, 0 for the SSB), or an id assigned to a custom
+    /// name.
+    #[getter]
+    pub fn id(&self) -> i32 {
+        self.inner.id
+    }
+
     #[getter]
     pub fn name(&self) -> String {
         self.inner.name().to_string()

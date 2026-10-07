@@ -27,7 +27,7 @@ impl GrSimple {
         let Some(is) = body_index(state, SUN) else { return };
         let (gm, xs, vs) = body(state, is);
         let c2 = self.c2;
-        for p in state.particles_1.iter_mut() {
+        for (ip, p) in state.particles_1.iter_mut().enumerate() {
             let x = p.position - xs;
             let v = p.velocity - vs;
             let v2 = v.norm_squared();
@@ -51,7 +51,7 @@ impl GrSimple {
                     dv[(i, j)] = prefac * (-2.0 * v[j] * x[i] + 4.0 * x[j] * v[i] + delta * b);
                 }
             }
-            add_jacobian(p, &dr, Some(&dv));
+            add_jacobian(&mut state.partials[ip], &dr, Some(&dv));
         }
     }
 }
@@ -80,7 +80,7 @@ impl GrPotential {
     fn apply(&self, state: &mut SimulationState, jac: bool) {
         let Some(is) = body_index(state, SUN) else { return };
         let (gm, xs, _) = body(state, is);
-        for p in state.particles_1.iter_mut() {
+        for (ip, p) in state.particles_1.iter_mut().enumerate() {
             let x = p.position - xs;
             let r2 = x.norm_squared();
             let r = r2.sqrt();
@@ -96,7 +96,7 @@ impl GrPotential {
                     dr[(i, j)] = if i == j { prefac } else { 0.0 } - 4.0 * prefac * u[i] * u[j];
                 }
             }
-            add_jacobian(p, &dr, None);
+            add_jacobian(&mut state.partials[ip], &dr, None);
         }
     }
 }
@@ -169,7 +169,7 @@ impl GrEih {
             })
             .collect();
 
-        for p in state.particles_1.iter_mut() {
+        for (ip, p) in state.particles_1.iter_mut().enumerate() {
             let xi = p.position;
             let vi = p.velocity;
             let vi2 = vi.norm_squared();
@@ -261,7 +261,7 @@ impl GrEih {
             if jac {
                 let dr = dr + (dterm7_dr + dterm8_dr) * over_c2;
                 let dv = dv + dterm7_dv * over_c2;
-                add_jacobian(p, &dr, Some(&dv));
+                add_jacobian(&mut state.partials[ip], &dr, Some(&dv));
             }
         }
     }

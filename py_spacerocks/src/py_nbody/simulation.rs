@@ -186,7 +186,7 @@ impl PySimulation {
     ///
     /// * `Result<(), &'static str>` - The result of the operation.
     pub fn set_epoch(&mut self, epoch: &PyTime) {
-        self.inner.epoch = epoch.inner.clone();
+        self.inner.set_epoch(&epoch.inner);
     }
 
     /// Set the reference plane of the simulation.
@@ -286,7 +286,7 @@ impl PySimulation {
 
     #[getter]
     pub fn epoch(&self) -> PyTime {
-        PyTime { inner: self.inner.epoch.clone() }
+        PyTime { inner: self.inner.epoch() }
     }
 
     #[getter]
@@ -320,7 +320,7 @@ impl PySimulation {
 
         let mut s = String::new();
         s.push_str("Simulation:\n");
-        s.push_str(&format!("    Epoch: {}\n", self.inner.epoch));
+        s.push_str(&format!("    Epoch: {}\n", self.inner.epoch()));
         s.push_str(&format!("    Reference Plane: {}\n", self.inner.reference_plane));
         s.push_str(&format!("    Origin: {}\n", self.inner.origin));
         s.push_str(&format!("    Timestep: {}\n", self.inner.integrator.timestep()));

@@ -129,34 +129,9 @@ let mean_anomaly = calc_mean_anomaly_from_conic_anomaly(0.5, 0.5)?;
 
 ## State Vector Operations
 
-#### calc_kep_from_state()
-```rust
-fn calc_kep_from_state(
-    position: Vector3,
-    velocity: Vector3,
-    mu: f64
-) -> Result<KeplerOrbit, OrbitError>
-```
-
-Calculates Keplerian orbital elements from state vectors. Computes:
-- Specific orbital energy
-- Angular momentum
-- Eccentricity vector
-- True anomaly
-- Additional orbital parameters
-
-**Arguments:**
-- `position`: Position vector in AU
-- `velocity`: Velocity vector in AU/day
-- `mu`: Gravitational parameter in AU³/day²
-
-**Example:**
-```rust
-let position = Vector3::new(0.000047, 0.0, 0.0);  // AU
-let velocity = Vector3::new(0.0, 0.000213, 0.0);  // AU/day
-let mu = 2.959122082855911e-4;  // AU³/day²
-let elements = calc_kep_from_state(position, velocity, mu)?;
-```
+Orbital elements from a state are computed by `spacerocks::state::elements(&state, mu)`
+(all elements in one pass) and the single-element functions next to it
+(`state::eccentricity`, `state::inclination`, ...).
 
 ## Examples
 

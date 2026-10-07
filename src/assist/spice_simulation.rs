@@ -37,14 +37,19 @@ pub struct SimulationParticle {
     pub position: Vector3<f64>,
     pub velocity: Vector3<f64>,
     pub acceleration: Vector3<f64>,
-    /// Jacobian of the acceleration, filled only when variational particles exist: rows 3..6
-    /// hold d(acceleration)/d(position) in columns 0..3 and d(acceleration)/d(velocity) in
-    /// columns 3..6 (rows 0..3 are unused).
-    pub stm: [[f64; 6]; 6],
     /// Non-gravitational parameters (A1, A2, A3) of the Marsden model, in AU/day^2.
     pub nongrav: [f64; 3],
-    /// d(acceleration)/d(A1, A2, A3), filled with `stm`.
-    pub nongrav_partials: [[f64; 3]; 3],
+}
+
+/// Partial derivatives of one particle's acceleration, kept in
+/// [`SimulationState::partials`] only while variational particles exist.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Partials {
+    /// Jacobian of the acceleration: rows 3..6 hold d(acceleration)/d(position) in columns 0..3
+    /// and d(acceleration)/d(velocity) in columns 3..6 (rows 0..3 are unused).
+    pub stm: [[f64; 6]; 6],
+    /// d(acceleration)/d(A1, A2, A3).
+    pub nongrav: [[f64; 3]; 3],
 }
 
 #[derive(Debug, Clone)]
@@ -68,6 +73,9 @@ pub struct SimulationState {
     
     pub particles_0: Vec<SimulationParticle>,
     pub particles_1: Vec<SimulationParticle>,
+    /// Acceleration partials of `particles_1`, one per particle when variational particles
+    /// exist and empty otherwise.
+    pub partials: Vec<Partials>,
 
     pub variational_particles_0: Vec<VariationalParticle>,
     pub variational_particles_1: Vec<VariationalParticle>,
@@ -158,6 +166,7 @@ impl SpiceSimulation {
             particles: Vec::new(),
             particles_0: Vec::new(),
             particles_1: Vec::new(),
+            partials: Vec::new(),
             variational_particles: Vec::new(),
             variational_particles_0: Vec::new(),
             variational_particles_1: Vec::new(),
@@ -257,9 +266,7 @@ impl SpiceSimulation {
             velocity: body.velocity,
             acceleration: Vector3::zeros(),
             epoch: body.epoch.tdb().jd() - self.state.jd_ref,
-            stm: [[0.0; 6]; 6],
             nongrav: body.properties.as_ref().and_then(|p| p.nongrav).unwrap_or([0.0; 3]),
-            nongrav_partials: [[0.0; 3]; 3],
         };
 
         // Add the simulation particle to the simulation

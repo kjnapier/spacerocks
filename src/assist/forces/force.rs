@@ -33,7 +33,7 @@ pub trait Force: Send + Sync + ForceClone {
     /// Add this force's acceleration to every particle.
     fn apply_acceleration(&self, state: &mut SimulationState);
     /// Add this force's acceleration, and its partial derivatives (see
-    /// [`crate::assist::SimulationParticle::stm`]), to every particle.
+    /// [`crate::assist::Partials`]) to `state.partials`, for every particle.
     fn apply_acceleration_and_stm(&self, state: &mut SimulationState);
     
 }

@@ -45,7 +45,7 @@ impl NonGravitational {
         let (_, xs, vs) = body(state, is);
         let (alpha, r0, nm, nn, nk) = (self.alpha, self.r0, self.m, self.n, self.k);
 
-        for p in state.particles_1.iter_mut() {
+        for (ip, p) in state.particles_1.iter_mut().enumerate() {
             let [a1, a2, a3] = p.nongrav;
             if a1 == 0.0 && a2 == 0.0 && a3 == 0.0 {
                 continue;
@@ -131,13 +131,13 @@ impl NonGravitational {
 
             let dadr = Matrix3::new(dxdx, dxdy, dxdz, dydx, dydy, dydz, dzdx, dzdy, dzdz);
             let dadv = Matrix3::new(dxdvx, dxdvy, dxdvz, dydvx, dydvy, dydvz, dzdvx, dzdvy, dzdvz);
-            add_jacobian(p, &dadr, Some(&dadv));
+            add_jacobian(&mut state.partials[ip], &dadr, Some(&dadv));
 
             // d(acceleration)/d(A1, A2, A3)
             let cols = [[g * dx / r, g * dy / r, g * dz / r], [g * tx / t, g * ty / t, g * tz / t], [g * hx / h, g * hy / h, g * hz / h]];
             for i in 0..3 {
                 for k in 0..3 {
-                    p.nongrav_partials[i][k] += cols[k][i];
+                    state.partials[ip].nongrav[i][k] += cols[k][i];
                 }
             }
         }
