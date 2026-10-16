@@ -10,8 +10,8 @@ use crate::state::{self, State};
 
 
 use crate::nbody::forces::{Force, NewtonianGravity};
-use crate::nbody::integrators::{Integrator, IAS15};
-use crate::nbody::monitor::ProgressMonitor;
+use crate::nbody::integrators::{Integrator, Leapfrog, Trace, WisdomHolman, IAS15};
+use crate::nbody::monitor::{Command, ProgressMonitor};
 use crate::spice::SpiceKernel;
 
 
@@ -347,6 +347,29 @@ impl Simulation {
 
     /// Step the simulation forward in time by one timestep.
     pub fn step(&mut self) {
+        self.monitor_gate();
+        self.step_unmonitored();
+    }
+
+    /// Step the simulation forward by `n` timesteps. Same result as calling [`Simulation::step`]
+    /// `n` times, but integrators can share work between the steps: Wisdom–Holman then splits
+    /// test particles between threads.
+    pub fn steps(&mut self, n: usize) {
+        if self.progress_monitor.is_none() {
+            self.steps_unmonitored(n);
+            return;
+        }
+        // Hand the steps over in chunks, so the page updates (and can pause) during a long call.
+        let mut left = n;
+        while left > 0 {
+            let chunk = self.monitor_chunk(left);
+            self.steps_unmonitored(chunk);
+            left -= chunk;
+        }
+    }
+
+    /// One step, with no stop at the progress page's controls.
+    fn step_unmonitored(&mut self) {
         self.synchronize();
         self.integrator.step(&mut self.states, &self.masses, &mut self.t, &self.forces);
         self.dense_valid = true;
@@ -355,28 +378,68 @@ impl Simulation {
         }
     }
 
-    /// Step the simulation forward by `n` timesteps. Same result as calling [`Simulation::step`]
-    /// `n` times, but integrators can share work between the steps: Wisdom–Holman then splits
-    /// test particles between threads.
-    pub fn steps(&mut self, n: usize) {
+    /// `n` steps, with no stop at the progress page's controls.
+    fn steps_unmonitored(&mut self, n: usize) {
         if n == 0 {
             return;
         }
         self.synchronize();
-        match self.progress_monitor.clone() {
-            None => self.integrator.steps(&mut self.states, &self.masses, &mut self.t, &self.forces, n),
-            Some(monitor) => {
-                // Hand the steps over in chunks, so the page updates during a long call.
-                let mut left = n;
-                while left > 0 {
-                    let chunk = left.min(MONITOR_CHUNK);
-                    self.integrator.steps(&mut self.states, &self.masses, &mut self.t, &self.forces, chunk);
-                    monitor.tick(self, chunk);
-                    left -= chunk;
+        self.integrator.steps(&mut self.states, &self.masses, &mut self.t, &self.forces, n);
+        self.dense_valid = true;
+        if let Some(monitor) = &self.progress_monitor {
+            monitor.tick(self, n);
+        }
+    }
+
+    /// Wait at the progress page's controls (if one is attached) and apply what was asked there.
+    /// Returns how many of `n` steps may be taken before the next wait: one after the page's
+    /// Step button, else up to [`MONITOR_CHUNK`].
+    fn monitor_chunk(&mut self, n: usize) -> usize {
+        if self.monitor_gate() { n.min(1) } else { n.min(MONITOR_CHUNK) }
+    }
+
+    /// Wait while the progress page is paused, applying its commands as they come. Returns true
+    /// when released for a single step.
+    fn monitor_gate(&mut self) -> bool {
+        let Some(monitor) = self.progress_monitor.clone() else { return false };
+        loop {
+            let (commands, released) = monitor.wait(self);
+            if !commands.is_empty() {
+                for command in commands {
+                    self.apply_command(command);
                 }
+                monitor.publish(self);
+            }
+            if let Some(single) = released {
+                return single;
             }
         }
-        self.dense_valid = true;
+    }
+
+    /// Apply a command from the progress page. Timesteps keep the direction the simulation is
+    /// going in.
+    fn apply_command(&mut self, command: Command) {
+        let sign = if self.integrator.timestep() < 0.0 { -1.0 } else { 1.0 };
+        match command {
+            Command::Integrator(name, h) => {
+                let h = sign * h.abs();
+                let integrator: Box<dyn Integrator + Send + Sync> = match name.as_str() {
+                    "IAS15" => Box::new(IAS15::new(h)),
+                    "WisdomHolman" => Box::new(WisdomHolman::new(h)),
+                    "Leapfrog" => Box::new(Leapfrog::new(h)),
+                    "Trace" => Box::new(Trace::new(h)),
+                    _ => return,
+                };
+                self.synchronize();
+                self.integrator = integrator;
+                self.dense_valid = false;
+            }
+            Command::Timestep(h) => {
+                self.synchronize();
+                self.integrator.set_timestep(sign * h.abs());
+                self.dense_valid = false;
+            }
+        }
     }
 
     /// Integrate to a new epoch, or interpolate to it when the integrator supports it.
@@ -434,11 +497,17 @@ impl Simulation {
             if self.dense_valid && dt.abs() < 1e-16 {
                 return;
             }
+            self.monitor_gate();
+            if !self.integrator.has_dense_output() {
+                // The page switched to an integrator without dense output.
+                self.integrate_inner(epoch);
+                return;
+            }
             let timestep = self.integrator.timestep();
             if (dt < 0.0) != (timestep < 0.0) {
                 self.integrator.set_timestep(-timestep);
             }
-            self.step();
+            self.step_unmonitored();
             if (target - self.t) * dt < 0.0 && self.integrator.interpolate(target).is_none() {
                 // Stepped past the target without being able to interpolate back; finish exactly.
                 self.integrate_inner(epoch);
@@ -496,6 +565,7 @@ impl Simulation {
             if dt.abs() < 1e-16 {
                 break;
             }
+            let single = self.monitor_gate();
 
             // if we're within a timestep of the epoch, just take a step of that size
             if dt.abs() < self.integrator.timestep().abs() {
@@ -506,7 +576,7 @@ impl Simulation {
                 let full_timestep = self.integrator.timestep();
                 let start = self.t;
                 self.integrator.set_timestep(dt);
-                self.step();
+                self.step_unmonitored();
                 let taken = self.t - start;
                 if (taken - dt).abs() < 0.5 * dt.abs() {
                     self.integrator.set_timestep(full_timestep);
@@ -532,7 +602,13 @@ impl Simulation {
             // A fixed-step integrator takes every full step this loop would take before the last,
             // shorter one, together; an adaptive one may change its timestep at each step.
             let n = if self.integrator.fixed_timestep() { self.full_steps_to(target) } else { 1 };
-            self.steps(n.max(1));
+            // With a progress page, at most a chunk of them before stopping at its controls.
+            let n = match (&self.progress_monitor, single) {
+                (None, _) => n,
+                (Some(_), true) => 1,
+                (Some(_), false) => n.min(MONITOR_CHUNK),
+            };
+            self.steps_unmonitored(n.max(1));
         }
         
         // let dt = &epoch - &self.epoch;
