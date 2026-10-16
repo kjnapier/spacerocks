@@ -22,3 +22,10 @@ serde = { version = "1.0.197", features = ["derive", "rc"]}
 reqwest = { version = "0.11.4", features = ["json", "blocking"] }
 anyhow = "1"
 dirs = "6"
+
+# Cargo's release default (strip = "debuginfo") runs rustc's bundled
+# rust-objcopy on macOS, which before Rust 1.98 leaves __LINKEDIT 4-byte
+# aligned; macOS 27's dyld then refuses to load the extension with
+# "mis-aligned LINKEDIT string pool". Skip stripping so any toolchain works.
+[profile.release]
+strip = false
