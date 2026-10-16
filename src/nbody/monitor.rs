@@ -3,7 +3,9 @@
 //! [`Simulation::monitor`] starts a small web server on `127.0.0.1` and returns its URL. Open it
 //! in a browser (or a notebook iframe) to watch an integration: how far it has got towards its
 //! target epoch, the current epoch and timestep, steps per second, an estimate of the time left,
-//! the relative energy error of the massive bodies, and a top-down view of the particles.
+//! the relative energy error of the massive bodies, a top-down view of the particles (hover one
+//! for its name and position) and the osculating elements of one tracked particle over time
+//! (click one, or [`ProgressMonitor::track`]).
 //!
 //! The simulation publishes a snapshot at most every [`PUBLISH_INTERVAL`] while it steps, so a
 //! monitored run costs one clock read per step plus the occasional snapshot. The server runs on
@@ -25,7 +27,7 @@ use serde::Serialize;
 
 use crate::constants::GRAVITATIONAL_CONSTANT;
 use crate::nbody::Simulation;
-use crate::state;
+use crate::state::{self, State};
 
 /// The least time between two snapshots.
 pub const PUBLISH_INTERVAL: Duration = Duration::from_millis(100);
@@ -35,6 +37,26 @@ const MAX_DRAWN: usize = 2000;
 
 /// Most points kept in the energy-error history.
 const MAX_HISTORY: usize = 2000;
+
+/// Osculating elements of the tracked particle about the most massive body. Angles in degrees.
+#[derive(Serialize, Clone)]
+struct TrackedElements {
+    name: String,
+    central: String,
+    a: f64,
+    e: f64,
+    inc: f64,
+    node: f64,
+    arg: f64,
+    mean_anomaly: f64,
+    true_anomaly: f64,
+    q: f64,
+    /// Aphelion distance and period (days), for bound orbits.
+    big_q: Option<f64>,
+    period: Option<f64>,
+    /// Distance from the central body.
+    r: f64,
+}
 
 /// A shared handle to a progress page. Clones (and clones of the simulation) share the page.
 #[derive(Clone)]
@@ -102,10 +124,21 @@ struct Status {
     energy_error: f64,
     /// `(t, energy_error)` pairs, oldest first.
     history: Vec<(f64, f64)>,
-    /// Positions `[x, y]` (AU) of the massive bodies, with their names, then of up to
+    /// Names and positions `(name, x, y, z)` (AU) of the massive bodies, then of up to
     /// [`MAX_DRAWN`] test particles.
-    massive: Vec<(String, f64, f64)>,
-    test_particles: Vec<(f64, f64)>,
+    massive: Vec<(String, f64, f64, f64)>,
+    test_particles: Vec<(String, f64, f64, f64)>,
+    /// The particle whose elements are followed, if any, and its elements now.
+    tracked: Option<String>,
+    elements: Option<TrackedElements>,
+    /// `[t, a, e, inc, q]` of the tracked particle, oldest first.
+    element_history: Vec<[f64; 5]>,
+    /// States and masses of the drawn particles (massive first), so a particle clicked on the
+    /// page can be tracked at once, and the central body's name, state and mass.
+    #[serde(skip)]
+    drawn: Vec<(State, f64)>,
+    #[serde(skip)]
+    central: Option<(String, State, f64)>,
     reference_plane: String,
     origin: String,
     /// The target set with [`ProgressMonitor::set_target`] overrides each run's own.
@@ -149,6 +182,11 @@ impl ProgressMonitor {
                 history: Vec::new(),
                 massive: Vec::new(),
                 test_particles: Vec::new(),
+                tracked: None,
+                elements: None,
+                element_history: Vec::new(),
+                drawn: Vec::new(),
+                central: None,
                 reference_plane: String::new(),
                 origin: String::new(),
                 fixed_target: None,
@@ -235,6 +273,12 @@ impl ProgressMonitor {
     /// Publish a snapshot now.
     pub(crate) fn publish(&self, sim: &Simulation) {
         snapshot(&mut self.lock(), sim);
+    }
+
+    /// Follow the osculating elements of the particle called `name` on the page (None stops), as
+    /// clicking it there does.
+    pub fn track(&self, name: Option<&str>) {
+        set_tracked(&mut self.lock(), name.map(str::to_string));
     }
 
     /// Pause or resume the simulation, as the page's Pause button does.
@@ -325,18 +369,81 @@ fn snapshot(s: &mut Status, sim: &Simulation) {
     let states = sim.states();
     let names = sim.names();
     s.n_massive = masses.iter().filter(|&&m| m != 0.0).count();
-    s.massive = (0..states.len())
-        .filter(|&i| masses[i] != 0.0)
-        .map(|i| (names[i].clone(), states[i][0], states[i][1]))
-        .collect();
     let n_test = states.len() - s.n_massive;
     let stride = n_test.div_ceil(MAX_DRAWN).max(1);
-    s.test_particles = (0..states.len())
-        .filter(|&i| masses[i] == 0.0)
-        .step_by(stride)
-        .map(|i| (states[i][0], states[i][1]))
-        .collect();
+    let massive: Vec<usize> = (0..states.len()).filter(|&i| masses[i] != 0.0).collect();
+    let test: Vec<usize> = (0..states.len()).filter(|&i| masses[i] == 0.0).step_by(stride).collect();
+    let row = |&i: &usize| (names[i].clone(), states[i][0], states[i][1], states[i][2]);
+    s.massive = massive.iter().map(row).collect();
+    s.test_particles = test.iter().map(row).collect();
+    s.drawn = massive.iter().chain(&test).map(|&i| (states[i], masses[i])).collect();
+    s.central = massive.first().map(|&i| (names[i].clone(), states[i], masses[i]));
+
+    if let Some(name) = s.tracked.clone() {
+        let found = sim.particle_index_map.get(&name).map(|&i| (states[i], masses[i]));
+        record_elements(s, &name, found, sim.t());
+    }
     s.last_publish = Some(Instant::now());
+}
+
+/// Work out the elements of `name` (with its state and mass, if it exists) at `t` and add them to
+/// the history.
+fn record_elements(s: &mut Status, name: &str, found: Option<(State, f64)>, t: f64) {
+    s.elements = match (found, &s.central) {
+        (Some((st, m)), Some((central, cs, cm))) if central != name => {
+            let rel: State = std::array::from_fn(|k| st[k] - cs[k]);
+            let mu = GRAVITATIONAL_CONSTANT * (cm + m);
+            let el = state::elements(&rel, mu);
+            let bound = el.e < 1.0 && el.a > 0.0;
+            let deg = f64::to_degrees;
+            Some(TrackedElements {
+                name: name.to_string(),
+                central: central.clone(),
+                a: el.a,
+                e: el.e,
+                inc: deg(el.inc),
+                node: deg(el.node),
+                arg: deg(el.arg),
+                mean_anomaly: deg(el.mean_anomaly),
+                true_anomaly: deg(el.true_anomaly),
+                q: el.q,
+                big_q: bound.then(|| el.a * (1.0 + el.e)),
+                period: bound.then(|| std::f64::consts::TAU * (el.a.powi(3) / mu).sqrt()),
+                r: state::position(&rel).norm(),
+            })
+        }
+        _ => None,
+    };
+    if let Some(el) = &s.elements {
+        let point = [t, el.a, el.e, el.inc, el.q];
+        if s.element_history.last().map_or(true, |p| p[0] != t) {
+            if s.element_history.len() == MAX_HISTORY {
+                let thinned = s.element_history.iter().step_by(2).copied().collect();
+                s.element_history = thinned;
+            }
+            s.element_history.push(point);
+        }
+    }
+}
+
+/// Follow the elements of the particle called `name` (None stops). Uses the last snapshot when
+/// the particle is drawn on the page, so the page shows them at once even while nothing steps.
+fn set_tracked(s: &mut Status, name: Option<String>) {
+    s.element_history.clear();
+    s.elements = None;
+    s.tracked = name.clone();
+    if let Some(name) = name {
+        let found = s
+            .massive
+            .iter()
+            .chain(&s.test_particles)
+            .position(|p| p.0 == name)
+            .map(|i| s.drawn[i]);
+        if found.is_some() {
+            let t = s.t;
+            record_elements(s, &name, found, t);
+        }
+    }
 }
 
 /// Energy of the massive bodies (test particles have none), so it costs nothing per test
@@ -444,6 +551,11 @@ fn control(shared: &Shared, query: &str) -> Result<(), String> {
     let param = |key: &str| {
         query.split('&').filter_map(|kv| kv.split_once('=')).find(|(k, _)| *k == key).map(|(_, v)| v)
     };
+    if param("action") == Some("track") {
+        let name = param("name").map(percent_decode).filter(|n| !n.is_empty());
+        set_tracked(&mut shared.status.lock().unwrap_or_else(|e| e.into_inner()), name);
+        return Ok(());
+    }
     let timestep = || -> Result<f64, String> {
         let h: f64 = param("timestep").ok_or("missing timestep")?.parse().map_err(|_| "bad timestep")?;
         if h.is_finite() && h != 0.0 { Ok(h) } else { Err("timestep must be finite and non-zero".into()) }
@@ -473,6 +585,31 @@ fn control(shared: &Shared, query: &str) -> Result<(), String> {
     drop(c);
     shared.wake.notify_all();
     Ok(())
+}
+
+/// Decode a query-string value (`+` and `%XX`).
+fn percent_decode(v: &str) -> String {
+    let hex = |b: u8| (b as char).to_digit(16).map(|d| d as u8);
+    let bytes = v.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match (bytes[i], bytes.get(i + 1).copied().and_then(hex), bytes.get(i + 2).copied().and_then(hex)) {
+            (b'%', Some(hi), Some(lo)) => {
+                out.push(hi * 16 + lo);
+                i += 3;
+            }
+            (b'+', ..) => {
+                out.push(b' ');
+                i += 1;
+            }
+            (b, ..) => {
+                out.push(b);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 impl Simulation {
