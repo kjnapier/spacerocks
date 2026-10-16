@@ -40,3 +40,21 @@ def test_dashboard_handle():
     assert d.wait() is not None
     d.close()
     assert "closed" in repr(d)
+
+
+def test_dashboard_load_and_command(capfd):
+    n = 5
+    d = orbfit.dashboard(np.linspace(1.0, 1.05, n), np.full(n, 0.1), 2460000.5 + np.arange(n), np.tile([1.0, 0.0, 0.0], (n, 1)),
+                         SpiceKernel(), timescale="tdb", asteroids=False, name="test rock", open_browser=False)
+    settle(d)
+    assert d.name == "test rock" and not d.loading
+    d.close()
+
+    orbfit.main(["--help"])
+    assert "spacerocks-fit" in capfd.readouterr().out
+    try:
+        orbfit.main(["--frobnicate"])
+    except SystemExit as e:
+        assert e.code == 1
+    else:
+        raise AssertionError("an unknown option should exit")

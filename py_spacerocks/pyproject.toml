@@ -17,6 +17,9 @@ keywords = ["rust", "python", "binding"]
 requires-python = ">= 3.10"
 
 
+[project.scripts]
+spacerocks-fit = "spacerocks.orbfit:main"
+
 [project.urls]
 # Documentation = "https://readthedocs.org"
 Repository = "https://github.com/kjnapier/spacerocks/tree/v3"

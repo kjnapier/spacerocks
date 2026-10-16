@@ -243,3 +243,41 @@ fn stop_ends_a_fit_early() {
     assert!(d.wait_idle(Duration::from_secs(20)));
     assert_eq!(json(d.url())["state"], "stopped");
 }
+
+/// Load and Random swap in another object's detections (here from a stand-in for the MPC),
+/// fit them from scratch, and keep the current object when the fetch fails.
+#[test]
+fn load_and_random_swap_the_object() {
+    let d = kernel_free();
+    assert!(d.wait_idle(Duration::from_secs(10)));
+    d.set_loader(|designation, _kernel| match designation {
+        Some("nothing") => Err("the MPC has no observations of that object".into()),
+        Some(name) => Astrometry::new(vec![2460100.5; 5], vec![2.0; 5], vec![-0.2; 5], vec![[1.0, 0.0, 0.0]; 5]).map(|a| (name.to_string(), a)),
+        None => Astrometry::new(vec![2460200.5; 4], vec![3.0; 4], vec![0.3; 4], vec![[1.0, 0.0, 0.0]; 4]).map(|a| ("(12345)".to_string(), a)),
+    });
+    // From the page: a designation, then Random.
+    control(d.url(), "action=exclude&index=0&on=1");
+    assert!(control(d.url(), "action=load&designation=2020+AA").0.contains("200"));
+    assert!(d.wait_idle(Duration::from_secs(10)));
+    let s = json(d.url());
+    assert_eq!(s["name"], "2020 AA");
+    assert_eq!(s["detections"].as_array().unwrap().len(), 5);
+    assert_eq!(s["excluded"], serde_json::json!(vec![false; 5]));
+    assert_eq!((s["runs"].as_u64(), s["log"].as_array().unwrap().len()), (Some(1), 1));
+    assert_eq!(s["loading"], false);
+    assert!(s["message"].as_str().unwrap().contains("loaded 2020 AA"));
+    assert_eq!(d.fit().unwrap().residuals.len(), 5);
+
+    assert!(control(d.url(), "action=load").0.contains("200"));
+    assert!(d.wait_idle(Duration::from_secs(10)));
+    assert_eq!((d.name().as_str(), d.astrometry().len()), ("(12345)", 4));
+
+    // A failed fetch keeps the object and says why.
+    d.load(Some("nothing"));
+    assert!(d.wait_idle(Duration::from_secs(10)));
+    let s = json(d.url());
+    assert_eq!((s["name"].as_str(), s["detections"].as_array().unwrap().len()), (Some("(12345)"), 4));
+    assert!(s["message"].as_str().unwrap().contains("no observations"), "{}", s["message"]);
+    assert_eq!(s["state"], "done");
+    assert!(!d.loading());
+}

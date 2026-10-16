@@ -12,6 +12,9 @@ h1 small { font-size: 16px; color: var(--text); margin-left: 12px; text-shadow: 
 .pill.converged { color: var(--cyan); }
 .pill.failed, .pill.stopped { color: var(--bad); }
 .pill.finished { color: var(--accent); }
+.pill.loading { color: var(--cyan); animation: blink 1s steps(2, start) infinite; }
+#desig { width: 240px; }
+.msg.note { color: var(--muted); }
 
 .result .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
 .verdict { font-size: 40px; line-height: 48px; }
@@ -83,8 +86,14 @@ h1 small { font-size: 16px; color: var(--text); margin-left: 12px; text-shadow: 
       <button class="toggle" id="seed" aria-pressed="false" title="Start from the last orbit instead of an initial orbit determination">From last fit</button>
       <span class="keys"><kbd>F</kbd> <kbd>Esc</kbd></span>
       <span class="spacer"></span>
-      <button id="done" title="Hand the fit back to Python (wait() returns it)">Done ✓</button>
+      <button id="done" title="Finish: hand the fit back (to wait() in Python, or the command line)">Done ✓</button>
       <span class="msg" id="msg"></span>
+    </div>
+    <div class="controls">
+      <label class="inline">Object <input id="desig" placeholder="433 or 2020 AA" spellcheck="false" autocomplete="off" title="A number, name or designation: Load fetches its observations from the Minor Planet Center"></label>
+      <button id="load" title="Fetch this object's observations from the Minor Planet Center and fit them">Load</button>
+      <button id="random" title="Fetch the observations of a random numbered asteroid from the Minor Planet Center (R)">Random ?</button>
+      <span class="keys"><kbd>R</kbd></span>
     </div>
   </section>
 
@@ -406,7 +415,7 @@ $("map").addEventListener("mouseleave", () => { $("tip3").style.display = "none"
 
 // --- Controls -----------------------------------------------------------------------------------
 async function control(params) {
-  $("msg").textContent = "";
+  $("msg").textContent = ""; $("msg").className = "msg";
   try {
     const r = await fetch("control?" + new URLSearchParams(params), { method: "POST", headers: { "X-Spacerocks": "1" } });
     if (!r.ok) $("msg").textContent = await r.text();
@@ -419,6 +428,9 @@ $("stop").onclick = () => control({ action: "stop" });
 $("done").onclick = () => control({ action: "done" });
 $("auto").onclick = () => control({ action: "auto", on: last && last.auto ? "0" : "1" });
 $("seed").onclick = () => control({ action: "seed", on: last && last.seed_last ? "0" : "1" });
+$("load").onclick = () => { const d = $("desig").value.trim(); if (d) control({ action: "load", designation: d }); else $("desig").focus(); };
+$("random").onclick = () => control({ action: "load" });
+$("desig").addEventListener("keydown", e => { if (e.key === "Enter") $("load").click(); });
 for (const b of document.querySelectorAll("button.toggle[data-key]")) b.onclick = () => set(b.dataset.key, b.getAttribute("aria-pressed") === "true" ? "0" : "1");
 for (const sel of document.querySelectorAll("select[data-key]")) sel.addEventListener("change", () => set(sel.dataset.key, sel.value));
 const editing = new Set();
@@ -432,6 +444,7 @@ document.addEventListener("keydown", e => {
   if (e.target.matches("input, select")) return;
   if (e.key === "f" || e.key === "F") $("fit").click();
   else if (e.key === "Escape") $("stop").click();
+  else if (e.key === "r" || e.key === "R") $("random").click();
 });
 
 function drawSetup(s) {
@@ -506,27 +519,29 @@ let last = null;
 function render(s) {
   last = s;
   const f = s.fit, n = s.detections.length;
-  const busy = s.state === "fitting" || s.pending;
-  let pill = busy ? "fitting" : s.state === "stopped" ? "stopped" : !f || !f.status ? "idle" : f.converged ? "converged" : "failed";
+  const loading = s.loading, busy = !loading && (s.state === "fitting" || s.pending);
+  let pill = loading ? "loading" : busy ? "fitting" : s.state === "stopped" ? "stopped" : !f || !f.status ? "idle" : f.converged ? "converged" : "failed";
   if (s.done && !busy) pill = "finished";
   const pillEl = $("state");
-  pillEl.textContent = pill === "finished" ? "done · back in python" : pill; pillEl.className = `pill ${pill}`;
+  pillEl.textContent = pill === "finished" ? "done · fit handed back" : pill; pillEl.className = `pill ${pill}`;
   const t = s.detections.map(d => d[0]);
   const arc = n ? Math.max(...t) - Math.min(...t) : 0;
   $("about").textContent = `${s.name} · ${n} detections`;
   const v = $("verdict");
-  if (busy) { v.textContent = "fitting..."; v.className = "verdict busy"; }
+  if (loading) { v.textContent = "fetching..."; v.className = "verdict busy"; }
+  else if (busy) { v.textContent = "fitting..."; v.className = "verdict busy"; }
   else if (!f || !f.status) { v.textContent = "–"; v.className = "verdict"; }
   else { v.textContent = s.state === "stopped" ? "stopped" : f.status; v.className = `verdict ${f.converged ? "good" : "bad"}`; }
   const bar = $("bar");
-  bar.className = `bar${busy ? " crawl" : ""}${!busy && f && !f.converged ? " bad" : ""}`;
-  bar.firstElementChild.style.width = busy ? "" : f ? "100%" : "0";
+  bar.className = `bar${busy || loading ? " crawl" : ""}${!busy && f && !f.converged ? " bad" : ""}`;
+  bar.firstElementChild.style.width = busy || loading ? "" : f ? "100%" : "0";
   $("summary").innerHTML = s.changed && !busy ? "settings changed · fit again" : f && finite(f.chi2) ? `<span class="g">χ</span>² ${f.chi2.toPrecision(4)} · <span class="g">ν</span> ${f.ndof} · ${f.niter} iterations` : "";
   $("summary").className = `sub${s.changed && !busy ? " changed" : ""}`;
   $("epoch").textContent = f && finite(f.epoch) ? epochText(f.epoch) : "–";
   const lastIt = s.live[s.live.length - 1];
-  $("now").textContent = busy ? (lastIt ? `iteration ${s.live.length} · ${lastIt[2]} detections · ${lastIt[3]} parameters` : "starting") : s.done ? "done: wait() has the fit" : "waiting for you";
+  $("now").textContent = loading ? "asking the minor planet center" : busy ? (lastIt ? `iteration ${s.live.length} · ${lastIt[2]} detections · ${lastIt[3]} parameters` : "starting") : s.done ? "done: the fit is handed back" : "waiting for you";
   $("stop").disabled = !busy;
+  $("load").disabled = $("random").disabled = loading;
   const used = f && f.used && f.used.length ? f.used.filter(u => u).length : n - s.excluded.filter(x => x).length;
   $("used").textContent = `${used} / ${n}`;
   $("chi2").textContent = f && finite(f.chi2_nu) ? f.chi2_nu.toPrecision(4) : "–";
@@ -536,7 +551,7 @@ function render(s) {
   $("time").textContent = duration(s.elapsed);
   $("arc").textContent = fmtDays(arc);
   $("runs").textContent = s.runs;
-  if (s.message) $("msg").textContent = s.message;
+  if (s.message) { $("msg").textContent = s.message; $("msg").className = /^(couldn't|no )/.test(s.message) ? "msg" : "msg note"; }
   drawSetup(s); drawResiduals(s); drawScatter(s); drawChi(s); drawMap(s); drawElements(s);
 }
 
@@ -547,7 +562,7 @@ async function pollOnce() {
 async function poll() {
   try {
     await pollOnce();
-    setTimeout(poll, last && (last.state === "fitting" || last.pending) ? 200 : 500);
+    setTimeout(poll, last && (last.state === "fitting" || last.pending || last.loading) ? 200 : 500);
   } catch (e) {
     const pill = $("state"); pill.textContent = "disconnected"; pill.className = "pill lost";
     setTimeout(poll, 1000);

@@ -15,6 +15,9 @@
 //!   fit"); **Stop** ends a fit early; with **Auto refit** on, every change refits at once.
 //!   Clicking a detection on the residual plot leaves it out of the fit (or puts it back).
 //! - **Done** ends [`FitDashboard::wait`], which returns the last fit.
+//! - **Load** fetches the observations of the object typed beside it from the Minor Planet
+//!   Center, and **Random** those of a random numbered asteroid (see [`crate::orbfit::mpc`]),
+//!   then fits them. [`FitDashboard::set_loader`] swaps in another source.
 //!
 //! The page shows each Levenberg–Marquardt iteration's chi-square while a fit runs, then the
 //! residuals of every detection (in arcseconds, against time and against each other), the
@@ -30,7 +33,7 @@ use serde_json::{json, Value};
 
 use crate::constants::GRAVITATIONAL_CONSTANT;
 use crate::orbfit::{
-    determine_orbit, residuals, Astrometry, Engine, FitIteration, FitOptions, FitProgress, ForceModel, NongravAuto, OrbitFit, Relativity,
+    determine_orbit, fetch_astrometry, residuals, Astrometry, Engine, FitIteration, FitOptions, FitProgress, ForceModel, NongravAuto, OrbitFit, Relativity,
     ASTEROID_PERTURBERS,
 };
 use crate::spice::SpiceKernel;
@@ -58,6 +61,13 @@ const MAP_PLANETS: [(i32, &str); 8] = [(1, "Mercury"), (2, "Venus"), (399, "Eart
 /// The comet g(r) of Marsden et al. (1973), as `FitOptions::gofr` takes it: `[alpha, m, n, k, r0]`.
 const COMET_GOFR: [f64; 5] = [0.1112620426, 2.15, 5.093, 4.6142, 2.808];
 
+/// Most detections the default loader keeps of an object (spread over its arc).
+pub const LOAD_MAX_DETECTIONS: usize = 1000;
+
+/// Where Load and Random get detections: a designation (`None` for a random object) and the
+/// kernel to place the observers with, to the object's label and its astrometry.
+pub type Loader = Arc<dyn Fn(Option<&str>, &SpiceKernel) -> Result<(String, Astrometry), String> + Send + Sync>;
+
 /// A running dashboard. Dropping it stops the fitting thread and the page's server.
 pub struct FitDashboard {
     shared: Arc<Shared>,
@@ -72,11 +82,15 @@ struct Shared {
 
 struct Status {
     name: String,
+    /// Where Load and Random get detections.
+    loader: Loader,
+    /// A load asked for: the designation, empty for a random object.
+    load: Option<String>,
     astrometry: Astrometry,
     options: FitOptions,
     /// An initial orbit (epoch, state, nongrav) to start the first fit from, if given.
     initial: Option<(f64, [f64; 6], [f64; 3])>,
-    /// "idle", "fitting", "done" (a fit finished) or "stopped" (one was stopped).
+    /// "idle", "fitting", "done" (a fit finished), "stopped" (one was stopped) or "loading".
     state: &'static str,
     /// A fit has been asked for.
     pending: bool,
@@ -115,19 +129,12 @@ impl FitDashboard {
     /// (from `initial`, `(epoch, state, nongrav)`, if given). `name` labels the page.
     pub fn start(port: u16, name: &str, astrometry: Astrometry, kernel: SpiceKernel, options: FitOptions, initial: Option<(f64, [f64; 6], [f64; 3])>) -> std::io::Result<FitDashboard> {
         let n = astrometry.len();
-        let detections = json!((0..n)
-            .map(|i| json!([astrometry.epoch[i], astrometry.ra[i].to_degrees(), astrometry.dec[i].to_degrees(), astrometry.sigma_ra[i] * ARCSEC, astrometry.sigma_dec[i] * ARCSEC]))
-            .collect::<Vec<_>>());
-        let observers = json!((0..n)
-            .map(|i| {
-                let sun = kernel.state_au(10, 0, astrometry.epoch[i]).unwrap_or([f64::NAN; 6]);
-                let o = astrometry.observer[i];
-                ecliptic(&[o[0] - sun[0], o[1] - sun[1], o[2] - sun[2]]).to_vec()
-            })
-            .collect::<Vec<_>>());
+        let (detections, observers) = views(&astrometry, &kernel);
         let shared = Arc::new(Shared {
             status: Mutex::new(Status {
                 name: name.to_string(),
+                loader: Arc::new(|designation, kernel| fetch_astrometry(designation, kernel, LOAD_MAX_DETECTIONS)),
+                load: None,
                 astrometry,
                 options: FitOptions { progress: None, ..options },
                 initial,
@@ -179,6 +186,13 @@ impl FitDashboard {
         self.lock().options.clone()
     }
 
+    /// What the page shows of the last fit, as JSON (`Null` before one finishes): its outcome,
+    /// the residuals in arcseconds and their RMS, and the heliocentric ecliptic elements with
+    /// their 1-sigma uncertainties (`elements`, angles in degrees).
+    pub fn fit_summary(&self) -> Value {
+        self.lock().fit_view.clone()
+    }
+
     /// Which detections are left out by hand.
     pub fn excluded(&self) -> Vec<bool> {
         self.lock().excluded.clone()
@@ -188,6 +202,37 @@ impl FitDashboard {
     pub fn fitting(&self) -> bool {
         let s = self.lock();
         s.pending || s.state == "fitting"
+    }
+
+    /// Whether another object's detections are being fetched or about to be.
+    pub fn loading(&self) -> bool {
+        let s = self.lock();
+        s.load.is_some() || s.state == "loading"
+    }
+
+    /// The object's label, which changes when another object is loaded.
+    pub fn name(&self) -> String {
+        self.lock().name.clone()
+    }
+
+    /// The detections being fitted, which change when another object is loaded.
+    pub fn astrometry(&self) -> Astrometry {
+        self.lock().astrometry.clone()
+    }
+
+    /// Fetch another object's detections and fit them, as the page's Load (with a designation)
+    /// and Random (`None`) buttons do. Stops a running fit. The fetch runs on the fitting
+    /// thread; if it fails, the page shows why and keeps the current object.
+    pub fn load(&self, designation: Option<&str>) {
+        let mut s = self.lock();
+        request_load(&mut s, designation.unwrap_or("").trim());
+        drop(s);
+        self.shared.wake.notify_all();
+    }
+
+    /// Get Load and Random's detections from `loader` instead of the Minor Planet Center.
+    pub fn set_loader(&self, loader: impl Fn(Option<&str>, &SpiceKernel) -> Result<(String, Astrometry), String> + Send + Sync + 'static) {
+        self.lock().loader = Arc::new(loader);
     }
 
     /// Ask for a fit, as the page's Fit button does.
@@ -203,7 +248,7 @@ impl FitDashboard {
     /// dashboard keeps running) and this returns `None`.
     pub fn wait(&self, interrupted: Option<&dyn Fn() -> bool>) -> Option<OrbitFit> {
         let mut s = self.lock();
-        while !(s.done && !s.pending && s.state != "fitting") && !s.closed {
+        while !(s.done && !s.pending && s.load.is_none() && !matches!(s.state, "fitting" | "loading")) && !s.closed {
             if interrupted.is_some_and(|f| f()) {
                 return None;
             }
@@ -212,11 +257,11 @@ impl FitDashboard {
         s.fit.clone()
     }
 
-    /// Wait (up to `timeout`) until no fit is running or asked for; true if none is.
+    /// Wait (up to `timeout`) until no fit or load is running or asked for; true if none is.
     pub fn wait_idle(&self, timeout: Duration) -> bool {
         let end = Instant::now() + timeout;
         let mut s = self.lock();
-        while s.pending || s.state == "fitting" {
+        while s.pending || s.load.is_some() || matches!(s.state, "fitting" | "loading") {
             let now = Instant::now();
             if now >= end {
                 return false;
@@ -243,6 +288,79 @@ impl Shared {
     }
 }
 
+/// What the page shows of the detections: `[jd, ra°, dec°, sigma_ra″, sigma_dec″]` each, and
+/// the heliocentric ecliptic positions of their observers.
+fn views(a: &Astrometry, kernel: &SpiceKernel) -> (Value, Value) {
+    let n = a.len();
+    let detections = json!((0..n).map(|i| json!([a.epoch[i], a.ra[i].to_degrees(), a.dec[i].to_degrees(), a.sigma_ra[i] * ARCSEC, a.sigma_dec[i] * ARCSEC])).collect::<Vec<_>>());
+    let observers = json!((0..n)
+        .map(|i| {
+            let sun = kernel.state_au(10, 0, a.epoch[i]).unwrap_or([f64::NAN; 6]);
+            let o = a.observer[i];
+            ecliptic(&[o[0] - sun[0], o[1] - sun[1], o[2] - sun[2]]).to_vec()
+        })
+        .collect::<Vec<_>>());
+    (detections, observers)
+}
+
+/// Ask the fitting thread to load `designation` (empty for a random object), stopping a
+/// running fit.
+fn request_load(s: &mut Status, designation: &str) {
+    if s.state == "fitting" {
+        s.cancel = true;
+    }
+    s.load = Some(designation.to_string());
+    s.done = false;
+}
+
+/// Fetch the detections asked for and swap them in (outside the lock), or say why not.
+fn load(shared: &Arc<Shared>, kernel: &SpiceKernel) {
+    let mut s = shared.lock();
+    let Some(designation) = s.load.take() else { return };
+    let before = s.state;
+    s.state = "loading";
+    s.message = if designation.is_empty() { "fetching a random object from the MPC...".into() } else { format!("fetching {designation} from the MPC...") };
+    let loader = s.loader.clone();
+    drop(s);
+    shared.wake.notify_all();
+
+    let loaded = loader((!designation.is_empty()).then_some(designation.as_str()), kernel).and_then(|(name, a)| {
+        if a.len() < 3 {
+            return Err(format!("{name} has only {} usable detections", a.len()));
+        }
+        let (detections, observers) = views(&a, kernel);
+        Ok((name, a, detections, observers))
+    });
+
+    let mut s = shared.lock();
+    match loaded {
+        Ok((name, a, detections, observers)) => {
+            s.message = format!("loaded {name}: {} detections", a.len());
+            s.name = name;
+            s.excluded = vec![false; a.len()];
+            s.astrometry = a;
+            s.detections = detections;
+            s.observers = observers;
+            s.initial = None;
+            s.fit = None;
+            s.fit_view = Value::Null;
+            s.log.clear();
+            s.live.clear();
+            s.runs = 0;
+            s.elapsed = 0.0;
+            s.changed = false;
+            s.state = "idle";
+            s.pending = true;
+        }
+        Err(e) => {
+            s.message = format!("couldn't load: {e}");
+            s.state = if before == "fitting" { "stopped" } else { before };
+        }
+    }
+    drop(s);
+    shared.wake.notify_all();
+}
+
 /// J2000 equatorial to ecliptic (obliquity 84381.448").
 fn ecliptic(v: &[f64; 3]) -> [f64; 3] {
     let eps = (84381.448f64 / 3600.0).to_radians();
@@ -254,11 +372,16 @@ fn ecliptic(v: &[f64; 3]) -> [f64; 3] {
 fn work(shared: &Arc<Shared>, kernel: &SpiceKernel) {
     loop {
         let mut s = shared.lock();
-        while !s.pending && !s.closed {
+        while !s.pending && s.load.is_none() && !s.closed {
             s = shared.wake.wait(s).unwrap_or_else(|e| e.into_inner());
         }
         if s.closed {
             return;
+        }
+        if s.load.is_some() {
+            drop(s);
+            load(shared, kernel);
+            continue;
         }
         s.pending = false;
         s.cancel = false;
@@ -266,7 +389,6 @@ fn work(shared: &Arc<Shared>, kernel: &SpiceKernel) {
         s.state = "fitting";
         s.live.clear();
         s.started = Some(Instant::now());
-        s.message.clear();
         let all = s.astrometry.clone();
         let excluded = s.excluded.clone();
         let mut options = s.options.clone();
@@ -558,6 +680,7 @@ fn respond(request: &Request, shared: &Shared) -> Response {
                 "name": s.name,
                 "state": s.state,
                 "pending": s.pending,
+                "loading": s.load.is_some() || s.state == "loading",
                 "done": s.done,
                 "auto": s.auto,
                 "seed_last": s.seed_last,
@@ -583,8 +706,8 @@ fn respond(request: &Request, shared: &Shared) -> Response {
     }
 }
 
-/// Apply `action=fit|stop|done|auto|seed|exclude|set` (with `on=1|0`, `index=` and
-/// `key=`/`value=`).
+/// Apply `action=fit|stop|done|auto|seed|exclude|include_all|set|load` (with `on=1|0`,
+/// `index=`, `key=`/`value=` and `designation=`, none for a random object).
 fn control(shared: &Shared, request: &Request) -> Result<(), String> {
     let param = |key: &str| request.param(key);
     let on = || match param("on").as_deref() {
@@ -593,6 +716,7 @@ fn control(shared: &Shared, request: &Request) -> Result<(), String> {
         _ => Err("on must be 1 or 0".to_string()),
     };
     let mut s = shared.lock();
+    s.message.clear();
     match param("action").as_deref().unwrap_or("") {
         "fit" => {
             if s.state == "fitting" {
@@ -606,6 +730,7 @@ fn control(shared: &Shared, request: &Request) -> Result<(), String> {
             s.pending = false;
         }
         "done" => s.done = true,
+        "load" => request_load(&mut s, param("designation").unwrap_or_default().trim()),
         "auto" => s.auto = on()?,
         "seed" => s.seed_last = on()?,
         "exclude" => {
