@@ -111,6 +111,18 @@ canvas.pixel {
 }
 .plots .caption { color: var(--muted); margin: 0 0 12px; }
 
+.setup { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 32px; }
+.setup .group { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+.setup .group > .label { width: 100%; }
+.setup input { width: 200px; }
+button.toggle { box-shadow: 4px 4px 0 #26265c; }
+button.toggle::before { content: "[ ] "; color: var(--muted); }
+button.toggle[aria-pressed="true"]::before { content: "[X] "; color: var(--good); }
+button.toggle[aria-pressed="true"]:hover::before { color: #000; }
+button:disabled { opacity: 0.4; cursor: default; }
+button:disabled:hover { background: #000; color: var(--text); }
+input:disabled { opacity: 0.4; }
+
 .tracker .head { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; margin-bottom: 16px; }
 .tracker .head .hint { margin-right: auto; }
 .tracker .body { display: grid; grid-template-columns: minmax(240px, 1fr) 2fr; gap: 20px; align-items: start; }
@@ -123,7 +135,7 @@ canvas.pixel {
 @media (max-width: 720px) {
   h1 { font-size: 24px; line-height: 32px; }
   .pct { font-size: 32px; line-height: 40px; }
-  .plots, .tracker .body, .epochs { grid-template-columns: 1fr; }
+  .plots, .tracker .body, .epochs, .setup { grid-template-columns: 1fr; }
   .stats { grid-template-columns: 1fr 1fr; gap: 16px; }
   .stat .value { font-size: 16px; line-height: 24px; }
   .panel { padding: 16px 12px 14px; }
@@ -152,8 +164,10 @@ canvas.pixel {
     </div>
     <div class="controls">
       <button class="primary" id="pause" title="Pause or resume (space)">Pause</button>
-      <button id="step" title="Take one step, then pause (.)">Step</button>
-      <span class="keys"><kbd>Space</kbd> <kbd>.</kbd></span>
+      <button id="back" title="Take one step backwards, then pause (,)">◀ Back</button>
+      <button id="step" title="Take one step, then pause (.)">Step ▶</button>
+      <button id="stop" title="End the run where it is">■ Stop</button>
+      <span class="keys"><kbd>Space</kbd> <kbd>,</kbd> <kbd>.</kbd></span>
       <span class="spacer"></span>
       <label class="inline">Integrator
         <span class="select"><select id="integratorSel">
@@ -163,6 +177,23 @@ canvas.pixel {
       <label class="inline">dt (d) <input id="timestepIn" type="number" step="any"></label>
       <button id="apply">Apply</button>
       <span class="msg" id="msg"></span>
+    </div>
+  </section>
+
+  <section class="panel setup" data-title="Setup">
+    <div class="group">
+      <span class="label">Run until (JD, TDB)</span>
+      <input id="endIn" type="number" step="any" placeholder="no end">
+      <button class="toggle" id="noEnd" aria-pressed="false" title="Run until Stop">No end ∞</button>
+      <button id="setEnd">Set</button>
+    </div>
+    <div class="group">
+      <span class="label">Forces</span>
+      <button class="toggle" id="gr" aria-pressed="false" title="Post-Newtonian correction to the Sun's gravity">Solar GR</button>
+    </div>
+    <div class="group" style="grid-column: 1 / -1">
+      <span class="label">Perturbers · gravity on</span>
+      <span id="perturbers" class="hint">none</span>
     </div>
   </section>
 
@@ -333,10 +364,10 @@ function drawOrbits(s) {
     }
   }
 
-  const labels = [];
+  const labels = [], off = new Set(s.perturbers.filter(p => !p[1]).map(p => p[0]));
   s.massive.forEach(([name, x, y, z], i) => {
     const [u, v] = P(x, y);
-    const color = i === 0 ? PAL.sun : PAL.planets[(i - 1) % PAL.planets.length];
+    const color = off.has(name) ? PAL.dim : i === 0 ? PAL.sun : PAL.planets[(i - 1) % PAL.planets.length];
     if (i === 0) { px(ctx, u - 1, v, color, 3); ctx.fillRect(Math.round(u), Math.round(v) - 1, 1, 3); }
     else px(ctx, u - 1, v - 1, color, 2);
     if (s.massive.length <= 12) {
@@ -347,7 +378,7 @@ function drawOrbits(s) {
       labels.push([u + 3, ly, lw]);
       text(ctx, name, u + 3, ly, color);
     }
-    drawnPoints.push({ name, x, y, z, u, v, massive: true });
+    drawnPoints.push({ name, x, y, z, u, v, massive: true, off: off.has(name) });
   });
 
   const t = drawnPoints.find(p => p.name === s.tracked);
@@ -381,7 +412,7 @@ $("orbits").addEventListener("mousemove", ev => {
   $("orbits").style.cursor = p ? "pointer" : "default";
   if (!p) { tip.style.display = "none"; last && drawOrbits(last); return; }
   const r = Math.hypot(p.x, p.y, p.z);
-  tip.textContent = `${p.name}${p.massive ? "  (massive)" : ""}\nx ${p.x.toFixed(3)}  y ${p.y.toFixed(3)}  z ${p.z.toFixed(3)}\nr ${r.toFixed(3)} AU\n${p.name === last.tracked ? "tracking" : "click to track"}`;
+  tip.textContent = `${p.name}${p.off ? "  (gravity off)" : p.massive ? "  (massive)" : ""}\nx ${p.x.toFixed(3)}  y ${p.y.toFixed(3)}  z ${p.z.toFixed(3)}\nr ${r.toFixed(3)} AU\n${p.name === last.tracked ? "tracking" : "click to track"}`;
   const box = $("orbits").parentElement.getBoundingClientRect();
   tip.style.display = "block";
   const left = ev.clientX - box.left + 14, top = ev.clientY - box.top + 14;
@@ -486,6 +517,46 @@ async function control(params) {
 let editing = false;
 $("pause").onclick = () => control({ action: last && last.paused ? "resume" : "pause" });
 $("step").onclick = () => control({ action: "step" });
+$("back").onclick = () => control({ action: "back" });
+$("stop").onclick = () => control({ action: "stop" });
+let endEditing = false;
+$("endIn").addEventListener("focus", () => endEditing = true);
+$("endIn").addEventListener("input", () => { endEditing = true; $("noEnd").setAttribute("aria-pressed", "false"); });
+$("noEnd").onclick = () => {
+  endEditing = true;
+  const on = $("noEnd").getAttribute("aria-pressed") !== "true";
+  $("noEnd").setAttribute("aria-pressed", String(on));
+  if (on) $("endIn").value = "";
+};
+$("setEnd").onclick = () => {
+  endEditing = false;
+  const open = $("noEnd").getAttribute("aria-pressed") === "true" || $("endIn").value.trim() === "";
+  control(open ? { action: "end" } : { action: "end", jd: $("endIn").value.trim() });
+};
+$("endIn").addEventListener("keydown", e => { if (e.key === "Enter") $("setEnd").click(); });
+$("gr").onclick = () => control({ action: "gr", on: last && last.solar_gr ? "0" : "1" });
+function drawSetup(s) {
+  const editable = s.end_editable;
+  for (const id of ["endIn", "noEnd", "setEnd"]) $(id).disabled = !editable;
+  $("stop").disabled = s.state !== "running" && s.state !== "paused";
+  if (!endEditing || !editable) {
+    endEditing = false;
+    $("endIn").value = s.t_target !== null && s.state !== "idle" ? (s.jd_ref + s.t_target).toFixed(5) : "";
+    $("noEnd").setAttribute("aria-pressed", String(s.t_target === null && s.state !== "idle"));
+  }
+  $("gr").setAttribute("aria-pressed", String(s.solar_gr));
+  const box = $("perturbers"), key = JSON.stringify(s.perturbers);
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  if (!s.perturbers.length) { box.className = "hint"; box.textContent = "none"; return; }
+  box.className = "group";
+  box.replaceChildren(...s.perturbers.map(([name, on]) => {
+    const b = Object.assign(document.createElement("button"), { className: "toggle", textContent: name, title: on ? "Turn its gravity off" : "Turn its gravity on" });
+    b.setAttribute("aria-pressed", String(on));
+    b.onclick = () => control({ action: "perturber", name, on: on ? "0" : "1" });
+    return b;
+  }));
+}
 $("apply").onclick = () => {
   editing = false;
   const name = $("integratorSel").value, h = $("timestepIn").value;
@@ -500,6 +571,7 @@ document.addEventListener("keydown", e => {
   if (e.target.matches("input, select")) return;
   if (e.key === " ") { e.preventDefault(); $("pause").click(); }
   else if (e.key === ".") $("step").click();
+  else if (e.key === ",") $("back").click();
 });
 
 let last = null;
@@ -525,7 +597,7 @@ function render(s) {
     bar.classList.toggle("indeterminate", s.state === "running");
     bar.firstElementChild.style.width = s.state === "done" ? "100%" : "";
     $("pct").textContent = s.state === "idle" ? "–" : `${fmtDays(s.t - s.t_start)} days`;
-    $("target").textContent = "–"; $("eta").textContent = "";
+    $("target").textContent = s.state === "idle" || s.state === "done" || s.state === "stopped" ? "–" : "none · runs until stop"; $("eta").textContent = "";
   }
   $("now").textContent = s.jd_ref ? epochText(s.jd_ref + s.t) : "–";
   $("steps").textContent = s.steps.toLocaleString();
@@ -536,7 +608,7 @@ function render(s) {
   $("np").textContent = `${s.n_particles.toLocaleString()} (${s.n_massive})`;
   $("integrator").textContent = s.integrator || "–";
   $("de").textContent = sci(s.energy_error);
-  drawOrbits(s); drawEnergy(s); drawElements(s);
+  drawSetup(s); drawOrbits(s); drawEnergy(s); drawElements(s);
 }
 
 async function pollOnce() {
