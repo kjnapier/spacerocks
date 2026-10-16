@@ -11,6 +11,7 @@ use crate::state::{self, State};
 
 use crate::nbody::forces::{Force, NewtonianGravity};
 use crate::nbody::integrators::{Integrator, IAS15};
+use crate::nbody::monitor::ProgressMonitor;
 use crate::spice::SpiceKernel;
 
 
@@ -50,6 +51,8 @@ pub struct Simulation {
     synced: Option<SyncedState>,
     /// Whether the integrator's last step describes the current particles.
     dense_valid: bool,
+    /// The live progress page, if one is attached ([`Simulation::monitor`]).
+    pub(crate) progress_monitor: Option<ProgressMonitor>,
 }
 
 /// Where the integrator actually is, kept aside by [`Simulation::integrate_or_interpolate`].
@@ -86,6 +89,7 @@ impl Simulation {
             particle_index_map: HashMap::new(),
             synced: None,
             dense_valid: false,
+            progress_monitor: None,
         })
     }
 
@@ -97,6 +101,11 @@ impl Simulation {
     /// Days since the reference epoch, the integrators' clock.
     pub fn t(&self) -> f64 {
         self.t
+    }
+
+    /// The reference epoch (TDB Julian date) the clock counts from.
+    pub(crate) fn jd_ref(&self) -> f64 {
+        self.jd_ref
     }
 
     /// Set the epoch without moving the particles (it becomes the new reference epoch).
@@ -341,6 +350,9 @@ impl Simulation {
         self.synchronize();
         self.integrator.step(&mut self.states, &self.masses, &mut self.t, &self.forces);
         self.dense_valid = true;
+        if let Some(monitor) = &self.progress_monitor {
+            monitor.tick(self, 1);
+        }
     }
 
     /// Step the simulation forward by `n` timesteps. Same result as calling [`Simulation::step`]
@@ -351,7 +363,19 @@ impl Simulation {
             return;
         }
         self.synchronize();
-        self.integrator.steps(&mut self.states, &self.masses, &mut self.t, &self.forces, n);
+        match self.progress_monitor.clone() {
+            None => self.integrator.steps(&mut self.states, &self.masses, &mut self.t, &self.forces, n),
+            Some(monitor) => {
+                // Hand the steps over in chunks, so the page updates during a long call.
+                let mut left = n;
+                while left > 0 {
+                    let chunk = left.min(MONITOR_CHUNK);
+                    self.integrator.steps(&mut self.states, &self.masses, &mut self.t, &self.forces, chunk);
+                    monitor.tick(self, chunk);
+                    left -= chunk;
+                }
+            }
+        }
         self.dense_valid = true;
     }
 
@@ -374,8 +398,18 @@ impl Simulation {
     ///
     /// * `epoch` - The epoch to integrate or interpolate to.
     pub fn integrate_or_interpolate(&mut self, epoch: &Time) {
+        if let Some(monitor) = self.progress_monitor.clone() {
+            monitor.begin_run(self, Some(self.days_since_ref(epoch)));
+            self.integrate_or_interpolate_inner(epoch);
+            monitor.end_run(self);
+        } else {
+            self.integrate_or_interpolate_inner(epoch);
+        }
+    }
+
+    fn integrate_or_interpolate_inner(&mut self, epoch: &Time) {
         if !self.integrator.has_dense_output() {
-            self.integrate(epoch);
+            self.integrate_inner(epoch);
             return;
         }
         self.synchronize();
@@ -407,7 +441,7 @@ impl Simulation {
             self.step();
             if (target - self.t) * dt < 0.0 && self.integrator.interpolate(target).is_none() {
                 // Stepped past the target without being able to interpolate back; finish exactly.
-                self.integrate(epoch);
+                self.integrate_inner(epoch);
                 return;
             }
         }
@@ -432,6 +466,16 @@ impl Simulation {
     ///
     /// * `epoch` - The new epoch to integrate to.
     pub fn integrate(&mut self, epoch: &Time) {
+        if let Some(monitor) = self.progress_monitor.clone() {
+            monitor.begin_run(self, Some(self.days_since_ref(epoch)));
+            self.integrate_inner(epoch);
+            monitor.end_run(self);
+        } else {
+            self.integrate_inner(epoch);
+        }
+    }
+
+    fn integrate_inner(&mut self, epoch: &Time) {
         self.synchronize();
 
         let target = self.days_since_ref(epoch);
@@ -614,3 +658,7 @@ impl Simulation {
 /// How close (days) a particle's epoch must be to the simulation's to be added: about two
 /// rounding steps of a Julian date.
 const EPOCH_TOLERANCE: f64 = 1e-9;
+
+/// Most steps [`Simulation::steps`] hands the integrator at once while a progress page is
+/// attached.
+const MONITOR_CHUNK: usize = 1000;

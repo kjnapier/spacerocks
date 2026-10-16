@@ -63,6 +63,11 @@ pub trait Integrator: Send + Sync + IntegratorClone {
     fn interpolate(&self, _t: f64) -> Option<Vec<State>> {
         None
     }
+
+    /// The integrator's type name (its full path), shown on the progress page.
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }
 
 

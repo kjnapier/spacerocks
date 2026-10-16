@@ -40,3 +40,23 @@ def test_arrays_and_particles_agree():
     assert p.epoch.jd() == sim.epoch.jd()
     assert abs((sim.energy() - e0) / e0) < 1e-6
     assert [r.name for r in sim.particles()] == sim.names
+
+
+def test_monitor_page_reports_progress():
+    import json
+    import urllib.request
+
+    sim = make_sim(Integrator.ias15(1.0))
+    url = sim.monitor(open_browser=False)
+    assert sim.monitor_url == url
+    target = Time(2460000.5 + 1000.0, "tdb", "jd")
+    sim.integrate(target)
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(url + "progress.json") as r:
+        status = json.load(r)
+    assert status["state"] == "done"
+    assert status["t_target"] == 1000.0
+    assert status["n_particles"] == 3
+    assert status["integrator"] == "IAS15"
+    sim.stop_monitor()
+    assert sim.monitor_url is None
