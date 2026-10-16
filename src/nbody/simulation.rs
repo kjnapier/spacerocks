@@ -53,6 +53,25 @@ pub struct Simulation {
     dense_valid: bool,
     /// The live progress page, if one is attached ([`Simulation::monitor`]).
     pub(crate) progress_monitor: Option<ProgressMonitor>,
+    /// Asked between steps whether to stop ([`Simulation::set_interrupt`]), when it was last
+    /// asked, and whether it said to.
+    interrupt: Option<InterruptCheck>,
+    interrupt_asked: Option<std::time::Instant>,
+    interrupted: bool,
+}
+
+/// A check for whether to stop integrating, e.g. whether Ctrl-C was pressed. See
+/// [`Simulation::set_interrupt`].
+pub type InterruptCheck = std::sync::Arc<dyn Fn() -> bool + Send + Sync>;
+
+/// What the stepping loops do after a [`Simulation::checkpoint`].
+enum Go {
+    /// Step on (up to [`MONITOR_CHUNK`] steps before the next checkpoint).
+    Steps,
+    /// Take one step: the progress page's Step button let it through.
+    OneStep,
+    /// Stop: the interrupt check said so.
+    Stop,
 }
 
 /// Where the integrator actually is, kept aside by [`Simulation::integrate_or_interpolate`].
@@ -90,6 +109,9 @@ impl Simulation {
             synced: None,
             dense_valid: false,
             progress_monitor: None,
+            interrupt: None,
+            interrupt_asked: None,
+            interrupted: false,
         })
     }
 
@@ -347,22 +369,28 @@ impl Simulation {
 
     /// Step the simulation forward in time by one timestep.
     pub fn step(&mut self) {
-        self.monitor_gate();
-        self.step_unmonitored();
+        if !matches!(self.checkpoint(), Go::Stop) {
+            self.step_unmonitored();
+        }
     }
 
     /// Step the simulation forward by `n` timesteps. Same result as calling [`Simulation::step`]
     /// `n` times, but integrators can share work between the steps: Wisdom–Holman then splits
     /// test particles between threads.
     pub fn steps(&mut self, n: usize) {
-        if self.progress_monitor.is_none() {
+        if !self.has_checkpoints() {
             self.steps_unmonitored(n);
             return;
         }
-        // Hand the steps over in chunks, so the page updates (and can pause) during a long call.
+        // Hand the steps over in chunks, so the page updates (and the run can pause or stop)
+        // during a long call.
         let mut left = n;
         while left > 0 {
-            let chunk = self.monitor_chunk(left);
+            let chunk = match self.checkpoint() {
+                Go::Stop => return,
+                Go::OneStep => 1,
+                Go::Steps => left.min(MONITOR_CHUNK),
+            };
             self.steps_unmonitored(chunk);
             left -= chunk;
         }
@@ -391,17 +419,49 @@ impl Simulation {
         }
     }
 
-    /// Wait at the progress page's controls (if one is attached) and apply what was asked there.
-    /// Returns how many of `n` steps may be taken before the next wait: one after the page's
-    /// Step button, else up to [`MONITOR_CHUNK`].
-    fn monitor_chunk(&mut self, n: usize) -> usize {
-        if self.monitor_gate() { n.min(1) } else { n.min(MONITOR_CHUNK) }
+    /// Ask `check` between steps (at most every 50 ms) whether to stop. When it says yes,
+    /// `step`, `steps`, `integrate` and `integrate_or_interpolate` return at once, between two
+    /// steps (also while the progress page holds the run paused), and [`Simulation::interrupted`]
+    /// reports it. The Python bindings use this to stop on Ctrl-C. `None` removes the check.
+    pub fn set_interrupt(&mut self, check: Option<InterruptCheck>) {
+        self.interrupt = check;
+        self.interrupt_asked = None;
+        self.interrupted = false;
     }
 
-    /// Wait while the progress page is paused, applying its commands as they come. Returns true
-    /// when released for a single step.
-    fn monitor_gate(&mut self) -> bool {
-        let Some(monitor) = self.progress_monitor.clone() else { return false };
+    /// Whether the interrupt check stopped the simulation since it was set.
+    pub fn interrupted(&self) -> bool {
+        self.interrupted
+    }
+
+    /// Whether the stepping loops need to stop between steps (for a progress page or an
+    /// interrupt check), rather than hand the integrator every step at once.
+    fn has_checkpoints(&self) -> bool {
+        self.progress_monitor.is_some() || self.interrupt.is_some()
+    }
+
+    /// Ask the interrupt check, if one is set and it wasn't asked in the last 50 ms.
+    fn should_stop(&mut self) -> bool {
+        if self.interrupted {
+            return true;
+        }
+        let Some(check) = &self.interrupt else { return false };
+        let now = std::time::Instant::now();
+        if self.interrupt_asked.is_some_and(|last| now - last < INTERRUPT_INTERVAL) {
+            return false;
+        }
+        self.interrupt_asked = Some(now);
+        self.interrupted = check();
+        self.interrupted
+    }
+
+    /// Stop between steps: for the interrupt check, and to wait while the progress page is
+    /// paused, applying its commands as they come.
+    fn checkpoint(&mut self) -> Go {
+        if self.should_stop() {
+            return Go::Stop;
+        }
+        let Some(monitor) = self.progress_monitor.clone() else { return Go::Steps };
         loop {
             let (commands, released) = monitor.wait(self);
             if !commands.is_empty() {
@@ -410,8 +470,11 @@ impl Simulation {
                 }
                 monitor.publish(self);
             }
-            if let Some(single) = released {
-                return single;
+            match released {
+                Some(true) => return Go::OneStep,
+                Some(false) => return Go::Steps,
+                None if self.should_stop() => return Go::Stop,
+                None => {}
             }
         }
     }
@@ -497,7 +560,9 @@ impl Simulation {
             if self.dense_valid && dt.abs() < 1e-16 {
                 return;
             }
-            self.monitor_gate();
+            if matches!(self.checkpoint(), Go::Stop) {
+                return;
+            }
             if !self.integrator.has_dense_output() {
                 // The page switched to an integrator without dense output.
                 self.integrate_inner(epoch);
@@ -565,7 +630,11 @@ impl Simulation {
             if dt.abs() < 1e-16 {
                 break;
             }
-            let single = self.monitor_gate();
+            let single = match self.checkpoint() {
+                Go::Stop => return,
+                Go::OneStep => true,
+                Go::Steps => false,
+            };
 
             // if we're within a timestep of the epoch, just take a step of that size
             if dt.abs() < self.integrator.timestep().abs() {
@@ -601,13 +670,14 @@ impl Simulation {
             }
             // A fixed-step integrator takes every full step this loop would take before the last,
             // shorter one, together; an adaptive one may change its timestep at each step.
-            let n = if self.integrator.fixed_timestep() { self.full_steps_to(target) } else { 1 };
-            // With a progress page, at most a chunk of them before stopping at its controls.
-            let n = match (&self.progress_monitor, single) {
-                (None, _) => n,
-                (Some(_), true) => 1,
-                (Some(_), false) => n.min(MONITOR_CHUNK),
+            // With a progress page or an interrupt check, at most a chunk of them before the next
+            // checkpoint (so counting them stops there too).
+            let cap = match (self.has_checkpoints(), single) {
+                (false, _) => usize::MAX,
+                (true, true) => 1,
+                (true, false) => MONITOR_CHUNK,
             };
+            let n = if self.integrator.fixed_timestep() { self.full_steps_to(target, cap) } else { 1 };
             self.steps_unmonitored(n.max(1));
         }
         
@@ -626,13 +696,14 @@ impl Simulation {
 
     /// How many steps of the current timestep fit before `target` (days since the reference
     /// epoch), as the loop in [`Simulation::integrate`] counts them, on the same arithmetic.
-    fn full_steps_to(&self, target: f64) -> usize {
+    /// Counts at most `cap`.
+    fn full_steps_to(&self, target: f64, cap: usize) -> usize {
         let h = self.integrator.timestep();
         let mut t = self.t;
         let mut n = 0;
         loop {
             let dt = target - t;
-            if dt.abs() < 1e-16 || dt.abs() < h.abs() || (dt < 0.0) != (h < 0.0) {
+            if n == cap || dt.abs() < 1e-16 || dt.abs() < h.abs() || (dt < 0.0) != (h < 0.0) {
                 return n;
             }
             t += h;
@@ -735,6 +806,9 @@ impl Simulation {
 /// rounding steps of a Julian date.
 const EPOCH_TOLERANCE: f64 = 1e-9;
 
-/// Most steps [`Simulation::steps`] hands the integrator at once while a progress page is
-/// attached.
+/// Most steps [`Simulation::steps`] hands the integrator at once while a progress page or an
+/// interrupt check is attached.
 const MONITOR_CHUNK: usize = 1000;
+
+/// Least time between two calls of the interrupt check.
+const INTERRUPT_INTERVAL: std::time::Duration = std::time::Duration::from_millis(50);

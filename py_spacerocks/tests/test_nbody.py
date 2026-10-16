@@ -77,3 +77,48 @@ def test_monitor_tracks_elements():
     sim.monitor_track(None)
     with opener.open(url + "progress.json") as r:
         assert json.load(r)["tracked"] is None
+
+
+def _interrupt_after(seconds):
+    import os
+    import signal
+    import threading
+
+    timer = threading.Timer(seconds, lambda: os.kill(os.getpid(), signal.SIGINT))
+    timer.start()
+    return timer
+
+
+def test_ctrl_c_stops_integrate():
+    import time
+
+    import pytest
+
+    sim = make_sim(Integrator.ias15(1.0))
+    target = Time(2460000.5 + 1e9, "tdb", "jd")  # far longer than the test may run
+    _interrupt_after(0.3)
+    start = time.monotonic()
+    with pytest.raises(KeyboardInterrupt):
+        sim.integrate(target)
+    assert time.monotonic() - start < 5
+    assert 2460000.5 < sim.epoch.jd() < target.jd()
+    # The simulation is usable afterwards.
+    jd = sim.epoch.jd()
+    sim.integrate(Time(jd + 10.0, "tdb", "jd"))
+    assert abs(sim.epoch.jd() - (jd + 10.0)) < 1e-9
+
+
+def test_ctrl_c_stops_a_paused_monitor_run():
+    import time
+
+    import pytest
+
+    sim = make_sim(Integrator.wisdom_holman(20.0))
+    sim.monitor(open_browser=False, paused=True)
+    _interrupt_after(0.3)
+    start = time.monotonic()
+    with pytest.raises(KeyboardInterrupt):
+        sim.integrate(Time(2460000.5 + 1e6, "tdb", "jd"))
+    assert time.monotonic() - start < 5
+    assert sim.epoch.jd() == 2460000.5
+    sim.stop_monitor()

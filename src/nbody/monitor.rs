@@ -99,7 +99,7 @@ const INTEGRATORS: [&str; 4] = ["IAS15", "WisdomHolman", "Leapfrog", "Trace"];
 #[derive(Serialize, Clone)]
 struct Status {
     /// "idle" before the first run, "running" during one, "paused" while held in one, "done"
-    /// after it.
+    /// after it, "stopped" after one cut short by an interrupt.
     state: &'static str,
     /// Whether the page's Pause is on (the next step will wait).
     paused: bool,
@@ -221,7 +221,8 @@ impl ProgressMonitor {
 
     /// Hold the simulation while the page is paused. Returns the commands the page sent, and
     /// `Some(single)` once the simulation may step (`single` when let through by Step for one
-    /// step only), or `None` to come back after applying the commands.
+    /// step only), or `None` to come back after applying the commands, or after a quarter of a
+    /// second of waiting (so the caller can check for an interrupt such as Ctrl-C).
     pub(crate) fn wait(&self, sim: &Simulation) -> (Vec<Command>, Option<bool>) {
         if !self.shared.attention.load(Ordering::Acquire) {
             return (Vec::new(), Some(false));
@@ -259,7 +260,9 @@ impl ProgressMonitor {
                     if s.state == "running" {
                         s.state = "paused";
                     }
-                    s.paused_since = Some(Instant::now());
+                    if s.paused_since.is_none() {
+                        s.paused_since = Some(Instant::now());
+                    }
                     snapshot(&mut s, sim);
                 }
                 announced = true;
@@ -267,6 +270,10 @@ impl ProgressMonitor {
                 continue;
             }
             control = self.shared.wake.wait_timeout(control, Duration::from_millis(250)).unwrap_or_else(|e| e.into_inner()).0;
+            if control.paused && control.step_credits == 0 && control.commands.is_empty() {
+                // Still paused: let the caller look for an interrupt, then wait again.
+                return (Vec::new(), None);
+            }
         }
     }
 
@@ -332,8 +339,13 @@ impl ProgressMonitor {
             Some((start, target)) => (sim.t() - target) * (target - start).signum() >= -1e-9,
             None => true,
         };
-        if finished {
+        if sim.interrupted() {
+            s.state = "stopped";
+        } else if finished {
             s.state = "done";
+        }
+        if let Some(since) = s.paused_since.take() {
+            s.paused_total += since.elapsed();
         }
         snapshot(&mut s, sim);
     }

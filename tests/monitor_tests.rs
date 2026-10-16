@@ -241,3 +241,42 @@ fn page_tracks_a_particles_elements() {
     let s = json(&url);
     assert!(s["tracked"].is_null() && s["element_history"].as_array().unwrap().is_empty());
 }
+
+#[test]
+fn interrupt_stops_running_and_paused_runs() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+
+    for paused in [false, true] {
+        let mut sim = outer_system(Box::new(WisdomHolman::new(1.0)));
+        let url = sim.monitor(0).unwrap();
+        sim.progress_monitor().unwrap().set_paused(paused);
+        let stop = Arc::new(AtomicBool::new(false));
+        let flag = stop.clone();
+        sim.set_interrupt(Some(Arc::new(move || flag.load(Ordering::Relaxed))));
+        let setter = stop.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(200));
+            setter.store(true, Ordering::Relaxed);
+        });
+
+        let start = Instant::now();
+        sim.integrate(&Time::new(T0 + 1e9, "tdb", "jd").unwrap());
+        assert!(start.elapsed() < Duration::from_secs(3));
+        assert!(sim.interrupted());
+        assert!(sim.t() < 1e9);
+        if paused {
+            assert_eq!(sim.t(), 0.0);
+        }
+        assert_eq!(json(&url)["state"], "stopped");
+
+        // Removing the check lets the simulation run again.
+        sim.set_interrupt(None);
+        sim.progress_monitor().unwrap().set_paused(false);
+        let t = sim.t();
+        sim.integrate(&Time::new(T0 + t + 10.0, "tdb", "jd").unwrap());
+        assert!((sim.t() - t - 10.0).abs() < 1e-9);
+        assert!(!sim.interrupted());
+    }
+}

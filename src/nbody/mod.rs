@@ -23,4 +23,4 @@ pub mod integrators;
     pub use self::integrators::Trace;
 
 
-pub use self::simulation::Simulation;
+pub use self::simulation::{InterruptCheck, Simulation};
