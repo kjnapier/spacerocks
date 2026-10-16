@@ -3,7 +3,7 @@
 use nalgebra::{DMatrix, DVector};
 
 use crate::orbfit::residuals::{residuals, residuals_per_arc};
-use crate::orbfit::{Astrometry, FitFlag, FitOptions, OrbitFit};
+use crate::orbfit::{Astrometry, FitFlag, FitIteration, FitOptions, OrbitFit};
 use crate::spice::SpiceKernel;
 
 /// Seed for fitted non-gravitational parameters that start at zero: the force (and so the
@@ -214,6 +214,12 @@ fn fit(
             accepted_any = true;
         } else {
             lambda *= 2.0;
+        }
+        if let Some(progress) = &opts.progress {
+            let it = FitIteration { detections: n, npar, iteration: iters, chi2, rows: nrows, accepted: rho > 0.1 };
+            if !progress.report(&it) {
+                break;
+            }
         }
 
         // Per-parameter tolerance: the absolute `tolerance`, or with `conv_frac` a fraction of the

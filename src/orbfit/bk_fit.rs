@@ -14,7 +14,7 @@
 use nalgebra::{DMatrix, DVector, Matrix6, Vector3, Vector6};
 
 use crate::orbfit::residuals::residuals;
-use crate::orbfit::{Astrometry, FitFlag, FitOptions, OrbitFit};
+use crate::orbfit::{Astrometry, FitFlag, FitIteration, FitOptions, OrbitFit};
 use crate::spice::SpiceKernel;
 
 /// layup's MU_SUN (AU³/day²), the mu of the bound-orbit prior.
@@ -179,6 +179,12 @@ pub fn fit_orbit_bk(astrometry: &Astrometry, epoch: f64, state: &[f64; 6], kerne
             c_final = Some(c_data + prior);
         } else {
             lambda *= 2.0;
+        }
+        if let Some(progress) = &opts.progress {
+            let it = FitIteration { detections: n, npar: 6, iteration: iters, chi2: chi2_data, rows: nrows, accepted: rho > 0.1 };
+            if !progress.report(&it) {
+                break;
+            }
         }
         if !chi2_cur.is_nan() && dx.iter().all(|v| !v.is_nan() && v.abs() <= opts.tolerance) {
             flag = FitFlag::Converged;

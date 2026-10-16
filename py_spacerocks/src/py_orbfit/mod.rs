@@ -4,6 +4,7 @@ pub mod gauss;
 pub mod fit;
 pub mod weights;
 pub mod observers;
+pub mod dashboard;
 
 pub fn make_orbfit_submodule(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     let submodule = PyModule::new(m.py(), "orbfit")?;
@@ -21,7 +22,9 @@ pub fn make_orbfit_submodule(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()
     submodule.add_function(wrap_pyfunction!(weights::debias, submodule.clone())?)?;
     submodule.add_function(wrap_pyfunction!(weights::occultation_radec, submodule.clone())?)?;
     submodule.add_function(wrap_pyfunction!(observers::observers, submodule.clone())?)?;
+    submodule.add_function(wrap_pyfunction!(dashboard::dashboard, submodule.clone())?)?;
     submodule.add_class::<fit::PyOrbitFit>()?;
+    submodule.add_class::<dashboard::PyFitDashboard>()?;
 
     m.add_submodule(&submodule)?;
     py.import("sys")?

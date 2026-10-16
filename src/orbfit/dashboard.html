@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit Fit</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="retro.css">
+<style>
+h1 small { font-size: 16px; color: var(--text); margin-left: 12px; text-shadow: none; }
+.pill.fitting { color: var(--good); animation: blink 1s steps(2, start) infinite; }
+.pill.converged { color: var(--cyan); }
+.pill.failed, .pill.stopped { color: var(--bad); }
+.pill.finished { color: var(--accent); }
+
+.result .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.verdict { font-size: 40px; line-height: 48px; }
+.verdict.good { color: var(--cyan); }
+.verdict.bad { color: var(--bad); }
+.verdict.busy { color: var(--good); }
+/* An HP-style bar: crawls while fitting, full when done. */
+.bar { height: 28px; border: 4px solid var(--line); padding: 4px; margin: 12px 0 16px; background: #000; }
+.bar > div { height: 100%; width: 0; background: repeating-linear-gradient(90deg, var(--good) 0 12px, transparent 12px 16px); }
+.bar.bad > div { background: repeating-linear-gradient(90deg, var(--bad) 0 12px, transparent 12px 16px); }
+.bar.crawl > div { width: 25%; animation: crawl 2s steps(20) infinite; }
+@keyframes crawl { from { margin-left: 0; } to { margin-left: 75%; } }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; }
+.changed { color: var(--warn); }
+
+.stat:nth-child(2) .value, .stat:nth-child(6) .value { color: var(--cyan); }
+.stat:nth-child(3) .value, .stat:nth-child(4) .value { color: var(--good); }
+
+.setup { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 32px; }
+.setup .group { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; align-content: start; }
+.setup .group > .label { width: 100%; }
+.setup .wide { grid-column: 1 / -1; }
+.setup input { width: 136px; }
+.g { text-transform: none; }
+.setup label.inline { gap: 8px; }
+
+.orbit .body { display: grid; grid-template-columns: minmax(280px, 1fr) 1fr; gap: 24px; align-items: start; }
+.orbit dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0 16px; }
+.orbit dt { color: var(--muted); text-transform: none; }
+.orbit dt.hint { grid-column: 1 / -1; }
+.orbit dd { margin: 0; text-align: right; }
+.orbit dd .pm { color: var(--muted); }
+.log { margin: 0; padding: 0; list-style: none; }
+.log li { padding: 6px 0; border-bottom: 4px dotted #26265c; }
+.log li:last-child { border-bottom: 0; }
+.log .head { display: flex; gap: 12px; flex-wrap: wrap; }
+.log .ok { color: var(--cyan); }
+.log .no { color: var(--bad); }
+.log .what { color: var(--muted); text-transform: none; }
+
+@media (max-width: 720px) {
+  .verdict { font-size: 24px; line-height: 32px; }
+  .facts, .setup, .orbit .body { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Spacerocks<small>orbit fit</small></h1>
+    <span id="state" class="pill">connecting</span>
+    <span id="about" class="sub"></span>
+  </header>
+
+  <section class="panel result" data-title="Fit">
+    <div class="row">
+      <span class="verdict" id="verdict">–</span>
+      <span class="sub" id="summary"></span>
+    </div>
+    <div class="bar" id="bar"><div></div></div>
+    <div class="facts">
+      <div><div class="label">Epoch (TDB)</div><div class="value" id="epoch">–</div></div>
+      <div><div class="label">Now</div><div class="value" id="now">–</div></div>
+    </div>
+    <div class="controls">
+      <button class="primary" id="fit" title="Fit with these settings (F)">Fit ▶</button>
+      <button id="stop" title="Stop the running fit (Esc)">■ Stop</button>
+      <button class="toggle" id="auto" aria-pressed="true" title="Refit whenever a setting or detection changes">Auto refit</button>
+      <button class="toggle" id="seed" aria-pressed="false" title="Start from the last orbit instead of an initial orbit determination">From last fit</button>
+      <span class="keys"><kbd>F</kbd> <kbd>Esc</kbd></span>
+      <span class="spacer"></span>
+      <button id="done" title="Hand the fit back to Python (wait() returns it)">Done ✓</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </section>
+
+  <section class="panel setup" data-title="Setup">
+    <div class="group">
+      <span class="label">Forces</span>
+      <button class="toggle" data-key="asteroids" title="The 16 massive asteroids of sb441-n16">Asteroids</button>
+      <button class="toggle" data-key="earth_harmonics" title="Earth's J2, J3 and J4">Earth J2-J4</button>
+      <button class="toggle" data-key="solar_j2" title="The Sun's oblateness">Solar J2</button>
+      <label class="inline">Relativity
+        <span class="select"><select data-key="relativity">
+          <option value="eih">EIH</option><option value="simple">Simple</option><option value="potential">Potential</option><option value="off">Off</option>
+        </select></span>
+      </label>
+    </div>
+    <div class="group">
+      <span class="label">Non-gravitational</span>
+      <button class="toggle" data-key="a1" title="Radial A1 g(r)">A1</button>
+      <button class="toggle" data-key="a2" title="Transverse A2 g(r): Yarkovsky drift">A2</button>
+      <button class="toggle" data-key="a3" title="Normal A3 g(r)">A3</button>
+      <button class="toggle" data-key="nongrav_auto" title="Pick the model the data warrant (layup's auto)">Auto</button>
+      <button class="toggle" data-key="comet" title="The comet g(r) of Marsden et al. (1973) instead of 1/r²">Comet g(r)</button>
+    </div>
+    <div class="group wide">
+      <span class="label">Perturbers · gravity on</span>
+      <span id="bodies" class="group"></span>
+    </div>
+    <div class="group">
+      <span class="label">Solver</span>
+      <label class="inline">Engine
+        <span class="select"><select data-key="engine">
+          <option value="cartesian">Cartesian</option><option value="bk">BK</option>
+        </select></span>
+      </label>
+      <label class="inline">IOD
+        <span class="select"><select data-key="iod" title="Initial orbit determination">
+          <option value="auto">Gauss+BK</option><option value="gauss">Gauss</option><option value="herget">Herget</option>
+        </select></span>
+      </label>
+      <button class="toggle" data-key="robust" title="Reject outliers, and grow the fit from short windows if needed">Robust</button>
+      <label class="inline">Outlier <span class="g">σ</span> <input data-key="outlier_sigma" type="number" step="any"></label>
+    </div>
+    <div class="group">
+      <span class="label">Tolerances</span>
+      <label class="inline">IAS15 <span class="g">ε</span> <input data-key="epsilon" type="number" step="any"></label>
+      <label class="inline">Max iter <input data-key="max_iter" type="number" step="1"></label>
+      <label class="inline">Converge <input data-key="tolerance" type="number" step="any"></label>
+      <label class="inline"><span class="g">χ</span>²/<span class="g">ν</span> limit <input data-key="chi2_threshold" type="number" step="any"></label>
+      <label class="inline">Arc gap (d) <input data-key="arc_gap" type="number" step="any"></label>
+    </div>
+  </section>
+
+  <section class="stats">
+    <div class="panel stat"><div class="label">Used / all</div><div class="value" id="used">–</div></div>
+    <div class="panel stat"><div class="label"><span class="g">χ</span>² / <span class="g">ν</span></div><div class="value" id="chi2">–</div></div>
+    <div class="panel stat"><div class="label">RMS RA (″)</div><div class="value" id="rmsRa">–</div></div>
+    <div class="panel stat"><div class="label">RMS Dec (″)</div><div class="value" id="rmsDec">–</div></div>
+    <div class="panel stat"><div class="label">Iterations</div><div class="value" id="iters">–</div></div>
+    <div class="panel stat"><div class="label">Fit time</div><div class="value" id="time">–</div></div>
+    <div class="panel stat"><div class="label">Arc (days)</div><div class="value" id="arc">–</div></div>
+    <div class="panel stat"><div class="label">Fits</div><div class="value" id="runs">–</div></div>
+  </section>
+
+  <section class="plots">
+    <div class="panel" data-title="Residuals · time">
+      <p class="caption">Hover a detection · click to leave out</p>
+      <div class="screen"><canvas class="pixel" id="resid" width="224" height="224"></canvas><div class="tip" id="tip"></div></div></div>
+    <div class="panel" data-title="Residuals · RA vs Dec">
+      <p class="caption">Arcseconds · ring at 3σ</p>
+      <div class="screen"><canvas class="pixel" id="scatter" width="224" height="224"></canvas><div class="tip" id="tip2"></div></div></div>
+  </section>
+
+  <section class="plots">
+    <div class="panel" data-title="Chi² per iteration">
+      <p class="caption">Live · log scale</p>
+      <div class="screen"><canvas class="pixel" id="chi" width="224" height="224"></canvas></div></div>
+    <div class="panel" data-title="Map · ecliptic">
+      <p class="caption">Orbit at the epoch · Earth at each detection</p>
+      <div class="screen"><canvas class="pixel" id="map" width="224" height="224"></canvas><div class="tip" id="tip3"></div></div></div>
+  </section>
+
+  <section class="panel orbit" data-title="Orbit">
+    <div class="body">
+      <dl id="elements"><dt class="hint">No orbit yet.</dt></dl>
+      <div>
+        <div class="label">Fit log</div>
+        <ul class="log" id="log"><li class="what">No fits yet.</li></ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="retro.js"></script>
+<script>
+const COL = { ra: "#7cd8fc", dec: "#58f898", out: "#f83800", rejected: "#fca044", live: "#58f898", dimLive: "#5c5ca8", orbit: "#f87858", earth: "#6888fc", rock: "#fcfcfc" };
+const finite = x => typeof x === "number" && isFinite(x);
+const num = (x, p = 3) => finite(x) ? x.toFixed(p) : "–";
+
+// Each detection's state: 0 used, 1 left out by hand, 2 rejected by the robust fit.
+function detectionState(s, i) {
+  if (s.excluded[i]) return 1;
+  if (s.fit && s.fit.used && s.fit.used.length && !s.fit.used[i]) return 2;
+  return 0;
+}
+const STATE_TEXT = ["used", "left out", "rejected as an outlier"];
+
+// --- Residuals against time ------------------------------------------------------------------
+let points = { resid: [], scatter: [], map: [] }, hovered = null;
+function drawResiduals(s) {
+  const [ctx, w, h] = screen("resid");
+  points.resid = [];
+  const det = s.detections, f = s.fit;
+  if (!f || !f.resid) { text(ctx, s.state === "fitting" ? "FITTING..." : "NO FIT YET", 6, 6, PAL.dim); return; }
+  const t0 = Math.min(...det.map(d => d[0])), t1 = Math.max(...det.map(d => d[0]));
+  let m = 0;
+  f.resid.forEach((r, i) => { if (detectionState(s, i) === 0) for (const v of r.slice(0, 2)) if (finite(v)) m = Math.max(m, Math.abs(v)); });
+  if (!m) f.resid.forEach(r => { for (const v of r.slice(0, 2)) if (finite(v)) m = Math.max(m, Math.abs(v)); });
+  m = m * 1.2 || 1;
+  const pad = { l: 3, r: 3 }, rowH = Math.floor(h / 2);
+  const X = t => pad.l + (t - t0) / ((t1 - t0) || 1) * (w - pad.l - pad.r);
+  [["RA COS DEC", 0, COL.ra], ["DEC", 1, COL.dec]].forEach(([label, col, color], row) => {
+    const y0 = row * rowH, mid = y0 + Math.floor(rowH / 2) + 4;
+    const Y = v => Math.max(y0 + 10, Math.min(y0 + rowH - 3, mid - v / m * (rowH / 2 - 7)));
+    if (row) dotted(ctx, 0, y0, w, y0, PAL.grid);
+    dotted(ctx, 0, mid, w, mid, PAL.grid);
+    text(ctx, label, 3, y0 + 3, color);
+    const range = `±${short(m)} ARCSEC`;
+    text(ctx, range, w - 3 - textWidth(range), y0 + 3, PAL.dim);
+    f.resid.forEach((r, i) => {
+      const v = r[col];
+      if (!finite(v)) return;
+      const u = X(det[i][0]), y = Y(v), st = detectionState(s, i);
+      if (st === 0) px(ctx, u - 1, y - 1, color, 2);
+      else cross(ctx, u, y, st === 1 ? COL.out : COL.rejected);
+      points.resid.push({ i, u, v: y });
+    });
+  });
+  const left = "0D", right = `${short(t1 - t0)}D`;
+  text(ctx, right, w - 3 - textWidth(right), h - 6, PAL.dim);
+  highlight(ctx, points.resid);
+}
+function cross(ctx, u, v, color) {
+  u = Math.round(u); v = Math.round(v);
+  for (const d of [-1, 0, 1]) { px(ctx, u + d, v + d, color); px(ctx, u + d, v - d, color); }
+}
+function highlight(ctx, pts) {
+  if (hovered === null) return;
+  for (const p of pts) if (p.i === hovered) {
+    ctx.strokeStyle = PAL.text; ctx.lineWidth = 1; ctx.strokeRect(Math.round(p.u) - 2.5, Math.round(p.v) - 2.5, 5, 5);
+  }
+}
+
+// --- Residuals against each other ------------------------------------------------------------
+function drawScatter(s) {
+  const [ctx, w, h] = screen("scatter");
+  points.scatter = [];
+  const f = s.fit;
+  if (!f || !f.resid) { text(ctx, "NO FIT YET", 6, 6, PAL.dim); return; }
+  const sig = s.detections.map(d => Math.max(d[3], d[4])).filter(finite).sort((a, b) => a - b);
+  const sigma = sig.length ? sig[Math.floor(sig.length / 2)] : 1;
+  let m = 3 * sigma;
+  f.resid.forEach((r, i) => { if (detectionState(s, i) === 0 && finite(r[0]) && finite(r[1])) m = Math.max(m, Math.abs(r[0]), Math.abs(r[1])); });
+  m *= 1.15;
+  const cx = Math.floor(w / 2), cy = Math.floor(h / 2), k = (w / 2 - 4) / m;
+  dotted(ctx, 0, cy, w, cy, PAL.grid); dotted(ctx, cx, 0, cx, h, PAL.grid);
+  for (let j = 0; j < 120; j += 2) {
+    const a = j / 120 * 2 * Math.PI;
+    px(ctx, cx + Math.cos(a) * 3 * sigma * k, cy - Math.sin(a) * 3 * sigma * k, PAL.dim);
+  }
+  text(ctx, `±${short(m)} ARCSEC`, 3, 3, PAL.dim);
+  text(ctx, "RA", w - 3 - textWidth("RA"), cy + 3, COL.ra);
+  text(ctx, "DEC", cx + 3, 3, COL.dec);
+  f.resid.forEach((r, i) => {
+    if (!finite(r[0]) || !finite(r[1])) return;
+    const clamp = v => Math.max(-m, Math.min(m, v));
+    const u = cx + clamp(r[0]) * k, v = cy - clamp(r[1]) * k, st = detectionState(s, i);
+    if (st === 0) px(ctx, u - 1, v - 1, PAL.text, 2); else cross(ctx, u, v, st === 1 ? COL.out : COL.rejected);
+    points.scatter.push({ i, u, v });
+  });
+  highlight(ctx, points.scatter);
+}
+
+// --- Chi-square per iteration -----------------------------------------------------------------
+function drawChi(s) {
+  const [ctx, w, h] = screen("chi");
+  const pts = s.live.filter(p => finite(p[1]) && p[1] > 0);
+  if (pts.length < 1) { text(ctx, s.state === "fitting" ? "WAITING FOR AN ITERATION..." : "NO ITERATIONS YET", 6, 6, PAL.dim); return; }
+  const pad = { l: 26, r: 4, t: 12, b: 10 };
+  const ls = pts.map(p => Math.log10(p[1]));
+  let lo = Math.floor(Math.min(...ls)), hi = Math.ceil(Math.max(...ls));
+  if (hi === lo) hi = lo + 1;
+  const n = pts.length, X = k => pad.l + k / Math.max(1, n - 1) * (w - pad.l - pad.r);
+  const Y = l => pad.t + (hi - l) / (hi - lo) * (h - pad.t - pad.b);
+  const every = Math.max(1, Math.ceil((hi - lo) / 6));
+  for (let e = lo; e <= hi; e += every) {
+    const y = Math.round(Y(e));
+    dotted(ctx, pad.l, y, w - pad.r, y, PAL.grid);
+    text(ctx, `1E${e}`, 2, Math.min(h - pad.b - 5, Math.max(1, y - 2)), PAL.dim);
+  }
+  // A new fit (a different subset of detections or parameters) starts a new segment.
+  let prev = null;
+  pts.forEach((p, k) => {
+    const q = [X(k), Y(Math.log10(p[1]))];
+    const fresh = k > 0 && (p[2] !== pts[k - 1][2] || p[3] !== pts[k - 1][3] || p[0] < pts[k - 1][0]);
+    if (fresh) { dotted(ctx, Math.round(q[0]), pad.t, Math.round(q[0]), h - pad.b, PAL.grid); prev = null; }
+    if (prev) line(ctx, prev[0], prev[1], q[0], q[1], COL.live);
+    px(ctx, q[0], q[1], p[4] ? COL.live : COL.dimLive);
+    prev = q;
+  });
+  const lastP = pts[pts.length - 1];
+  text(ctx, `${short(lastP[1])}  ${lastP[2]} DET  ${lastP[3]} PAR`, 3, 3, PAL.text);
+  text(ctx, `${n} ITER`, w - 3 - textWidth(`${n} ITER`), h - 6, PAL.dim);
+}
+
+// --- Map --------------------------------------------------------------------------------------
+function kepler(M, e) {
+  let E = e < 0.8 ? M : Math.PI;
+  for (let k = 0; k < 30; k++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+  return E;
+}
+// Heliocentric ecliptic position from elements (degrees) at mean anomaly M (radians).
+function place(el, M) {
+  const rad = Math.PI / 180, [O, w_, I] = [el.node * rad, el.arg * rad, el.inc * rad];
+  const E = kepler(M, el.e), b = el.a * Math.sqrt(1 - el.e * el.e);
+  const xo = el.a * (Math.cos(E) - el.e), yo = b * Math.sin(E);
+  const [cO, sO, cw, sw, ci, si] = [Math.cos(O), Math.sin(O), Math.cos(w_), Math.sin(w_), Math.cos(I), Math.sin(I)];
+  return [(cO * cw - sO * sw * ci) * xo + (-cO * sw - sO * cw * ci) * yo, (sO * cw + cO * sw * ci) * xo + (-sO * sw + cO * cw * ci) * yo, sw * si * xo + cw * si * yo];
+}
+function drawMap(s) {
+  const [ctx, w, h] = screen("map");
+  for (const [u, v, bright] of STARS) px(ctx, u * w, v * h, bright ? PAL.dim : PAL.star);
+  points.map = [];
+  const f = s.fit, el = f && f.elements, pos = f && f.position;
+  if (!el || !pos) { text(ctx, "NO ORBIT YET", 6, 6, PAL.dim); return; }
+  const bound = el.e < 1 && el.a > 0;
+  const r = Math.hypot(...pos);
+  let m = Math.max(1.6, bound ? Math.min(el.big_q, 60) : Math.max(r, el.q) * 1.5, r) * 1.1;
+  const cx = Math.floor(w / 2), cy = Math.floor(h / 2), k = (Math.min(w, h) / 2 - 2) / m;
+  const P = (x, y) => [cx + x * k, cy - y * k];
+  dotted(ctx, 0, cy, w, cy, PAL.grid); dotted(ctx, cx, 0, cx, h, PAL.grid);
+  text(ctx, `±${short(m)} AU`, 3, 3, PAL.dim);
+  // Planets' orbits (as circles) and places at the epoch.
+  (f.planets || []).forEach(([name, x, y, z], j) => {
+    const rp = Math.hypot(x, y);
+    if (rp > m * 1.02) return;
+    const color = PAL.planets[j % PAL.planets.length];
+    for (let a = 0; a < 2 * Math.PI; a += 4 / Math.max(8, rp * k)) px(ctx, cx + Math.cos(a) * rp * k, cy - Math.sin(a) * rp * k, PAL.grid);
+    const [u, v] = P(x, y);
+    px(ctx, u - 1, v - 1, color, 2);
+    if (rp * k > 14) text(ctx, name, u + 3, v - 6, color);
+    points.map.push({ name, x, y, z, u, v });
+  });
+  // The observer at each detection.
+  s.observers.forEach(([x, y, z], i) => { if (finite(x)) { const [u, v] = P(x, y); px(ctx, u, v, COL.earth); } });
+  // The fitted orbit, and the object at each detection (two-body) and at the epoch.
+  if (bound) {
+    let prev = null;
+    for (let j = 0; j <= 160; j++) {
+      const [x, y] = place(el, 2 * Math.PI * j / 160), q = P(x, y);
+      if (prev) line(ctx, prev[0], prev[1], q[0], q[1], COL.orbit);
+      prev = q;
+    }
+    s.detections.forEach(d => {
+      const M = (el.mean_anomaly + el.n * (d[0] - f.epoch)) * Math.PI / 180;
+      const [x, y] = place(el, M), [u, v] = P(x, y);
+      px(ctx, u, v, PAL.text);
+    });
+  }
+  px(ctx, cx - 1, cy, PAL.sun, 3); ctx.fillRect(cx, cy - 1, 1, 3);
+  const [u, v] = P(pos[0], pos[1]);
+  for (const d of [2, 3]) { px(ctx, u - d, v, PAL.text); px(ctx, u + d, v, PAL.text); px(ctx, u, v - d, PAL.text); px(ctx, u, v + d, PAL.text); }
+  points.map.push({ name: s.name, x: pos[0], y: pos[1], z: pos[2], u, v, rock: true });
+  text(ctx, s.name, u + 4, v + 2, PAL.text);
+}
+
+// --- Hover and click ----------------------------------------------------------------------------
+function nearest(id, ev, pts) {
+  const c = $(id), r = c.getBoundingClientRect();
+  const u = (ev.clientX - r.left) / r.width * c.width, v = (ev.clientY - r.top) / r.height * c.height;
+  let best = null, bd = 30;
+  for (const p of pts) { const d = (p.u - u) ** 2 + (p.v - v) ** 2; if (d < bd) { bd = d; best = p; } }
+  return best;
+}
+function showTip(tipId, canvasId, ev, textContent) {
+  const tip = $(tipId);
+  if (!textContent) { tip.style.display = "none"; return; }
+  tip.textContent = textContent;
+  const box = $(canvasId).parentElement.getBoundingClientRect();
+  tip.style.display = "block";
+  const left = ev.clientX - box.left + 14, top = ev.clientY - box.top + 14;
+  tip.style.left = `${Math.max(0, Math.min(left, box.width - tip.offsetWidth - 4))}px`;
+  tip.style.top = `${top + tip.offsetHeight > box.height ? top - tip.offsetHeight - 24 : top}px`;
+}
+function detectionText(i) {
+  const d = last.detections[i], r = last.fit && last.fit.resid ? last.fit.resid[i] : [NaN, NaN], st = detectionState(last, i);
+  return `#${i} · JD ${d[0].toFixed(5)}\n${calendar(d[0])}\nRA ${d[1].toFixed(5)}°  Dec ${d[2].toFixed(5)}°\nΔRA ${num(r[0])}″  ΔDec ${num(r[1])}″\nsigma ${num(d[3], 2)}″ × ${num(d[4], 2)}″ · ${STATE_TEXT[st]}\nclick to ${last.excluded[i] ? "put it back" : "leave it out"}`;
+}
+for (const [canvasId, tipId, key] of [["resid", "tip", "resid"], ["scatter", "tip2", "scatter"]]) {
+  $(canvasId).addEventListener("mousemove", ev => {
+    if (!last) return;
+    const p = nearest(canvasId, ev, points[key]);
+    hovered = p ? p.i : null;
+    $(canvasId).style.cursor = p ? "pointer" : "default";
+    showTip(tipId, canvasId, ev, p ? detectionText(p.i) : "");
+    drawResiduals(last); drawScatter(last);
+  });
+  $(canvasId).addEventListener("mouseleave", () => { hovered = null; $(tipId).style.display = "none"; if (last) { drawResiduals(last); drawScatter(last); } });
+  $(canvasId).addEventListener("click", ev => {
+    const p = nearest(canvasId, ev, points[key]);
+    if (p) control({ action: "exclude", index: p.i, on: last.excluded[p.i] ? "0" : "1" });
+  });
+}
+$("map").addEventListener("mousemove", ev => {
+  if (!last) return;
+  const p = nearest("map", ev, points.map);
+  showTip("tip3", "map", ev, p ? `${p.name}${p.rock ? " at the epoch" : ""}\nx ${p.x.toFixed(3)}  y ${p.y.toFixed(3)}  z ${p.z.toFixed(3)}\nr ${Math.hypot(p.x, p.y, p.z).toFixed(3)} AU from the Sun` : "");
+});
+$("map").addEventListener("mouseleave", () => { $("tip3").style.display = "none"; });
+
+// --- Controls -----------------------------------------------------------------------------------
+async function control(params) {
+  $("msg").textContent = "";
+  try {
+    const r = await fetch("control?" + new URLSearchParams(params), { method: "POST", headers: { "X-Spacerocks": "1" } });
+    if (!r.ok) $("msg").textContent = await r.text();
+  } catch (e) { $("msg").textContent = "not connected"; }
+  setTimeout(pollOnce, 30);
+}
+const set = (key, value) => control({ action: "set", key, value });
+$("fit").onclick = () => control({ action: "fit" });
+$("stop").onclick = () => control({ action: "stop" });
+$("done").onclick = () => control({ action: "done" });
+$("auto").onclick = () => control({ action: "auto", on: last && last.auto ? "0" : "1" });
+$("seed").onclick = () => control({ action: "seed", on: last && last.seed_last ? "0" : "1" });
+for (const b of document.querySelectorAll("button.toggle[data-key]")) b.onclick = () => set(b.dataset.key, b.getAttribute("aria-pressed") === "true" ? "0" : "1");
+for (const sel of document.querySelectorAll("select[data-key]")) sel.addEventListener("change", () => set(sel.dataset.key, sel.value));
+const editing = new Set();
+for (const inp of document.querySelectorAll("input[data-key]")) {
+  inp.addEventListener("focus", () => editing.add(inp));
+  inp.addEventListener("blur", () => editing.delete(inp));
+  inp.addEventListener("change", () => { editing.delete(inp); set(inp.dataset.key, inp.value.trim()); });
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") inp.blur(); });
+}
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input, select")) return;
+  if (e.key === "f" || e.key === "F") $("fit").click();
+  else if (e.key === "Escape") $("stop").click();
+});
+
+function drawSetup(s) {
+  const st = s.settings;
+  for (const b of document.querySelectorAll("button.toggle[data-key]")) {
+    const k = b.dataset.key, on = k[0] === "a" && k.length === 2 ? st.nongrav[+k[1] - 1] : st[k];
+    b.setAttribute("aria-pressed", String(!!on));
+  }
+  for (const sel of document.querySelectorAll("select[data-key]")) if (document.activeElement !== sel) sel.value = st[sel.dataset.key];
+  for (const inp of document.querySelectorAll("input[data-key]")) if (!editing.has(inp)) inp.value = st[inp.dataset.key];
+  $("auto").setAttribute("aria-pressed", String(s.auto));
+  $("seed").setAttribute("aria-pressed", String(s.seed_last));
+  const box = $("bodies"), key = JSON.stringify(st.bodies);
+  if (box.dataset.key !== key) {
+    box.dataset.key = key;
+    box.replaceChildren(...st.bodies.map(([name, on]) => {
+      const b = Object.assign(document.createElement("button"), { className: "toggle", textContent: name, title: on ? "Leave its gravity out" : "Put its gravity back" });
+      b.setAttribute("aria-pressed", String(on));
+      b.onclick = () => set(name, on ? "0" : "1");
+      return b;
+    }));
+  }
+}
+
+function drawElements(s) {
+  const f = s.fit, el = f && f.elements, dl = $("elements");
+  if (!el) {
+    dl.innerHTML = "";
+    dl.append(Object.assign(document.createElement("dt"), { className: "hint", textContent: f ? "No orbit: " + f.status + "." : "No orbit yet." }));
+  } else {
+    const pm = (v, sg, p, unit = "") => {
+      if (!finite(v)) return ["–", ""];
+      const digits = finite(sg) && sg > 0 ? Math.max(0, Math.min(10, 1 - Math.floor(Math.log10(sg)))) : p;
+      return [`${v.toFixed(Math.max(digits, 0))}${unit}`, finite(sg) && sg > 0 ? ` ± ${sg.toPrecision(2)}` : ""];
+    };
+    const sgm = el.sigma;
+    const rows = [
+      ["Semi-major a (AU)", pm(el.a, sgm[0], 6)], ["Ecc e", pm(el.e, sgm[1], 6)], ["Incl i", pm(el.inc, sgm[2], 4, "°")],
+      ["Node Ω", pm(el.node, sgm[3], 4, "°")], ["Peri ω", pm(el.arg, sgm[4], 4, "°")], ["Mean anom M", pm(el.mean_anomaly, sgm[5], 4, "°")],
+      ["Perihelion q (AU)", pm(el.q, sgm[6], 6)], ["Aphelion Q (AU)", [finite(el.big_q) ? el.big_q.toPrecision(6) : "–", ""]],
+      ["Period", [finite(el.period) ? `${(el.period / 365.25).toPrecision(6)} yr` : "unbound", ""]],
+    ];
+    ["A1", "A2", "A3"].forEach((n, k) => {
+      if (el.fit_nongrav[k]) rows.push([`${n} (AU/d²)`, [el.nongrav[k].toExponential(3), finite(el.nongrav_sigma[k]) ? ` ± ${el.nongrav_sigma[k].toPrecision(2)}` : ""]]);
+    });
+    rows.push(["Frame", ["heliocentric ecliptic", ""]]);
+    dl.replaceChildren(...rows.flatMap(([k, [v, e]]) => {
+      const dd = document.createElement("dd");
+      dd.append(v, Object.assign(document.createElement("span"), { className: "pm", textContent: e }));
+      return [Object.assign(document.createElement("dt"), { textContent: k }), dd];
+    }));
+  }
+  const log = $("log"), key = JSON.stringify(s.log.map(e => e.run));
+  if (log.dataset.key === key) return;
+  log.dataset.key = key;
+  if (!s.log.length) { log.innerHTML = `<li class="what">No fits yet.</li>`; return; }
+  log.replaceChildren(...s.log.map(e => {
+    const li = document.createElement("li"), head = Object.assign(document.createElement("div"), { className: "head" });
+    head.append(
+      Object.assign(document.createElement("span"), { textContent: `#${e.run}` }),
+      Object.assign(document.createElement("span"), { className: e.converged ? "ok" : "no", textContent: e.status }),
+      Object.assign(document.createElement("span"), { className: "g", textContent: `χ²/ν ${finite(e.chi2_nu) ? e.chi2_nu.toPrecision(3) : "–"}` }),
+      Object.assign(document.createElement("span"), { textContent: `rms ${finite(e.rms && e.rms[2]) ? e.rms[2].toPrecision(3) + "″" : "–"}` }),
+      Object.assign(document.createElement("span"), { textContent: duration(e.seconds) }),
+    );
+    li.append(head, Object.assign(document.createElement("div"), { className: "what", textContent: e.settings }));
+    return li;
+  }));
+}
+
+let last = null;
+function render(s) {
+  last = s;
+  const f = s.fit, n = s.detections.length;
+  const busy = s.state === "fitting" || s.pending;
+  let pill = busy ? "fitting" : s.state === "stopped" ? "stopped" : !f || !f.status ? "idle" : f.converged ? "converged" : "failed";
+  if (s.done && !busy) pill = "finished";
+  const pillEl = $("state");
+  pillEl.textContent = pill === "finished" ? "done · back in python" : pill; pillEl.className = `pill ${pill}`;
+  const t = s.detections.map(d => d[0]);
+  const arc = n ? Math.max(...t) - Math.min(...t) : 0;
+  $("about").textContent = `${s.name} · ${n} detections`;
+  const v = $("verdict");
+  if (busy) { v.textContent = "fitting..."; v.className = "verdict busy"; }
+  else if (!f || !f.status) { v.textContent = "–"; v.className = "verdict"; }
+  else { v.textContent = s.state === "stopped" ? "stopped" : f.status; v.className = `verdict ${f.converged ? "good" : "bad"}`; }
+  const bar = $("bar");
+  bar.className = `bar${busy ? " crawl" : ""}${!busy && f && !f.converged ? " bad" : ""}`;
+  bar.firstElementChild.style.width = busy ? "" : f ? "100%" : "0";
+  $("summary").innerHTML = s.changed && !busy ? "settings changed · fit again" : f && finite(f.chi2) ? `<span class="g">χ</span>² ${f.chi2.toPrecision(4)} · <span class="g">ν</span> ${f.ndof} · ${f.niter} iterations` : "";
+  $("summary").className = `sub${s.changed && !busy ? " changed" : ""}`;
+  $("epoch").textContent = f && finite(f.epoch) ? epochText(f.epoch) : "–";
+  const lastIt = s.live[s.live.length - 1];
+  $("now").textContent = busy ? (lastIt ? `iteration ${s.live.length} · ${lastIt[2]} detections · ${lastIt[3]} parameters` : "starting") : s.done ? "done: wait() has the fit" : "waiting for you";
+  $("stop").disabled = !busy;
+  const used = f && f.used && f.used.length ? f.used.filter(u => u).length : n - s.excluded.filter(x => x).length;
+  $("used").textContent = `${used} / ${n}`;
+  $("chi2").textContent = f && finite(f.chi2_nu) ? f.chi2_nu.toPrecision(4) : "–";
+  $("rmsRa").textContent = f && f.rms && finite(f.rms[0]) ? f.rms[0].toPrecision(3) : "–";
+  $("rmsDec").textContent = f && f.rms && finite(f.rms[1]) ? f.rms[1].toPrecision(3) : "–";
+  $("iters").textContent = s.live.length.toLocaleString();
+  $("time").textContent = duration(s.elapsed);
+  $("arc").textContent = fmtDays(arc);
+  $("runs").textContent = s.runs;
+  if (s.message) $("msg").textContent = s.message;
+  drawSetup(s); drawResiduals(s); drawScatter(s); drawChi(s); drawMap(s); drawElements(s);
+}
+
+async function pollOnce() {
+  const r = await fetch("state.json", { cache: "no-store" });
+  render(await r.json());
+}
+async function poll() {
+  try {
+    await pollOnce();
+    setTimeout(poll, last && (last.state === "fitting" || last.pending) ? 200 : 500);
+  } catch (e) {
+    const pill = $("state"); pill.textContent = "disconnected"; pill.className = "pill lost";
+    setTimeout(poll, 1000);
+  }
+}
+poll();
+</script>
+</body>
+</html>

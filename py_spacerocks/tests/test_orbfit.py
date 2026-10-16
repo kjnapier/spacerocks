@@ -142,3 +142,21 @@ def test_weights_observers_occultations(kernel):
     assert obs.shape == (2, 6)
     ra, dec = orbfit.occultation_radec(np.array([1.0]), np.array([0.3]), np.array([0.0]), np.array([0.0]))
     assert abs(ra[0] - 1.0) < 1e-15 and abs(dec[0] - 0.3) < 1e-15
+
+
+def test_dashboard_fits_bennu_robustly(full, bennu, kernel):
+    import time
+    import urllib.request
+    d = orbfit.dashboard(bennu["ra"], bennu["dec"], bennu["epoch"], bennu["observer"], kernel, sigma_ra=bennu["sigma_ra"],
+                         sigma_dec=bennu["sigma_dec"], timescale="tdb", robust=True, open_browser=False)
+    for _ in range(6000):
+        if not d.fitting:
+            break
+        time.sleep(0.01)
+    fit = d.fit
+    assert fit.flag == 0, fit
+    assert abs(fit.chi2 - full.chi2) < 1e-6 * full.chi2
+    req = urllib.request.Request(d.url + "control?action=done", method="POST", headers={"X-Spacerocks": "1"})
+    urllib.request.urlopen(req)
+    assert d.wait().flag == 0
+    d.close()

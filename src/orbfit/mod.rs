@@ -55,6 +55,9 @@ pub mod comet;
 pub mod sequential;
     pub use sequential::{sequential_update, update_mahalanobis, update_orbit, PriorFit, UpdateRoute};
 
+pub mod dashboard;
+    pub use dashboard::FitDashboard;
+
 pub mod pipeline;
     pub use pipeline::{build_sequence, determine_orbit, select_nongrav};
 
@@ -202,6 +205,121 @@ pub struct FitOptions {
     /// Sequential updates: the largest move, in prior sigmas (Mahalanobis), accepted before
     /// falling back to a full refit (layup's `max_update_sigma`).
     pub max_update_sigma: f64,
+    /// The force model of the trial orbits. The default is ASSIST's (and layup's).
+    pub forces: ForceModel,
+    /// Called after every Levenberg–Marquardt iteration (see [`FitProgress`]), e.g. to show a
+    /// fit's progress or stop it.
+    pub progress: Option<FitProgress>,
+}
+
+/// NAIF ids of the 16 massive asteroids among ASSIST's perturbers (read from `sb441-n16.bsp`).
+pub const ASTEROID_PERTURBERS: [i32; 16] =
+    [2000001, 2000002, 2000003, 2000004, 2000007, 2000010, 2000015, 2000016, 2000031, 2000052, 2000065, 2000087, 2000088, 2000107, 2000511, 2000704];
+
+/// The relativistic correction in [`ForceModel`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Relativity {
+    /// Einstein–Infeld–Hoffmann from the Sun ([`crate::assist::forces::GrEih`]): ASSIST's default.
+    #[default]
+    Eih,
+    /// The Sun's one-body post-Newtonian term ([`crate::assist::forces::GrSimple`]).
+    Simple,
+    /// The potential-only approximation ([`crate::assist::forces::GrPotential`]).
+    Potential,
+    /// Newtonian gravity only.
+    Off,
+}
+
+/// Which forces act on a trial orbit. The default is ASSIST's model: the Sun, planets, Moon,
+/// Pluto and 16 massive asteroids, Earth J2–J4, solar J2 and Einstein–Infeld–Hoffmann
+/// relativity (non-gravitational forces follow [`FitOptions::fit_nongrav`] and
+/// [`FitOptions::gofr`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ForceModel {
+    /// NAIF ids of perturbers left out (the Sun can't be). [`ASTEROID_PERTURBERS`] drops the
+    /// asteroids, so no small-body kernel is needed.
+    pub exclude: Vec<i32>,
+    /// Earth's J2, J3 and J4.
+    pub earth_harmonics: bool,
+    pub solar_j2: bool,
+    pub relativity: Relativity,
+}
+
+impl Default for ForceModel {
+    fn default() -> Self {
+        ForceModel { exclude: Vec::new(), earth_harmonics: true, solar_j2: true, relativity: Relativity::Eih }
+    }
+}
+
+impl ForceModel {
+    /// Whether this is ASSIST's model.
+    pub fn is_assist(&self) -> bool {
+        *self == ForceModel::default()
+    }
+
+    /// The forces, in ASSIST's order of application (smallest first), with g(r) `gofr` for
+    /// the non-gravitational term.
+    pub fn forces(&self, c: &crate::assist::EphemerisConstants, gofr: Option<[f64; 5]>) -> Vec<Box<dyn crate::assist::forces::Force + Send + Sync>> {
+        use crate::assist::forces::*;
+        let mut f: Vec<Box<dyn Force + Send + Sync>> = Vec::new();
+        f.push(Box::new(match gofr {
+            Some([alpha, m, n, k, r0]) => NonGravitational { alpha, r0, m, n, k },
+            None => NonGravitational::default(),
+        }));
+        if self.earth_harmonics {
+            f.push(Box::new(EarthHarmonics::new(c)));
+        }
+        if self.solar_j2 {
+            f.push(Box::new(SolarJ2::new(c)));
+        }
+        match self.relativity {
+            Relativity::Eih => f.push(Box::new(GrEih::new(c))),
+            Relativity::Simple => f.push(Box::new(GrSimple::new(c))),
+            Relativity::Potential => f.push(Box::new(GrPotential::new(c))),
+            Relativity::Off => {}
+        }
+        f.push(Box::new(NewtonianGravity));
+        f
+    }
+}
+
+/// One Levenberg–Marquardt iteration, as reported to [`FitProgress`].
+#[derive(Debug, Clone, Copy)]
+pub struct FitIteration {
+    /// Detections in this fit (the pipeline fits subsets: the longest arc first).
+    pub detections: usize,
+    /// Fitted parameters: 6, plus any non-gravitational ones.
+    pub npar: usize,
+    /// Iteration within this fit, from 0.
+    pub iteration: usize,
+    /// Chi-square of the orbit this iteration started from, and its residual rows.
+    pub chi2: f64,
+    pub rows: usize,
+    /// Whether the step was accepted.
+    pub accepted: bool,
+}
+
+/// A callback for [`FitOptions::progress`]. Returning `false` stops the fit: every
+/// differential correction then ends at once as not converged, so the pipeline winds up
+/// quickly.
+#[derive(Clone)]
+pub struct FitProgress(pub std::sync::Arc<dyn Fn(&FitIteration) -> bool + Send + Sync>);
+
+impl FitProgress {
+    pub fn new(f: impl Fn(&FitIteration) -> bool + Send + Sync + 'static) -> FitProgress {
+        FitProgress(std::sync::Arc::new(f))
+    }
+
+    /// Report `it`; false means stop.
+    pub fn report(&self, it: &FitIteration) -> bool {
+        (self.0)(it)
+    }
+}
+
+impl std::fmt::Debug for FitProgress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("FitProgress")
+    }
 }
 
 impl Default for FitOptions {
@@ -229,6 +347,8 @@ impl Default for FitOptions {
             seed_tries: 10,
             max_update_sigma: 4.0,
             engine: Engine::Cartesian,
+            forces: ForceModel::default(),
+            progress: None,
         }
     }
 }

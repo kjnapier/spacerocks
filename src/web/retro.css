@@ -1,0 +1,110 @@
+/* The retro look of spacerocks' live pages, served as retro.css.
+   Everything is drawn like an 8-bit console: one 5x7 pixel font (served as font.ttf) at multiples
+   of 8 px so its pixels stay square, an NES-like palette, and RPG-style windows with double
+   borders. */
+@font-face { font-family: "Spacerocks Pixel"; src: url("font.ttf") format("truetype"); font-display: block; }
+:root {
+  --bg: #0c0c24; --window: #000000; --text: #fcfcfc; --muted: #8c8cd8; --line: #fcfcfc;
+  --accent: #f8b800; --good: #58d854; --warn: #f8b800; --bad: #f83800; --cyan: #3cbcfc;
+  --px: 2px; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/24px "Spacerocks Pixel", ui-monospace, monospace; text-transform: uppercase;
+  -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
+  background-image: radial-gradient(#3c3c7c 1px, transparent 1px), radial-gradient(#26265c 1px, transparent 1px);
+  background-size: 96px 96px, 56px 56px; background-position: 0 0, 28px 40px;
+}
+::selection { background: var(--accent); color: #000; }
+main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 40px; }
+header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+h1 { font-size: 32px; line-height: 40px; font-weight: normal; margin: 0; color: var(--accent); text-shadow: 4px 4px 0 #000; }
+.pill { color: var(--muted); }
+.pill::before { content: "▶ "; }
+.pill.running { color: var(--good); }
+.pill.paused { color: var(--warn); animation: blink 1s steps(2, start) infinite; }
+.pill.done { color: var(--cyan); }
+.pill.stopped { color: var(--bad); }
+.pill.lost { color: var(--bad); animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
+.sub { color: var(--muted); margin-left: auto; text-align: right; }
+
+/* A window: black, with a white double border and a title sitting on the top border. */
+.panel {
+  position: relative; background: var(--window); padding: 20px 20px 18px;
+  border: 8px double var(--line); box-shadow: 6px 6px 0 #000;
+}
+.panel[data-title] { margin-top: 12px; }
+.panel[data-title]::before {
+  content: attr(data-title); position: absolute; top: -18px; left: 16px;
+  background: var(--window); color: var(--accent); padding: 0 8px; line-height: 24px;
+}
+section + section { margin-top: 24px; }
+
+.label { color: var(--muted); }
+.value { color: var(--text); overflow-wrap: anywhere; }
+
+.controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;
+  margin-top: 20px; padding-top: 20px; border-top: 4px dotted #26265c;
+}
+.controls .spacer { flex: 1; }
+button, select, input {
+  font: inherit; text-transform: uppercase; color: var(--text); background: #000;
+  border: 4px solid var(--line); border-radius: 0; padding: 4px 12px; min-height: 40px;
+  box-shadow: 4px 4px 0 #26265c; outline: none;
+}
+button { cursor: pointer; }
+button:hover, button:focus-visible { background: var(--text); color: #000; }
+button:active { transform: translate(4px, 4px); box-shadow: none; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #000; min-width: 128px; }
+button.primary:hover { background: var(--text); border-color: var(--text); }
+select { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer; }
+.select { position: relative; display: inline-block; }
+.select::after { content: "▼"; position: absolute; right: 12px; top: 8px; pointer-events: none; }
+select:focus-visible, input:focus { border-color: var(--accent); }
+input { width: 120px; color: var(--accent); caret-color: var(--accent); }
+input::placeholder { color: #4c4c8c; }
+label.inline { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.msg { color: var(--bad); }
+kbd { font: inherit; border: 2px solid var(--muted); padding: 0 4px; color: var(--muted); }
+.keys { color: var(--muted); }
+
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.stat { padding: 12px 16px; }
+.stat .value { font-size: 24px; line-height: 32px; margin-top: 4px; }
+
+.plots { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.hint { color: var(--muted); }
+/* The plots are low-resolution canvases blown up without smoothing. */
+.screen { position: relative; background: #0c0c24; border: 4px solid #26265c; }
+canvas.pixel {
+  width: 100%; height: auto; display: block;
+  image-rendering: pixelated; image-rendering: crisp-edges;
+}
+.tip {
+  position: absolute; pointer-events: none; display: none; z-index: 2;
+  background: #000; color: var(--text); border: 4px solid var(--text); box-shadow: 4px 4px 0 #000;
+  font: 16px/24px "Spacerocks Pixel", monospace; padding: 4px 10px; white-space: pre;
+}
+.plots .caption { color: var(--muted); margin: 0 0 12px; }
+
+button.toggle { box-shadow: 4px 4px 0 #26265c; }
+button.toggle::before { content: "[ ] "; color: var(--muted); }
+button.toggle[aria-pressed="true"]::before { content: "[X] "; color: var(--good); }
+button.toggle[aria-pressed="true"]:hover::before { color: #000; }
+button:disabled { opacity: 0.4; cursor: default; }
+button:disabled:hover { background: #000; color: var(--text); }
+input:disabled { opacity: 0.4; }
+
+@media (max-width: 720px) {
+  h1 { font-size: 24px; line-height: 32px; }
+  .plots { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .stat .value { font-size: 16px; line-height: 24px; }
+  .panel { padding: 16px 12px 14px; }
+  .sub { margin-left: 0; text-align: left; }
+  .keys { display: none; }
+}
