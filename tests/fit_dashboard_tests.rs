@@ -11,7 +11,7 @@ use std::time::Duration;
 use nalgebra::Vector3;
 
 use spacerocks::assist::SpiceSimulation;
-use spacerocks::orbfit::{self, Astrometry, FitDashboard, FitFlag, FitOptions, ForceModel, ASTEROID_PERTURBERS};
+use spacerocks::orbfit::{self, Astrometry, FitDashboard, FitFlag, FitOptions, ForceModel, McmcOptions, ASTEROID_PERTURBERS};
 use spacerocks::{SpaceRock, SpiceKernel, Time};
 
 const C: f64 = 173.1446326742403;
@@ -214,9 +214,13 @@ fn dashboard_fits_and_robust_mode_rejects_the_outlier() {
     assert_eq!(fit.flag, FitFlag::Converged);
     assert!(!fit.used[17] && fit.used.iter().filter(|&&u| u).count() == 39);
     let s = json(d.url());
-    let el = &s["fit"]["elements"];
+    let el = &s["fit"]["elements"]["helio"];
     assert!((el["a"].as_f64().unwrap() - 2.08).abs() < 0.05, "{el}");
     assert!(el["sigma"][0].as_f64().unwrap() > 0.0);
+    // Barycentric elements differ from heliocentric ones by the Sun's reflex motion.
+    let bary = &s["fit"]["elements"]["bary"];
+    let da = (bary["a"].as_f64().unwrap() - el["a"].as_f64().unwrap()).abs();
+    assert!(da > 1e-5 && da < 0.05, "{da}");
     assert!(s["fit"]["rms"][2].as_f64().unwrap() < 1.0);
 
     // Leaving the outlier out by hand instead also converges, from the last orbit.
@@ -280,4 +284,66 @@ fn load_and_random_swap_the_object() {
     assert!(s["message"].as_str().unwrap().contains("no observations"), "{}", s["message"]);
     assert_eq!(s["state"], "done");
     assert!(!d.loading());
+}
+
+/// Sample buttons need an orbit; the burn-in can change without one.
+#[test]
+fn sampling_needs_an_orbit() {
+    let d = kernel_free();
+    assert!(d.wait_idle(Duration::from_secs(10)));
+    // Without a kernel the fit has no orbit (or no usable one): the page says why.
+    let (status, body) = control(d.url(), "action=sample&steps=100");
+    if status.contains("400") {
+        assert!(body.contains("fit first"), "{body}");
+    } else {
+        assert!(d.wait_idle(Duration::from_secs(10)));
+        let message = json(d.url())["message"].as_str().unwrap().to_string();
+        assert!(message.starts_with("couldn't sample"), "{message}");
+    }
+    assert!(control(d.url(), "action=burn_in&value=250").0.contains("200"));
+    assert_eq!(d.mcmc_options().burn_in, 250);
+    assert!(control(d.url(), "action=sample&steps=3").0.contains("400"));
+    assert!(control(d.url(), "action=burn_in&value=-1").0.contains("400"));
+    assert!(d.chain().is_none());
+    assert_eq!(get(d.url(), "/chain.json").1, "null");
+}
+
+/// A chain over a converged fit: as many steps as asked, sensible acceptance, a posterior
+/// centred on the fit, and a burn-in that can change afterwards.
+#[test]
+fn chain_samples_the_posterior() {
+    let Some((k, forces)) = kernel() else { return };
+    let a = detections(&k, &forces);
+    let d = FitDashboard::start(0, "main belt", a, k, FitOptions { forces, robust: true, ..Default::default() }, None).unwrap();
+    assert!(d.wait_idle(Duration::from_secs(60)));
+    let fit = d.fit().unwrap();
+    assert!(fit.converged());
+    d.sample(Some(McmcOptions { steps: 400, burn_in: 100, spread: 2.0, seed: Some(7) }));
+    assert!(d.wait_idle(Duration::from_secs(300)));
+    let chain = d.chain().unwrap();
+    assert_eq!(chain.steps.len(), 400);
+    let rate = chain.acceptance(100);
+    assert!((0.05..0.8).contains(&rate), "{rate}");
+    let (mean, cov) = chain.moments(100);
+    let sigma = fit.state_covariance();
+    for k in 0..3 {
+        let z = (mean[k] - fit.state[k]) / sigma[k][k].sqrt();
+        assert!(z.abs() < 3.0, "x{k} is {z} sigma off");
+        // Within a factor of a few of the least-squares width (a short chain).
+        let ratio = (cov[k * 6 + k] / sigma[k][k]).sqrt();
+        assert!((0.2..5.0).contains(&ratio), "x{k} width ratio {ratio}");
+    }
+    let view: serde_json::Value = serde_json::from_str(&get(d.url(), "/chain.json").1).unwrap();
+    assert_eq!((view["steps"].as_u64(), view["burn_in"].as_u64()), (Some(400), Some(100)));
+    let a_post = &view["summary"]["helio"][0];
+    assert!((a_post["median"].as_f64().unwrap() - 2.08).abs() < 0.05, "{a_post}");
+    d.set_burn_in(300);
+    let view: serde_json::Value = serde_json::from_str(&get(d.url(), "/chain.json").1).unwrap();
+    assert_eq!(view["burn_in"], 300);
+    assert!((view["acceptance"].as_f64().unwrap() - chain.acceptance(300)).abs() < 1e-12);
+
+    // A new fit drops the chain.
+    d.refit();
+    assert!(d.wait_idle(Duration::from_secs(60)));
+    assert!(d.chain().is_none());
 }
