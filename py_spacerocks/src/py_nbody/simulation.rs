@@ -141,6 +141,47 @@ impl PySimulation {
         self.inner.integrate_or_interpolate(&epoch.inner);
     }
     
+    /// Serve a live progress page for this simulation and return its URL.
+    ///
+    /// The page shows how far `integrate`/`integrate_or_interpolate` has got towards its target
+    /// epoch, the current epoch and timestep, steps per second, the time left, the energy error
+    /// of the massive bodies and a top-down view of the particles. It listens on 127.0.0.1 only.
+    ///
+    /// # Arguments
+    ///
+    /// * `port` - The port to serve on; 0 (the default) picks a free one.
+    /// * `open_browser` - Open the page in the default web browser.
+    #[pyo3(signature = (port=0, open_browser=true))]
+    pub fn monitor(&mut self, py: Python<'_>, port: u16, open_browser: bool) -> PyResult<String> {
+        let url = self.inner.monitor(port).map_err(|e| PyErr::new::<pyo3::exceptions::PyOSError, _>(e.to_string()))?;
+        if open_browser {
+            py.import("webbrowser")?.call_method1("open", (url.as_str(),))?;
+        }
+        Ok(url)
+    }
+
+    /// Measure the progress page's progress from the current epoch up to `epoch`, across however
+    /// many calls it takes (e.g. a loop of `integrate_or_interpolate` over output epochs),
+    /// instead of over each call.
+    ///
+    /// # Arguments
+    ///
+    /// * `epoch` - The epoch the whole run ends at.
+    pub fn set_monitor_target(&mut self, epoch: &PyTime) {
+        self.inner.set_monitor_target(&epoch.inner);
+    }
+
+    /// Detach the progress page and stop its server.
+    pub fn stop_monitor(&mut self) {
+        self.inner.stop_monitor();
+    }
+
+    /// The progress page's URL, or None.
+    #[getter]
+    pub fn monitor_url(&self) -> Option<String> {
+        self.inner.monitor_url().map(str::to_string)
+    }
+
     /// Step the simulation by one timestep.
     pub fn step(&mut self) {
         self.inner.step();

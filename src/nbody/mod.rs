@@ -10,6 +10,9 @@
 
 pub mod simulation;
 
+pub mod monitor;
+    pub use self::monitor::ProgressMonitor;
+
 pub mod forces;
 
 pub mod integrators;
