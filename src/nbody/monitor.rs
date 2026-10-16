@@ -14,8 +14,10 @@
 //!
 //! The page also steers the run. Pause holds the simulation before its next step (the calling
 //! thread waits, so `integrate` returns later, not early); Step lets one step through and pauses
-//! again; and the integrator and timestep can be swapped from there, taking effect at the next
-//! step. The page asks with `POST /control?action=...`, which needs an `X-Spacerocks` header and
+//! again, and Back takes one step backwards; the integrator and timestep can be swapped, solar
+//! general relativity turned on or off, and each perturber's gravity turned off or on, taking
+//! effect at the next step. The run's end can be moved, or removed so it runs until Stop (which
+//! ends it where it is, so `integrate` returns early). The page asks with `POST /control?action=...`, which needs an `X-Spacerocks` header and
 //! a local `Host`, so other web pages open in the browser can't send it.
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -78,9 +80,21 @@ struct Shared {
 #[derive(Default)]
 struct Control {
     paused: bool,
-    /// Steps let through while paused.
+    /// Steps let through while paused, and steps backwards asked for.
     step_credits: u64,
+    back_credits: u64,
     commands: Vec<Command>,
+}
+
+/// What a paused simulation may do next ([`ProgressMonitor::wait`]).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum Release {
+    /// Run on.
+    Run,
+    /// Take one step, then wait again.
+    One,
+    /// Take one step backwards, then wait again.
+    Back,
 }
 
 /// A change to the simulation asked for on the page.
@@ -90,6 +104,15 @@ pub(crate) enum Command {
     Integrator(String, f64),
     /// Set the integrator's timestep (days).
     Timestep(f64),
+    /// End the run at this time (days since the reference epoch), or never (`None`): it then
+    /// runs until stopped.
+    End(Option<f64>),
+    /// End the run now.
+    Stop,
+    /// Turn solar general relativity ([`SolarGR`](crate::nbody::forces::SolarGR)) on or off.
+    SolarGR(bool),
+    /// Turn the gravity of the massive particle of this name on or off.
+    Perturber(String, bool),
 }
 
 /// The integrators the page offers.
@@ -128,6 +151,13 @@ struct Status {
     /// [`MAX_DRAWN`] test particles.
     massive: Vec<(String, f64, f64, f64)>,
     test_particles: Vec<(String, f64, f64, f64)>,
+    /// Whether the run's end can be changed on the page (not while
+    /// [`Simulation::set_monitor_target`] spans several calls).
+    end_editable: bool,
+    /// Whether solar general relativity is on.
+    solar_gr: bool,
+    /// Every particle with a mass but the central body, and whether its gravity is on.
+    perturbers: Vec<(String, bool)>,
     /// The particle whose elements are followed, if any, and its elements now.
     tracked: Option<String>,
     elements: Option<TrackedElements>,
@@ -153,6 +183,9 @@ struct Status {
     paused_total: Duration,
     #[serde(skip)]
     paused_since: Option<Instant>,
+    /// Whether the page's Stop ended the run.
+    #[serde(skip)]
+    stop_asked: bool,
 }
 
 impl ProgressMonitor {
@@ -182,6 +215,9 @@ impl ProgressMonitor {
                 history: Vec::new(),
                 massive: Vec::new(),
                 test_particles: Vec::new(),
+                end_editable: false,
+                solar_gr: false,
+                perturbers: Vec::new(),
                 tracked: None,
                 elements: None,
                 element_history: Vec::new(),
@@ -194,6 +230,7 @@ impl ProgressMonitor {
                 last_publish: None,
                 paused_total: Duration::ZERO,
                 paused_since: None,
+                stop_asked: false,
             }),
             control: Mutex::new(Control::default()),
             wake: Condvar::new(),
@@ -220,23 +257,26 @@ impl ProgressMonitor {
     }
 
     /// Hold the simulation while the page is paused. Returns the commands the page sent, and
-    /// `Some(single)` once the simulation may step (`single` when let through by Step for one
-    /// step only), or `None` to come back after applying the commands, or after a quarter of a
-    /// second of waiting (so the caller can check for an interrupt such as Ctrl-C).
-    pub(crate) fn wait(&self, sim: &Simulation) -> (Vec<Command>, Option<bool>) {
+    /// what the simulation may do next, or `None` to come back after applying the commands, or
+    /// after a quarter of a second of waiting (so the caller can check for an interrupt such as
+    /// Ctrl-C).
+    pub(crate) fn wait(&self, sim: &Simulation) -> (Vec<Command>, Option<Release>) {
         if !self.shared.attention.load(Ordering::Acquire) {
-            return (Vec::new(), Some(false));
+            return (Vec::new(), Some(Release::Run));
         }
         let mut control = self.control();
         let mut announced = false;
         loop {
             let commands = std::mem::take(&mut control.commands);
-            self.shared.attention.store(control.paused, Ordering::Release);
-            let released = if !control.paused {
-                Some(false)
+            self.shared.attention.store(control.paused || control.back_credits > 0, Ordering::Release);
+            let released = if control.back_credits > 0 {
+                control.back_credits -= 1;
+                Some(Release::Back)
+            } else if !control.paused {
+                Some(Release::Run)
             } else if control.step_credits > 0 {
                 control.step_credits -= 1;
-                Some(true)
+                Some(Release::One)
             } else {
                 None
             };
@@ -270,7 +310,7 @@ impl ProgressMonitor {
                 continue;
             }
             control = self.shared.wake.wait_timeout(control, Duration::from_millis(250)).unwrap_or_else(|e| e.into_inner()).0;
-            if control.paused && control.step_credits == 0 && control.commands.is_empty() {
+            if control.paused && control.step_credits == 0 && control.back_credits == 0 && control.commands.is_empty() {
                 // Still paused: let the caller look for an interrupt, then wait again.
                 return (Vec::new(), None);
             }
@@ -304,8 +344,22 @@ impl ProgressMonitor {
         self.lock().fixed_target = Some((t_start, t_target));
     }
 
-    /// A run (one call of `integrate`, `integrate_or_interpolate` or `steps`) starts.
-    pub(crate) fn begin_run(&self, sim: &Simulation, t_target: Option<f64>) {
+    /// The page moved the run's end to `t_target` (days since the reference epoch; `None` runs
+    /// on until stopped).
+    pub(crate) fn set_end(&self, t_target: Option<f64>) {
+        self.lock().t_target = t_target;
+    }
+
+    /// The page's Stop ended the run.
+    pub(crate) fn note_stop(&self) {
+        let mut s = self.lock();
+        s.stop_asked = true;
+        s.t_target = None;
+    }
+
+    /// A run (one call of `integrate`, `integrate_or_interpolate`, `run` or `steps`) starts.
+    /// `editable_end` says whether the run's loop follows an end set on the page (`steps` doesn't).
+    pub(crate) fn begin_run(&self, sim: &Simulation, t_target: Option<f64>, editable_end: bool) {
         let mut s = self.lock();
         let (t_start, t_target) = match s.fixed_target {
             Some((start, target)) => (start, Some(target)),
@@ -318,6 +372,8 @@ impl ProgressMonitor {
         }
         s.t_start = t_start;
         s.t_target = t_target;
+        s.end_editable = s.fixed_target.is_none() && editable_end;
+        s.stop_asked = false;
         s.state = "running";
         snapshot(&mut s, sim);
     }
@@ -339,15 +395,24 @@ impl ProgressMonitor {
             Some((start, target)) => (sim.t() - target) * (target - start).signum() >= -1e-9,
             None => true,
         };
-        if sim.interrupted() {
+        if sim.interrupted() || s.stop_asked {
             s.state = "stopped";
         } else if finished {
             s.state = "done";
         }
+        s.end_editable = false;
         if let Some(since) = s.paused_since.take() {
             s.paused_total += since.elapsed();
         }
         snapshot(&mut s, sim);
+    }
+
+    /// The energy the page measures its error from changed (a perturber was turned on or off):
+    /// start the error over.
+    pub(crate) fn reset_energy(&self) {
+        let mut s = self.lock();
+        s.energy0 = 0.0;
+        s.history.clear();
     }
 }
 
@@ -383,13 +448,17 @@ fn snapshot(s: &mut Status, sim: &Simulation) {
     s.n_massive = masses.iter().filter(|&&m| m != 0.0).count();
     let n_test = states.len() - s.n_massive;
     let stride = n_test.div_ceil(MAX_DRAWN).max(1);
-    let massive: Vec<usize> = (0..states.len()).filter(|&i| masses[i] != 0.0).collect();
-    let test: Vec<usize> = (0..states.len()).filter(|&i| masses[i] == 0.0).step_by(stride).collect();
+    let perturbers = sim.perturbers();
+    let muted = |i: usize| masses[i] == 0.0 && perturbers.iter().any(|(name, on)| !on && *name == names[i]);
+    let massive: Vec<usize> = (0..states.len()).filter(|&i| masses[i] != 0.0 || muted(i)).collect();
+    let test: Vec<usize> = (0..states.len()).filter(|&i| masses[i] == 0.0 && !muted(i)).step_by(stride).collect();
     let row = |&i: &usize| (names[i].clone(), states[i][0], states[i][1], states[i][2]);
     s.massive = massive.iter().map(row).collect();
     s.test_particles = test.iter().map(row).collect();
     s.drawn = massive.iter().chain(&test).map(|&i| (states[i], masses[i])).collect();
     s.central = massive.first().map(|&i| (names[i].clone(), states[i], masses[i]));
+    s.perturbers = perturbers;
+    s.solar_gr = sim.solar_gr();
 
     if let Some(name) = s.tracked.clone() {
         let found = sim.particle_index_map.get(&name).map(|&i| (states[i], masses[i]));
@@ -504,9 +573,18 @@ fn serve(listener: TcpListener, shared: Weak<Shared>, port: u16) {
 fn respond(mut stream: TcpStream, shared: &Shared, port: u16) -> std::io::Result<()> {
     stream.set_nonblocking(false)?;
     stream.set_read_timeout(Some(Duration::from_secs(2)))?;
-    let mut buf = [0u8; 2048];
-    let n = stream.read(&mut buf)?;
-    let request = String::from_utf8_lossy(&buf[..n]);
+    // Read up to the end of the headers (requests carry no body), which may come in several
+    // pieces: closing the connection with part of a request unread would reset it.
+    let mut buf = Vec::with_capacity(1024);
+    let mut chunk = [0u8; 1024];
+    while !buf.windows(4).any(|w| w == b"\r\n\r\n") && buf.len() < 16 * 1024 {
+        let n = stream.read(&mut chunk)?;
+        if n == 0 {
+            break;
+        }
+        buf.extend_from_slice(&chunk[..n]);
+    }
+    let request = String::from_utf8_lossy(&buf);
     let mut words = request.split_whitespace();
     let method = words.next().unwrap_or("GET");
     let target = words.next().unwrap_or("/");
@@ -565,7 +643,8 @@ fn from_page(request: &str, port: u16) -> bool {
     marked && local
 }
 
-/// Apply `action=pause|resume|step|integrator|timestep` (with `name=` and `timestep=`).
+/// Apply `action=pause|resume|step|back|stop|integrator|timestep|end|gr|perturber|track` (with
+/// `name=`, `timestep=`, `jd=` (none for no end) and `on=1|0`).
 fn control(shared: &Shared, query: &str) -> Result<(), String> {
     let param = |key: &str| {
         query.split('&').filter_map(|kv| kv.split_once('=')).find(|(k, _)| *k == key).map(|(_, v)| v)
@@ -579,16 +658,51 @@ fn control(shared: &Shared, query: &str) -> Result<(), String> {
         let h: f64 = param("timestep").ok_or("missing timestep")?.parse().map_err(|_| "bad timestep")?;
         if h.is_finite() && h != 0.0 { Ok(h) } else { Err("timestep must be finite and non-zero".into()) }
     };
+    let on = || match param("on") {
+        Some("1" | "true") => Ok(true),
+        Some("0" | "false") => Ok(false),
+        _ => Err("on must be 1 or 0".to_string()),
+    };
+    let jd_ref = shared.status.lock().unwrap_or_else(|e| e.into_inner()).jd_ref;
     let mut c = shared.control.lock().unwrap_or_else(|e| e.into_inner());
     match param("action").unwrap_or("") {
         "pause" => c.paused = true,
         "resume" => {
             c.paused = false;
             c.step_credits = 0;
+            c.back_credits = 0;
         }
         "step" => {
             c.paused = true;
             c.step_credits += 1;
+        }
+        "back" => {
+            c.paused = true;
+            c.back_credits += 1;
+        }
+        "end" => {
+            let end = match param("jd") {
+                None | Some("") => None,
+                Some(jd) => {
+                    let jd: f64 = jd.parse().map_err(|_| "bad end date")?;
+                    if !jd.is_finite() {
+                        return Err("end date must be finite".into());
+                    }
+                    Some(jd - jd_ref)
+                }
+            };
+            c.commands.push(Command::End(end));
+        }
+        "stop" => {
+            c.paused = false;
+            c.step_credits = 0;
+            c.back_credits = 0;
+            c.commands.push(Command::Stop);
+        }
+        "gr" => c.commands.push(Command::SolarGR(on()?)),
+        "perturber" => {
+            let name = param("name").map(percent_decode).ok_or("missing name")?;
+            c.commands.push(Command::Perturber(name, on()?));
         }
         "integrator" => {
             let name = param("name").ok_or("missing name")?;
@@ -600,7 +714,7 @@ fn control(shared: &Shared, query: &str) -> Result<(), String> {
         "timestep" => c.commands.push(Command::Timestep(timestep()?)),
         other => return Err(format!("unknown action {other}")),
     }
-    shared.attention.store(c.paused || !c.commands.is_empty(), Ordering::Release);
+    shared.attention.store(c.paused || c.back_credits > 0 || !c.commands.is_empty(), Ordering::Release);
     drop(c);
     shared.wake.notify_all();
     Ok(())

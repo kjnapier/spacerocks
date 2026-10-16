@@ -132,6 +132,35 @@ impl PySimulation {
         run_interruptible(py, &mut self.inner, move |sim| sim.integrate(&epoch))
     }
 
+    /// Integrate with no end, until the monitor page's Stop (or an end set there), or Ctrl-C
+    /// (which raises KeyboardInterrupt). Goes backwards with a negative timestep.
+    pub fn run(&mut self, py: Python<'_>) -> PyResult<()> {
+        run_interruptible(py, &mut self.inner, |sim| sim.run())
+    }
+
+    /// Whether solar general relativity is among the forces.
+    #[getter]
+    pub fn solar_gr(&self) -> bool {
+        self.inner.solar_gr()
+    }
+
+    /// Add solar general relativity to the forces (True), or take it out (False).
+    pub fn set_solar_gr(&mut self, on: bool) {
+        self.inner.set_solar_gr(on);
+    }
+
+    /// Turn the gravity of the massive particle `name` off (it then moves as a test particle)
+    /// or back on. The central body can't be turned off.
+    pub fn set_perturber(&mut self, name: &str, on: bool) -> PyResult<()> {
+        self.inner.set_perturber(name, on).map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+    }
+
+    /// Every massive particle but the central body, as (name, gravity on).
+    #[getter]
+    pub fn perturbers(&self) -> Vec<(String, bool)> {
+        self.inner.perturbers()
+    }
+
     /// Integrate to an epoch with the integrator's own steps, then interpolate to it.
     ///
     /// Much faster than `integrate` for many output epochs. Falls back to `integrate` for

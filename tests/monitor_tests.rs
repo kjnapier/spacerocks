@@ -280,3 +280,129 @@ fn interrupt_stops_running_and_paused_runs() {
         assert!(!sim.interrupted());
     }
 }
+
+#[test]
+fn page_steps_back_and_moves_the_end() {
+    let mut sim = outer_system(Box::new(WisdomHolman::new(10.0)));
+    let url = sim.monitor(0).unwrap();
+    sim.progress_monitor().unwrap().set_paused(true);
+    let target = Time::new(T0 + 2000.0, "tdb", "jd").unwrap();
+    let run = std::thread::spawn(move || {
+        sim.integrate(&target);
+        sim
+    });
+
+    let s = wait_for(&url, |s| s["state"] == "paused");
+    assert_eq!(s["end_editable"], true);
+    control(&url, "action=step");
+    wait_for(&url, |s| s["steps"] == 1 && s["state"] == "paused");
+    control(&url, "action=step");
+    let s = wait_for(&url, |s| s["steps"] == 2 && s["state"] == "paused");
+    assert!((s["t"].as_f64().unwrap() - 20.0).abs() < 1e-9);
+    assert!(control(&url, "action=back").contains("200"));
+    let s = wait_for(&url, |s| s["steps"] == 3);
+    assert!((s["t"].as_f64().unwrap() - 10.0).abs() < 1e-9);
+    assert_eq!(s["timestep"], 10.0, "Back leaves the run going forwards");
+
+    assert!(control(&url, &format!("action=end&jd={}", T0 + 105.0)).contains("200"));
+    let s = wait_for(&url, |s| s["t_target"] == 105.0);
+    assert_eq!(s["state"], "paused");
+    control(&url, "action=resume");
+    let sim = run.join().unwrap();
+    assert!((sim.t() - 105.0).abs() < 1e-12);
+    assert_eq!(json(&url)["state"], "done");
+}
+
+#[test]
+fn open_ended_runs_go_until_stop() {
+    let mut sim = outer_system(Box::new(WisdomHolman::new(1.0)));
+    let url = sim.monitor(0).unwrap();
+    let run = std::thread::spawn(move || {
+        sim.run();
+        sim
+    });
+    let s = wait_for(&url, |s| s["state"] == "running" && s["steps"].as_u64().unwrap() > 100);
+    assert!(s["t_target"].is_null());
+    assert!(control(&url, "action=stop").contains("200"));
+    let sim = run.join().unwrap();
+    assert!(sim.t() > 100.0);
+    let s = json(&url);
+    assert_eq!(s["state"], "stopped");
+    assert_eq!(s["t"].as_f64().unwrap(), sim.t());
+
+    // An integrate whose end the page takes away runs on until Stop too.
+    let mut sim = sim;
+    let url = sim.monitor(0).unwrap();
+    sim.progress_monitor().unwrap().set_paused(true);
+    let start = sim.t();
+    let target = Time::new(T0 + start + 10.0, "tdb", "jd").unwrap();
+    let run = std::thread::spawn(move || {
+        sim.integrate(&target);
+        sim
+    });
+    wait_for(&url, |s| s["state"] == "paused");
+    control(&url, "action=end");
+    wait_for(&url, |s| s["t_target"].is_null());
+    control(&url, "action=resume");
+    wait_for(&url, |s| s["t"].as_f64().unwrap() > start + 50.0);
+    control(&url, "action=stop");
+    let sim = run.join().unwrap();
+    assert!(sim.t() > start + 50.0);
+}
+
+#[test]
+fn page_toggles_gr_and_perturbers() {
+    let mut sim = outer_system(Box::new(IAS15::new(1.0)));
+    assert!(!sim.solar_gr());
+    assert_eq!(sim.perturbers(), vec![("jupiter".to_string(), true), ("saturn".to_string(), true)]);
+    let url = sim.monitor(0).unwrap();
+    sim.progress_monitor().unwrap().set_paused(true);
+    let target = Time::new(T0 + 100.0, "tdb", "jd").unwrap();
+    let run = std::thread::spawn(move || {
+        sim.integrate(&target);
+        sim
+    });
+    let s = wait_for(&url, |s| s["state"] == "paused");
+    assert_eq!(s["solar_gr"], false);
+    assert_eq!(s["n_massive"], 3);
+
+    assert!(control(&url, "action=gr&on=1").contains("200"));
+    wait_for(&url, |s| s["solar_gr"] == true);
+    assert!(control(&url, "action=perturber&name=saturn&on=0").contains("200"));
+    let s = wait_for(&url, |s| s["n_massive"] == 2);
+    assert_eq!(s["perturbers"], serde_json::json!([["jupiter", true], ["saturn", false]]));
+    // Saturn is still drawn with the massive bodies, just without gravity.
+    assert!(s["massive"].as_array().unwrap().iter().any(|p| p[0] == "saturn"));
+    // The central body can't be turned off; a missing body is ignored.
+    control(&url, "action=perturber&name=sun&on=0");
+    control(&url, "action=perturber&name=pluto&on=0");
+    assert!(control(&url, "action=perturber&name=saturn&on=maybe").contains("400"));
+    control(&url, "action=step");
+    let s = wait_for(&url, |s| s["steps"] == 1);
+    assert_eq!(s["n_massive"], 2);
+
+    control(&url, "action=resume");
+    let mut sim = run.join().unwrap();
+    assert!(sim.solar_gr());
+    assert_eq!(sim.masses()[2], 0.0);
+    assert_eq!(sim.get_particle("saturn").unwrap().mass(), 2.858860e-4);
+    sim.set_perturber("saturn", true).unwrap();
+    assert_eq!(sim.masses()[2], 2.858860e-4);
+    sim.set_solar_gr(false);
+    assert!(!sim.solar_gr());
+    assert_eq!(sim.forces.len(), 1);
+}
+
+#[test]
+fn muted_perturber_matches_a_simulation_without_it() {
+    let mut with = outer_system(Box::new(IAS15::new(1.0)));
+    with.set_perturber("saturn", false).unwrap();
+    let mut without = outer_system(Box::new(IAS15::new(1.0)));
+    without.remove("saturn").unwrap();
+    let target = Time::new(T0 + 500.0, "tdb", "jd").unwrap();
+    with.integrate(&target);
+    without.integrate(&target);
+    let a = with.get_particle("jupiter").unwrap();
+    let b = without.get_particle("jupiter").unwrap();
+    assert!((a.position - b.position).norm() < 1e-12, "{}", (a.position - b.position).norm());
+}

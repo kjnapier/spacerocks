@@ -18,6 +18,12 @@ pub trait Force: Send + Sync + ForceClone {
     fn is_newtonian_gravity(&self) -> bool {
         false
     }
+
+    /// The force's type name (its full path), e.g. to find [`SolarGR`](super::SolarGR) among a
+    /// simulation's forces.
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }
 
 /// The total acceleration of every body due to `forces`, written into `acc` (resized to one

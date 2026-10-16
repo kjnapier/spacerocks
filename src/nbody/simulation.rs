@@ -9,9 +9,9 @@ use crate::errors::SimulationError;
 use crate::state::{self, State};
 
 
-use crate::nbody::forces::{Force, NewtonianGravity};
+use crate::nbody::forces::{central_body, Force, NewtonianGravity, SolarGR};
 use crate::nbody::integrators::{Integrator, Leapfrog, Trace, WisdomHolman, IAS15};
-use crate::nbody::monitor::{Command, ProgressMonitor};
+use crate::nbody::monitor::{Command, ProgressMonitor, Release};
 use crate::spice::SpiceKernel;
 
 
@@ -58,6 +58,11 @@ pub struct Simulation {
     interrupt: Option<InterruptCheck>,
     interrupt_asked: Option<std::time::Instant>,
     interrupted: bool,
+    /// A new end (days since the reference epoch, infinite for none) for the running
+    /// `integrate`, `integrate_or_interpolate` or `run`, set on the progress page.
+    end_override: Option<f64>,
+    /// Length (days) of the last step taken, for the progress page's Back.
+    last_step: f64,
 }
 
 /// A check for whether to stop integrating, e.g. whether Ctrl-C was pressed. See
@@ -112,6 +117,8 @@ impl Simulation {
             interrupt: None,
             interrupt_asked: None,
             interrupted: false,
+            end_override: None,
+            last_step: 0.0,
         })
     }
 
@@ -399,7 +406,9 @@ impl Simulation {
     /// One step, with no stop at the progress page's controls.
     fn step_unmonitored(&mut self) {
         self.synchronize();
+        let start = self.t;
         self.integrator.step(&mut self.states, &self.masses, &mut self.t, &self.forces);
+        self.last_step = self.t - start;
         self.dense_valid = true;
         if let Some(monitor) = &self.progress_monitor {
             monitor.tick(self, 1);
@@ -412,7 +421,9 @@ impl Simulation {
             return;
         }
         self.synchronize();
+        let start = self.t;
         self.integrator.steps(&mut self.states, &self.masses, &mut self.t, &self.forces, n);
+        self.last_step = (self.t - start) / n as f64;
         self.dense_valid = true;
         if let Some(monitor) = &self.progress_monitor {
             monitor.tick(self, n);
@@ -471,12 +482,26 @@ impl Simulation {
                 monitor.publish(self);
             }
             match released {
-                Some(true) => return Go::OneStep,
-                Some(false) => return Go::Steps,
+                Some(Release::One) => return Go::OneStep,
+                Some(Release::Run) => return Go::Steps,
+                Some(Release::Back) => self.step_back(),
                 None if self.should_stop() => return Go::Stop,
                 None => {}
             }
         }
+    }
+
+    /// One step against the direction the simulation is going in, for the progress page's Back:
+    /// as long as the last step (so an adaptive integrator goes back about where it was), then
+    /// the timestep is as it was before.
+    fn step_back(&mut self) {
+        let h = self.integrator.timestep();
+        let back = if self.last_step != 0.0 { self.last_step.abs() } else { h.abs() };
+        self.synchronize();
+        self.integrator.set_timestep(-back * h.signum());
+        self.step_unmonitored();
+        self.integrator.set_timestep(h);
+        self.dense_valid = false;
     }
 
     /// Apply a command from the progress page. Timesteps keep the direction the simulation is
@@ -502,7 +527,82 @@ impl Simulation {
                 self.integrator.set_timestep(sign * h.abs());
                 self.dense_valid = false;
             }
+            Command::End(end) => {
+                self.end_override = Some(end.unwrap_or(sign * f64::INFINITY));
+                if let Some(monitor) = &self.progress_monitor {
+                    monitor.set_end(end);
+                }
+            }
+            Command::Stop => {
+                self.synchronize();
+                self.end_override = Some(self.t);
+                if let Some(monitor) = &self.progress_monitor {
+                    monitor.note_stop();
+                }
+            }
+            Command::SolarGR(on) => self.set_solar_gr(on),
+            Command::Perturber(name, on) => {
+                let _ = self.set_perturber(&name, on);
+            }
         }
+    }
+
+    /// Whether the forces include solar general relativity ([`SolarGR`]).
+    pub fn solar_gr(&self) -> bool {
+        self.forces.iter().any(|f| f.name() == std::any::type_name::<SolarGR>())
+    }
+
+    /// Add solar general relativity ([`SolarGR`]) to the forces, or take it out.
+    pub fn set_solar_gr(&mut self, on: bool) {
+        if on == self.solar_gr() {
+            return;
+        }
+        self.synchronize();
+        self.dense_valid = false;
+        if on {
+            self.forces.push(Box::new(SolarGR));
+        } else {
+            self.forces.retain(|f| f.name() != std::any::type_name::<SolarGR>());
+        }
+    }
+
+    /// Every particle with a mass (from its properties), except the central body, and whether
+    /// its gravity is on ([`Simulation::set_perturber`]).
+    pub fn perturbers(&self) -> Vec<(String, bool)> {
+        let real: Vec<f64> = (0..self.len()).map(|i| self.real_mass(i)).collect();
+        let central = central_body(&real);
+        (0..self.len())
+            .filter(|&i| real[i] != 0.0 && Some(i) != central)
+            .map(|i| (self.names[i].clone(), self.masses[i] != 0.0))
+            .collect()
+    }
+
+    /// Turn the gravity of the particle called `name` off (it then moves as a test particle)
+    /// or back on. Its mass is kept in its properties meanwhile. The central body (the most
+    /// massive) can't be turned off.
+    pub fn set_perturber(&mut self, name: &str, on: bool) -> Result<(), SimulationError> {
+        let idx = *self.particle_index_map.get(name).ok_or_else(|| SimulationError::ParticleNotFound(name.to_string()))?;
+        let real: Vec<f64> = (0..self.len()).map(|i| self.real_mass(i)).collect();
+        if real[idx] == 0.0 || central_body(&real) == Some(idx) {
+            return Ok(());
+        }
+        let mass = if on { real[idx] } else { 0.0 };
+        if self.masses[idx] == mass {
+            return Ok(());
+        }
+        self.synchronize();
+        self.dense_valid = false;
+        self.masses[idx] = mass;
+        if let Some(monitor) = &self.progress_monitor {
+            monitor.reset_energy();
+        }
+        Ok(())
+    }
+
+    /// The mass in the `idx`-th particle's properties, which [`Simulation::set_perturber`]
+    /// leaves alone.
+    fn real_mass(&self, idx: usize) -> f64 {
+        self.properties[idx].as_ref().and_then(|p| p.mass).unwrap_or(self.masses[idx])
     }
 
     /// Integrate to a new epoch, or interpolate to it when the integrator supports it.
@@ -524,23 +624,25 @@ impl Simulation {
     ///
     /// * `epoch` - The epoch to integrate or interpolate to.
     pub fn integrate_or_interpolate(&mut self, epoch: &Time) {
+        let target = self.days_since_ref(epoch);
+        self.end_override = None;
         if let Some(monitor) = self.progress_monitor.clone() {
-            monitor.begin_run(self, Some(self.days_since_ref(epoch)));
-            self.integrate_or_interpolate_inner(epoch);
+            monitor.begin_run(self, Some(target), true);
+            self.integrate_or_interpolate_to(target);
             monitor.end_run(self);
         } else {
-            self.integrate_or_interpolate_inner(epoch);
+            self.integrate_or_interpolate_to(target);
         }
+        self.end_override = None;
     }
 
-    fn integrate_or_interpolate_inner(&mut self, epoch: &Time) {
+    fn integrate_or_interpolate_to(&mut self, mut target: f64) {
         if !self.integrator.has_dense_output() {
-            self.integrate_inner(epoch);
+            self.integrate_to(target);
             return;
         }
         self.synchronize();
 
-        let target = self.days_since_ref(epoch);
         if (target - self.t).abs() < 1e-16 {
             return;
         }
@@ -563,9 +665,18 @@ impl Simulation {
             if matches!(self.checkpoint(), Go::Stop) {
                 return;
             }
+            if let Some(end) = self.end_override.take() {
+                // The page moved the end: go there instead.
+                self.synchronize();
+                target = end;
+                if (target - self.t).abs() < 1e-16 {
+                    return;
+                }
+                continue;
+            }
             if !self.integrator.has_dense_output() {
                 // The page switched to an integrator without dense output.
-                self.integrate_inner(epoch);
+                self.integrate_to(target);
                 return;
             }
             let timestep = self.integrator.timestep();
@@ -575,7 +686,7 @@ impl Simulation {
             self.step_unmonitored();
             if (target - self.t) * dt < 0.0 && self.integrator.interpolate(target).is_none() {
                 // Stepped past the target without being able to interpolate back; finish exactly.
-                self.integrate_inner(epoch);
+                self.integrate_to(target);
                 return;
             }
         }
@@ -600,19 +711,36 @@ impl Simulation {
     ///
     /// * `epoch` - The new epoch to integrate to.
     pub fn integrate(&mut self, epoch: &Time) {
-        if let Some(monitor) = self.progress_monitor.clone() {
-            monitor.begin_run(self, Some(self.days_since_ref(epoch)));
-            self.integrate_inner(epoch);
-            monitor.end_run(self);
-        } else {
-            self.integrate_inner(epoch);
-        }
+        let target = self.days_since_ref(epoch);
+        self.run_to(Some(target));
     }
 
-    fn integrate_inner(&mut self, epoch: &Time) {
+    /// Integrate with no end: forwards (or backwards, with a negative timestep) until the
+    /// progress page's Stop, an end set there, or the interrupt check
+    /// ([`Simulation::set_interrupt`]) ends it. Without a progress page or an interrupt check it
+    /// never returns.
+    pub fn run(&mut self) {
+        self.run_to(None);
+    }
+
+    /// Integrate to `target` (days since the reference epoch), or with no end.
+    fn run_to(&mut self, target: Option<f64>) {
+        self.end_override = None;
+        let sign = if self.integrator.timestep() < 0.0 { -1.0 } else { 1.0 };
+        let end = target.unwrap_or(sign * f64::INFINITY);
+        if let Some(monitor) = self.progress_monitor.clone() {
+            monitor.begin_run(self, target, true);
+            self.integrate_to(end);
+            monitor.end_run(self);
+        } else {
+            self.integrate_to(end);
+        }
+        self.end_override = None;
+    }
+
+    fn integrate_to(&mut self, mut target: f64) {
         self.synchronize();
 
-        let target = self.days_since_ref(epoch);
         let dt = target - self.t;
         if dt.abs() < 1e-16 {
             return;
@@ -635,6 +763,15 @@ impl Simulation {
                 Go::OneStep => true,
                 Go::Steps => false,
             };
+            if let Some(end) = self.end_override.take() {
+                // The page moved the end.
+                self.synchronize();
+                target = end;
+            }
+            let dt = target - self.t;
+            if dt.abs() < 1e-16 {
+                break;
+            }
 
             // if we're within a timestep of the epoch, just take a step of that size
             if dt.abs() < self.integrator.timestep().abs() {
@@ -673,6 +810,7 @@ impl Simulation {
             // With a progress page or an interrupt check, at most a chunk of them before the next
             // checkpoint (so counting them stops there too).
             let cap = match (self.has_checkpoints(), single) {
+                (false, _) if target.is_infinite() => MONITOR_CHUNK,
                 (false, _) => usize::MAX,
                 (true, true) => 1,
                 (true, false) => MONITOR_CHUNK,

@@ -122,3 +122,40 @@ def test_ctrl_c_stops_a_paused_monitor_run():
     assert time.monotonic() - start < 5
     assert sim.epoch.jd() == 2460000.5
     sim.stop_monitor()
+
+
+def test_run_goes_until_stopped_from_the_page():
+    import json
+    import threading
+    import urllib.request
+
+    sim = make_sim(Integrator.wisdom_holman(1.0))
+    url = sim.monitor(open_browser=False)
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+    def stop():
+        req = urllib.request.Request(url + "control?action=stop", method="POST", headers={"X-Spacerocks": "1"})
+        opener.open(req).read()
+
+    timer = threading.Timer(0.3, stop)
+    timer.start()
+    sim.run()
+    timer.join()
+    assert sim.epoch.jd() > 2460000.5
+    with opener.open(url + "progress.json") as r:
+        assert json.load(r)["state"] == "stopped"
+    sim.stop_monitor()
+
+
+def test_gr_and_perturber_toggles():
+    sim = make_sim(Integrator.ias15(1.0))
+    assert sim.solar_gr is False
+    sim.set_solar_gr(True)
+    assert sim.solar_gr is True
+    assert sim.perturbers == [("jupiter", True)]
+    sim.set_perturber("jupiter", False)
+    assert sim.perturbers == [("jupiter", False)]
+    assert sim.masses[1] == 0.0
+    assert sim.get_particle("jupiter").mass == 9.547919e-4
+    sim.set_perturber("jupiter", True)
+    assert sim.masses[1] == 9.547919e-4
