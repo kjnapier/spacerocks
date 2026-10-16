@@ -14,9 +14,6 @@ use crate::PySpaceRock;
 pub struct PyFitDashboard {
     inner: Option<FitDashboard>,
     url: String,
-    name: String,
-    frequency: Vec<f64>,
-    keys: Vec<u64>,
 }
 
 impl PyFitDashboard {
@@ -24,8 +21,11 @@ impl PyFitDashboard {
         self.inner.as_ref().ok_or_else(|| PyOSError::new_err("the dashboard is closed"))
     }
 
-    fn wrap(&self, fit: spacerocks::orbfit::OrbitFit) -> PyOrbitFit {
-        PyOrbitFit { inner: fit, name: self.name.clone(), frequency: self.frequency.clone(), keys: self.keys.clone(), route: None }
+    /// A fit of the dashboard's current object (which Load and Random change). The dashboard
+    /// fits optical detections only, so there are no transmit frequencies.
+    fn wrap(d: &FitDashboard, fit: spacerocks::orbfit::OrbitFit) -> PyOrbitFit {
+        let keys = d.astrometry().detection_keys();
+        PyOrbitFit { inner: fit, name: d.name(), frequency: vec![f64::NAN; keys.len()], keys, route: None }
     }
 }
 
@@ -41,7 +41,30 @@ impl PyFitDashboard {
     /// detection; those left out on the page are marked unused.
     #[getter]
     fn fit(&self) -> PyResult<Option<PyOrbitFit>> {
-        Ok(self.dashboard()?.fit().map(|f| self.wrap(f)))
+        let d = self.dashboard()?;
+        Ok(d.fit().map(|f| Self::wrap(d, f)))
+    }
+
+    /// The object's name (Load and Random on the page change it).
+    #[getter]
+    fn name(&self) -> PyResult<String> {
+        Ok(self.dashboard()?.name())
+    }
+
+    /// Whether another object's observations are being fetched.
+    #[getter]
+    fn loading(&self) -> PyResult<bool> {
+        Ok(self.dashboard()?.loading())
+    }
+
+    /// Fetch the observations of `designation` (a number, name or designation; None for a random
+    /// numbered asteroid) from the Minor Planet Center and fit them, as the page's Load and
+    /// Random buttons do. Returns at once; if the fetch fails, the page says why and keeps the
+    /// current object.
+    #[pyo3(signature = (designation=None))]
+    fn load(&self, designation: Option<&str>) -> PyResult<()> {
+        self.dashboard()?.load(designation);
+        Ok(())
     }
 
     /// Whether a fit is running or about to.
@@ -81,7 +104,7 @@ impl PyFitDashboard {
         if let Some(e) = caught.into_inner().unwrap() {
             return Err(e);
         }
-        Ok(fit.map(|f| self.wrap(f)))
+        Ok(fit.map(|f| Self::wrap(d, f)))
     }
 
     /// Stop the dashboard: its page goes away and any running fit stops.
@@ -144,7 +167,7 @@ pub fn dashboard<'py>(
 ) -> PyResult<PyFitDashboard> {
     let k = &kernel.inner;
     let extras = Extras { ra_rate: None, dec_rate: None, sigma_ra_rate: None, sigma_dec_rate: None, delay: None, doppler: None, sigma_delay: None, sigma_doppler: None, frequency: None, transmitter: None, want_velocity: false };
-    let (a, frequency) = build_astrometry(ra, dec, epoch, observer, k, sigma_ra, sigma_dec, timescale, &extras)?;
+    let (a, _) = build_astrometry(ra, dec, epoch, observer, k, sigma_ra, sigma_dec, timescale, &extras)?;
     let mut opts = options(nongrav, nongrav_thresholds, gofr, max_iter, epsilon, chi2_threshold, arc_gap, iod, engine, robust, outlier_sigma, conv_frac, false)?;
     if !asteroids {
         opts.forces.exclude = ASTEROID_PERTURBERS.to_vec();
@@ -153,11 +176,51 @@ pub fn dashboard<'py>(
         Some(r) => Some(rock_state(&r.inner, k)?),
         None => None,
     };
-    let keys = a.detection_keys();
     let d = FitDashboard::start(port, name, a, k.clone(), opts, init).map_err(err)?;
     let url = d.url().to_string();
     if open_browser {
         py.import("webbrowser")?.call_method1("open", (url.as_str(),))?;
     }
-    Ok(PyFitDashboard { inner: Some(d), url, name: name.to_string(), frequency, keys })
+    Ok(PyFitDashboard { inner: Some(d), url })
+}
+
+/// The `spacerocks-fit` command: fit an orbit to an object's Minor Planet Center observations
+/// in the dashboard. `args` are the command-line arguments (default `sys.argv[1:]`); run
+/// `spacerocks-fit --help` for them. With no designation it picks a random numbered asteroid.
+/// Prints the fit when Done is pressed on the page.
+#[pyfunction]
+#[pyo3(signature = (args=None))]
+pub fn main(py: Python<'_>, args: Option<Vec<String>>) -> PyResult<()> {
+    let args = match args {
+        Some(a) => a,
+        None => py.import("sys")?.getattr("argv")?.extract::<Vec<String>>()?.into_iter().skip(1).collect(),
+    };
+    let caught: std::sync::Mutex<Option<PyErr>> = std::sync::Mutex::new(None);
+    let open = |url: &str| Python::attach(|py| py.import("webbrowser")?.call_method1("open", (url,)).map(|_| ())).map_err(|e| e.to_string());
+    let result = py.detach(|| {
+        spacerocks::orbfit::cli::run(
+            &args,
+            &open,
+            Some(&|| {
+                Python::attach(|py| match py.check_signals() {
+                    Ok(()) => false,
+                    Err(e) => {
+                        *caught.lock().unwrap() = Some(e);
+                        true
+                    }
+                })
+            }),
+        )
+    });
+    if let Some(e) = caught.into_inner().unwrap() {
+        // Ctrl-C quits quietly, as a command should.
+        if e.is_instance_of::<pyo3::exceptions::PyKeyboardInterrupt>(py) {
+            return Ok(());
+        }
+        return Err(e);
+    }
+    result.map_err(|e| {
+        eprintln!("spacerocks-fit: {e}");
+        pyo3::exceptions::PySystemExit::new_err(1)
+    })
 }

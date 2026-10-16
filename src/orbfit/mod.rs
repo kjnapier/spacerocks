@@ -55,8 +55,13 @@ pub mod comet;
 pub mod sequential;
     pub use sequential::{sequential_update, update_mahalanobis, update_orbit, PriorFit, UpdateRoute};
 
+pub mod mpc;
+    pub use mpc::{fetch_astrometry, fetch_observations, mpc_astrometry, parse_obs80, MpcObservation};
+
 pub mod dashboard;
-    pub use dashboard::FitDashboard;
+    pub use dashboard::{FitDashboard, Loader, LOAD_MAX_DETECTIONS};
+
+pub mod cli;
 
 pub mod pipeline;
     pub use pipeline::{build_sequence, determine_orbit, select_nongrav};
