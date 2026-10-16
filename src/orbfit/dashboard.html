@@ -40,6 +40,12 @@ h1 small { font-size: 16px; color: var(--text); margin-left: 12px; text-shadow: 
 .mcmc td .pm { color: var(--muted); }
 .mcmc td.post { color: var(--cyan); }
 .mcmc .tablewrap { overflow-x: auto; }
+.mcmc .corner { margin-top: 24px; }
+.mcmc .corner .row { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.mcmc .corner .caption { margin: 0; }
+.mcmc .keyset { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+.mcmc .keyset button { min-height: 32px; padding: 0 8px; }
+.mcmc .corner .screen { max-width: 896px; margin: 0 auto; }
 .msg.note { color: var(--muted); }
 
 .result .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
@@ -237,6 +243,13 @@ h1 small { font-size: 16px; color: var(--text); margin-left: 12px; text-shadow: 
         </p>
         <div class="screen"><canvas class="pixel" id="corner" width="224" height="224"></canvas></div></div>
     </section>
+    <div class="panel corner" data-title="Corner plot">
+      <div class="row">
+        <p class="caption">After the burn-in · density with 1σ (white) and 2σ (amber) contours · correlations above · click a cell to plot it large</p>
+        <span id="corner-keys" class="keyset"></span>
+      </div>
+      <div class="screen"><canvas class="pixel" id="cornerplot" width="448" height="448"></canvas><div class="tip" id="tip5"></div></div>
+    </div>
     <div class="tablewrap"><table id="mc-table"></table></div>
   </section>
 </main>
@@ -706,12 +719,20 @@ function drawCorner(s) {
   };
   const [x0, x1] = range(xs), [y0, y1] = range(ys), pad = { l: 3, r: 3, t: 12, b: 10 };
   const X = v => pad.l + (v - x0) / (x1 - x0) * (w - pad.l - pad.r), Y = v => h - pad.b - (v - y0) / (y1 - y0) * (h - pad.t - pad.b);
+  // Burn-in samples as dim points; the rest as a density with its 1- and 2-sigma contours.
+  const px_ = [], py_ = [], pts = [];
   for (let k = 0; k < n; k++) {
     if (!finite(xs[k]) || !finite(ys[k])) continue;
     const u = X(xs[k]), v = Y(ys[k]);
     if (u < 0 || u > w || v < 0 || v > h) continue;
-    px(ctx, u, v, post[k] ? COL.ra : PAL.grid);
+    if (!post[k]) { px(ctx, u, v, PAL.grid); continue; }
+    px_.push(xs[k]); py_.push(ys[k]);
   }
+  if (px_.length >= 5) {
+    const den = density(px_, py_, [x0, x1], [y0, y1], 32);
+    px_.forEach((x, k) => pts.push([X(x), Y(py_[k]), () => insideOuter(den, [x0, x1], [y0, y1], x, py_[k])]));
+    drawDensity(ctx, den, pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b, pts);
+  } else px_.forEach((x, k) => px(ctx, X(x), Y(py_[k]), COL.ra));
   // The least-squares fit.
   const el = s.fit && s.fit.elements && s.fit.elements[frame];
   const fitValue = j => j < ELEMENTS.length ? (el ? el[ELEMENTS[j][0]] : NaN) : (el ? el.nongrav[["A1", "A2", "A3"].indexOf(c.nongrav_names[j - ELEMENTS.length])] : NaN);
@@ -749,9 +770,199 @@ function drawMcmcTable(s) {
     return tr;
   }));
 }
+// --- Density heatmaps -------------------------------------------------------------------------
+// The samples' density on a grid of `nb` x `nb` bins over the box, smoothed with a Gaussian
+// (sigma 1.5 bins), and the density levels enclosing 39% and 86% of them: the 1- and 2-sigma
+// regions of a 2-D Gaussian.
+function density(xs, ys, xr, yr, nb) {
+  const g = new Float64Array(nb * nb);
+  for (let k = 0; k < xs.length; k++) {
+    const i = Math.floor((xs[k] - xr[0]) / (xr[1] - xr[0]) * nb), j = Math.floor((ys[k] - yr[0]) / (yr[1] - yr[0]) * nb);
+    if (i >= 0 && i < nb && j >= 0 && j < nb) g[j * nb + i] += 1;
+  }
+  const kern = [-3, -2, -1, 0, 1, 2, 3].map(d => Math.exp(-d * d / (2 * 1.5 * 1.5)));
+  const pass = (src, dx, dy) => {
+    const out = new Float64Array(nb * nb);
+    for (let j = 0; j < nb; j++) for (let i = 0; i < nb; i++) {
+      let v = 0;
+      kern.forEach((w, t) => { const ii = i + (t - 3) * dx, jj = j + (t - 3) * dy; if (ii >= 0 && ii < nb && jj >= 0 && jj < nb) v += w * src[jj * nb + ii]; });
+      out[j * nb + i] = v;
+    }
+    return out;
+  };
+  const d = pass(pass(g, 1, 0), 0, 1);
+  const sorted = Array.from(d).sort((a, b) => b - a), total = sorted.reduce((a, b) => a + b, 0);
+  const level = f => { let acc = 0; for (const v of sorted) { acc += v; if (acc >= f * total) return v; } return 0; };
+  return { d, nb, max: sorted[0] || 1, levels: [level(0.393), level(0.865)] };
+}
+const HEAT = ["#14143c", "#18246a", "#1c3c98", "#2460c4", "#3c8ce8", "#7cd8fc", "#c8f4fc"];
+// Draw a density grid into the box (x0, y0, size): the heatmap, the 2- and 1-sigma contours,
+// and (with `xs`, `ys`, `U`, `V`) the samples outside the 2-sigma region as points.
+function drawDensity(ctx, den, x0, y0, sw, sh, pts) {
+  const { d, nb, max, levels } = den, bw = sw / nb, bh = sh / nb;
+  const cellAt = (i, j) => [Math.round(x0 + i * bw), Math.round(y0 + sh - (j + 1) * bh), Math.max(1, Math.round(x0 + (i + 1) * bw) - Math.round(x0 + i * bw)), Math.max(1, Math.round(y0 + sh - j * bh) - Math.round(y0 + sh - (j + 1) * bh))];
+  for (let j = 0; j < nb; j++) for (let i = 0; i < nb; i++) {
+    const v = d[j * nb + i] / max;
+    if (v < 0.02) continue;
+    ctx.fillStyle = HEAT[Math.min(HEAT.length - 1, Math.floor(Math.sqrt(v) * HEAT.length))];
+    const [x, y, ww, hh] = cellAt(i, j);
+    ctx.fillRect(x, y, ww, hh);
+  }
+  if (pts) for (const [u, v, inside] of pts) if (!inside()) px(ctx, u, v, COL.ra);
+  // Contours: the edge cells of each region.
+  [[levels[1], PAL.sun], [levels[0], PAL.text]].forEach(([lv, color]) => {
+    if (!(lv > 0)) return;
+    const on = (i, j) => i >= 0 && i < nb && j >= 0 && j < nb && d[j * nb + i] >= lv;
+    ctx.fillStyle = color;
+    for (let j = 0; j < nb; j++) for (let i = 0; i < nb; i++) {
+      if (!on(i, j) || (on(i - 1, j) && on(i + 1, j) && on(i, j - 1) && on(i, j + 1))) continue;
+      const [x, y, ww, hh] = cellAt(i, j);
+      ctx.fillRect(x + Math.floor(ww / 2), y + Math.floor(hh / 2), Math.max(1, Math.floor(ww / 2)), Math.max(1, Math.floor(hh / 2)));
+    }
+  });
+}
+// Whether a value pair lies inside a density grid's 2-sigma region.
+function insideOuter(den, xr, yr, x, y) {
+  const i = Math.floor((x - xr[0]) / (xr[1] - xr[0]) * den.nb), j = Math.floor((y - yr[0]) / (yr[1] - yr[0]) * den.nb);
+  return i >= 0 && i < den.nb && j >= 0 && j < den.nb && den.d[j * den.nb + i] >= den.levels[1];
+}
+
+// --- Corner plot -----------------------------------------------------------------------------
+// Which parameters it shows, by axis index (elements, then the fitted non-grav ones). q follows
+// from a and e, so it starts off.
+const SHORT = ["A", "E", "I", "NODE", "PERI", "M", "Q"];
+let cornerOff = new Set([6]), cornerCells = [];
+try { const saved = JSON.parse(localStorage.getItem("spacerocks-corner-off")); if (Array.isArray(saved)) cornerOff = new Set(saved); } catch (e) {}
+function axisNames(c) { return [...ELEMENTS.map(([, label]) => label), ...(c.nongrav_names || []).map(n => `${n} (AU/d²)`)]; }
+function axisShort(c, j) { return j < ELEMENTS.length ? SHORT[j] : c.nongrav_names[j - ELEMENTS.length]; }
+function drawCornerKeys(c) {
+  const box = $("corner-keys"), names = c && c.steps ? axisNames(c) : [], key = JSON.stringify([names, [...cornerOff]]);
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  box.replaceChildren(...names.map((n, j) => {
+    const b = Object.assign(document.createElement("button"), { className: "toggle", textContent: axisShort(c, j), title: `Show ${n}` });
+    b.setAttribute("aria-pressed", String(!cornerOff.has(j)));
+    b.onclick = () => {
+      if (cornerOff.has(j)) cornerOff.delete(j); else if (names.length - cornerOff.size > 2) cornerOff.add(j);
+      try { localStorage.setItem("spacerocks-corner-off", JSON.stringify([...cornerOff])); } catch (e) {}
+      if (last) drawMcmc(last);
+    };
+    return b;
+  }));
+}
+// Correlation coefficient of two equal-length arrays.
+function correlation(x, y) {
+  const n = x.length, mx = x.reduce((a, b) => a + b, 0) / n, my = y.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0, sxx = 0, syy = 0;
+  for (let k = 0; k < n; k++) { const dx = x[k] - mx, dy = y[k] - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
+  return sxy / Math.sqrt(sxx * syy);
+}
+function drawCornerPlot(s) {
+  const [ctx, w, h] = screen("cornerplot");
+  cornerCells = [];
+  const c = chain;
+  drawCornerKeys(c);
+  if (!c || !c.steps) { text(ctx, s.sampling ? "STARTING THE CHAIN..." : "NO CHAIN YET: FIT, THEN SAMPLE", 8, 8, PAL.dim); return; }
+  const keep = c.index.map((i, k) => i >= c.burn_in ? k : -1).filter(k => k >= 0);
+  if (keep.length < 5) { text(ctx, `${keep.length} SAMPLES AFTER THE BURN-IN: TOO FEW`, 8, 8, PAL.dim); return; }
+  const axes = axisNames(c).map((_, j) => j).filter(j => !cornerOff.has(j));
+  const n = axes.length, pad = { l: 22, b: 12, t: 4, r: 4 };
+  const cell = Math.floor(Math.min((w - pad.l - pad.r) / n, (h - pad.t - pad.b) / n)), gap = 2;
+  const el = s.fit && s.fit.elements && s.fit.elements[frame];
+  const fitValue = j => !el ? NaN : j < ELEMENTS.length ? el[ELEMENTS[j][0]] : el.nongrav[["A1", "A2", "A3"].indexOf(c.nongrav_names[j - ELEMENTS.length])];
+  const vals = axes.map(j => keep.map(k => chainValue(c, k, j)));
+  const ranges = vals.map(v => {
+    const f = v.filter(finite).sort((a, b) => a - b);
+    let lo = f[Math.floor(0.005 * (f.length - 1))], hi = f[Math.ceil(0.995 * (f.length - 1))];
+    if (!(hi > lo)) { lo -= Math.abs(lo) * 1e-9 || 1e-12; hi += Math.abs(hi) * 1e-9 || 1e-12; }
+    const m = (hi - lo) * 0.06;
+    return [lo - m, hi + m];
+  });
+  const origin = (a, b) => [pad.l + a * cell, pad.t + b * cell];
+  const inner = cell - gap;
+  for (let b = 0; b < n; b++) for (let a = 0; a < n; a++) {
+    const [x0, y0] = origin(a, b);
+    const U = (v, i) => x0 + (v - ranges[i][0]) / (ranges[i][1] - ranges[i][0]) * (inner - 1);
+    const V = (v, i) => y0 + inner - 1 - (v - ranges[i][0]) / (ranges[i][1] - ranges[i][0]) * (inner - 1);
+    if (a > b) {
+      // Upper triangle: the correlation, as a tinted block and its value.
+      const r = correlation(vals[a], vals[b]);
+      const level = Math.min(4, Math.floor(Math.abs(r) * 5));
+      const tints = r >= 0 ? ["#101030", "#14284c", "#1c3c78", "#2850a8", "#3c6cd8"] : ["#101030", "#341430", "#581838", "#842040", "#b02c44"];
+      ctx.fillStyle = tints[level]; ctx.fillRect(x0, y0, inner, inner);
+      const label = finite(r) ? r.toFixed(2).replace("0.", ".") : "-";
+      if (inner >= 18) text(ctx, label, x0 + (inner - textWidth(label)) / 2, y0 + inner / 2 - 2, Math.abs(r) > 0.5 ? PAL.text : PAL.dim);
+      cornerCells.push({ x0, y0, a: axes[a], b: axes[b], r });
+      continue;
+    }
+    ctx.fillStyle = "#101030"; ctx.fillRect(x0, y0, inner, inner);
+    if (a === b) {
+      // Diagonal: a histogram, with the median and 68% interval, and the least-squares value.
+      const bins = Math.max(6, Math.min(24, Math.floor(inner / 3))), counts = new Array(bins).fill(0);
+      for (const v of vals[a]) { const k = Math.floor((v - ranges[a][0]) / (ranges[a][1] - ranges[a][0]) * bins); if (k >= 0 && k < bins) counts[k]++; }
+      const top = Math.max(...counts) || 1, bw = inner / bins;
+      counts.forEach((m, k) => {
+        const hh = Math.round(m / top * (inner - 4));
+        ctx.fillStyle = COL.ra; ctx.fillRect(Math.round(x0 + k * bw), y0 + inner - hh, Math.max(1, Math.round(bw) - 1), hh);
+      });
+      const sorted = vals[a].filter(finite).sort((p, q) => p - q), q = f => sorted[Math.round(f * (sorted.length - 1))];
+      for (const [f, color] of [[0.16, PAL.dim], [0.5, PAL.sun], [0.84, PAL.dim]]) { const u = Math.round(U(q(f), a)); dotted(ctx, u, y0, u, y0 + inner - 1, color); }
+      const fv = fitValue(axes[a]);
+      if (finite(fv)) { const u = Math.round(U(fv, a)); if (u >= x0 && u < x0 + inner) for (let y = y0; y < y0 + 4; y++) px(ctx, u, y, COL.orbit); }
+      cornerCells.push({ x0, y0, a: axes[a], b: axes[a], diag: true, med: q(0.5), lo: q(0.16), hi: q(0.84) });
+    } else {
+      // Lower triangle: the samples' density with its 1- and 2-sigma contours (and the
+      // samples outside them), and the least-squares fit.
+      const den = density(vals[a], vals[b], ranges[a], ranges[b], Math.max(8, Math.min(20, Math.floor(inner / 3))));
+      const pts = [];
+      for (let k = 0; k < keep.length; k++) {
+        const u = U(vals[a][k], a), v = V(vals[b][k], b);
+        if (u >= x0 && u < x0 + inner && v >= y0 && v < y0 + inner) pts.push([u, v, () => insideOuter(den, ranges[a], ranges[b], vals[a][k], vals[b][k])]);
+      }
+      drawDensity(ctx, den, x0, y0, inner, inner, pts);
+      const fx = fitValue(axes[a]), fy = fitValue(axes[b]);
+      if (finite(fx) && finite(fy)) {
+        const u = U(fx, a), v = V(fy, b);
+        if (u >= x0 && u < x0 + inner && v >= y0 && v < y0 + inner) cross(ctx, u, v, COL.orbit);
+      }
+      cornerCells.push({ x0, y0, a: axes[a], b: axes[b], r: correlation(vals[a], vals[b]) });
+    }
+  }
+  // Names along the bottom and the left.
+  axes.forEach((j, k) => {
+    const name = axisShort(c, j), [x0] = origin(k, n - 1), [, y0] = origin(0, k);
+    text(ctx, name, x0 + (inner - textWidth(name)) / 2, pad.t + n * cell + 3, PAL.dim);
+    text(ctx, name, Math.max(1, pad.l - 3 - textWidth(name)), y0 + inner / 2 - 2, PAL.dim);
+  });
+  cornerCells.forEach(cl => { cl.size = inner; });
+}
+function cornerAt(ev) {
+  const cv = $("cornerplot"), r = cv.getBoundingClientRect();
+  const u = (ev.clientX - r.left) / r.width * cv.width, v = (ev.clientY - r.top) / r.height * cv.height;
+  return cornerCells.find(cl => u >= cl.x0 && u < cl.x0 + cl.size && v >= cl.y0 && v < cl.y0 + cl.size);
+}
+$("cornerplot").addEventListener("mousemove", ev => {
+  const cl = cornerAt(ev), c = chain;
+  $("cornerplot").style.cursor = cl && !cl.diag ? "pointer" : "default";
+  if (!cl || !c) { showTip("tip5", "cornerplot", ev, ""); return; }
+  const names = axisNames(c);
+  const fmt = v => Math.abs(v) < 1e-3 || Math.abs(v) >= 1e5 ? v.toExponential(4) : v.toPrecision(10).replace(/0+$/, "").replace(/\.$/, "");
+  showTip("tip5", "cornerplot", ev, cl.diag
+    ? `${names[cl.a]}\nmedian ${fmt(cl.med)}\n68%: ${fmt(cl.lo)} to ${fmt(cl.hi)}`
+    : `${names[cl.b]} vs ${names[cl.a]}\ncorrelation ${finite(cl.r) ? cl.r.toFixed(3) : "-"}\nclick to plot it large`);
+});
+$("cornerplot").addEventListener("mouseleave", () => { $("tip5").style.display = "none"; });
+$("cornerplot").addEventListener("click", ev => {
+  const cl = cornerAt(ev);
+  if (!cl || cl.diag || !last) return;
+  $("mc-x").value = cl.a; $("mc-y").value = cl.b;
+  drawMcmc(last);
+  $("corner").scrollIntoView({ block: "nearest", behavior: "smooth" });
+});
+
 function drawMcmc(s) {
   if (chain && chain.nongrav_names) addNongravOptions(chain.nongrav_names);
-  drawTrace(s); drawCorner(s); drawMcmcTable(s);
+  drawTrace(s); drawCorner(s); drawCornerPlot(s); drawMcmcTable(s);
   const c = chain;
   const status = s.sampling ? (c && c.steps ? `step ${c.steps} / ${s.mcmc.steps} · ${Math.round(100 * c.acceptance_all)}% accepted` : "starting...")
     : c && c.steps ? `${c.steps} steps · ${Math.max(0, c.steps - c.burn_in)} after burn-in · ${Math.round(100 * c.acceptance)}% accepted${c.stopped ? " · stopped" : ""}` : "";
