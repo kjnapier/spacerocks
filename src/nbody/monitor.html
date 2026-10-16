@@ -4,126 +4,162 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Simulation Monitor</title>
+<link rel="icon" href="data:,">
 <style>
+/* Everything is drawn like an 8-bit console: one 5x7 pixel font (served as font.ttf) at multiples
+   of 8 px so its pixels stay square, an NES-like palette, and RPG-style windows with double
+   borders. */
+@font-face { font-family: "Spacerocks Pixel"; src: url("font.ttf") format("truetype"); font-display: block; }
 :root {
-  --bg: #f7f7f5; --panel: #ffffff; --text: #1c1d1f; --muted: #6b6e75; --line: #e3e3e0;
-  --accent: #3b6fd8; --track: #e8ebf2; --good: #2f8f5b; --warn: #b7791f; --bad: #c2413a;
-  --dot: #8a8f99; --massive: #e08a2c; --on-accent: #ffffff;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #141518; --panel: #1d1f23; --text: #e9eaec; --muted: #9a9ea6; --line: #2c2f35;
-    --accent: #6d9bff; --track: #2a2e37; --good: #4cc38a; --warn: #e2b04a; --bad: #ff6b61;
-    --dot: #7d838d; --massive: #f2a54a; --on-accent: #0b1020;
-    color-scheme: dark;
-  }
+  --bg: #0c0c24; --window: #000000; --text: #fcfcfc; --muted: #8c8cd8; --line: #fcfcfc;
+  --accent: #f8b800; --good: #58d854; --warn: #f8b800; --bad: #f83800; --cyan: #3cbcfc;
+  --px: 2px; color-scheme: dark;
 }
 * { box-sizing: border-box; }
+html { background: var(--bg); }
 body {
   margin: 0; background: var(--bg); color: var(--text);
-  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 16px/24px "Spacerocks Pixel", ui-monospace, monospace; text-transform: uppercase;
+  -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
+  background-image: radial-gradient(#3c3c7c 1px, transparent 1px), radial-gradient(#26265c 1px, transparent 1px);
+  background-size: 96px 96px, 56px 56px; background-position: 0 0, 28px 40px;
 }
-main { max-width: 1080px; margin: 0 auto; padding: 20px 16px 32px; }
-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-h1 { font-size: 18px; font-weight: 600; margin: 0; }
-.pill {
-  font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px;
-  background: var(--track); color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+::selection { background: var(--accent); color: #000; }
+main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 40px; }
+header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+h1 { font-size: 32px; line-height: 40px; font-weight: normal; margin: 0; color: var(--accent); text-shadow: 4px 4px 0 #000; }
+.pill { color: var(--muted); }
+.pill::before { content: "▶ "; }
+.pill.running { color: var(--good); }
+.pill.paused { color: var(--warn); animation: blink 1s steps(2, start) infinite; }
+.pill.done { color: var(--cyan); }
+.pill.lost { color: var(--bad); animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
+.sub { color: var(--muted); margin-left: auto; text-align: right; }
+
+/* A window: black, with a white double border and a title sitting on the top border. */
+.panel {
+  position: relative; background: var(--window); padding: 20px 20px 18px;
+  border: 8px double var(--line); box-shadow: 6px 6px 0 #000;
 }
-.pill.running { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
-.pill.paused { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
-.pill.done { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
-.pill.lost { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
-.sub { color: var(--muted); font-size: 13px; margin-left: auto; text-align: right; }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
-.progress .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.pct { font-size: 32px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.bar { height: 10px; background: var(--track); border-radius: 999px; overflow: hidden; margin: 10px 0 12px; }
-.bar > div { height: 100%; width: 0; background: var(--accent); border-radius: 999px; transition: width .25s linear; }
-.bar.indeterminate > div { width: 30%; animation: slide 1.4s ease-in-out infinite; }
-@keyframes slide { from { margin-left: -30%; } to { margin-left: 100%; } }
-.epochs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; font-variant-numeric: tabular-nums; }
-.epochs .label, .stat .label { color: var(--muted); font-size: 12px; }
-.epochs .value { font-size: 15px; }
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 12px 0; }
-.stat .value { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.plots { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.plots h2 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--muted); }
-/* The plots are low-resolution canvases blown up without smoothing, like an NES or SNES screen. */
-.screen {
-  position: relative; background: #0c0c24; border-radius: 4px; padding: 6px;
-  box-shadow: inset 0 0 0 2px #000, inset 0 0 0 4px #26265c;
+.panel[data-title] { margin-top: 12px; }
+.panel[data-title]::before {
+  content: attr(data-title); position: absolute; top: -18px; left: 16px;
+  background: var(--window); color: var(--accent); padding: 0 8px; line-height: 24px;
 }
+section + section { margin-top: 24px; }
+
+.progress .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.pct { font-size: 48px; line-height: 56px; color: var(--text); }
+/* An HP-style bar of square blocks. */
+.bar { height: 28px; border: 4px solid var(--line); padding: 4px; margin: 12px 0 16px; background: #000; }
+.bar > div {
+  height: 100%; width: 0;
+  background: repeating-linear-gradient(90deg, var(--good) 0 12px, transparent 12px 16px);
+}
+.bar.indeterminate > div { width: 25%; animation: crawl 2s steps(20) infinite; }
+@keyframes crawl { from { margin-left: 0; } to { margin-left: 75%; } }
+.epochs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; }
+.label { color: var(--muted); }
+.value { color: var(--text); overflow-wrap: anywhere; }
+
+.controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;
+  margin-top: 20px; padding-top: 20px; border-top: 4px dotted #26265c;
+}
+.controls .spacer { flex: 1; }
+button, select, input {
+  font: inherit; text-transform: uppercase; color: var(--text); background: #000;
+  border: 4px solid var(--line); border-radius: 0; padding: 4px 12px; min-height: 40px;
+  box-shadow: 4px 4px 0 #26265c; outline: none;
+}
+button { cursor: pointer; }
+button:hover, button:focus-visible { background: var(--text); color: #000; }
+button:active { transform: translate(4px, 4px); box-shadow: none; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #000; min-width: 128px; }
+button.primary:hover { background: var(--text); border-color: var(--text); }
+select { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer; }
+.select { position: relative; display: inline-block; }
+.select::after { content: "▼"; position: absolute; right: 12px; top: 8px; pointer-events: none; }
+select:focus-visible, input:focus { border-color: var(--accent); }
+input { width: 120px; color: var(--accent); caret-color: var(--accent); }
+input::placeholder { color: #4c4c8c; }
+label.inline { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.msg { color: var(--bad); }
+kbd { font: inherit; border: 2px solid var(--muted); padding: 0 4px; color: var(--muted); }
+.keys { color: var(--muted); }
+
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.stat { padding: 12px 16px; }
+.stat .value { font-size: 24px; line-height: 32px; margin-top: 4px; }
+.stat:nth-child(1) .value, .stat:nth-child(5) .value { color: var(--cyan); }
+.stat:nth-child(8) .value { color: var(--good); }
+
+.plots { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.hint { color: var(--muted); }
+/* The plots are low-resolution canvases blown up without smoothing. */
+.screen { position: relative; background: #0c0c24; border: 4px solid #26265c; }
 canvas.pixel {
   width: 100%; height: auto; display: block;
   image-rendering: pixelated; image-rendering: crisp-edges;
 }
 .tip {
   position: absolute; pointer-events: none; display: none; z-index: 2;
-  background: #0c0c24; color: #fcfcfc; border: 2px solid #fcfcfc; box-shadow: 3px 3px 0 #000;
-  font: 12px/1.35 ui-monospace, "SF Mono", Menlo, Consolas, monospace; padding: 4px 7px; white-space: pre;
+  background: #000; color: var(--text); border: 4px solid var(--text); box-shadow: 4px 4px 0 #000;
+  font: 16px/24px "Spacerocks Pixel", monospace; padding: 4px 10px; white-space: pre;
 }
-.tracker { margin-top: 12px; }
-.tracker .head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
-.tracker .head h2 { margin: 0 auto 0 0; }
-.tracker .body { display: grid; grid-template-columns: minmax(220px, 1fr) 2fr; gap: 12px; align-items: start; }
-.tracker dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font: 13px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
-.tracker dt { color: var(--muted); }
-.tracker dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
-.tracker .hint { color: var(--muted); font-size: 13px; }
-.tracker input { width: 160px; }
-.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
-.controls .spacer { flex: 1; }
-button, select, input {
-  font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line);
-  border-radius: 7px; padding: 6px 12px; min-height: 34px;
-}
-button { cursor: pointer; font-weight: 600; }
-button:hover, select:hover, input:hover { border-color: var(--muted); }
-button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); min-width: 92px; }
-button:disabled { opacity: .5; cursor: default; }
-input { width: 110px; font-variant-numeric: tabular-nums; }
-label.inline { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
-.msg { color: var(--bad); font-size: 13px; }
-kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; color: var(--muted); }
+.plots .caption { color: var(--muted); margin: 0 0 12px; }
+
+.tracker .head { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; margin-bottom: 16px; }
+.tracker .head .hint { margin-right: auto; }
+.tracker .body { display: grid; grid-template-columns: minmax(240px, 1fr) 2fr; gap: 20px; align-items: start; }
+.tracker dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0 16px; }
+.tracker dt { color: var(--muted); text-transform: none; } /* keeps ω (the font draws a-z as capitals anyway) */
+.tracker dt.hint { grid-column: 1 / -1; }
+.tracker dd { margin: 0; text-align: right; }
+.tracker input { width: 200px; }
+
 @media (max-width: 720px) {
-  .plots { grid-template-columns: 1fr; }
-  .tracker .body { grid-template-columns: 1fr; }
-  .epochs { grid-template-columns: 1fr; }
-  .stats { grid-template-columns: 1fr 1fr; }
+  h1 { font-size: 24px; line-height: 32px; }
+  .pct { font-size: 32px; line-height: 40px; }
+  .plots, .tracker .body, .epochs { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .stat .value { font-size: 16px; line-height: 24px; }
+  .panel { padding: 16px 12px 14px; }
+  .sub { margin-left: 0; text-align: left; }
+  .keys { display: none; }
 }
 </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>Simulation</h1>
+    <h1>Spacerocks</h1>
     <span id="state" class="pill">connecting</span>
     <span id="frame" class="sub"></span>
   </header>
 
-  <section class="panel progress">
+  <section class="panel progress" data-title="Progress">
     <div class="row">
       <span class="pct" id="pct">–</span>
       <span class="sub" id="eta"></span>
     </div>
     <div class="bar" id="bar"><div></div></div>
     <div class="epochs">
-      <div><div class="label">Current epoch (TDB)</div><div class="value" id="now">–</div></div>
-      <div><div class="label">Target epoch (TDB)</div><div class="value" id="target">–</div></div>
+      <div><div class="label">Now (TDB)</div><div class="value" id="now">–</div></div>
+      <div><div class="label">Target (TDB)</div><div class="value" id="target">–</div></div>
     </div>
     <div class="controls">
       <button class="primary" id="pause" title="Pause or resume (space)">Pause</button>
       <button id="step" title="Take one step, then pause (.)">Step</button>
-      <span class="sub" style="margin-left:0"><kbd>space</kbd> <kbd>.</kbd></span>
+      <span class="keys"><kbd>Space</kbd> <kbd>.</kbd></span>
       <span class="spacer"></span>
       <label class="inline">Integrator
-        <select id="integratorSel">
+        <span class="select"><select id="integratorSel">
           <option>IAS15</option><option>WisdomHolman</option><option>Leapfrog</option><option>Trace</option>
-        </select>
+        </select></span>
       </label>
-      <label class="inline">Timestep (d) <input id="timestepIn" type="number" step="any"></label>
+      <label class="inline">dt (d) <input id="timestepIn" type="number" step="any"></label>
       <button id="apply">Apply</button>
       <span class="msg" id="msg"></span>
     </div>
@@ -131,32 +167,34 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
 
   <section class="stats">
     <div class="panel stat"><div class="label">Steps</div><div class="value" id="steps">–</div></div>
-    <div class="panel stat"><div class="label">Steps per second</div><div class="value" id="rate">–</div></div>
-    <div class="panel stat"><div class="label">Timestep (days)</div><div class="value" id="dt">–</div></div>
-    <div class="panel stat"><div class="label">Simulated days per second</div><div class="value" id="speed">–</div></div>
-    <div class="panel stat"><div class="label">Elapsed (running)</div><div class="value" id="elapsed">–</div></div>
-    <div class="panel stat"><div class="label">Particles (massive)</div><div class="value" id="np">–</div></div>
+    <div class="panel stat"><div class="label">Steps / sec</div><div class="value" id="rate">–</div></div>
+    <div class="panel stat"><div class="label">Timestep (d)</div><div class="value" id="dt">–</div></div>
+    <div class="panel stat"><div class="label">Days / sec</div><div class="value" id="speed">–</div></div>
+    <div class="panel stat"><div class="label">Time (running)</div><div class="value" id="elapsed">–</div></div>
+    <div class="panel stat"><div class="label">Bodies (massive)</div><div class="value" id="np">–</div></div>
     <div class="panel stat"><div class="label">Integrator</div><div class="value" id="integrator">–</div></div>
-    <div class="panel stat"><div class="label">Energy error |ΔE/E₀|</div><div class="value" id="de">–</div></div>
+    <div class="panel stat"><div class="label">ΔE / E₀</div><div class="value" id="de">–</div></div>
   </section>
 
   <section class="plots">
-    <div class="panel"><h2>Particles, x–y plane · hover for details, click to track</h2>
+    <div class="panel" data-title="Map · x–y plane">
+      <p class="caption">Hover a body · click to track</p>
       <div class="screen"><canvas class="pixel" id="orbits" width="224" height="224"></canvas><div class="tip" id="tip"></div></div></div>
-    <div class="panel"><h2>Energy error of the massive bodies</h2>
+    <div class="panel" data-title="Energy error">
+      <p class="caption">Massive bodies, log scale</p>
       <div class="screen"><canvas class="pixel" id="energy" width="224" height="224"></canvas></div></div>
   </section>
 
-  <section class="panel tracker">
+  <section class="panel tracker" data-title="Orbital elements">
     <div class="head">
-      <h2>Orbital elements</h2>
-      <input id="trackIn" list="names" placeholder="particle name">
+      <span class="hint">Track a body</span>
+      <input id="trackIn" list="names" placeholder="name">
       <datalist id="names"></datalist>
       <button id="trackBtn">Track</button>
       <button id="untrackBtn">Stop</button>
     </div>
     <div class="body">
-      <dl id="elements"><dt class="hint">Click a particle, or type its name.</dt><dd></dd></dl>
+      <dl id="elements"><dt class="hint">Click a body on the map, or type its name.</dt></dl>
       <div class="screen"><canvas class="pixel" id="elementPlot" width="224" height="132"></canvas></div>
     </div>
   </section>
@@ -397,16 +435,16 @@ function drawElements(s) {
   }
 
   const el = s.elements, dl = $("elements");
-  if (!s.tracked) dl.innerHTML = `<dt class="hint">Click a particle, or type its name.</dt><dd></dd>`;
-  else if (!el) dl.innerHTML = `<dt class="hint">No elements for “${s.tracked.replace(/[<&]/g, "")}” yet: it isn't in the simulation, or it is the central body.</dt><dd></dd>`;
+  if (!s.tracked) dl.innerHTML = `<dt class="hint">Click a body on the map, or type its name.</dt>`;
+  else if (!el) dl.innerHTML = `<dt class="hint">No elements for “${s.tracked.replace(/[<&]/g, "")}”: it isn't in the simulation, or it is the central body.</dt>`;
   else {
     const deg = x => isFinite(x) ? `${x.toFixed(3)}°` : "–";
     const rows = [
-      ["object", el.name], ["about", el.central],
-      ["a", `${el.a.toPrecision(7)} AU`], ["e", el.e.toFixed(6)], ["i", deg(el.inc)],
-      ["Ω", deg(el.node)], ["ω", deg(el.arg)], ["M", deg(el.mean_anomaly)], ["f", deg(el.true_anomaly)],
-      ["q", `${el.q.toPrecision(6)} AU`], ["Q", el.big_q ? `${el.big_q.toPrecision(6)} AU` : "–"],
-      ["P", el.period ? `${(el.period / 365.25).toPrecision(6)} yr` : "unbound"], ["r", `${el.r.toPrecision(6)} AU`],
+      ["Body", el.name], ["About", el.central],
+      ["Semi-major a", `${el.a.toPrecision(7)} AU`], ["Ecc e", el.e.toFixed(6)], ["Incl i", deg(el.inc)],
+      ["Node Ω", deg(el.node)], ["Peri ω", deg(el.arg)], ["Mean anom", deg(el.mean_anomaly)], ["True anom", deg(el.true_anomaly)],
+      ["Perihelion", `${el.q.toPrecision(6)} AU`], ["Aphelion", el.big_q ? `${el.big_q.toPrecision(6)} AU` : "–"],
+      ["Period", el.period ? `${(el.period / 365.25).toPrecision(6)} yr` : "unbound"], ["Distance", `${el.r.toPrecision(6)} AU`],
     ];
     dl.replaceChildren(...rows.flatMap(([k, v]) => [Object.assign(document.createElement("dt"), { textContent: k }), Object.assign(document.createElement("dd"), { textContent: v })]));
   }
@@ -419,10 +457,11 @@ function drawElements(s) {
   series.forEach(([label, col, unit], r) => {
     const y0 = r * rowH, vals = hist.map(p => p[col]);
     let lo = Math.min(...vals), hi = Math.max(...vals);
-    if (hi - lo < 1e-12 * Math.max(1, Math.abs(hi))) { lo -= 1e-9; hi += 1e-9; }
+    const flat = hi - lo < 1e-9 * Math.max(1, Math.abs(hi));
+    if (flat) { lo -= 1e-9; hi += 1e-9; }
     const color = PAL.series[r], t0 = hist[0][0], t1 = hist[hist.length - 1][0];
     text(ctx, `${label} ${short(vals[vals.length - 1])}${unit}`, 3, y0 + 3, color);
-    const range = `${short(lo)}-${short(hi)}`;
+    const range = flat ? "FLAT" : `${short(lo)} TO ${short(hi)}`;
     text(ctx, range, w - 3 - textWidth(range), y0 + 3, PAL.dim);
     if (r) dotted(ctx, 0, y0, w, y0, PAL.grid);
     const X = t => 3 + (t - t0) / ((t1 - t0) || 1) * (w - 6), Y = v => y0 + rowH - 3 - (v - lo) / (hi - lo) * (rowH - 13);

@@ -502,6 +502,9 @@ fn respond(mut stream: TcpStream, shared: &Shared, port: u16) -> std::io::Result
 
     let (status, content_type, body) = match (method, path) {
         ("GET", "/" | "/index.html") => ("200 OK", "text/html; charset=utf-8", PAGE.to_string()),
+        ("GET", "/font.ttf") => {
+            return send(&mut stream, "200 OK", "font/ttf", FONT);
+        }
         ("GET", "/progress.json") => {
             let mut status = shared.status.lock().unwrap_or_else(|e| e.into_inner()).clone();
             status.paused = shared.control.lock().unwrap_or_else(|e| e.into_inner()).paused;
@@ -519,12 +522,16 @@ fn respond(mut stream: TcpStream, shared: &Shared, port: u16) -> std::io::Result
         }
         _ => ("404 Not Found", "text/plain", "not found".to_string()),
     };
+    send(&mut stream, status, content_type, body.as_bytes())
+}
+
+fn send(stream: &mut TcpStream, status: &str, content_type: &str, body: &[u8]) -> std::io::Result<()> {
     write!(
         stream,
         "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
         body.len()
     )?;
-    stream.write_all(body.as_bytes())?;
+    stream.write_all(body)?;
     stream.flush()
 }
 
@@ -659,3 +666,6 @@ impl Simulation {
 }
 
 const PAGE: &str = include_str!("monitor.html");
+
+/// The page's 5x7 pixel font, built by `scripts/monitor_font.py`.
+const FONT: &[u8] = include_bytes!("monitor_font.ttf");
