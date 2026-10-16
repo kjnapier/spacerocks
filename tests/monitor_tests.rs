@@ -59,8 +59,9 @@ fn request(url: &str, method: &str, path: &str, headers: &str) -> (String, Strin
     let addr = url.trim_start_matches("http://").trim_end_matches('/');
     let mut stream = TcpStream::connect(addr).unwrap();
     write!(stream, "{method} {path} HTTP/1.1\r\nHost: {addr}\r\n{headers}\r\n").unwrap();
-    let mut response = String::new();
-    stream.read_to_string(&mut response).unwrap();
+    let mut bytes = Vec::new();
+    stream.read_to_end(&mut bytes).unwrap();
+    let response = String::from_utf8_lossy(&bytes);
     let (head, body) = response.split_once("\r\n\r\n").unwrap();
     (head.lines().next().unwrap().to_string(), body.to_string())
 }
@@ -98,6 +99,8 @@ fn page_reports_a_finished_integration() {
     let (status, body) = get(&url, "/");
     assert!(status.contains("200"));
     assert!(body.contains("<title>Simulation Monitor</title>"));
+    let (status, body) = get(&url, "/font.ttf");
+    assert!(status.contains("200") && body.len() > 1000);
     let (status, _) = get(&url, "/nope");
     assert!(status.contains("404"));
 }
