@@ -60,3 +60,20 @@ def test_monitor_page_reports_progress():
     assert status["integrator"] == "IAS15"
     sim.stop_monitor()
     assert sim.monitor_url is None
+
+
+def test_monitor_tracks_elements():
+    import json
+    import urllib.request
+
+    sim = make_sim(Integrator.ias15(1.0))
+    url = sim.monitor(open_browser=False, track="jupiter")
+    sim.integrate(Time(2460000.5 + 100.0, "tdb", "jd"))
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(url + "progress.json") as r:
+        status = json.load(r)
+    assert status["tracked"] == "jupiter"
+    assert abs(status["elements"]["a"] - 5.2) < 0.01
+    sim.monitor_track(None)
+    with opener.open(url + "progress.json") as r:
+        assert json.load(r)["tracked"] is None

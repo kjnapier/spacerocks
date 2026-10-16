@@ -152,16 +152,21 @@ impl PySimulation {
     /// * `port` - The port to serve on; 0 (the default) picks a free one.
     /// * `open_browser` - Open the page in the default web browser.
     /// * `paused` - Start paused, so the next integration waits for Resume or Step on the page.
+    /// * `track` - Name of a particle whose orbital elements the page follows (clicking a
+    ///   particle on the page does the same).
     ///
     /// The page's Pause holds the simulation before its next step, Step lets one step through,
     /// and the integrator and timestep can be switched there. While paused, the call that is
     /// integrating waits (Ctrl-C included) until the page resumes it.
-    #[pyo3(signature = (port=0, open_browser=true, paused=false))]
-    pub fn monitor(&mut self, py: Python<'_>, port: u16, open_browser: bool, paused: bool) -> PyResult<String> {
+    #[pyo3(signature = (port=0, open_browser=true, paused=false, track=None))]
+    pub fn monitor(&mut self, py: Python<'_>, port: u16, open_browser: bool, paused: bool, track: Option<&str>) -> PyResult<String> {
         let url = self.inner.monitor(port).map_err(|e| PyErr::new::<pyo3::exceptions::PyOSError, _>(e.to_string()))?;
-        if paused {
-            if let Some(monitor) = self.inner.progress_monitor() {
+        if let Some(monitor) = self.inner.progress_monitor() {
+            if paused {
                 monitor.set_paused(true);
+            }
+            if track.is_some() {
+                monitor.track(track);
             }
         }
         if open_browser {
@@ -184,6 +189,14 @@ impl PySimulation {
     /// Detach the progress page and stop its server.
     pub fn stop_monitor(&mut self) {
         self.inner.stop_monitor();
+    }
+
+    /// Follow the orbital elements of the particle called `name` on the progress page (None stops).
+    #[pyo3(signature = (name=None))]
+    pub fn monitor_track(&self, name: Option<&str>) {
+        if let Some(monitor) = self.inner.progress_monitor() {
+            monitor.track(name);
+        }
     }
 
     /// Pause or resume the simulation, as the progress page's Pause button does.

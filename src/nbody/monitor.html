@@ -8,14 +8,14 @@
 :root {
   --bg: #f7f7f5; --panel: #ffffff; --text: #1c1d1f; --muted: #6b6e75; --line: #e3e3e0;
   --accent: #3b6fd8; --track: #e8ebf2; --good: #2f8f5b; --warn: #b7791f; --bad: #c2413a;
-  --dot: #8a8f99; --massive: #e08a2c;
+  --dot: #8a8f99; --massive: #e08a2c; --on-accent: #ffffff;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #141518; --panel: #1d1f23; --text: #e9eaec; --muted: #9a9ea6; --line: #2c2f35;
     --accent: #6d9bff; --track: #2a2e37; --good: #4cc38a; --warn: #e2b04a; --bad: #ff6b61;
-    --dot: #7d838d; --massive: #f2a54a;
+    --dot: #7d838d; --massive: #f2a54a; --on-accent: #0b1020;
     color-scheme: dark;
   }
 }
@@ -50,8 +50,29 @@ h1 { font-size: 18px; font-weight: 600; margin: 0; }
 .stat .value { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .plots { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .plots h2 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--muted); }
-canvas { width: 100%; aspect-ratio: 1 / 1; display: block; }
-#energy { aspect-ratio: 4 / 3; }
+/* The plots are low-resolution canvases blown up without smoothing, like an NES or SNES screen. */
+.screen {
+  position: relative; background: #0c0c24; border-radius: 4px; padding: 6px;
+  box-shadow: inset 0 0 0 2px #000, inset 0 0 0 4px #26265c;
+}
+canvas.pixel {
+  width: 100%; height: auto; display: block;
+  image-rendering: pixelated; image-rendering: crisp-edges;
+}
+.tip {
+  position: absolute; pointer-events: none; display: none; z-index: 2;
+  background: #0c0c24; color: #fcfcfc; border: 2px solid #fcfcfc; box-shadow: 3px 3px 0 #000;
+  font: 12px/1.35 ui-monospace, "SF Mono", Menlo, Consolas, monospace; padding: 4px 7px; white-space: pre;
+}
+.tracker { margin-top: 12px; }
+.tracker .head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.tracker .head h2 { margin: 0 auto 0 0; }
+.tracker .body { display: grid; grid-template-columns: minmax(220px, 1fr) 2fr; gap: 12px; align-items: start; }
+.tracker dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font: 13px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.tracker dt { color: var(--muted); }
+.tracker dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.tracker .hint { color: var(--muted); font-size: 13px; }
+.tracker input { width: 160px; }
 .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
 .controls .spacer { flex: 1; }
 button, select, input {
@@ -60,7 +81,7 @@ button, select, input {
 }
 button { cursor: pointer; font-weight: 600; }
 button:hover, select:hover, input:hover { border-color: var(--muted); }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; min-width: 92px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); min-width: 92px; }
 button:disabled { opacity: .5; cursor: default; }
 input { width: 110px; font-variant-numeric: tabular-nums; }
 label.inline { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
@@ -68,6 +89,7 @@ label.inline { display: flex; align-items: center; gap: 6px; color: var(--muted)
 kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; color: var(--muted); }
 @media (max-width: 720px) {
   .plots { grid-template-columns: 1fr; }
+  .tracker .body { grid-template-columns: 1fr; }
   .epochs { grid-template-columns: 1fr; }
   .stats { grid-template-columns: 1fr 1fr; }
 }
@@ -119,8 +141,24 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
   </section>
 
   <section class="plots">
-    <div class="panel"><h2>Particles, x–y plane (AU)</h2><canvas id="orbits"></canvas></div>
-    <div class="panel"><h2>Energy error of the massive bodies</h2><canvas id="energy"></canvas></div>
+    <div class="panel"><h2>Particles, x–y plane · hover for details, click to track</h2>
+      <div class="screen"><canvas class="pixel" id="orbits" width="224" height="224"></canvas><div class="tip" id="tip"></div></div></div>
+    <div class="panel"><h2>Energy error of the massive bodies</h2>
+      <div class="screen"><canvas class="pixel" id="energy" width="224" height="224"></canvas></div></div>
+  </section>
+
+  <section class="panel tracker">
+    <div class="head">
+      <h2>Orbital elements</h2>
+      <input id="trackIn" list="names" placeholder="particle name">
+      <datalist id="names"></datalist>
+      <button id="trackBtn">Track</button>
+      <button id="untrackBtn">Stop</button>
+    </div>
+    <div class="body">
+      <dl id="elements"><dt class="hint">Click a particle, or type its name.</dt><dd></dd></dl>
+      <div class="screen"><canvas class="pixel" id="elementPlot" width="224" height="132"></canvas></div>
+    </div>
   </section>
 </main>
 
@@ -148,62 +186,253 @@ function fmtDays(x) {
   return a !== 0 && (a < 1e-3 || a >= 1e5) ? x.toExponential(3) : x.toPrecision(4);
 }
 
-function setupCanvas(c) {
-  const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-  c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
-  const ctx = c.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return [ctx, r.width, r.height];
-}
+// --- Pixel drawing -----------------------------------------------------------------------------
+// A small NES-like palette and a 3x5 bitmap font, drawn one pixel at a time.
+const PAL = {
+  bg: "#0c0c24", grid: "#26265c", dim: "#5c5ca8", text: "#fcfcfc", star: "#3c3c7c",
+  sun: "#f8b800", tp: "#7cd8fc", tracked: "#f83800", orbit: "#f87858",
+  energy: "#58f898", series: ["#fca044", "#58f898", "#d878f8"],
+  planets: ["#f87858", "#58d854", "#6888fc", "#f878f8", "#fca044", "#00e8d8", "#bcbcbc"],
+};
+const GLYPHS = {};
+`0 111101101101111|1 010110010010111|2 111001111100111|3 111001111001111|4 101101111001001
+5 111100111001111|6 111100111101111|7 111001001010010|8 111101111101111|9 111101111001111
+A 010101111101101|B 110101110101110|C 011100100100011|D 110101101101110|E 111100110100111
+F 111100110100100|G 011100101101011|H 101101111101101|I 111010010010111|J 001001001101010
+K 101101110101101|L 100100100100111|M 101111111101101|N 110101101101101|O 010101101101010
+P 110101110100100|Q 010101101110011|R 110101110101101|S 011100010001110|T 111010010010010
+U 101101101101111|V 101101101101010|W 101101111111101|X 101101010101101|Y 101101010010010
+Z 111001010100111|. 000000000000010|- 000000111000000|+ 000010111010000|: 000010000010000
+/ 001001010100100|± 010111010000111|( 010100100100010|) 010001001001010|% 101001010100101
+_ 000000000000111|' 010010000000000|= 000111000111000|° 010101010000000`.split(/[|\n]/).forEach(g => { GLYPHS[g[0]] = g.slice(2); });
 
-let extent = 0;
+function screen(id) {
+  const c = $(id), ctx = c.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = PAL.bg; ctx.fillRect(0, 0, c.width, c.height);
+  return [ctx, c.width, c.height];
+}
+function px(ctx, x, y, color, size = 1) {
+  ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), size, size);
+}
+function text(ctx, str, x, y, color = PAL.text) {
+  ctx.fillStyle = color;
+  x = Math.round(x); y = Math.round(y);
+  for (const ch of String(str).toUpperCase()) {
+    const g = GLYPHS[ch];
+    if (g) for (let i = 0; i < 15; i++) if (g[i] === "1") ctx.fillRect(x + i % 3, y + Math.floor(i / 3), 1, 1);
+    x += 4;
+  }
+}
+const textWidth = str => String(str).length * 4 - 1;
+function line(ctx, x0, y0, x1, y1, color) {
+  // Bresenham, so lines stay one crisp pixel wide.
+  x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy;
+  ctx.fillStyle = color;
+  for (let n = 0; n < 2000; n++) {
+    ctx.fillRect(x0, y0, 1, 1);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+}
+function dotted(ctx, x0, y0, x1, y1, color) {
+  ctx.fillStyle = color;
+  if (y0 === y1) for (let x = x0; x <= x1; x += 2) ctx.fillRect(x, y0, 1, 1);
+  else for (let y = y0; y <= y1; y += 2) ctx.fillRect(x0, y, 1, 1);
+}
+/// Short numbers for 4-pixel-wide characters: 3 significant figures, E notation when far from 1.
+function short(x) {
+  if (!isFinite(x)) return "-";
+  const a = Math.abs(x);
+  if (a !== 0 && (a < 1e-2 || a >= 1e5)) return x.toExponential(1).replace("e+", "E").replace("e", "E");
+  return String(+x.toPrecision(3));
+}
+// A fixed starfield (a seeded generator, so it doesn't twinkle between frames).
+const STARS = (() => { let r = 7; const n = () => (r = (r * 16807) % 2147483647) / 2147483647; return Array.from({ length: 70 }, () => [n(), n(), n() < 0.2]); })();
+
+// --- Particles ------------------------------------------------------------------------------------
+let extent = 0, drawnPoints = [], hovered = null;
 function drawOrbits(s) {
-  const [ctx, w, h] = setupCanvas($("orbits"));
-  ctx.clearRect(0, 0, w, h);
+  const [ctx, w, h] = screen("orbits");
+  for (const [u, v, bright] of STARS) px(ctx, u * w, v * h, bright ? PAL.dim : PAL.star);
   let m = 0;
   for (const [, x, y] of s.massive) m = Math.max(m, Math.abs(x), Math.abs(y));
-  for (const [x, y] of s.test_particles) m = Math.max(m, Math.abs(x), Math.abs(y));
+  for (const [, x, y] of s.test_particles) m = Math.max(m, Math.abs(x), Math.abs(y));
   m = m * 1.1 || 1;
   // Grow at once, shrink slowly, so the view doesn't jump about.
   extent = extent === 0 || m > extent ? m : extent + (m - extent) * 0.05;
-  const cx = w / 2, cy = h / 2, k = Math.min(w, h) / 2 / extent;
-  ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.moveTo(cx, 0); ctx.lineTo(cx, h); ctx.stroke();
-  ctx.fillStyle = css("--muted"); ctx.font = "11px system-ui, sans-serif";
-  ctx.fillText(`±${extent.toPrecision(3)}`, 6, 14);
-  ctx.fillStyle = css("--dot");
-  for (const [x, y] of s.test_particles) ctx.fillRect(cx + x * k - 1, cy - y * k - 1, 2, 2);
-  ctx.fillStyle = css("--massive");
-  for (const [name, x, y] of s.massive) {
-    const px = cx + x * k, py = cy - y * k;
-    ctx.beginPath(); ctx.arc(px, py, 3.5, 0, 2 * Math.PI); ctx.fill();
-    if (s.massive.length <= 30) { ctx.fillStyle = css("--text"); ctx.fillText(name, px + 6, py - 4); ctx.fillStyle = css("--massive"); }
+  const cx = Math.floor(w / 2), cy = Math.floor(h / 2), k = (Math.min(w, h) / 2 - 2) / extent;
+  const P = (x, y) => [cx + x * k, cy - y * k];
+  dotted(ctx, 0, cy, w, cy, PAL.grid); dotted(ctx, cx, 0, cx, h, PAL.grid);
+  text(ctx, `±${short(extent)} AU`, 3, 3, PAL.dim);
+
+  drawnPoints = [];
+  for (const [name, x, y, z] of s.test_particles) {
+    const [u, v] = P(x, y);
+    px(ctx, u, v, PAL.tp);
+    drawnPoints.push({ name, x, y, z, u, v, massive: false });
+  }
+
+  // The tracked particle's osculating orbit, about the central body.
+  const el = s.elements, central = s.massive[0];
+  if (el && el.e < 1 && el.a > 0 && central) {
+    const rad = Math.PI / 180, [O, w_, I] = [el.node * rad, el.arg * rad, el.inc * rad];
+    const [cO, sO, cw, sw, ci] = [Math.cos(O), Math.sin(O), Math.cos(w_), Math.sin(w_), Math.cos(I)];
+    const b = el.a * Math.sqrt(1 - el.e * el.e);
+    let prev = null;
+    for (let j = 0; j <= 96; j++) {
+      const E = 2 * Math.PI * j / 96, xo = el.a * (Math.cos(E) - el.e), yo = b * Math.sin(E);
+      const X = (cO * cw - sO * sw * ci) * xo + (-cO * sw - sO * cw * ci) * yo + central[1];
+      const Y = (sO * cw + cO * sw * ci) * xo + (-sO * sw + cO * cw * ci) * yo + central[2];
+      const p = P(X, Y);
+      if (prev && j % 2) line(ctx, prev[0], prev[1], p[0], p[1], PAL.orbit);
+      prev = p;
+    }
+  }
+
+  const labels = [];
+  s.massive.forEach(([name, x, y, z], i) => {
+    const [u, v] = P(x, y);
+    const color = i === 0 ? PAL.sun : PAL.planets[(i - 1) % PAL.planets.length];
+    if (i === 0) { px(ctx, u - 1, v, color, 3); ctx.fillRect(Math.round(u), Math.round(v) - 1, 1, 3); }
+    else px(ctx, u - 1, v - 1, color, 2);
+    if (s.massive.length <= 12) {
+      // Nudge a label down past the ones already placed, so close bodies stay readable.
+      const lw = textWidth(name);
+      let ly = v - 6;
+      while (labels.some(([lx, ly2, w2]) => u + 3 < lx + w2 + 2 && lx < u + 5 + lw && Math.abs(ly - ly2) < 7)) ly += 7;
+      labels.push([u + 3, ly, lw]);
+      text(ctx, name, u + 3, ly, color);
+    }
+    drawnPoints.push({ name, x, y, z, u, v, massive: true });
+  });
+
+  const t = drawnPoints.find(p => p.name === s.tracked);
+  if (t) {
+    const [u, v] = [Math.round(t.u), Math.round(t.v)];
+    for (const d of [2, 3]) { px(ctx, u - d, v, PAL.tracked); px(ctx, u + d, v, PAL.tracked); px(ctx, u, v - d, PAL.tracked); px(ctx, u, v + d, PAL.tracked); }
+  }
+  if (hovered) {
+    const p = drawnPoints.find(p => p.name === hovered);
+    if (p) {
+      const [u, v] = [Math.round(p.u), Math.round(p.v)];
+      ctx.strokeStyle = PAL.text; ctx.lineWidth = 1; ctx.strokeRect(u - 2.5, v - 2.5, 5, 5);
+    }
   }
 }
 
+// Hover a particle for its details; click it to track its elements.
+function nearest(ev) {
+  const c = $("orbits"), r = c.getBoundingClientRect();
+  const u = (ev.clientX - r.left) / r.width * c.width, v = (ev.clientY - r.top) / r.height * c.height;
+  let best = null, bd = 25;
+  for (const p of drawnPoints) {
+    const d = (p.u - u) ** 2 + (p.v - v) ** 2 - (p.massive ? 6 : 0);
+    if (d < bd) { bd = d; best = p; }
+  }
+  return best;
+}
+$("orbits").addEventListener("mousemove", ev => {
+  const p = nearest(ev), tip = $("tip");
+  hovered = p ? p.name : null;
+  $("orbits").style.cursor = p ? "pointer" : "default";
+  if (!p) { tip.style.display = "none"; last && drawOrbits(last); return; }
+  const r = Math.hypot(p.x, p.y, p.z);
+  tip.textContent = `${p.name}${p.massive ? "  (massive)" : ""}\nx ${p.x.toFixed(3)}  y ${p.y.toFixed(3)}  z ${p.z.toFixed(3)}\nr ${r.toFixed(3)} AU\n${p.name === last.tracked ? "tracking" : "click to track"}`;
+  const box = $("orbits").parentElement.getBoundingClientRect();
+  tip.style.display = "block";
+  const left = ev.clientX - box.left + 14, top = ev.clientY - box.top + 14;
+  tip.style.left = `${Math.min(left, box.width - tip.offsetWidth - 4)}px`;
+  tip.style.top = `${top + tip.offsetHeight > box.height ? top - tip.offsetHeight - 24 : top}px`;
+  last && drawOrbits(last);
+});
+$("orbits").addEventListener("mouseleave", () => { hovered = null; $("tip").style.display = "none"; last && drawOrbits(last); });
+$("orbits").addEventListener("click", ev => { const p = nearest(ev); if (p) track(p.name); });
+
+// --- Energy error ---------------------------------------------------------------------------------
 function drawEnergy(s) {
-  const [ctx, w, h] = setupCanvas($("energy"));
-  ctx.clearRect(0, 0, w, h);
+  const [ctx, w, h] = screen("energy");
   const pts = s.history.filter(([, e]) => e > 0);
-  ctx.fillStyle = css("--muted"); ctx.font = "11px system-ui, sans-serif";
-  if (pts.length < 2) { ctx.fillText("waiting for steps…", 8, 18); return; }
-  const pad = { l: 44, r: 8, t: 8, b: 22 };
+  if (pts.length < 2) { text(ctx, "WAITING FOR STEPS...", 6, 6, PAL.dim); return; }
+  const pad = { l: 26, r: 4, t: 4, b: 10 };
   const ts = pts.map(p => p[0]), ls = pts.map(p => Math.log10(p[1]));
-  const t0 = Math.min(...ts), t1 = Math.max(...ts) || t0 + 1;
+  const t0 = Math.min(...ts), t1 = Math.max(...ts);
   let lo = Math.floor(Math.min(...ls)), hi = Math.ceil(Math.max(...ls));
   if (hi === lo) hi = lo + 1;
   const X = t => pad.l + (t - t0) / ((t1 - t0) || 1) * (w - pad.l - pad.r);
   const Y = l => pad.t + (hi - l) / (hi - lo) * (h - pad.t - pad.b);
-  ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
   const every = Math.max(1, Math.ceil((hi - lo) / 6));
   for (let e = lo; e <= hi; e += every) {
-    ctx.beginPath(); ctx.moveTo(pad.l, Y(e)); ctx.lineTo(w - pad.r, Y(e)); ctx.stroke();
-    ctx.fillText(`1e${e}`, 4, Y(e) + 4);
+    const y = Math.round(Y(e));
+    dotted(ctx, pad.l, y, w - pad.r, y, PAL.grid);
+    text(ctx, `1E${e}`, 2, Math.min(h - pad.b - 5, Math.max(1, y - 2)), PAL.dim);
   }
-  ctx.fillText(`${fmtDays(t0)} d`, pad.l, h - 6);
-  const right = `${fmtDays(t1)} d`; ctx.fillText(right, w - pad.r - ctx.measureText(right).width, h - 6);
-  ctx.strokeStyle = css("--accent"); ctx.lineWidth = 1.5; ctx.beginPath();
-  pts.forEach(([t, e], i) => { const x = X(t), y = Y(Math.log10(e)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
-  ctx.stroke();
+  text(ctx, `${short(t0)}D`, pad.l, h - 6, PAL.dim);
+  const right = `${short(t1)}D`; text(ctx, right, w - pad.r - textWidth(right), h - 6, PAL.dim);
+  let prev = null;
+  for (const [t, e] of pts) {
+    const p = [X(t), Y(Math.log10(e))];
+    if (prev) line(ctx, prev[0], prev[1], p[0], p[1], PAL.energy);
+    prev = p;
+  }
+}
+
+// --- Tracked elements -----------------------------------------------------------------------------
+function track(name) { control({ action: "track", name }); $("trackIn").value = name; }
+$("trackBtn").onclick = () => track($("trackIn").value.trim());
+$("trackIn").addEventListener("keydown", e => { if (e.key === "Enter") track($("trackIn").value.trim()); });
+$("untrackBtn").onclick = () => { $("trackIn").value = ""; control({ action: "track", name: "" }); };
+
+let knownNames = "";
+function drawElements(s) {
+  const names = s.massive.concat(s.test_particles).map(p => p[0]);
+  const key = names.length + (names[0] || "") + (names[names.length - 1] || "");
+  if (key !== knownNames) {
+    knownNames = key;
+    $("names").replaceChildren(...names.map(n => Object.assign(document.createElement("option"), { value: n })));
+  }
+
+  const el = s.elements, dl = $("elements");
+  if (!s.tracked) dl.innerHTML = `<dt class="hint">Click a particle, or type its name.</dt><dd></dd>`;
+  else if (!el) dl.innerHTML = `<dt class="hint">No elements for “${s.tracked.replace(/[<&]/g, "")}” yet: it isn't in the simulation, or it is the central body.</dt><dd></dd>`;
+  else {
+    const deg = x => isFinite(x) ? `${x.toFixed(3)}°` : "–";
+    const rows = [
+      ["object", el.name], ["about", el.central],
+      ["a", `${el.a.toPrecision(7)} AU`], ["e", el.e.toFixed(6)], ["i", deg(el.inc)],
+      ["Ω", deg(el.node)], ["ω", deg(el.arg)], ["M", deg(el.mean_anomaly)], ["f", deg(el.true_anomaly)],
+      ["q", `${el.q.toPrecision(6)} AU`], ["Q", el.big_q ? `${el.big_q.toPrecision(6)} AU` : "–"],
+      ["P", el.period ? `${(el.period / 365.25).toPrecision(6)} yr` : "unbound"], ["r", `${el.r.toPrecision(6)} AU`],
+    ];
+    dl.replaceChildren(...rows.flatMap(([k, v]) => [Object.assign(document.createElement("dt"), { textContent: k }), Object.assign(document.createElement("dd"), { textContent: v })]));
+  }
+
+  const [ctx, w, h] = screen("elementPlot");
+  const hist = s.element_history;
+  if (!s.tracked || hist.length === 0) { text(ctx, "NOTHING TRACKED", 6, 6, PAL.dim); return; }
+  const series = [["A", 1, " AU"], ["E", 2, ""], ["I", 3, "°"]];
+  const rowH = Math.floor(h / series.length);
+  series.forEach(([label, col, unit], r) => {
+    const y0 = r * rowH, vals = hist.map(p => p[col]);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (hi - lo < 1e-12 * Math.max(1, Math.abs(hi))) { lo -= 1e-9; hi += 1e-9; }
+    const color = PAL.series[r], t0 = hist[0][0], t1 = hist[hist.length - 1][0];
+    text(ctx, `${label} ${short(vals[vals.length - 1])}${unit}`, 3, y0 + 3, color);
+    const range = `${short(lo)}-${short(hi)}`;
+    text(ctx, range, w - 3 - textWidth(range), y0 + 3, PAL.dim);
+    if (r) dotted(ctx, 0, y0, w, y0, PAL.grid);
+    const X = t => 3 + (t - t0) / ((t1 - t0) || 1) * (w - 6), Y = v => y0 + rowH - 3 - (v - lo) / (hi - lo) * (rowH - 13);
+    let prev = null;
+    for (const p of hist) {
+      const q = [X(p[0]), Y(p[col])];
+      if (prev) line(ctx, prev[0], prev[1], q[0], q[1], color); else px(ctx, q[0], q[1], color);
+      prev = q;
+    }
+  });
 }
 
 async function control(params) {
@@ -267,7 +496,7 @@ function render(s) {
   $("np").textContent = `${s.n_particles.toLocaleString()} (${s.n_massive})`;
   $("integrator").textContent = s.integrator || "–";
   $("de").textContent = sci(s.energy_error);
-  drawOrbits(s); drawEnergy(s);
+  drawOrbits(s); drawEnergy(s); drawElements(s);
 }
 
 async function pollOnce() {
@@ -283,7 +512,6 @@ async function poll() {
     setTimeout(poll, 1000);
   }
 }
-window.addEventListener("resize", () => last && render(last));
 poll();
 </script>
 </body>

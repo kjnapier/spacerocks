@@ -89,6 +89,8 @@ fn page_reports_a_finished_integration() {
     assert_eq!(s["n_particles"], 53);
     assert_eq!(s["n_massive"], 3);
     assert_eq!(s["massive"].as_array().unwrap().len(), 3);
+    assert_eq!(s["massive"][1][0], "jupiter");
+    assert_eq!(s["test_particles"][0][0], "tp0");
     assert_eq!(s["test_particles"].as_array().unwrap().len(), 50);
     assert_eq!(s["integrator"], "IAS15");
     assert!(s["energy_error"].as_f64().unwrap() < 1e-12);
@@ -198,4 +200,41 @@ fn control_needs_the_page() {
     assert!(control(&url, "action=timestep&timestep=0").contains("400"));
     assert!(control(&url, "action=pause").contains("200"));
     assert_eq!(json(&url)["paused"], true);
+}
+
+#[test]
+fn page_tracks_a_particles_elements() {
+    let mut sim = outer_system(Box::new(IAS15::new(1.0)));
+    let url = sim.monitor(0).unwrap();
+    // Before any run: a particle drawn on the page is tracked from the last snapshot at once.
+    assert!(control(&url, "action=track&name=tp10").contains("200"));
+    let s = json(&url);
+    assert_eq!(s["tracked"], "tp10");
+    let el = &s["elements"];
+    assert_eq!(el["name"], "tp10");
+    assert_eq!(el["central"], "sun");
+    assert!((el["a"].as_f64().unwrap() - 2.5).abs() < 0.01, "{el}");
+    assert!(el["e"].as_f64().unwrap() < 0.01);
+    assert!((el["inc"].as_f64().unwrap() - 0.53).abs() < 0.05, "{el}");
+    assert!(el["period"].as_f64().unwrap() > 1400.0);
+    assert_eq!(s["element_history"].as_array().unwrap().len(), 1);
+
+    sim.integrate(&Time::new(T0 + 1000.0, "tdb", "jd").unwrap());
+    let s = json(&url);
+    let history = s["element_history"].as_array().unwrap();
+    assert!(history.len() >= 2);
+    assert_eq!(history.last().unwrap()[0], 1000.0);
+
+    // Names are percent-decoded; unknown names and the central body have no elements.
+    control(&url, "action=track&name=no%20such+rock");
+    let s = json(&url);
+    assert_eq!(s["tracked"], "no such rock");
+    assert!(s["elements"].is_null());
+    control(&url, "action=track&name=sun");
+    assert!(json(&url)["elements"].is_null());
+    sim.progress_monitor().unwrap().track(Some("jupiter"));
+    assert!((json(&url)["elements"]["a"].as_f64().unwrap() - 5.4).abs() < 0.5);
+    control(&url, "action=track&name=");
+    let s = json(&url);
+    assert!(s["tracked"].is_null() && s["element_history"].as_array().unwrap().is_empty());
 }
