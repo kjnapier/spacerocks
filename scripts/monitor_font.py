@@ -1,4 +1,5 @@
-"""Build the 5x7 pixel font the simulation monitor page uses (src/nbody/monitor_font.ttf).
+"""Build the 5x7 pixel font of the retro pages (the simulation monitor and the orbit-fit dashboard),
+src/web/font.ttf.
 
 Each glyph is drawn on a 5x7 grid ('#' = lit pixel) and becomes one square contour per pixel,
 on a 6-pixel advance (one pixel of spacing), 8 pixels to the em. Set the font size to a multiple
@@ -94,6 +95,14 @@ GLYPHS = {
     "∞": "..... ..... .#.#. #.#.# .#.#. ..... .....",
     "■": "..... ##### ##### ##### ##### ##### .....",
     "█": "##### ##### ##### ##### ##### ##### #####",
+    "χ": "..... #...# .#.#. ..#.. .#.#. #...# #....",
+    "σ": "..... ..... .#### #..#. #...# #...# .###.",
+    "α": "..... ..... .##.# #..#. #..#. #..#. .##.#",
+    "δ": ".##.. #.... .#... .##.. #..#. #..#. .##..",
+    "²": ".##.. ...#. ..#.. .###. ..... ..... .....",
+    "″": ".#.#. .#.#. #.#.. ..... ..... ..... .....",
+    "ν": "..... ..... #...# #...# .#.#. .#.#. ..#..",
+    "✓": "..... ....# ...#. #.#.. .#... ..... .....",
 }
 
 PX = 128  # font units per pixel
@@ -142,6 +151,6 @@ def build(path):
 
 
 if __name__ == "__main__":
-    out = Path(__file__).resolve().parent.parent / "src" / "nbody" / "monitor_font.ttf"
+    out = Path(__file__).resolve().parent.parent / "src" / "web" / "font.ttf"
     build(out)
     print(f"wrote {out} ({out.stat().st_size} bytes)")

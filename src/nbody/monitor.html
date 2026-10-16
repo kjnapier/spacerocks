@@ -5,51 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Simulation Monitor</title>
 <link rel="icon" href="data:,">
+<link rel="stylesheet" href="retro.css">
 <style>
-/* Everything is drawn like an 8-bit console: one 5x7 pixel font (served as font.ttf) at multiples
-   of 8 px so its pixels stay square, an NES-like palette, and RPG-style windows with double
-   borders. */
-@font-face { font-family: "Spacerocks Pixel"; src: url("font.ttf") format("truetype"); font-display: block; }
-:root {
-  --bg: #0c0c24; --window: #000000; --text: #fcfcfc; --muted: #8c8cd8; --line: #fcfcfc;
-  --accent: #f8b800; --good: #58d854; --warn: #f8b800; --bad: #f83800; --cyan: #3cbcfc;
-  --px: 2px; color-scheme: dark;
-}
-* { box-sizing: border-box; }
-html { background: var(--bg); }
-body {
-  margin: 0; background: var(--bg); color: var(--text);
-  font: 16px/24px "Spacerocks Pixel", ui-monospace, monospace; text-transform: uppercase;
-  -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed;
-  background-image: radial-gradient(#3c3c7c 1px, transparent 1px), radial-gradient(#26265c 1px, transparent 1px);
-  background-size: 96px 96px, 56px 56px; background-position: 0 0, 28px 40px;
-}
-::selection { background: var(--accent); color: #000; }
-main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 40px; }
-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
-h1 { font-size: 32px; line-height: 40px; font-weight: normal; margin: 0; color: var(--accent); text-shadow: 4px 4px 0 #000; }
-.pill { color: var(--muted); }
-.pill::before { content: "▶ "; }
-.pill.running { color: var(--good); }
-.pill.paused { color: var(--warn); animation: blink 1s steps(2, start) infinite; }
-.pill.done { color: var(--cyan); }
-.pill.stopped { color: var(--bad); }
-.pill.lost { color: var(--bad); animation: blink 1s steps(2, start) infinite; }
-@keyframes blink { to { visibility: hidden; } }
-.sub { color: var(--muted); margin-left: auto; text-align: right; }
-
-/* A window: black, with a white double border and a title sitting on the top border. */
-.panel {
-  position: relative; background: var(--window); padding: 20px 20px 18px;
-  border: 8px double var(--line); box-shadow: 6px 6px 0 #000;
-}
-.panel[data-title] { margin-top: 12px; }
-.panel[data-title]::before {
-  content: attr(data-title); position: absolute; top: -18px; left: 16px;
-  background: var(--window); color: var(--accent); padding: 0 8px; line-height: 24px;
-}
-section + section { margin-top: 24px; }
-
 .progress .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
 .pct { font-size: 48px; line-height: 56px; color: var(--text); }
 /* An HP-style bar of square blocks. */
@@ -61,67 +18,14 @@ section + section { margin-top: 24px; }
 .bar.indeterminate > div { width: 25%; animation: crawl 2s steps(20) infinite; }
 @keyframes crawl { from { margin-left: 0; } to { margin-left: 75%; } }
 .epochs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; }
-.label { color: var(--muted); }
-.value { color: var(--text); overflow-wrap: anywhere; }
 
-.controls {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;
-  margin-top: 20px; padding-top: 20px; border-top: 4px dotted #26265c;
-}
-.controls .spacer { flex: 1; }
-button, select, input {
-  font: inherit; text-transform: uppercase; color: var(--text); background: #000;
-  border: 4px solid var(--line); border-radius: 0; padding: 4px 12px; min-height: 40px;
-  box-shadow: 4px 4px 0 #26265c; outline: none;
-}
-button { cursor: pointer; }
-button:hover, button:focus-visible { background: var(--text); color: #000; }
-button:active { transform: translate(4px, 4px); box-shadow: none; }
-button.primary { background: var(--accent); border-color: var(--accent); color: #000; min-width: 128px; }
-button.primary:hover { background: var(--text); border-color: var(--text); }
-select { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer; }
-.select { position: relative; display: inline-block; }
-.select::after { content: "▼"; position: absolute; right: 12px; top: 8px; pointer-events: none; }
-select:focus-visible, input:focus { border-color: var(--accent); }
-input { width: 120px; color: var(--accent); caret-color: var(--accent); }
-input::placeholder { color: #4c4c8c; }
-label.inline { display: flex; align-items: center; gap: 8px; color: var(--muted); }
-.msg { color: var(--bad); }
-kbd { font: inherit; border: 2px solid var(--muted); padding: 0 4px; color: var(--muted); }
-.keys { color: var(--muted); }
-
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-.stat { padding: 12px 16px; }
-.stat .value { font-size: 24px; line-height: 32px; margin-top: 4px; }
 .stat:nth-child(1) .value, .stat:nth-child(5) .value { color: var(--cyan); }
 .stat:nth-child(8) .value { color: var(--good); }
-
-.plots { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.hint { color: var(--muted); }
-/* The plots are low-resolution canvases blown up without smoothing. */
-.screen { position: relative; background: #0c0c24; border: 4px solid #26265c; }
-canvas.pixel {
-  width: 100%; height: auto; display: block;
-  image-rendering: pixelated; image-rendering: crisp-edges;
-}
-.tip {
-  position: absolute; pointer-events: none; display: none; z-index: 2;
-  background: #000; color: var(--text); border: 4px solid var(--text); box-shadow: 4px 4px 0 #000;
-  font: 16px/24px "Spacerocks Pixel", monospace; padding: 4px 10px; white-space: pre;
-}
-.plots .caption { color: var(--muted); margin: 0 0 12px; }
 
 .setup { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 32px; }
 .setup .group { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
 .setup .group > .label { width: 100%; }
 .setup input { width: 200px; }
-button.toggle { box-shadow: 4px 4px 0 #26265c; }
-button.toggle::before { content: "[ ] "; color: var(--muted); }
-button.toggle[aria-pressed="true"]::before { content: "[X] "; color: var(--good); }
-button.toggle[aria-pressed="true"]:hover::before { color: #000; }
-button:disabled { opacity: 0.4; cursor: default; }
-button:disabled:hover { background: #000; color: var(--text); }
-input:disabled { opacity: 0.4; }
 
 .tracker .head { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; margin-bottom: 16px; }
 .tracker .head .hint { margin-right: auto; }
@@ -133,14 +37,8 @@ input:disabled { opacity: 0.4; }
 .tracker input { width: 200px; }
 
 @media (max-width: 720px) {
-  h1 { font-size: 24px; line-height: 32px; }
   .pct { font-size: 32px; line-height: 40px; }
-  .plots, .tracker .body, .epochs, .setup { grid-template-columns: 1fr; }
-  .stats { grid-template-columns: 1fr 1fr; gap: 16px; }
-  .stat .value { font-size: 16px; line-height: 24px; }
-  .panel { padding: 16px 12px 14px; }
-  .sub { margin-left: 0; text-align: left; }
-  .keys { display: none; }
+  .tracker .body, .epochs, .setup { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -232,98 +130,8 @@ input:disabled { opacity: 0.4; }
   </section>
 </main>
 
+<script src="retro.js"></script>
 <script>
-const $ = id => document.getElementById(id);
-const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-
-function calendar(jd) {
-  const d = new Date((jd - 2440587.5) * 86400000);
-  if (isNaN(d)) return "";
-  const y = d.getUTCFullYear();
-  if (y < 0 || y > 9999) return `year ${y.toLocaleString()}`;
-  return d.toISOString().replace("T", " ").slice(0, 19);
-}
-function epochText(jd) { return `JD ${jd.toFixed(5)} · ${calendar(jd)}`; }
-function duration(s) {
-  if (!isFinite(s) || s < 0) return "–";
-  if (s < 60) return `${s.toFixed(1)} s`;
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
-  return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m ${String(sec).padStart(2, "0")}s`;
-}
-function sci(x) { return x === 0 ? "0" : x.toExponential(2); }
-function fmtDays(x) {
-  const a = Math.abs(x);
-  return a !== 0 && (a < 1e-3 || a >= 1e5) ? x.toExponential(3) : x.toPrecision(4);
-}
-
-// --- Pixel drawing -----------------------------------------------------------------------------
-// A small NES-like palette and a 3x5 bitmap font, drawn one pixel at a time.
-const PAL = {
-  bg: "#0c0c24", grid: "#26265c", dim: "#5c5ca8", text: "#fcfcfc", star: "#3c3c7c",
-  sun: "#f8b800", tp: "#7cd8fc", tracked: "#f83800", orbit: "#f87858",
-  energy: "#58f898", series: ["#fca044", "#58f898", "#d878f8"],
-  planets: ["#f87858", "#58d854", "#6888fc", "#f878f8", "#fca044", "#00e8d8", "#bcbcbc"],
-};
-const GLYPHS = {};
-`0 111101101101111|1 010110010010111|2 111001111100111|3 111001111001111|4 101101111001001
-5 111100111001111|6 111100111101111|7 111001001010010|8 111101111101111|9 111101111001111
-A 010101111101101|B 110101110101110|C 011100100100011|D 110101101101110|E 111100110100111
-F 111100110100100|G 011100101101011|H 101101111101101|I 111010010010111|J 001001001101010
-K 101101110101101|L 100100100100111|M 101111111101101|N 110101101101101|O 010101101101010
-P 110101110100100|Q 010101101110011|R 110101110101101|S 011100010001110|T 111010010010010
-U 101101101101111|V 101101101101010|W 101101111111101|X 101101010101101|Y 101101010010010
-Z 111001010100111|. 000000000000010|- 000000111000000|+ 000010111010000|: 000010000010000
-/ 001001010100100|± 010111010000111|( 010100100100010|) 010001001001010|% 101001010100101
-_ 000000000000111|' 010010000000000|= 000111000111000|° 010101010000000`.split(/[|\n]/).forEach(g => { GLYPHS[g[0]] = g.slice(2); });
-
-function screen(id) {
-  const c = $(id), ctx = c.getContext("2d");
-  ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = PAL.bg; ctx.fillRect(0, 0, c.width, c.height);
-  return [ctx, c.width, c.height];
-}
-function px(ctx, x, y, color, size = 1) {
-  ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), size, size);
-}
-function text(ctx, str, x, y, color = PAL.text) {
-  ctx.fillStyle = color;
-  x = Math.round(x); y = Math.round(y);
-  for (const ch of String(str).toUpperCase()) {
-    const g = GLYPHS[ch];
-    if (g) for (let i = 0; i < 15; i++) if (g[i] === "1") ctx.fillRect(x + i % 3, y + Math.floor(i / 3), 1, 1);
-    x += 4;
-  }
-}
-const textWidth = str => String(str).length * 4 - 1;
-function line(ctx, x0, y0, x1, y1, color) {
-  // Bresenham, so lines stay one crisp pixel wide.
-  x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
-  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-  let err = dx + dy;
-  ctx.fillStyle = color;
-  for (let n = 0; n < 2000; n++) {
-    ctx.fillRect(x0, y0, 1, 1);
-    if (x0 === x1 && y0 === y1) break;
-    const e2 = 2 * err;
-    if (e2 >= dy) { err += dy; x0 += sx; }
-    if (e2 <= dx) { err += dx; y0 += sy; }
-  }
-}
-function dotted(ctx, x0, y0, x1, y1, color) {
-  ctx.fillStyle = color;
-  if (y0 === y1) for (let x = x0; x <= x1; x += 2) ctx.fillRect(x, y0, 1, 1);
-  else for (let y = y0; y <= y1; y += 2) ctx.fillRect(x0, y, 1, 1);
-}
-/// Short numbers for 4-pixel-wide characters: 3 significant figures, E notation when far from 1.
-function short(x) {
-  if (!isFinite(x)) return "-";
-  const a = Math.abs(x);
-  if (a !== 0 && (a < 1e-2 || a >= 1e5)) return x.toExponential(1).replace("e+", "E").replace("e", "E");
-  return String(+x.toPrecision(3));
-}
-// A fixed starfield (a seeded generator, so it doesn't twinkle between frames).
-const STARS = (() => { let r = 7; const n = () => (r = (r * 16807) % 2147483647) / 2147483647; return Array.from({ length: 70 }, () => [n(), n(), n() < 0.2]); })();
-
 // --- Particles ------------------------------------------------------------------------------------
 let extent = 0, drawnPoints = [], hovered = null;
 function drawOrbits(s) {

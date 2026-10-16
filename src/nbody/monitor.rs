@@ -19,10 +19,8 @@
 //! effect at the next step. The run's end can be moved, or removed so it runs until Stop (which
 //! ends it where it is, so `integrate` returns early). The page asks with `POST /control?action=...`, which needs an `X-Spacerocks` header and
 //! a local `Host`, so other web pages open in the browser can't send it.
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, Weak};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -30,6 +28,7 @@ use serde::Serialize;
 use crate::constants::GRAVITATIONAL_CONSTANT;
 use crate::nbody::Simulation;
 use crate::state::{self, State};
+use crate::web::{self, Request, Response};
 
 /// The least time between two snapshots.
 pub const PUBLISH_INTERVAL: Duration = Duration::from_millis(100);
@@ -191,10 +190,6 @@ struct Status {
 impl ProgressMonitor {
     /// Starts the page's server on `127.0.0.1:port` (`port` 0 picks a free port).
     fn start(port: u16) -> std::io::Result<ProgressMonitor> {
-        let listener = TcpListener::bind(("127.0.0.1", port))?;
-        listener.set_nonblocking(true)?;
-        let port = listener.local_addr()?.port();
-        let url = format!("http://127.0.0.1:{port}/");
         let shared = Arc::new(Shared {
             status: Mutex::new(Status {
                 state: "idle",
@@ -236,10 +231,7 @@ impl ProgressMonitor {
             wake: Condvar::new(),
             attention: AtomicBool::new(false),
         });
-        let weak = Arc::downgrade(&shared);
-        std::thread::Builder::new()
-            .name("spacerocks-monitor".into())
-            .spawn(move || serve(listener, weak, port))?;
+        let url = web::start(port, "spacerocks-monitor", Arc::downgrade(&shared), respond)?;
         Ok(ProgressMonitor { shared, url })
     }
 
@@ -551,106 +543,25 @@ fn integrator_name(sim: &Simulation) -> String {
     full.rsplit("::").next().unwrap_or(full).to_string()
 }
 
-/// Answer requests until the monitor is dropped.
-fn serve(listener: TcpListener, shared: Weak<Shared>, port: u16) {
-    loop {
-        if shared.strong_count() == 0 {
-            return;
-        }
-        match listener.accept() {
-            Ok((stream, _)) => {
-                let Some(shared) = shared.upgrade() else { return };
-                let _ = respond(stream, &shared, port);
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(25));
-            }
-            Err(_) => std::thread::sleep(Duration::from_millis(25)),
-        }
-    }
-}
-
-fn respond(mut stream: TcpStream, shared: &Shared, port: u16) -> std::io::Result<()> {
-    stream.set_nonblocking(false)?;
-    stream.set_read_timeout(Some(Duration::from_secs(2)))?;
-    // Read up to the end of the headers (requests carry no body), which may come in several
-    // pieces: closing the connection with part of a request unread would reset it.
-    let mut buf = Vec::with_capacity(1024);
-    let mut chunk = [0u8; 1024];
-    while !buf.windows(4).any(|w| w == b"\r\n\r\n") && buf.len() < 16 * 1024 {
-        let n = stream.read(&mut chunk)?;
-        if n == 0 {
-            break;
-        }
-        buf.extend_from_slice(&chunk[..n]);
-    }
-    let request = String::from_utf8_lossy(&buf);
-    let mut words = request.split_whitespace();
-    let method = words.next().unwrap_or("GET");
-    let target = words.next().unwrap_or("/");
-    let (path, query) = target.split_once('?').unwrap_or((target, ""));
-
-    let (status, content_type, body) = match (method, path) {
-        ("GET", "/" | "/index.html") => ("200 OK", "text/html; charset=utf-8", PAGE.to_string()),
-        ("GET", "/font.ttf") => {
-            return send(&mut stream, "200 OK", "font/ttf", FONT);
-        }
+fn respond(request: &Request, shared: &Shared) -> Response {
+    match (request.method.as_str(), request.path.as_str()) {
+        ("GET", "/" | "/index.html") => Response::html(PAGE),
         ("GET", "/progress.json") => {
             let mut status = shared.status.lock().unwrap_or_else(|e| e.into_inner()).clone();
             status.paused = shared.control.lock().unwrap_or_else(|e| e.into_inner()).paused;
-            ("200 OK", "application/json", serde_json::to_string(&status).unwrap_or_default())
+            Response::json(&status)
         }
-        ("POST", "/control") => {
-            if !from_page(&request, port) {
-                ("403 Forbidden", "text/plain", "forbidden".to_string())
-            } else {
-                match control(shared, query) {
-                    Ok(()) => ("200 OK", "text/plain", "ok".to_string()),
-                    Err(e) => ("400 Bad Request", "text/plain", e),
-                }
-            }
-        }
-        _ => ("404 Not Found", "text/plain", "not found".to_string()),
-    };
-    send(&mut stream, status, content_type, body.as_bytes())
-}
-
-fn send(stream: &mut TcpStream, status: &str, content_type: &str, body: &[u8]) -> std::io::Result<()> {
-    write!(
-        stream,
-        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
-        body.len()
-    )?;
-    stream.write_all(body)?;
-    stream.flush()
-}
-
-/// Whether a request came from the page itself: it carries the `X-Spacerocks` header (which a
-/// page from another site can't add without a CORS preflight this server never answers) and a
-/// local `Host` (so a site rebinding its name to 127.0.0.1 is turned away).
-fn from_page(request: &str, port: u16) -> bool {
-    let mut marked = false;
-    let mut local = false;
-    for line in request.lines().skip(1) {
-        let Some((name, value)) = line.split_once(':') else { continue };
-        let value = value.trim();
-        if name.eq_ignore_ascii_case("x-spacerocks") {
-            marked = true;
-        } else if name.eq_ignore_ascii_case("host") {
-            local = value == format!("127.0.0.1:{port}") || value == format!("localhost:{port}");
-        }
+        ("POST", "/control") => Response::outcome(control(shared, request)),
+        _ => Response::not_found(),
     }
-    marked && local
 }
 
 /// Apply `action=pause|resume|step|back|stop|integrator|timestep|end|gr|perturber|track` (with
 /// `name=`, `timestep=`, `jd=` (none for no end) and `on=1|0`).
-fn control(shared: &Shared, query: &str) -> Result<(), String> {
-    let param = |key: &str| {
-        query.split('&').filter_map(|kv| kv.split_once('=')).find(|(k, _)| *k == key).map(|(_, v)| v)
-    };
-    if param("action") == Some("track") {
-        let name = param("name").map(percent_decode).filter(|n| !n.is_empty());
+fn control(shared: &Shared, request: &Request) -> Result<(), String> {
+    let param = |key: &str| request.param(key);
+    if param("action").as_deref() == Some("track") {
+        let name = param("name").filter(|n| !n.is_empty());
         set_tracked(&mut shared.status.lock().unwrap_or_else(|e| e.into_inner()), name);
         return Ok(());
     }
@@ -658,14 +569,14 @@ fn control(shared: &Shared, query: &str) -> Result<(), String> {
         let h: f64 = param("timestep").ok_or("missing timestep")?.parse().map_err(|_| "bad timestep")?;
         if h.is_finite() && h != 0.0 { Ok(h) } else { Err("timestep must be finite and non-zero".into()) }
     };
-    let on = || match param("on") {
+    let on = || match param("on").as_deref() {
         Some("1" | "true") => Ok(true),
         Some("0" | "false") => Ok(false),
         _ => Err("on must be 1 or 0".to_string()),
     };
     let jd_ref = shared.status.lock().unwrap_or_else(|e| e.into_inner()).jd_ref;
     let mut c = shared.control.lock().unwrap_or_else(|e| e.into_inner());
-    match param("action").unwrap_or("") {
+    match param("action").as_deref().unwrap_or("") {
         "pause" => c.paused = true,
         "resume" => {
             c.paused = false;
@@ -681,7 +592,7 @@ fn control(shared: &Shared, query: &str) -> Result<(), String> {
             c.back_credits += 1;
         }
         "end" => {
-            let end = match param("jd") {
+            let end = match param("jd").as_deref() {
                 None | Some("") => None,
                 Some(jd) => {
                     let jd: f64 = jd.parse().map_err(|_| "bad end date")?;
@@ -701,15 +612,15 @@ fn control(shared: &Shared, query: &str) -> Result<(), String> {
         }
         "gr" => c.commands.push(Command::SolarGR(on()?)),
         "perturber" => {
-            let name = param("name").map(percent_decode).ok_or("missing name")?;
+            let name = param("name").ok_or("missing name")?;
             c.commands.push(Command::Perturber(name, on()?));
         }
         "integrator" => {
             let name = param("name").ok_or("missing name")?;
-            if !INTEGRATORS.contains(&name) {
+            if !INTEGRATORS.contains(&name.as_str()) {
                 return Err(format!("unknown integrator {name}"));
             }
-            c.commands.push(Command::Integrator(name.to_string(), timestep()?));
+            c.commands.push(Command::Integrator(name, timestep()?));
         }
         "timestep" => c.commands.push(Command::Timestep(timestep()?)),
         other => return Err(format!("unknown action {other}")),
@@ -718,31 +629,6 @@ fn control(shared: &Shared, query: &str) -> Result<(), String> {
     drop(c);
     shared.wake.notify_all();
     Ok(())
-}
-
-/// Decode a query-string value (`+` and `%XX`).
-fn percent_decode(v: &str) -> String {
-    let hex = |b: u8| (b as char).to_digit(16).map(|d| d as u8);
-    let bytes = v.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        match (bytes[i], bytes.get(i + 1).copied().and_then(hex), bytes.get(i + 2).copied().and_then(hex)) {
-            (b'%', Some(hi), Some(lo)) => {
-                out.push(hi * 16 + lo);
-                i += 3;
-            }
-            (b'+', ..) => {
-                out.push(b' ');
-                i += 1;
-            }
-            (b, ..) => {
-                out.push(b);
-                i += 1;
-            }
-        }
-    }
-    String::from_utf8_lossy(&out).into_owned()
 }
 
 impl Simulation {
@@ -793,5 +679,3 @@ impl Simulation {
 
 const PAGE: &str = include_str!("monitor.html");
 
-/// The page's 5x7 pixel font, built by `scripts/monitor_font.py`.
-const FONT: &[u8] = include_bytes!("monitor_font.ttf");

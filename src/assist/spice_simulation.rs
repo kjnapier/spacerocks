@@ -156,6 +156,12 @@ impl SpiceSimulation {
     /// particles that have A1/A2/A3), with constants read from the kernel's planetary
     /// ephemeris. Use [`SpiceSimulation::set_forces`] to change the model.
     pub fn horizons(epoch: &Time, kernel: &SpiceKernel) -> Result<SpiceSimulation, Box<dyn std::error::Error>> {
+        SpiceSimulation::horizons_except(epoch, kernel, &[])
+    }
+
+    /// [`SpiceSimulation::horizons`] without the perturbers whose NAIF ids are in `exclude`
+    /// (e.g. the asteroids, so that no small-body kernel is needed).
+    pub fn horizons_except(epoch: &Time, kernel: &SpiceKernel, exclude: &[i32]) -> Result<SpiceSimulation, Box<dyn std::error::Error>> {
 
         let reference_plane = ReferencePlane::from_str("J2000")?;
         let origin = SpiceBody::from_name("SSB")?;
@@ -189,6 +195,9 @@ impl SpiceSimulation {
             // uppercase the name
             let name = name.to_uppercase();
             let particle = SpiceBody::from_name(&name)?;
+            if exclude.contains(&particle.code) {
+                continue;
+            }
             sim.add_spice_body(particle, kernel)?;
         }
 

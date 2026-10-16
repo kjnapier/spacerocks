@@ -15,7 +15,7 @@
 use nalgebra::Vector3;
 
 use crate::assist::forces::NonGravitational;
-use crate::assist::{AdaptiveMode, SpiceSimulation};
+use crate::assist::{AdaptiveMode, EphemerisConstants, SpiceSimulation};
 use crate::data::SPEED_OF_LIGHT;
 use crate::observing::earth_fixed_state;
 use crate::orbfit::{Astrometry, FitOptions, RowKind};
@@ -174,10 +174,20 @@ pub(crate) fn trial_simulation(
     partials: bool,
 ) -> Result<SpiceSimulation, BoxError> {
     let t0 = Time::new(epoch, "tdb", "jd")?;
-    let mut sim = SpiceSimulation::horizons(&t0, kernel).map_err(|e| e.to_string())?;
-    if let Some([alpha, nm, nn, nk, r0]) = opts.gofr {
-        sim.forces[0] = Box::new(NonGravitational { alpha, r0, m: nm, n: nn, k: nk });
-    }
+    let mut sim = if opts.forces.is_assist() {
+        let mut sim = SpiceSimulation::horizons(&t0, kernel).map_err(|e| e.to_string())?;
+        if let Some([alpha, nm, nn, nk, r0]) = opts.gofr {
+            sim.forces[0] = Box::new(NonGravitational { alpha, r0, m: nm, n: nn, k: nk });
+        }
+        sim
+    } else {
+        if opts.forces.exclude.contains(&10) {
+            return Err("the Sun can't be left out of the force model".into());
+        }
+        let mut sim = SpiceSimulation::horizons_except(&t0, kernel, &opts.forces.exclude).map_err(|e| e.to_string())?;
+        sim.set_forces(opts.forces.forces(&EphemerisConstants::from_kernel(kernel), opts.gofr));
+        sim
+    };
     sim.integrator.set_epsilon(opts.epsilon);
     sim.integrator.set_adaptive_mode(AdaptiveMode::Prs23);
     let mut rock = SpaceRock::from_xyz("rock", state[0], state[1], state[2], state[3], state[4], state[5], t0, "J2000", "SSB")

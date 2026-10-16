@@ -324,7 +324,7 @@ fn parse_nongrav(nongrav: Option<&Bound<'_, PyAny>>) -> PyResult<[bool; 3]> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn options(nongrav: Option<&Bound<'_, PyAny>>, nongrav_thresholds: Option<[f64; 3]>, gofr: Option<[f64; 5]>, max_iter: usize, epsilon: f64, chi2_threshold: f64, arc_gap: f64, iod: &str, engine: &str, robust: bool, outlier_sigma: f64, conv_frac: f64, per_arc: bool) -> PyResult<FitOptions> {
+pub(crate) fn options(nongrav: Option<&Bound<'_, PyAny>>, nongrav_thresholds: Option<[f64; 3]>, gofr: Option<[f64; 5]>, max_iter: usize, epsilon: f64, chi2_threshold: f64, arc_gap: f64, iod: &str, engine: &str, robust: bool, outlier_sigma: f64, conv_frac: f64, per_arc: bool) -> PyResult<FitOptions> {
     let engine = match engine.to_lowercase().as_str() {
         "cartesian" => Engine::Cartesian,
         "bk_native" | "bk" => Engine::BkNative,
@@ -357,7 +357,7 @@ fn options(nongrav: Option<&Bound<'_, PyAny>>, nongrav_thresholds: Option<[f64; 
 }
 
 /// Barycentric J2000 (epoch, state, nongrav) of a SpaceRock.
-fn rock_state(rock: &SpaceRock, kernel: &spacerocks::SpiceKernel) -> PyResult<(f64, [f64; 6], [f64; 3])> {
+pub(crate) fn rock_state(rock: &SpaceRock, kernel: &spacerocks::SpiceKernel) -> PyResult<(f64, [f64; 6], [f64; 3])> {
     let mut r = rock.clone();
     r.to_ssb(kernel).map_err(err)?;
     r.change_reference_plane("J2000").map_err(err)?;
