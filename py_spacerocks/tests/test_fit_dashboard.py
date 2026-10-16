@@ -58,3 +58,21 @@ def test_dashboard_load_and_command(capfd):
         assert e.code == 1
     else:
         raise AssertionError("an unknown option should exit")
+
+
+def test_dashboard_chain_handle():
+    n = 5
+    d = orbfit.dashboard(np.linspace(1.0, 1.05, n), np.full(n, 0.1), 2460000.5 + np.arange(n), np.tile([1.0, 0.0, 0.0], (n, 1)),
+                         SpiceKernel(), timescale="tdb", asteroids=False, open_browser=False)
+    settle(d)
+    assert d.chain is None and not d.sampling
+    d.burn_in = 123
+    assert d.burn_in == 123
+    # Without a kernel there is no usable orbit to sample: the chain stays empty.
+    d.sample(steps=50, burn_in=10, seed=1)
+    for _ in range(500):
+        if not d.sampling:
+            break
+        time.sleep(0.01)
+    assert d.chain is None
+    d.close()

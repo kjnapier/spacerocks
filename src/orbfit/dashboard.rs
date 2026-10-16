@@ -15,6 +15,13 @@
 //!   fit"); **Stop** ends a fit early; with **Auto refit** on, every change refits at once.
 //!   Clicking a detection on the residual plot leaves it out of the fit (or puts it back).
 //! - **Done** ends [`FitDashboard::wait`], which returns the last fit.
+//! - **Sample** runs a Markov chain Monte Carlo over the last fit's orbit (see
+//!   [`crate::orbfit::mcmc`]): the page traces each step's chi-square, plots the samples of any
+//!   two elements, and summarizes the posterior after the burn-in, which can be changed (or
+//!   clicked on the trace) after the chain has run.
+//! - Elements and posteriors show in heliocentric or barycentric ecliptic coordinates.
+//! - When the fit finds non-gravitational accelerations (or, with gravity alone, the residuals
+//!   suggest them), the page says so.
 //! - **Load** fetches the observations of the object typed beside it from the Minor Planet
 //!   Center, and **Random** those of a random numbered asteroid (see [`crate::orbfit::mpc`]),
 //!   then fits them. [`FitDashboard::set_loader`] swaps in another source.
@@ -33,7 +40,7 @@ use serde_json::{json, Value};
 
 use crate::constants::GRAVITATIONAL_CONSTANT;
 use crate::orbfit::{
-    determine_orbit, fetch_astrometry, residuals, Astrometry, Engine, FitIteration, FitOptions, FitProgress, ForceModel, NongravAuto, OrbitFit, Relativity,
+    determine_orbit, fetch_astrometry, mcmc, McmcChain, McmcOptions, MU_TOTAL, residuals, Astrometry, Engine, FitIteration, FitOptions, FitProgress, ForceModel, NongravAuto, OrbitFit, Relativity,
     ASTEROID_PERTURBERS,
 };
 use crate::spice::SpiceKernel;
@@ -90,7 +97,8 @@ struct Status {
     options: FitOptions,
     /// An initial orbit (epoch, state, nongrav) to start the first fit from, if given.
     initial: Option<(f64, [f64; 6], [f64; 3])>,
-    /// "idle", "fitting", "done" (a fit finished), "stopped" (one was stopped) or "loading".
+    /// "idle", "fitting", "done" (a fit finished), "stopped" (one was stopped), "loading" or
+    /// "sampling".
     state: &'static str,
     /// A fit has been asked for.
     pending: bool,
@@ -117,6 +125,14 @@ struct Status {
     /// What the page shows of it.
     fit_view: Value,
     log: Vec<Value>,
+    /// Chain settings, and a chain asked for.
+    mcmc: McmcOptions,
+    sample: bool,
+    /// The last chain (of the last fit), what the page shows of it, and a counter of its
+    /// changes.
+    chain: Option<McmcChain>,
+    chain_view: Value,
+    chain_version: u64,
     /// Static page data: detections and the heliocentric ecliptic observer positions.
     detections: Value,
     observers: Value,
@@ -154,6 +170,11 @@ impl FitDashboard {
                 fit: None,
                 fit_view: Value::Null,
                 log: Vec::new(),
+                mcmc: McmcOptions::default(),
+                sample: false,
+                chain: None,
+                chain_view: Value::Null,
+                chain_version: 0,
                 detections,
                 observers,
                 message: String::new(),
@@ -235,9 +256,48 @@ impl FitDashboard {
         self.lock().loader = Arc::new(loader);
     }
 
+    /// Sample the last fit's posterior with a Markov chain (with `options`, or the page's
+    /// settings), as the page's Sample button does. Stops a running chain; does nothing
+    /// without a fit.
+    pub fn sample(&self, options: Option<McmcOptions>) {
+        let mut s = self.lock();
+        if let Some(o) = options {
+            s.mcmc = o;
+        }
+        request_sample(&mut s);
+        drop(s);
+        self.shared.wake.notify_all();
+    }
+
+    /// The last chain (it belongs to the last fit, and is dropped when another fit finishes).
+    pub fn chain(&self) -> Option<McmcChain> {
+        self.lock().chain.clone()
+    }
+
+    /// The chain settings as they are on the page now (`burn_in` included).
+    pub fn mcmc_options(&self) -> McmcOptions {
+        self.lock().mcmc.clone()
+    }
+
+    /// Change the burn-in: the steps the posterior summary drops from the start of the chain.
+    pub fn set_burn_in(&self, burn_in: usize) {
+        let mut s = self.lock();
+        s.mcmc.burn_in = burn_in;
+        refresh_chain_view(&mut s);
+    }
+
+    /// Whether a chain is running or about to.
+    pub fn sampling(&self) -> bool {
+        let s = self.lock();
+        s.sample || s.state == "sampling"
+    }
+
     /// Ask for a fit, as the page's Fit button does.
     pub fn refit(&self) {
         let mut s = self.lock();
+        if s.state == "sampling" {
+            s.cancel = true;
+        }
         s.pending = true;
         drop(s);
         self.shared.wake.notify_all();
@@ -248,7 +308,7 @@ impl FitDashboard {
     /// dashboard keeps running) and this returns `None`.
     pub fn wait(&self, interrupted: Option<&dyn Fn() -> bool>) -> Option<OrbitFit> {
         let mut s = self.lock();
-        while !(s.done && !s.pending && s.load.is_none() && !matches!(s.state, "fitting" | "loading")) && !s.closed {
+        while !(s.done && !busy(&s)) && !s.closed {
             if interrupted.is_some_and(|f| f()) {
                 return None;
             }
@@ -257,11 +317,12 @@ impl FitDashboard {
         s.fit.clone()
     }
 
-    /// Wait (up to `timeout`) until no fit or load is running or asked for; true if none is.
+    /// Wait (up to `timeout`) until no fit, load or chain is running or asked for; true if
+    /// none is.
     pub fn wait_idle(&self, timeout: Duration) -> bool {
         let end = Instant::now() + timeout;
         let mut s = self.lock();
-        while s.pending || s.load.is_some() || matches!(s.state, "fitting" | "loading") {
+        while busy(&s) {
             let now = Instant::now();
             if now >= end {
                 return false;
@@ -288,6 +349,157 @@ impl Shared {
     }
 }
 
+/// Whether a fit, load or chain is running or asked for.
+fn busy(s: &Status) -> bool {
+    s.pending || s.load.is_some() || s.sample || matches!(s.state, "fitting" | "loading" | "sampling")
+}
+
+/// Ask the fitting thread for a chain, stopping a running one.
+fn request_sample(s: &mut Status) {
+    if s.state == "sampling" {
+        s.cancel = true;
+    }
+    s.sample = true;
+    s.done = false;
+}
+
+/// Run the chain asked for, over the last fit, showing it as it goes.
+fn sample(shared: &Arc<Shared>, kernel: &SpiceKernel) {
+    let mut s = shared.lock();
+    s.sample = false;
+    let Some(fit) = s.fit.clone().filter(|f| f.state.iter().all(|v| v.is_finite())) else {
+        s.message = "no orbit to sample yet: fit first".into();
+        return;
+    };
+    let idx: Vec<usize> = (0..s.astrometry.len()).filter(|&i| if fit.used.is_empty() { !s.excluded[i] } else { fit.used[i] }).collect();
+    let astrometry = s.astrometry.subset(&idx);
+    let (options, mc) = (s.options.clone(), s.mcmc.clone());
+    let before = s.state;
+    s.state = "sampling";
+    s.cancel = false;
+    s.started = Some(Instant::now());
+    s.chain = None;
+    refresh_chain_view(&mut s);
+    let sun = kernel.state_au(10, 0, fit.epoch).unwrap_or([f64::NAN; 6]);
+    drop(s);
+    shared.wake.notify_all();
+
+    let weak = Arc::downgrade(shared);
+    let mut last = Instant::now();
+    let result = mcmc(&astrometry, &fit, kernel, &options, &mc, |step, chain| {
+        let Some(shared) = weak.upgrade() else { return false };
+        let mut s = shared.lock();
+        if last.elapsed() > Duration::from_millis(250) || step + 1 == mc.steps {
+            last = Instant::now();
+            s.chain = Some(chain.clone());
+            s.chain_view = chain_view(chain, &fit, &sun, s.mcmc.burn_in, true);
+            s.chain_version += 1;
+        }
+        !s.cancel
+    });
+
+    let mut s = shared.lock();
+    s.elapsed = s.started.map_or(0.0, |t| t.elapsed().as_secs_f64());
+    s.started = None;
+    s.state = if before == "sampling" { "done" } else { before };
+    match result {
+        Ok(chain) => {
+            let post = chain.posterior(s.mcmc.burn_in).len();
+            s.message = format!("{} steps, {post} after the burn-in, {:.0}% accepted{}", chain.steps.len(), 100.0 * chain.acceptance(s.mcmc.burn_in), if chain.stopped { " (stopped)" } else { "" });
+            s.chain_view = chain_view(&chain, &fit, &sun, s.mcmc.burn_in, false);
+            s.chain = Some(chain);
+        }
+        Err(e) => {
+            s.message = format!("couldn't sample: {e}");
+            s.chain = None;
+            s.chain_view = Value::Null;
+        }
+    }
+    s.chain_version += 1;
+    drop(s);
+    shared.wake.notify_all();
+}
+
+/// Rebuild what the page shows of the chain (after the burn-in changed, or the chain went).
+fn refresh_chain_view(s: &mut Status) {
+    s.chain_view = match (&s.chain, &s.fit) {
+        (Some(c), Some(f)) => {
+            let sun = s.chain_view.get("sun").and_then(|v| serde_json::from_value::<[f64; 6]>(v.clone()).ok()).unwrap_or([f64::NAN; 6]);
+            chain_view(c, f, &sun, s.mcmc.burn_in, s.state == "sampling")
+        }
+        _ => Value::Null,
+    };
+    s.chain_version += 1;
+}
+
+/// Most chain steps sent to the page for plotting.
+const MAX_CHAIN_POINTS: usize = 1500;
+
+/// Percentiles (16th, 50th, 84th), mean and standard deviation of `v`.
+fn spread(mut v: Vec<f64>) -> Value {
+    v.retain(|x| x.is_finite());
+    if v.is_empty() {
+        return Value::Null;
+    }
+    v.sort_by(f64::total_cmp);
+    let q = |p: f64| v[((v.len() - 1) as f64 * p).round() as usize];
+    let mean = v.iter().sum::<f64>() / v.len() as f64;
+    let sd = (v.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (v.len().max(2) - 1) as f64).sqrt();
+    json!({ "lo": q(0.16), "median": q(0.5), "hi": q(0.84), "mean": mean, "sd": sd })
+}
+
+/// What the page shows of a chain over `fit`: the chi-square trace and the elements (degrees
+/// for angles, in both frames) of up to [`MAX_CHAIN_POINTS`] steps, and the posterior
+/// summary after `burn_in` steps. `sun` is the Sun's barycentric state at the fit's epoch.
+fn chain_view(chain: &McmcChain, fit: &OrbitFit, sun: &[f64; 6], burn_in: usize, running: bool) -> Value {
+    let n = chain.steps.len();
+    let frames = [("helio", *sun, GRAVITATIONAL_CONSTANT), ("bary", [0.0; 6], MU_TOTAL)];
+    // Angles are unwrapped around the fit's so a posterior straddling 0/360 stays in one piece.
+    let reference: Vec<[f64; 7]> = frames.iter().map(|(_, o, mu)| element_vector(&ecliptic_state(&fit.state, o), *mu)).collect();
+    let elements = |i: usize, f: usize| -> [f64; 7] {
+        let (_, origin, mu) = frames[f];
+        let mut el = element_vector(&ecliptic_state(&chain.state(i), &origin), mu);
+        for k in 2..6 {
+            el[k] = reference[f][k] + wrap(el[k] - reference[f][k]);
+        }
+        for k in 2..6 {
+            el[k] = el[k].to_degrees();
+        }
+        el
+    };
+    let stride = n.div_ceil(MAX_CHAIN_POINTS).max(1);
+    let shown: Vec<usize> = (0..n).step_by(stride).collect();
+    let points = |f: usize| json!(shown.iter().map(|&i| elements(i, f).to_vec()).collect::<Vec<_>>());
+    let ng_fit: Vec<usize> = (0..3).filter(|&k| chain.fit_nongrav[k]).collect();
+    let post: Vec<usize> = (burn_in.min(n)..n).collect();
+    let summary = |f: usize| {
+        let el: Vec<[f64; 7]> = post.iter().map(|&i| elements(i, f)).collect();
+        json!((0..7).map(|k| spread(el.iter().map(|e| e[k]).collect())).collect::<Vec<_>>())
+    };
+    json!({
+        "steps": n,
+        "burn_in": burn_in,
+        "running": running,
+        "stopped": chain.stopped,
+        "acceptance": chain.acceptance(burn_in),
+        "acceptance_all": chain.acceptance(0),
+        "best_chi2": chain.steps.iter().map(|s| s.chi2).fold(f64::INFINITY, f64::min),
+        "fit_chi2": fit.chi2,
+        "sun": sun,
+        "index": shown,
+        "chi2": shown.iter().map(|&i| chain.steps[i].chi2).collect::<Vec<_>>(),
+        "helio": points(0),
+        "bary": points(1),
+        "nongrav_names": ng_fit.iter().map(|k| format!("A{}", k + 1)).collect::<Vec<_>>(),
+        "nongrav": shown.iter().map(|&i| { let ng = chain.nongrav_at(i); ng_fit.iter().map(|&k| ng[k]).collect::<Vec<_>>() }).collect::<Vec<_>>(),
+        "summary": {
+            "helio": summary(0),
+            "bary": summary(1),
+            "nongrav": ng_fit.iter().map(|&k| spread(post.iter().map(|&i| chain.nongrav_at(i)[k]).collect())).collect::<Vec<_>>(),
+        },
+    })
+}
+
 /// What the page shows of the detections: `[jd, ra°, dec°, sigma_ra″, sigma_dec″]` each, and
 /// the heliocentric ecliptic positions of their observers.
 fn views(a: &Astrometry, kernel: &SpiceKernel) -> (Value, Value) {
@@ -306,7 +518,7 @@ fn views(a: &Astrometry, kernel: &SpiceKernel) -> (Value, Value) {
 /// Ask the fitting thread to load `designation` (empty for a random object), stopping a
 /// running fit.
 fn request_load(s: &mut Status, designation: &str) {
-    if s.state == "fitting" {
+    if matches!(s.state, "fitting" | "sampling") {
         s.cancel = true;
     }
     s.load = Some(designation.to_string());
@@ -346,6 +558,8 @@ fn load(shared: &Arc<Shared>, kernel: &SpiceKernel) {
             s.fit_view = Value::Null;
             s.log.clear();
             s.live.clear();
+            s.chain = None;
+            refresh_chain_view(&mut s);
             s.runs = 0;
             s.elapsed = 0.0;
             s.changed = false;
@@ -372,7 +586,7 @@ fn ecliptic(v: &[f64; 3]) -> [f64; 3] {
 fn work(shared: &Arc<Shared>, kernel: &SpiceKernel) {
     loop {
         let mut s = shared.lock();
-        while !s.pending && s.load.is_none() && !s.closed {
+        while !s.pending && s.load.is_none() && !s.sample && !s.closed {
             s = shared.wake.wait(s).unwrap_or_else(|e| e.into_inner());
         }
         if s.closed {
@@ -381,6 +595,11 @@ fn work(shared: &Arc<Shared>, kernel: &SpiceKernel) {
         if s.load.is_some() {
             drop(s);
             load(shared, kernel);
+            continue;
+        }
+        if s.sample && !s.pending {
+            drop(s);
+            sample(shared, kernel);
             continue;
         }
         s.pending = false;
@@ -415,7 +634,7 @@ fn work(shared: &Arc<Shared>, kernel: &SpiceKernel) {
         let sub = all.subset(&idx);
         let fit = determine_orbit(&sub, initial, kernel, &options);
         let full = expand(&all, &idx, fit, kernel, &options);
-        let view = fit_view(&full, &all, &excluded, kernel);
+        let view = fit_view(&full, &all, &excluded, kernel, &options);
 
         let mut s = shared.lock();
         s.elapsed = s.started.map_or(0.0, |t| t.elapsed().as_secs_f64());
@@ -430,12 +649,16 @@ fn work(shared: &Arc<Shared>, kernel: &SpiceKernel) {
             "rms": view["rms"],
             "used": full.used.iter().filter(|&&u| u).count(),
             "settings": summary(&options, idx.len(), all.len()),
+            "nongrav": view["nongrav_note"]["short"],
             "seconds": s.elapsed,
         });
         s.log.insert(0, entry);
         s.log.truncate(MAX_LOG);
         s.fit = Some(full);
         s.fit_view = view;
+        // A chain belongs to the fit it sampled.
+        s.chain = None;
+        refresh_chain_view(&mut s);
         drop(s);
         shared.wake.notify_all();
     }
@@ -531,16 +754,150 @@ fn wrap(d: f64) -> f64 {
     if w > std::f64::consts::PI { w - t } else { w }
 }
 
-/// Heliocentric ecliptic elements `[a, e, inc, node, arg, mean anomaly, q]` (radians) of the
-/// heliocentric ecliptic state `s`.
-fn element_vector(s: &[f64; 6]) -> [f64; 7] {
-    let el = state::elements(s, GRAVITATIONAL_CONSTANT);
+/// A barycentric J2000 state relative to `origin`, in ecliptic coordinates.
+fn ecliptic_state(state: &[f64; 6], origin: &[f64; 6]) -> [f64; 6] {
+    let r = ecliptic(&std::array::from_fn(|k| state[k] - origin[k]));
+    let v = ecliptic(&std::array::from_fn(|k| state[k + 3] - origin[k + 3]));
+    [r[0], r[1], r[2], v[0], v[1], v[2]]
+}
+
+/// Elements `[a, e, inc, node, arg, mean anomaly, q]` (radians) of the ecliptic state `s`
+/// relative to a body with gravitational parameter `mu`.
+fn element_vector(s: &[f64; 6], mu: f64) -> [f64; 7] {
+    let el = state::elements(s, mu);
     [el.a, el.e, el.inc, el.node, el.arg, el.mean_anomaly, el.q]
+}
+
+/// Ecliptic elements of a fit's orbit about `origin` (a barycentric J2000 state) with
+/// gravitational parameter `mu`, with 1-sigma uncertainties from its covariance.
+fn elements_view(fit: &OrbitFit, origin: &[f64; 6], mu: f64) -> Value {
+    let s = ecliptic_state(&fit.state, origin);
+    let el = element_vector(&s, mu);
+    // Linear propagation of the state covariance: rotate it to the ecliptic, then
+    // through the elements' Jacobian (central differences).
+    let cov = fit.state_covariance();
+    let rot = |m: &[[f64; 6]; 6]| -> [[f64; 6]; 6] {
+        let eps = (84381.448f64 / 3600.0).to_radians();
+        let (se, ce) = eps.sin_cos();
+        let mut rm = [[0.0; 6]; 6];
+        for b in [0, 3] {
+            rm[b][b] = 1.0;
+            rm[b + 1][b + 1] = ce;
+            rm[b + 1][b + 2] = se;
+            rm[b + 2][b + 1] = -se;
+            rm[b + 2][b + 2] = ce;
+        }
+        let mut out = [[0.0; 6]; 6];
+        for i in 0..6 {
+            for j in 0..6 {
+                out[i][j] = (0..6).map(|k| (0..6).map(|l| rm[i][k] * m[k][l] * rm[j][l]).sum::<f64>()).sum();
+            }
+        }
+        out
+    };
+    let c = rot(&cov);
+    let mut jac = [[0.0; 6]; 7];
+    for j in 0..6 {
+        let h = if j < 3 { 1e-7 } else { 1e-9 } * s[j].abs().max(if j < 3 { 1.0 } else { 0.01 });
+        let (mut p, mut m) = (s, s);
+        p[j] += h;
+        m[j] -= h;
+        let (ep, em) = (element_vector(&p, mu), element_vector(&m, mu));
+        for i in 0..7 {
+            let d = if (2..6).contains(&i) { wrap(ep[i] - em[i]) } else { ep[i] - em[i] };
+            jac[i][j] = d / (2.0 * h);
+        }
+    }
+    let sigma: Vec<f64> = (0..7)
+        .map(|i| (0..6).map(|k| (0..6).map(|l| jac[i][k] * c[k][l] * jac[i][l]).sum::<f64>()).sum::<f64>().max(0.0).sqrt())
+        .collect();
+    let deg = |x: f64| x.to_degrees();
+    let bound = el[1] < 1.0 && el[0] > 0.0;
+    let ng_sigma = fit.nongrav_sigma();
+    json!({
+        "a": el[0], "e": el[1], "inc": deg(el[2]), "node": deg(el[3].rem_euclid(std::f64::consts::TAU)),
+        "arg": deg(el[4].rem_euclid(std::f64::consts::TAU)), "mean_anomaly": deg(el[5].rem_euclid(std::f64::consts::TAU)), "q": el[6],
+        "sigma": [sigma[0], sigma[1], deg(sigma[2]), deg(sigma[3]), deg(sigma[4]), deg(sigma[5]), sigma[6]],
+        "big_q": if bound { el[0] * (1.0 + el[1]) } else { f64::NAN },
+        "period": if bound { std::f64::consts::TAU * (el[0].powi(3) / mu).sqrt() } else { f64::NAN },
+        "nongrav": fit.nongrav, "nongrav_sigma": ng_sigma, "fit_nongrav": fit.fit_nongrav,
+        "n": (mu / el[0].abs().powi(3)).sqrt().to_degrees(),
+    })
+}
+
+/// A fitted non-gravitational parameter counts as detected at this many sigma.
+const NONGRAV_DETECTION_SIGMA: f64 = 3.0;
+
+/// What the page says about non-gravitational accelerations: `{level, title, text, short}`,
+/// `level` being "detected" (a fitted parameter at 3 sigma or more), "weak" (fitted, none
+/// significant), "none" (the automatic choice kept gravity alone) or "hint" (gravity alone fits
+/// a long arc poorly); `Null` when there is nothing to say.
+fn nongrav_note(fit: &OrbitFit, o: &FitOptions, all: &Astrometry) -> Value {
+    if !fit.state.iter().all(|v| v.is_finite()) || fit.per_arc {
+        return Value::Null;
+    }
+    let sigma = fit.nongrav_sigma();
+    let comet = o.gofr.is_some();
+    let meaning = |k: usize| match (k, comet) {
+        (0, false) => "radial push, as from radiation pressure",
+        (1, false) => "Yarkovsky drift",
+        (2, false) => "out-of-plane push",
+        (0, true) => "radial outgassing",
+        (1, true) => "transverse outgassing",
+        _ => "normal outgassing",
+    };
+    let name = |k: usize| format!("A{}", k + 1);
+    let fitted: Vec<usize> = (0..3).filter(|&k| fit.fit_nongrav[k]).collect();
+    let snr = |k: usize| (fit.nongrav[k] / sigma[k]).abs();
+    let auto = if o.nongrav_auto.is_some() { "Auto picked " } else { "" };
+    let chi2_nu = if fit.ndof > 0 { fit.chi2 / fit.ndof as f64 } else { f64::NAN };
+    if !fitted.is_empty() {
+        let detected: Vec<usize> = fitted.iter().copied().filter(|&k| snr(k) >= NONGRAV_DETECTION_SIGMA).collect();
+        let parts = |ks: &[usize]| ks.iter().map(|&k| format!("{} = {:.3e} AU/d² ± {:.1e} ({:.1}σ)", name(k), fit.nongrav[k], sigma[k], snr(k))).collect::<Vec<_>>().join(" · ");
+        if !detected.is_empty() {
+            let what: Vec<&str> = detected.iter().map(|&k| meaning(k)).collect();
+            return json!({
+                "level": "detected",
+                "title": if !comet && detected == [1] { "Yarkovsky detected!" } else { "Non-grav detected!" },
+                "text": format!("{auto}{}. {}", parts(&fitted), capitalize(&what.join(" and "))),
+                "short": format!("non-grav: {}", detected.iter().map(|&k| format!("{} {:.1}σ", name(k), snr(k))).collect::<Vec<_>>().join(", ")),
+            });
+        }
+        return json!({
+            "level": "weak",
+            "title": "No significant non-grav",
+            "text": format!("{}: below {NONGRAV_DETECTION_SIGMA}σ, consistent with zero", parts(&fitted)),
+            "short": "non-grav not significant",
+        });
+    }
+    if let Some(t) = o.nongrav_auto.filter(|_| fit.converged()) {
+        let text = if chi2_nu <= t.accept_reduced_chi2 {
+            format!("Gravity alone already fits (χ²/ν {chi2_nu:.2} ≤ {}), so Auto tried no non-grav model", t.accept_reduced_chi2)
+        } else {
+            "Auto tried A1, A2 and A3: none is warranted by the data".to_string()
+        };
+        return json!({ "level": "none", "title": "Gravity is enough", "text": text, "short": "auto: gravity only" });
+    }
+    let arc = all.epoch.iter().copied().fold(f64::NEG_INFINITY, f64::max) - all.epoch.iter().copied().fold(f64::INFINITY, f64::min);
+    if chi2_nu > 2.0 && arc > 365.25 {
+        return json!({
+            "level": "hint",
+            "title": "Non-grav suspected?",
+            "text": format!("Gravity alone fits {:.1} years with χ²/ν {chi2_nu:.2}: try non-grav Auto or A2", arc / 365.25),
+            "short": "non-grav suspected",
+        });
+    }
+    Value::Null
+}
+
+fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
 }
 
 /// What the page shows of a fit: its outcome, residuals in arcseconds, and its heliocentric
 /// ecliptic elements with uncertainties.
-fn fit_view(fit: &OrbitFit, all: &Astrometry, excluded: &[bool], kernel: &SpiceKernel) -> Value {
+fn fit_view(fit: &OrbitFit, all: &Astrometry, excluded: &[bool], kernel: &SpiceKernel, options: &FitOptions) -> Value {
     let n = all.len();
     let resid: Vec<Value> = (0..n).map(|i| json!([fit.residuals[i][0] * ARCSEC, fit.residuals[i][1] * ARCSEC])).collect();
     // A fit with no orbit marks nothing as used: count every detection it was given.
@@ -562,62 +919,10 @@ fn fit_view(fit: &OrbitFit, all: &Astrometry, excluded: &[bool], kernel: &SpiceK
     let mut planets = Value::Null;
     if has_orbit {
         if let Ok(sun) = kernel.state_au(10, 0, fit.epoch) {
-            let rel = std::array::from_fn::<f64, 3, _>(|k| fit.state[k] - sun[k]);
-            let vel = std::array::from_fn::<f64, 3, _>(|k| fit.state[k + 3] - sun[k + 3]);
-            let (r, v) = (ecliptic(&rel), ecliptic(&vel));
-            let s: [f64; 6] = [r[0], r[1], r[2], v[0], v[1], v[2]];
-            let el = element_vector(&s);
-            // Linear propagation of the state covariance: rotate it to the ecliptic, then
-            // through the elements' Jacobian (central differences).
-            let cov = fit.state_covariance();
-            let rot = |m: &[[f64; 6]; 6]| -> [[f64; 6]; 6] {
-                let eps = (84381.448f64 / 3600.0).to_radians();
-                let (se, ce) = eps.sin_cos();
-                let mut rm = [[0.0; 6]; 6];
-                for b in [0, 3] {
-                    rm[b][b] = 1.0;
-                    rm[b + 1][b + 1] = ce;
-                    rm[b + 1][b + 2] = se;
-                    rm[b + 2][b + 1] = -se;
-                    rm[b + 2][b + 2] = ce;
-                }
-                let mut out = [[0.0; 6]; 6];
-                for i in 0..6 {
-                    for j in 0..6 {
-                        out[i][j] = (0..6).map(|k| (0..6).map(|l| rm[i][k] * m[k][l] * rm[j][l]).sum::<f64>()).sum();
-                    }
-                }
-                out
-            };
-            let c = rot(&cov);
-            let mut jac = [[0.0; 6]; 7];
-            for j in 0..6 {
-                let h = if j < 3 { 1e-7 } else { 1e-9 } * s[j].abs().max(if j < 3 { 1.0 } else { 0.01 });
-                let (mut p, mut m) = (s, s);
-                p[j] += h;
-                m[j] -= h;
-                let (ep, em) = (element_vector(&p), element_vector(&m));
-                for i in 0..7 {
-                    let d = if (2..6).contains(&i) { wrap(ep[i] - em[i]) } else { ep[i] - em[i] };
-                    jac[i][j] = d / (2.0 * h);
-                }
-            }
-            let sigma: Vec<f64> = (0..7)
-                .map(|i| (0..6).map(|k| (0..6).map(|l| jac[i][k] * c[k][l] * jac[i][l]).sum::<f64>()).sum::<f64>().max(0.0).sqrt())
-                .collect();
-            let deg = |x: f64| x.to_degrees();
-            let bound = el[1] < 1.0 && el[0] > 0.0;
-            let ng_sigma = fit.nongrav_sigma();
-            elements = json!({
-                "a": el[0], "e": el[1], "inc": deg(el[2]), "node": deg(el[3].rem_euclid(std::f64::consts::TAU)),
-                "arg": deg(el[4].rem_euclid(std::f64::consts::TAU)), "mean_anomaly": deg(el[5].rem_euclid(std::f64::consts::TAU)), "q": el[6],
-                "sigma": [sigma[0], sigma[1], deg(sigma[2]), deg(sigma[3]), deg(sigma[4]), deg(sigma[5]), sigma[6]],
-                "big_q": if bound { el[0] * (1.0 + el[1]) } else { f64::NAN },
-                "period": if bound { std::f64::consts::TAU * (el[0].powi(3) / GRAVITATIONAL_CONSTANT).sqrt() } else { f64::NAN },
-                "nongrav": fit.nongrav, "nongrav_sigma": ng_sigma, "fit_nongrav": fit.fit_nongrav,
-                "n": (GRAVITATIONAL_CONSTANT / el[0].abs().powi(3)).sqrt().to_degrees(),
-            });
-            position = json!(r);
+            let helio = elements_view(fit, &sun, GRAVITATIONAL_CONSTANT);
+            let bary = elements_view(fit, &[0.0; 6], MU_TOTAL);
+            elements = json!({ "helio": helio, "bary": bary });
+            position = json!(ecliptic(&std::array::from_fn(|k| fit.state[k] - sun[k])));
         }
         planets = json!(MAP_PLANETS
             .iter()
@@ -641,6 +946,7 @@ fn fit_view(fit: &OrbitFit, all: &Astrometry, excluded: &[bool], kernel: &SpiceK
         "used": used,
         "rms": rms,
         "elements": elements,
+        "nongrav_note": nongrav_note(fit, options, all),
         "position": position,
         "planets": planets,
     })
@@ -681,6 +987,9 @@ fn respond(request: &Request, shared: &Shared) -> Response {
                 "state": s.state,
                 "pending": s.pending,
                 "loading": s.load.is_some() || s.state == "loading",
+                "sampling": s.sample || s.state == "sampling",
+                "mcmc": { "steps": s.mcmc.steps, "burn_in": s.mcmc.burn_in, "spread": s.mcmc.spread },
+                "chain_version": s.chain_version,
                 "done": s.done,
                 "auto": s.auto,
                 "seed_last": s.seed_last,
@@ -697,6 +1006,7 @@ fn respond(request: &Request, shared: &Shared) -> Response {
                 "message": s.message,
             }))
         }
+        ("GET", "/chain.json") => Response::json(&shared.lock().chain_view),
         ("POST", "/control") => {
             let r = control(shared, request);
             shared.wake.notify_all();
@@ -719,7 +1029,7 @@ fn control(shared: &Shared, request: &Request) -> Result<(), String> {
     s.message.clear();
     match param("action").as_deref().unwrap_or("") {
         "fit" => {
-            if s.state == "fitting" {
+            if matches!(s.state, "fitting" | "sampling") {
                 s.cancel = true;
             }
             s.pending = true;
@@ -728,8 +1038,30 @@ fn control(shared: &Shared, request: &Request) -> Result<(), String> {
         "stop" => {
             s.cancel = true;
             s.pending = false;
+            s.sample = false;
         }
         "done" => s.done = true,
+        "sample" => {
+            let mut mc = s.mcmc.clone();
+            if let Some(v) = param("steps") {
+                mc.steps = v.trim().parse().ok().filter(|&n: &usize| (10..=1_000_000).contains(&n)).ok_or("steps must be a whole number from 10 to 1000000")?;
+            }
+            if let Some(v) = param("spread") {
+                mc.spread = v.trim().parse().ok().filter(|x: &f64| x.is_finite() && *x >= 0.0).ok_or("the start spread must be a number of sigmas, 0 or more")?;
+            }
+            if let Some(v) = param("burn_in") {
+                mc.burn_in = v.trim().parse().map_err(|_| "the burn-in must be a whole number of steps")?;
+            }
+            if !s.fit.as_ref().is_some_and(|f| f.state.iter().all(|v| v.is_finite())) {
+                return Err("no orbit to sample yet: fit first".into());
+            }
+            s.mcmc = mc;
+            request_sample(&mut s);
+        }
+        "burn_in" => {
+            s.mcmc.burn_in = param("value").ok_or("missing value")?.trim().parse().map_err(|_| "the burn-in must be a whole number of steps")?;
+            refresh_chain_view(&mut s);
+        }
         "load" => request_load(&mut s, param("designation").unwrap_or_default().trim()),
         "auto" => s.auto = on()?,
         "seed" => s.seed_last = on()?,
@@ -773,7 +1105,7 @@ fn changed(s: &mut Status) {
     s.changed = true;
     s.done = false;
     if s.auto {
-        if s.state == "fitting" {
+        if matches!(s.state, "fitting" | "sampling") {
             s.cancel = true;
         }
         s.pending = true;
@@ -869,4 +1201,58 @@ fn set(o: &mut FitOptions, key: &str, value: &str) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::orbfit::{FitFlag, NongravAuto};
+
+    fn fit(nongrav: [f64; 3], fitted: [bool; 3], sigma: [f64; 3], chi2: f64) -> OrbitFit {
+        let npar = 6 + fitted.iter().filter(|&&b| b).count();
+        let mut covariance = vec![0.0; npar * npar];
+        let mut j = 6;
+        for i in 0..6 {
+            covariance[i * npar + i] = 1e-12;
+        }
+        for k in 0..3 {
+            if fitted[k] {
+                covariance[j * npar + j] = sigma[k] * sigma[k];
+                j += 1;
+            }
+        }
+        OrbitFit { epoch: 2460000.5, state: [1.0, 0.0, 0.0, 0.0, 0.017, 0.0], nongrav, fit_nongrav: fitted, covariance, npar, chi2, ndof: 100, flag: FitFlag::Converged, ..OrbitFit::failed(FitFlag::Converged) }
+    }
+
+    fn arc(days: f64) -> Astrometry {
+        Astrometry::new(vec![2460000.5, 2460000.5 + days, 2460000.5 + days / 2.0], vec![0.0; 3], vec![0.0; 3], vec![[1.0, 0.0, 0.0]; 3]).unwrap()
+    }
+
+    #[test]
+    fn nongrav_messages() {
+        let o = FitOptions::default();
+        let note = nongrav_note(&fit([0.0, -4.5e-14, 0.0], [false, true, false], [0.0, 1e-15, 0.0], 90.0), &o, &arc(5000.0));
+        assert_eq!(note["level"], "detected");
+        assert_eq!(note["title"], "Yarkovsky detected!");
+        assert!(note["text"].as_str().unwrap().contains("45.0σ"), "{note}");
+
+        let comet = FitOptions { gofr: Some(COMET_GOFR), ..FitOptions::default() };
+        let note = nongrav_note(&fit([1e-8, 1e-9, 0.0], [true, true, false], [1e-10, 1e-9, 0.0], 90.0), &comet, &arc(5000.0));
+        assert_eq!((note["level"].as_str(), note["title"].as_str()), (Some("detected"), Some("Non-grav detected!")));
+        assert!(note["text"].as_str().unwrap().contains("Radial outgassing"), "{note}");
+
+        let note = nongrav_note(&fit([0.0, 1e-15, 0.0], [false, true, false], [0.0, 1e-15, 0.0], 90.0), &o, &arc(5000.0));
+        assert_eq!(note["level"], "weak");
+
+        let auto = FitOptions { nongrav_auto: Some(NongravAuto::default()), ..FitOptions::default() };
+        let note = nongrav_note(&fit([0.0; 3], [false; 3], [0.0; 3], 90.0), &auto, &arc(5000.0));
+        assert_eq!(note["level"], "none");
+        assert!(note["text"].as_str().unwrap().contains("already fits"));
+
+        // Gravity alone, a poor fit over years: a hint. Over days, or fitting well: nothing.
+        assert_eq!(nongrav_note(&fit([0.0; 3], [false; 3], [0.0; 3], 450.0), &o, &arc(3000.0))["level"], "hint");
+        assert!(nongrav_note(&fit([0.0; 3], [false; 3], [0.0; 3], 450.0), &o, &arc(30.0)).is_null());
+        assert!(nongrav_note(&fit([0.0; 3], [false; 3], [0.0; 3], 90.0), &o, &arc(3000.0)).is_null());
+        assert!(nongrav_note(&OrbitFit::failed(FitFlag::Converged), &o, &arc(3000.0)).is_null());
+    }
 }

@@ -12,8 +12,34 @@ h1 small { font-size: 16px; color: var(--text); margin-left: 12px; text-shadow: 
 .pill.converged { color: var(--cyan); }
 .pill.failed, .pill.stopped { color: var(--bad); }
 .pill.finished { color: var(--accent); }
+.pill.sampling { color: var(--cyan); animation: blink 1s steps(2, start) infinite; }
 .pill.loading { color: var(--cyan); animation: blink 1s steps(2, start) infinite; }
 #desig { width: 240px; }
+
+/* Non-grav messages: a fanfare banner when one is detected. */
+.ngnote { display: none; margin: 4px 0 12px; padding: 8px 12px; border: 4px solid var(--line); }
+.ngnote.show { display: block; }
+.ngnote .title { font-size: 24px; line-height: 32px; }
+.ngnote .text { color: var(--text); text-transform: none; margin-top: 4px; }
+.ngnote.detected { border-color: var(--good); }
+.ngnote.detected .title { color: var(--good); animation: blink 1s steps(2, start) 4; }
+.ngnote.detected .title::before, .ngnote.detected .title::after { content: " ★ "; color: var(--accent); }
+.ngnote.hint { border-color: var(--warn); }
+.ngnote.hint .title { color: var(--warn); }
+.ngnote.weak .title, .ngnote.none .title { color: var(--muted); }
+.log .ng { color: var(--good); }
+
+.orbit .frames { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.mcmc .controls { margin-top: 0; padding-top: 0; border-top: 0; }
+.mcmc .controls input { width: 104px; }
+.mcmc .plots { margin-top: 20px; }
+.mcmc table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+.mcmc th { color: var(--muted); text-align: right; font-weight: normal; padding: 4px 8px; }
+.mcmc th:first-child, .mcmc td:first-child { text-align: left; }
+.mcmc td { text-align: right; padding: 4px 8px; border-top: 4px dotted #26265c; }
+.mcmc td .pm { color: var(--muted); }
+.mcmc td.post { color: var(--cyan); }
+.mcmc .tablewrap { overflow-x: auto; }
 .msg.note { color: var(--muted); }
 
 .result .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
@@ -74,6 +100,7 @@ h1 small { font-size: 16px; color: var(--text); margin-left: 12px; text-shadow: 
       <span class="verdict" id="verdict">–</span>
       <span class="sub" id="summary"></span>
     </div>
+    <div class="ngnote" id="ngnote"><div class="title" id="ngtitle"></div><div class="text" id="ngtext"></div></div>
     <div class="bar" id="bar"><div></div></div>
     <div class="facts">
       <div><div class="label">Epoch (TDB)</div><div class="value" id="epoch">–</div></div>
@@ -176,6 +203,11 @@ h1 small { font-size: 16px; color: var(--text); margin-left: 12px; text-shadow: 
   </section>
 
   <section class="panel orbit" data-title="Orbit">
+    <div class="frames">
+      <span class="label">Frame</span>
+      <button class="toggle" id="frame-helio" title="Elements about the Sun">Heliocentric</button>
+      <button class="toggle" id="frame-bary" title="Elements about the solar system barycenter">Barycentric</button>
+    </div>
     <div class="body">
       <dl id="elements"><dt class="hint">No orbit yet.</dt></dl>
       <div>
@@ -183,6 +215,29 @@ h1 small { font-size: 16px; color: var(--text); margin-left: 12px; text-shadow: 
         <ul class="log" id="log"><li class="what">No fits yet.</li></ul>
       </div>
     </div>
+  </section>
+
+  <section class="panel mcmc" data-title="Posterior · MCMC">
+    <div class="controls">
+      <button class="primary" id="sample" title="Sample the last fit's posterior with a Markov chain (M)">Sample ▶</button>
+      <label class="inline">Steps <input id="mc-steps" type="number" step="1" min="10"></label>
+      <label class="inline">Burn-in <input id="mc-burn" type="number" step="1" min="0" title="Steps dropped from the start of the chain; click the trace to set it"></label>
+      <label class="inline">Start <span class="g">σ</span> <input id="mc-spread" type="number" step="any" min="0" title="How far from the fit the chain starts, in sigmas"></label>
+      <span class="keys"><kbd>M</kbd></span>
+      <span class="spacer"></span>
+      <span class="sub" id="mc-status"></span>
+    </div>
+    <section class="plots">
+      <div class="panel" data-title="Chain · χ² per step">
+        <p class="caption">Burn-in shaded · dots at the fit · click to move it</p>
+        <div class="screen"><canvas class="pixel" id="trace" width="224" height="224"></canvas><div class="tip" id="tip4"></div></div></div>
+      <div class="panel" data-title="Posterior samples">
+        <p class="caption">
+          <span class="select"><select id="mc-x"></select></span> vs <span class="select"><select id="mc-y"></select></span>
+        </p>
+        <div class="screen"><canvas class="pixel" id="corner" width="224" height="224"></canvas></div></div>
+    </section>
+    <div class="tablewrap"><table id="mc-table"></table></div>
   </section>
 </main>
 
@@ -326,7 +381,7 @@ function drawMap(s) {
   const [ctx, w, h] = screen("map");
   for (const [u, v, bright] of STARS) px(ctx, u * w, v * h, bright ? PAL.dim : PAL.star);
   points.map = [];
-  const f = s.fit, el = f && f.elements, pos = f && f.position;
+  const f = s.fit, el = f && f.elements && f.elements.helio, pos = f && f.position;
   if (!el || !pos) { text(ctx, "NO ORBIT YET", 6, 6, PAL.dim); return; }
   const bound = el.e < 1 && el.a > 0;
   const r = Math.hypot(...pos);
@@ -445,6 +500,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "f" || e.key === "F") $("fit").click();
   else if (e.key === "Escape") $("stop").click();
   else if (e.key === "r" || e.key === "R") $("random").click();
+  else if ((e.key === "m" || e.key === "M") && !$("sample").disabled) $("sample").click();
 });
 
 function drawSetup(s) {
@@ -470,7 +526,7 @@ function drawSetup(s) {
 }
 
 function drawElements(s) {
-  const f = s.fit, el = f && f.elements, dl = $("elements");
+  const f = s.fit, el = f && f.elements && f.elements[frame], dl = $("elements");
   if (!el) {
     dl.innerHTML = "";
     dl.append(Object.assign(document.createElement("dt"), { className: "hint", textContent: f ? "No orbit: " + f.status + "." : "No orbit yet." }));
@@ -490,7 +546,7 @@ function drawElements(s) {
     ["A1", "A2", "A3"].forEach((n, k) => {
       if (el.fit_nongrav[k]) rows.push([`${n} (AU/d²)`, [el.nongrav[k].toExponential(3), finite(el.nongrav_sigma[k]) ? ` ± ${el.nongrav_sigma[k].toPrecision(2)}` : ""]]);
     });
-    rows.push(["Frame", ["heliocentric ecliptic", ""]]);
+    rows.push(["Frame", [frame === "bary" ? "barycentric ecliptic" : "heliocentric ecliptic", ""]]);
     dl.replaceChildren(...rows.flatMap(([k, [v, e]]) => {
       const dd = document.createElement("dd");
       dd.append(v, Object.assign(document.createElement("span"), { className: "pm", textContent: e }));
@@ -510,17 +566,204 @@ function drawElements(s) {
       Object.assign(document.createElement("span"), { textContent: `rms ${finite(e.rms && e.rms[2]) ? e.rms[2].toPrecision(3) + "″" : "–"}` }),
       Object.assign(document.createElement("span"), { textContent: duration(e.seconds) }),
     );
+    if (e.nongrav) head.append(Object.assign(document.createElement("span"), { className: "ng g", textContent: e.nongrav }));
     li.append(head, Object.assign(document.createElement("div"), { className: "what", textContent: e.settings }));
     return li;
   }));
+}
+
+// --- Frame -------------------------------------------------------------------------------------
+let frame = "helio";
+try { if (localStorage.getItem("spacerocks-frame") === "bary") frame = "bary"; } catch (e) {}
+function setFrame(f) {
+  frame = f;
+  try { localStorage.setItem("spacerocks-frame", f); } catch (e) {}
+  $("elements").dataset.key = "";
+  if (last) { drawElements(last); drawMcmc(last); }
+}
+$("frame-helio").onclick = () => setFrame("helio");
+$("frame-bary").onclick = () => setFrame("bary");
+
+// --- Non-grav messages -------------------------------------------------------------------------
+let fanfareFor = null;
+function fanfare() {
+  // Four square-wave notes, up an arpeggio: a power-up.
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    [523.25, 659.25, 783.99, 1046.5].forEach((hz, k) => {
+      const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + k * 0.09;
+      o.type = "square"; o.frequency.value = hz;
+      g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t + (k === 3 ? 0.4 : 0.08));
+      o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.45);
+    });
+    setTimeout(() => ac.close(), 1000);
+  } catch (e) {}
+}
+function drawNongrav(s, busy) {
+  const note = !busy && s.fit && s.fit.nongrav_note, box = $("ngnote");
+  if (!note) { box.className = "ngnote"; return; }
+  box.className = `ngnote show ${note.level}`;
+  $("ngtitle").textContent = note.title;
+  $("ngtext").textContent = note.text;
+  if (note.level === "detected" && fanfareFor !== s.runs) { if (fanfareFor !== null) fanfare(); fanfareFor = s.runs; }
+  if (note.level !== "detected") fanfareFor = s.runs;
+}
+
+// --- MCMC -------------------------------------------------------------------------------------
+const ELEMENTS = [["a", "a (AU)"], ["e", "e"], ["inc", "i (°)"], ["node", "node (°)"], ["arg", "peri (°)"], ["mean_anomaly", "M (°)"], ["q", "q (AU)"]];
+let chain = null, chainVersion = -1, chainFetching = false;
+for (const id of ["mc-x", "mc-y"]) {
+  $(id).replaceChildren(...ELEMENTS.map(([k, label], i) => Object.assign(document.createElement("option"), { value: i, textContent: label })));
+  $(id).addEventListener("change", () => last && drawMcmc(last));
+}
+$("mc-x").value = 0; $("mc-y").value = 1;
+function addNongravOptions(names) {
+  for (const id of ["mc-x", "mc-y"]) {
+    const sel = $(id), want = ELEMENTS.length + names.length;
+    if (sel.options.length === want) continue;
+    const keep = sel.value;
+    while (sel.options.length > ELEMENTS.length) sel.remove(ELEMENTS.length);
+    names.forEach((n, k) => sel.append(Object.assign(document.createElement("option"), { value: ELEMENTS.length + k, textContent: `${n} (AU/d²)` })));
+    sel.value = keep < want ? keep : 0;
+  }
+}
+async function fetchChain(version) {
+  if (chainFetching) return;
+  chainFetching = true;
+  try {
+    const r = await fetch("chain.json", { cache: "no-store" });
+    chain = await r.json(); chainVersion = version;
+    if (last) drawMcmc(last);
+  } catch (e) {} finally { chainFetching = false; }
+}
+const mcInputs = { "mc-steps": "steps", "mc-burn": "burn_in", "mc-spread": "spread" };
+for (const id of Object.keys(mcInputs)) {
+  const inp = $(id);
+  inp.addEventListener("focus", () => editing.add(inp));
+  inp.addEventListener("blur", () => editing.delete(inp));
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") inp.blur(); });
+}
+$("mc-burn").addEventListener("change", () => { editing.delete($("mc-burn")); control({ action: "burn_in", value: $("mc-burn").value.trim() }); });
+$("sample").onclick = () => control({ action: "sample", steps: $("mc-steps").value.trim(), burn_in: $("mc-burn").value.trim(), spread: $("mc-spread").value.trim() });
+// The value of chain point k on axis j (an element, or a fitted non-grav parameter).
+const chainValue = (c, k, j) => j < ELEMENTS.length ? c[frame][k][j] : c.nongrav[k][j - ELEMENTS.length];
+function drawTrace(s) {
+  const [ctx, w, h] = screen("trace");
+  const c = chain;
+  if (!c || !c.steps) { text(ctx, s.sampling ? "STARTING THE CHAIN..." : "NO CHAIN YET", 6, 6, PAL.dim); return; }
+  const pad = { l: 26, r: 4, t: 12, b: 10 };
+  // Log scale when chi-square spans a decade or more (a chain started far off), else linear.
+  const good = c.chi2.filter(v => finite(v) && v > 0), logScale = Math.max(...good) > 10 * Math.min(...good);
+  const T = v => logScale ? Math.log10(Math.max(v, 1e-300)) : v, U = l => logScale ? Math.pow(10, l) : l;
+  const ls = good.map(T);
+  let lo = Math.min(...ls), hi = Math.max(...ls);
+  const m = (hi - lo) * 0.08 || Math.abs(hi) * 0.01 || 1;
+  lo -= m; hi += m;
+  const total = Math.max(c.steps, s.mcmc.steps), X = i => pad.l + i / Math.max(1, total - 1) * (w - pad.l - pad.r);
+  const Y = l => pad.t + (hi - l) / (hi - lo) * (h - pad.t - pad.b);
+  const bx = Math.round(X(Math.min(c.burn_in, total)));
+  ctx.fillStyle = "#1c1c44"; ctx.fillRect(pad.l, pad.t, Math.max(0, bx - pad.l), h - pad.t - pad.b);
+  dotted(ctx, bx, pad.t, bx, h - pad.b, COL.rejected);
+  for (const l of [lo, hi]) text(ctx, short(U(l)), 2, Math.min(h - pad.b - 5, Math.max(1, Math.round(Y(l)) - 2)), PAL.dim);
+  if (finite(c.fit_chi2) && c.fit_chi2 > 0) { const y = Math.round(Y(T(c.fit_chi2))); if (y > pad.t && y < h - pad.b) dotted(ctx, pad.l, y, w - pad.r, y, PAL.grid); }
+  let prev = null;
+  c.index.forEach((i, k) => {
+    const q = [X(i), Y(T(c.chi2[k]))];
+    if (prev) line(ctx, prev[0], prev[1], q[0], q[1], i < c.burn_in ? COL.dimLive : COL.live);
+    prev = q;
+  });
+  text(ctx, `BURN-IN ${c.burn_in}`, 3, 3, COL.rejected);
+  const right = `${c.steps}/${total}`;
+  text(ctx, right, w - 3 - textWidth(right), h - 6, PAL.dim);
+}
+$("trace").addEventListener("click", ev => {
+  if (!chain || !chain.steps || !last) return;
+  const r = $("trace").getBoundingClientRect(), u = (ev.clientX - r.left) / r.width * 224;
+  const total = Math.max(chain.steps, last.mcmc.steps), step = Math.round((u - 26) / (224 - 30) * (total - 1));
+  control({ action: "burn_in", value: String(Math.max(0, Math.min(chain.steps - 1, step))) });
+});
+$("trace").addEventListener("mousemove", ev => {
+  if (!chain || !chain.steps || !last) return;
+  const r = $("trace").getBoundingClientRect(), u = (ev.clientX - r.left) / r.width * 224;
+  const total = Math.max(chain.steps, last.mcmc.steps), step = Math.max(0, Math.round((u - 26) / (224 - 30) * (total - 1)));
+  showTip("tip4", "trace", ev, `step ${step}\nclick: burn-in here`);
+});
+$("trace").addEventListener("mouseleave", () => { $("tip4").style.display = "none"; });
+function drawCorner(s) {
+  const [ctx, w, h] = screen("corner");
+  const c = chain;
+  if (!c || !c.steps) { text(ctx, "NO SAMPLES YET", 6, 6, PAL.dim); return; }
+  const jx = +$("mc-x").value, jy = +$("mc-y").value, n = c.index.length;
+  const xs = [], ys = [];
+  for (let k = 0; k < n; k++) { xs.push(chainValue(c, k, jx)); ys.push(chainValue(c, k, jy)); }
+  const post = c.index.map(i => i >= c.burn_in);
+  const range = (v) => {
+    const use = v.filter((x, k) => finite(x) && (post[k] || !post.some(Boolean)));
+    let a = Math.min(...use), b = Math.max(...use);
+    if (!(b > a)) { a -= Math.abs(a) * 1e-9 || 1e-12; b += Math.abs(b) * 1e-9 || 1e-12; }
+    const m = (b - a) * 0.08;
+    return [a - m, b + m];
+  };
+  const [x0, x1] = range(xs), [y0, y1] = range(ys), pad = { l: 3, r: 3, t: 12, b: 10 };
+  const X = v => pad.l + (v - x0) / (x1 - x0) * (w - pad.l - pad.r), Y = v => h - pad.b - (v - y0) / (y1 - y0) * (h - pad.t - pad.b);
+  for (let k = 0; k < n; k++) {
+    if (!finite(xs[k]) || !finite(ys[k])) continue;
+    const u = X(xs[k]), v = Y(ys[k]);
+    if (u < 0 || u > w || v < 0 || v > h) continue;
+    px(ctx, u, v, post[k] ? COL.ra : PAL.grid);
+  }
+  // The least-squares fit.
+  const el = s.fit && s.fit.elements && s.fit.elements[frame];
+  const fitValue = j => j < ELEMENTS.length ? (el ? el[ELEMENTS[j][0]] : NaN) : (el ? el.nongrav[["A1", "A2", "A3"].indexOf(c.nongrav_names[j - ELEMENTS.length])] : NaN);
+  const fx = fitValue(jx), fy = fitValue(jy);
+  if (finite(fx) && finite(fy)) cross(ctx, X(fx), Y(fy), COL.orbit);
+  const lx = $("mc-x").selectedOptions[0].textContent, ly = $("mc-y").selectedOptions[0].textContent;
+  text(ctx, `${ly.toUpperCase()} VS ${lx.toUpperCase()}`.replace(/°/g, "DEG").replace(/²/g, "2"), 3, 3, PAL.text);
+  const span = `${short(x1 - x0)} X ${short(y1 - y0)}`;
+  text(ctx, span, w - 3 - textWidth(span), h - 6, PAL.dim);
+}
+function drawMcmcTable(s) {
+  const t = $("mc-table"), c = chain, sm = c && c.summary;
+  if (!sm || !sm[frame]) { t.replaceChildren(); return; }
+  const el = s.fit && s.fit.elements && s.fit.elements[frame];
+  const head = document.createElement("tr");
+  for (const h of ["", "Least squares", "Posterior median", "68% interval"]) head.append(Object.assign(document.createElement("th"), { textContent: h }));
+  const fmt = (v, sg) => {
+    if (!finite(v)) return "–";
+    const digits = finite(sg) && sg > 0 ? Math.max(0, Math.min(12, 1 - Math.floor(Math.log10(sg)))) : 6;
+    return v.toFixed(digits);
+  };
+  const rows = ELEMENTS.map(([k, label], j) => [label, el ? el[k] : NaN, el ? el.sigma[j] : NaN, sm[frame][j]]);
+  (c.nongrav_names || []).forEach((n, k) => {
+    const idx = ["A1", "A2", "A3"].indexOf(n);
+    rows.push([`${n} (AU/d²)`, el ? el.nongrav[idx] : NaN, el ? el.nongrav_sigma[idx] : NaN, sm.nongrav[k], true]);
+  });
+  t.replaceChildren(head, ...rows.map(([label, v, sg, p, sci]) => {
+    const tr = document.createElement("tr");
+    const cell = (txt, cls) => Object.assign(document.createElement("td"), { textContent: txt, className: cls || "" });
+    const half = p ? (p.hi - p.lo) / 2 : NaN;
+    const f = (x, s_) => sci ? (finite(x) ? x.toExponential(3) : "–") : fmt(x, s_);
+    const fitTd = cell(f(v, sg)), pm = Object.assign(document.createElement("span"), { className: "pm", textContent: finite(sg) ? ` ± ${sg.toPrecision(2)}` : "" });
+    fitTd.append(pm);
+    tr.append(cell(label), fitTd, cell(p ? f(p.median, half) : "–", "post"), cell(p ? `${f(p.lo, half)} – ${f(p.hi, half)}` : "–"));
+    return tr;
+  }));
+}
+function drawMcmc(s) {
+  if (chain && chain.nongrav_names) addNongravOptions(chain.nongrav_names);
+  drawTrace(s); drawCorner(s); drawMcmcTable(s);
+  const c = chain;
+  const status = s.sampling ? (c && c.steps ? `step ${c.steps} / ${s.mcmc.steps} · ${Math.round(100 * c.acceptance_all)}% accepted` : "starting...")
+    : c && c.steps ? `${c.steps} steps · ${Math.max(0, c.steps - c.burn_in)} after burn-in · ${Math.round(100 * c.acceptance)}% accepted${c.stopped ? " · stopped" : ""}` : "";
+  $("mc-status").textContent = status;
 }
 
 let last = null;
 function render(s) {
   last = s;
   const f = s.fit, n = s.detections.length;
-  const loading = s.loading, busy = !loading && (s.state === "fitting" || s.pending);
-  let pill = loading ? "loading" : busy ? "fitting" : s.state === "stopped" ? "stopped" : !f || !f.status ? "idle" : f.converged ? "converged" : "failed";
+  const loading = s.loading, sampling = !loading && s.sampling, busy = !loading && !sampling && (s.state === "fitting" || s.pending);
+  let pill = loading ? "loading" : sampling ? "sampling" : busy ? "fitting" : s.state === "stopped" ? "stopped" : !f || !f.status ? "idle" : f.converged ? "converged" : "failed";
   if (s.done && !busy) pill = "finished";
   const pillEl = $("state");
   pillEl.textContent = pill === "finished" ? "done · fit handed back" : pill; pillEl.className = `pill ${pill}`;
@@ -529,18 +772,24 @@ function render(s) {
   $("about").textContent = `${s.name} · ${n} detections`;
   const v = $("verdict");
   if (loading) { v.textContent = "fetching..."; v.className = "verdict busy"; }
+  else if (sampling) { v.textContent = "sampling..."; v.className = "verdict busy"; }
   else if (busy) { v.textContent = "fitting..."; v.className = "verdict busy"; }
   else if (!f || !f.status) { v.textContent = "–"; v.className = "verdict"; }
   else { v.textContent = s.state === "stopped" ? "stopped" : f.status; v.className = `verdict ${f.converged ? "good" : "bad"}`; }
   const bar = $("bar");
-  bar.className = `bar${busy || loading ? " crawl" : ""}${!busy && f && !f.converged ? " bad" : ""}`;
-  bar.firstElementChild.style.width = busy || loading ? "" : f ? "100%" : "0";
+  bar.className = `bar${busy || loading || sampling ? " crawl" : ""}${!busy && f && !f.converged ? " bad" : ""}`;
+  bar.firstElementChild.style.width = busy || loading || sampling ? "" : f ? "100%" : "0";
   $("summary").innerHTML = s.changed && !busy ? "settings changed · fit again" : f && finite(f.chi2) ? `<span class="g">χ</span>² ${f.chi2.toPrecision(4)} · <span class="g">ν</span> ${f.ndof} · ${f.niter} iterations` : "";
   $("summary").className = `sub${s.changed && !busy ? " changed" : ""}`;
   $("epoch").textContent = f && finite(f.epoch) ? epochText(f.epoch) : "–";
   const lastIt = s.live[s.live.length - 1];
-  $("now").textContent = loading ? "asking the minor planet center" : busy ? (lastIt ? `iteration ${s.live.length} · ${lastIt[2]} detections · ${lastIt[3]} parameters` : "starting") : s.done ? "done: the fit is handed back" : "waiting for you";
-  $("stop").disabled = !busy;
+  $("now").textContent = loading ? "asking the minor planet center" : sampling ? "running the markov chain" : busy ? (lastIt ? `iteration ${s.live.length} · ${lastIt[2]} detections · ${lastIt[3]} parameters` : "starting") : s.done ? "done: the fit is handed back" : "waiting for you";
+  $("stop").disabled = !busy && !sampling;
+  $("sample").disabled = busy || loading || !(f && f.elements);
+  for (const [id, key] of Object.entries(mcInputs)) if (!editing.has($(id))) $(id).value = s.mcmc[key];
+  $("frame-helio").setAttribute("aria-pressed", String(frame === "helio"));
+  $("frame-bary").setAttribute("aria-pressed", String(frame === "bary"));
+  if (s.chain_version !== chainVersion) fetchChain(s.chain_version);
   $("load").disabled = $("random").disabled = loading;
   const used = f && f.used && f.used.length ? f.used.filter(u => u).length : n - s.excluded.filter(x => x).length;
   $("used").textContent = `${used} / ${n}`;
@@ -552,7 +801,7 @@ function render(s) {
   $("arc").textContent = fmtDays(arc);
   $("runs").textContent = s.runs;
   if (s.message) { $("msg").textContent = s.message; $("msg").className = /^(couldn't|no )/.test(s.message) ? "msg" : "msg note"; }
-  drawSetup(s); drawResiduals(s); drawScatter(s); drawChi(s); drawMap(s); drawElements(s);
+  drawSetup(s); drawResiduals(s); drawScatter(s); drawChi(s); drawMap(s); drawElements(s); drawNongrav(s, busy || loading); drawMcmc(s);
 }
 
 async function pollOnce() {
@@ -562,7 +811,7 @@ async function pollOnce() {
 async function poll() {
   try {
     await pollOnce();
-    setTimeout(poll, last && (last.state === "fitting" || last.pending || last.loading) ? 200 : 500);
+    setTimeout(poll, last && (last.state === "fitting" || last.pending || last.loading || last.sampling) ? 200 : 500);
   } catch (e) {
     const pill = $("state"); pill.textContent = "disconnected"; pill.className = "pill lost";
     setTimeout(poll, 1000);

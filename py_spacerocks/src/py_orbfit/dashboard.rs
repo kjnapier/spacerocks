@@ -1,7 +1,9 @@
 use pyo3::exceptions::PyOSError;
 use pyo3::prelude::*;
 
-use spacerocks::orbfit::{FitDashboard, ASTEROID_PERTURBERS};
+use numpy::{IntoPyArray, PyArray2, PyArrayMethods};
+use pyo3::types::PyDict;
+use spacerocks::orbfit::{FitDashboard, McmcOptions, ASTEROID_PERTURBERS};
 
 use crate::py_orbfit::fit::{build_astrometry, err, options, rock_state, Extras, PyOrbitFit};
 use crate::py_spice::spicekernel::PySpiceKernel;
@@ -105,6 +107,61 @@ impl PyFitDashboard {
             return Err(e);
         }
         Ok(fit.map(|f| Self::wrap(d, f)))
+    }
+
+    /// Sample the last fit's posterior with a Markov chain, as the page's Sample button does:
+    /// `steps` random-walk Metropolis steps starting `spread` sigmas from the fit, the first
+    /// `burn_in` of them left out of the posterior summary (`seed` makes it repeatable).
+    /// Returns at once; `.chain` has the chain when `.sampling` turns False.
+    #[pyo3(signature = (steps=5000, burn_in=1000, spread=3.0, seed=None))]
+    fn sample(&self, steps: usize, burn_in: usize, spread: f64, seed: Option<u64>) -> PyResult<()> {
+        self.dashboard()?.sample(Some(McmcOptions { steps, burn_in, spread, seed }));
+        Ok(())
+    }
+
+    /// Whether a chain is running or about to.
+    #[getter]
+    fn sampling(&self) -> PyResult<bool> {
+        Ok(self.dashboard()?.sampling())
+    }
+
+    /// The burn-in: the steps the posterior summary drops from the start of the chain.
+    #[getter]
+    fn burn_in(&self) -> PyResult<usize> {
+        Ok(self.dashboard()?.mcmc_options().burn_in)
+    }
+
+    #[setter]
+    fn set_burn_in(&self, burn_in: usize) -> PyResult<()> {
+        self.dashboard()?.set_burn_in(burn_in);
+        Ok(())
+    }
+
+    /// The last chain (None before one runs, and after a new fit): a dict with `params` (steps x
+    /// parameters: the barycentric J2000 state at `epoch`, AU and AU/day, then the fitted
+    /// non-gravitational parameters, AU/day²), `names`, `chi2`, `accepted`, `epoch` (TDB JD),
+    /// `burn_in` and `posterior` (the params after the burn-in).
+    #[getter]
+    fn chain<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyDict>>> {
+        let d = self.dashboard()?;
+        let Some(c) = d.chain() else { return Ok(None) };
+        let burn_in = d.mcmc_options().burn_in.min(c.steps.len());
+        let npar = c.npar();
+        let rows = |from: usize| -> PyResult<Bound<'py, PyArray2<f64>>> {
+            let flat: Vec<f64> = c.steps[from..].iter().flat_map(|s| s.params.iter().copied()).collect();
+            Ok(flat.into_pyarray(py).reshape([c.steps.len() - from, npar])?)
+        };
+        let mut names: Vec<String> = ["x", "y", "z", "vx", "vy", "vz"].iter().map(|s| s.to_string()).collect();
+        names.extend((0..3).filter(|&k| c.fit_nongrav[k]).map(|k| format!("A{}", k + 1)));
+        let out = PyDict::new(py);
+        out.set_item("params", rows(0)?)?;
+        out.set_item("posterior", rows(burn_in)?)?;
+        out.set_item("names", names)?;
+        out.set_item("chi2", c.steps.iter().map(|s| s.chi2).collect::<Vec<_>>().into_pyarray(py))?;
+        out.set_item("accepted", c.steps.iter().map(|s| s.accepted).collect::<Vec<_>>().into_pyarray(py))?;
+        out.set_item("epoch", c.epoch)?;
+        out.set_item("burn_in", burn_in)?;
+        Ok(Some(out))
     }
 
     /// Stop the dashboard: its page goes away and any running fit stops.

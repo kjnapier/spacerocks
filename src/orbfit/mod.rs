@@ -55,6 +55,9 @@ pub mod comet;
 pub mod sequential;
     pub use sequential::{sequential_update, update_mahalanobis, update_orbit, PriorFit, UpdateRoute};
 
+pub mod mcmc;
+    pub use mcmc::{mcmc, McmcChain, McmcOptions, McmcStep};
+
 pub mod mpc;
     pub use mpc::{fetch_astrometry, fetch_observations, mpc_astrometry, parse_obs80, MpcObservation};
 

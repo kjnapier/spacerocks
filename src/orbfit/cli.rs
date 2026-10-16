@@ -161,13 +161,19 @@ pub fn report(name: &str, fit: &Value) -> String {
         fit["niter"]
     )];
     out.push(format!("epoch      JD {:.6} TDB", f(&fit["epoch"])));
-    let el = &fit["elements"];
-    if el.is_object() {
+    for (key, frame) in [("helio", "heliocentric"), ("bary", "barycentric")] {
+        let el = &fit["elements"][key];
+        if !el.is_object() {
+            continue;
+        }
+        out.push(format!("{frame} ecliptic J2000 elements:"));
         let rows = [("a (AU)", "a", 0), ("e", "e", 1), ("i (deg)", "inc", 2), ("node (deg)", "node", 3), ("peri (deg)", "arg", 4), ("M (deg)", "mean_anomaly", 5), ("q (AU)", "q", 6)];
         for (label, key, k) in rows {
-            out.push(format!("{label:<10} {:.10} ± {:.2e}", f(&el[key]), f(&el["sigma"][k])));
+            out.push(format!("  {label:<10} {:.10} ± {:.2e}", f(&el[key]), f(&el["sigma"][k])));
         }
-        out.push("           heliocentric ecliptic J2000".into());
+    }
+    if let Some(note) = fit["nongrav_note"]["text"].as_str() {
+        out.push(format!("non-grav: {} ({note})", fit["nongrav_note"]["title"].as_str().unwrap_or("")));
     }
     if let Some(s) = fit["state"].as_array() {
         let s: Vec<String> = s.iter().map(|v| format!("{:.15e}", f(v))).collect();
