@@ -9,9 +9,16 @@
 //! monitored run costs one clock read per step plus the occasional snapshot. The server runs on
 //! its own thread with the standard library only, and stops once the simulation (and every
 //! clone of it) is dropped or [`Simulation::stop_monitor`] is called.
+//!
+//! The page also steers the run. Pause holds the simulation before its next step (the calling
+//! thread waits, so `integrate` returns later, not early); Step lets one step through and pauses
+//! again; and the integrator and timestep can be swapped from there, taking effect at the next
+//! step. The page asks with `POST /control?action=...`, which needs an `X-Spacerocks` header and
+//! a local `Host`, so other web pages open in the browser can't send it.
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Condvar, Mutex, Weak};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -38,13 +45,42 @@ pub struct ProgressMonitor {
 
 struct Shared {
     status: Mutex<Status>,
+    control: Mutex<Control>,
+    /// Signalled when `control` changes.
+    wake: Condvar,
+    /// Whether `control` is paused or holds commands, so a step can skip its lock otherwise.
+    attention: AtomicBool,
 }
+
+/// What the page has asked for.
+#[derive(Default)]
+struct Control {
+    paused: bool,
+    /// Steps let through while paused.
+    step_credits: u64,
+    commands: Vec<Command>,
+}
+
+/// A change to the simulation asked for on the page.
+pub(crate) enum Command {
+    /// Switch to the integrator of this name (`IAS15`, `WisdomHolman`, `Leapfrog`, `Trace`) with
+    /// this timestep (days).
+    Integrator(String, f64),
+    /// Set the integrator's timestep (days).
+    Timestep(f64),
+}
+
+/// The integrators the page offers.
+const INTEGRATORS: [&str; 4] = ["IAS15", "WisdomHolman", "Leapfrog", "Trace"];
 
 /// What the page shows; serialized as `/progress.json`.
 #[derive(Serialize, Clone)]
 struct Status {
-    /// "idle" before the first run, "running" during one, "done" after it.
+    /// "idle" before the first run, "running" during one, "paused" while held in one, "done"
+    /// after it.
     state: &'static str,
+    /// Whether the page's Pause is on (the next step will wait).
+    paused: bool,
     /// TDB Julian date the simulation's clock counts from.
     jd_ref: f64,
     /// Days since `jd_ref` when the run started, now, and at its target.
@@ -79,6 +115,11 @@ struct Status {
     run_started: Option<Instant>,
     #[serde(skip)]
     last_publish: Option<Instant>,
+    /// Time spent paused in this run, left out of `elapsed`.
+    #[serde(skip)]
+    paused_total: Duration,
+    #[serde(skip)]
+    paused_since: Option<Instant>,
 }
 
 impl ProgressMonitor {
@@ -86,10 +127,12 @@ impl ProgressMonitor {
     fn start(port: u16) -> std::io::Result<ProgressMonitor> {
         let listener = TcpListener::bind(("127.0.0.1", port))?;
         listener.set_nonblocking(true)?;
-        let url = format!("http://{}/", listener.local_addr()?);
+        let port = listener.local_addr()?.port();
+        let url = format!("http://127.0.0.1:{port}/");
         let shared = Arc::new(Shared {
             status: Mutex::new(Status {
                 state: "idle",
+                paused: false,
                 jd_ref: 0.0,
                 t_start: 0.0,
                 t: 0.0,
@@ -111,12 +154,17 @@ impl ProgressMonitor {
                 fixed_target: None,
                 run_started: None,
                 last_publish: None,
+                paused_total: Duration::ZERO,
+                paused_since: None,
             }),
+            control: Mutex::new(Control::default()),
+            wake: Condvar::new(),
+            attention: AtomicBool::new(false),
         });
         let weak = Arc::downgrade(&shared);
         std::thread::Builder::new()
             .name("spacerocks-monitor".into())
-            .spawn(move || serve(listener, weak))?;
+            .spawn(move || serve(listener, weak, port))?;
         Ok(ProgressMonitor { shared, url })
     }
 
@@ -127,6 +175,75 @@ impl ProgressMonitor {
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Status> {
         self.shared.status.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn control(&self) -> std::sync::MutexGuard<'_, Control> {
+        self.shared.control.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Hold the simulation while the page is paused. Returns the commands the page sent, and
+    /// `Some(single)` once the simulation may step (`single` when let through by Step for one
+    /// step only), or `None` to come back after applying the commands.
+    pub(crate) fn wait(&self, sim: &Simulation) -> (Vec<Command>, Option<bool>) {
+        if !self.shared.attention.load(Ordering::Acquire) {
+            return (Vec::new(), Some(false));
+        }
+        let mut control = self.control();
+        let mut announced = false;
+        loop {
+            let commands = std::mem::take(&mut control.commands);
+            self.shared.attention.store(control.paused, Ordering::Release);
+            let released = if !control.paused {
+                Some(false)
+            } else if control.step_credits > 0 {
+                control.step_credits -= 1;
+                Some(true)
+            } else {
+                None
+            };
+            if !commands.is_empty() || released.is_some() {
+                drop(control);
+                if announced || released.is_some() {
+                    let mut s = self.lock();
+                    if s.state == "paused" {
+                        s.state = "running";
+                    }
+                    if let Some(since) = s.paused_since.take() {
+                        s.paused_total += since.elapsed();
+                    }
+                }
+                return (commands, released);
+            }
+            if !announced {
+                drop(control);
+                {
+                    let mut s = self.lock();
+                    if s.state == "running" {
+                        s.state = "paused";
+                    }
+                    s.paused_since = Some(Instant::now());
+                    snapshot(&mut s, sim);
+                }
+                announced = true;
+                control = self.control();
+                continue;
+            }
+            control = self.shared.wake.wait_timeout(control, Duration::from_millis(250)).unwrap_or_else(|e| e.into_inner()).0;
+        }
+    }
+
+    /// Publish a snapshot now.
+    pub(crate) fn publish(&self, sim: &Simulation) {
+        snapshot(&mut self.lock(), sim);
+    }
+
+    /// Pause or resume the simulation, as the page's Pause button does.
+    pub fn set_paused(&self, paused: bool) {
+        let mut c = self.control();
+        c.paused = paused;
+        self.shared.attention.store(c.paused || !c.commands.is_empty(), Ordering::Release);
+        drop(c);
+        self.shared.wake.notify_all();
     }
 
     /// Measure progress from `t_start` to `t_target` (days since the simulation's reference
@@ -145,6 +262,7 @@ impl ProgressMonitor {
         };
         if s.state != "running" || s.fixed_target.is_none() {
             s.run_started = Some(Instant::now());
+            s.paused_total = Duration::ZERO;
             s.steps = 0;
         }
         s.t_start = t_start;
@@ -158,7 +276,7 @@ impl ProgressMonitor {
         let mut s = self.lock();
         s.steps += n as u64;
         s.total_steps += n as u64;
-        if s.last_publish.map_or(true, |last| last.elapsed() >= PUBLISH_INTERVAL) {
+        if s.last_publish.map_or(true, |last| last.elapsed() >= PUBLISH_INTERVAL) || self.shared.attention.load(Ordering::Acquire) {
             snapshot(&mut s, sim);
         }
     }
@@ -196,7 +314,8 @@ fn snapshot(s: &mut Status, sim: &Simulation) {
     s.jd_ref = sim.jd_ref();
     s.t = sim.t();
     s.timestep = sim.integrator.timestep();
-    s.elapsed = s.run_started.map_or(0.0, |start| start.elapsed().as_secs_f64());
+    let paused = s.paused_total + s.paused_since.map_or(Duration::ZERO, |since| since.elapsed());
+    s.elapsed = s.run_started.map_or(0.0, |start| start.elapsed().saturating_sub(paused).as_secs_f64());
     s.n_particles = sim.len();
     s.integrator = integrator_name(sim);
     s.reference_plane = sim.reference_plane.to_string();
@@ -245,7 +364,7 @@ fn integrator_name(sim: &Simulation) -> String {
 }
 
 /// Answer requests until the monitor is dropped.
-fn serve(listener: TcpListener, shared: Weak<Shared>) {
+fn serve(listener: TcpListener, shared: Weak<Shared>, port: u16) {
     loop {
         if shared.strong_count() == 0 {
             return;
@@ -253,7 +372,7 @@ fn serve(listener: TcpListener, shared: Weak<Shared>) {
         match listener.accept() {
             Ok((stream, _)) => {
                 let Some(shared) = shared.upgrade() else { return };
-                let _ = respond(stream, &shared);
+                let _ = respond(stream, &shared, port);
             }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 std::thread::sleep(Duration::from_millis(25));
@@ -263,20 +382,33 @@ fn serve(listener: TcpListener, shared: Weak<Shared>) {
     }
 }
 
-fn respond(mut stream: TcpStream, shared: &Shared) -> std::io::Result<()> {
+fn respond(mut stream: TcpStream, shared: &Shared, port: u16) -> std::io::Result<()> {
     stream.set_nonblocking(false)?;
     stream.set_read_timeout(Some(Duration::from_secs(2)))?;
     let mut buf = [0u8; 2048];
     let n = stream.read(&mut buf)?;
     let request = String::from_utf8_lossy(&buf[..n]);
-    let path = request.split_whitespace().nth(1).unwrap_or("/");
-    let path = path.split('?').next().unwrap_or("/");
+    let mut words = request.split_whitespace();
+    let method = words.next().unwrap_or("GET");
+    let target = words.next().unwrap_or("/");
+    let (path, query) = target.split_once('?').unwrap_or((target, ""));
 
-    let (status, content_type, body) = match path {
-        "/" | "/index.html" => ("200 OK", "text/html; charset=utf-8", PAGE.to_string()),
-        "/progress.json" => {
-            let status = shared.status.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let (status, content_type, body) = match (method, path) {
+        ("GET", "/" | "/index.html") => ("200 OK", "text/html; charset=utf-8", PAGE.to_string()),
+        ("GET", "/progress.json") => {
+            let mut status = shared.status.lock().unwrap_or_else(|e| e.into_inner()).clone();
+            status.paused = shared.control.lock().unwrap_or_else(|e| e.into_inner()).paused;
             ("200 OK", "application/json", serde_json::to_string(&status).unwrap_or_default())
+        }
+        ("POST", "/control") => {
+            if !from_page(&request, port) {
+                ("403 Forbidden", "text/plain", "forbidden".to_string())
+            } else {
+                match control(shared, query) {
+                    Ok(()) => ("200 OK", "text/plain", "ok".to_string()),
+                    Err(e) => ("400 Bad Request", "text/plain", e),
+                }
+            }
         }
         _ => ("404 Not Found", "text/plain", "not found".to_string()),
     };
@@ -287,6 +419,60 @@ fn respond(mut stream: TcpStream, shared: &Shared) -> std::io::Result<()> {
     )?;
     stream.write_all(body.as_bytes())?;
     stream.flush()
+}
+
+/// Whether a request came from the page itself: it carries the `X-Spacerocks` header (which a
+/// page from another site can't add without a CORS preflight this server never answers) and a
+/// local `Host` (so a site rebinding its name to 127.0.0.1 is turned away).
+fn from_page(request: &str, port: u16) -> bool {
+    let mut marked = false;
+    let mut local = false;
+    for line in request.lines().skip(1) {
+        let Some((name, value)) = line.split_once(':') else { continue };
+        let value = value.trim();
+        if name.eq_ignore_ascii_case("x-spacerocks") {
+            marked = true;
+        } else if name.eq_ignore_ascii_case("host") {
+            local = value == format!("127.0.0.1:{port}") || value == format!("localhost:{port}");
+        }
+    }
+    marked && local
+}
+
+/// Apply `action=pause|resume|step|integrator|timestep` (with `name=` and `timestep=`).
+fn control(shared: &Shared, query: &str) -> Result<(), String> {
+    let param = |key: &str| {
+        query.split('&').filter_map(|kv| kv.split_once('=')).find(|(k, _)| *k == key).map(|(_, v)| v)
+    };
+    let timestep = || -> Result<f64, String> {
+        let h: f64 = param("timestep").ok_or("missing timestep")?.parse().map_err(|_| "bad timestep")?;
+        if h.is_finite() && h != 0.0 { Ok(h) } else { Err("timestep must be finite and non-zero".into()) }
+    };
+    let mut c = shared.control.lock().unwrap_or_else(|e| e.into_inner());
+    match param("action").unwrap_or("") {
+        "pause" => c.paused = true,
+        "resume" => {
+            c.paused = false;
+            c.step_credits = 0;
+        }
+        "step" => {
+            c.paused = true;
+            c.step_credits += 1;
+        }
+        "integrator" => {
+            let name = param("name").ok_or("missing name")?;
+            if !INTEGRATORS.contains(&name) {
+                return Err(format!("unknown integrator {name}"));
+            }
+            c.commands.push(Command::Integrator(name.to_string(), timestep()?));
+        }
+        "timestep" => c.commands.push(Command::Timestep(timestep()?)),
+        other => return Err(format!("unknown action {other}")),
+    }
+    shared.attention.store(c.paused || !c.commands.is_empty(), Ordering::Release);
+    drop(c);
+    shared.wake.notify_all();
+    Ok(())
 }
 
 impl Simulation {
@@ -322,6 +508,11 @@ impl Simulation {
     /// The progress page's URL, if one is attached.
     pub fn monitor_url(&self) -> Option<&str> {
         self.progress_monitor.as_ref().map(|m| m.url())
+    }
+
+    /// The attached progress page, e.g. to pause it from code ([`ProgressMonitor::set_paused`]).
+    pub fn progress_monitor(&self) -> Option<&ProgressMonitor> {
+        self.progress_monitor.as_ref()
     }
 
     /// Detach the progress page; its server stops once no clone of this simulation holds it.

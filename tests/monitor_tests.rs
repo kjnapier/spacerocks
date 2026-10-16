@@ -31,9 +31,34 @@ fn outer_system(integrator: Box<dyn Integrator + Send + Sync>) -> Simulation {
 
 /// GET `path` from the page at `url`; returns (status line, body).
 fn get(url: &str, path: &str) -> (String, String) {
+    request(url, "GET", path, "")
+}
+
+/// POST a control action as the page does.
+fn control(url: &str, query: &str) -> String {
+    request(url, "POST", &format!("/control?{query}"), "X-Spacerocks: 1\r\n").0
+}
+
+fn json(url: &str) -> serde_json::Value {
+    serde_json::from_str(&get(url, "/progress.json").1).unwrap()
+}
+
+/// Wait (up to a few seconds) until the page's JSON satisfies `ok`.
+fn wait_for(url: &str, ok: impl Fn(&serde_json::Value) -> bool) -> serde_json::Value {
+    for _ in 0..300 {
+        let s = json(url);
+        if ok(&s) {
+            return s;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    panic!("page never got there: {}", json(url));
+}
+
+fn request(url: &str, method: &str, path: &str, headers: &str) -> (String, String) {
     let addr = url.trim_start_matches("http://").trim_end_matches('/');
     let mut stream = TcpStream::connect(addr).unwrap();
-    write!(stream, "GET {path} HTTP/1.1\r\nHost: {addr}\r\n\r\n").unwrap();
+    write!(stream, "{method} {path} HTTP/1.1\r\nHost: {addr}\r\n{headers}\r\n").unwrap();
     let mut response = String::new();
     stream.read_to_string(&mut response).unwrap();
     let (head, body) = response.split_once("\r\n\r\n").unwrap();
@@ -119,4 +144,58 @@ fn server_stops_with_the_simulation() {
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
     assert!(stopped);
+}
+
+#[test]
+fn page_pauses_steps_and_switches_integrator() {
+    let mut sim = outer_system(Box::new(IAS15::new(1.0)));
+    let url = sim.monitor(0).unwrap();
+    sim.progress_monitor().unwrap().set_paused(true);
+    let target = Time::new(T0 + 2000.0, "tdb", "jd").unwrap();
+    let run = std::thread::spawn(move || {
+        sim.integrate(&target);
+        sim
+    });
+
+    let s = wait_for(&url, |s| s["state"] == "paused");
+    assert_eq!(s["paused"], true);
+    assert_eq!(s["steps"], 0);
+
+    for k in 1..=3 {
+        assert!(control(&url, "action=step").contains("200"));
+        wait_for(&url, |s| s["steps"] == k && s["state"] == "paused");
+    }
+
+    assert!(control(&url, "action=integrator&name=WisdomHolman&timestep=10").contains("200"));
+    let s = wait_for(&url, |s| s["integrator"] == "WisdomHolman");
+    assert_eq!(s["timestep"], 10.0);
+    assert_eq!(s["steps"], 3);
+    assert!(control(&url, "action=timestep&timestep=5").contains("200"));
+    wait_for(&url, |s| s["timestep"] == 5.0);
+    let t = json(&url)["t"].as_f64().unwrap();
+    control(&url, "action=step");
+    let s = wait_for(&url, |s| s["steps"] == 4);
+    assert!((s["t"].as_f64().unwrap() - t - 5.0).abs() < 1e-9);
+
+    control(&url, "action=resume");
+    let sim = run.join().unwrap();
+    assert_eq!(sim.t(), 2000.0);
+    let s = json(&url);
+    assert_eq!(s["state"], "done");
+    assert_eq!(s["paused"], false);
+    assert_eq!(s["integrator"], "WisdomHolman");
+}
+
+#[test]
+fn control_needs_the_page() {
+    let mut sim = outer_system(Box::new(IAS15::new(1.0)));
+    let url = sim.monitor(0).unwrap();
+    // No marker header, as a form on another site would send it.
+    assert!(request(&url, "POST", "/control?action=pause", "").0.contains("403"));
+    assert_eq!(json(&url)["paused"], false);
+    assert!(control(&url, "action=launch").contains("400"));
+    assert!(control(&url, "action=integrator&name=RK4&timestep=1").contains("400"));
+    assert!(control(&url, "action=timestep&timestep=0").contains("400"));
+    assert!(control(&url, "action=pause").contains("200"));
+    assert_eq!(json(&url)["paused"], true);
 }

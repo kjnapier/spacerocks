@@ -32,6 +32,7 @@ h1 { font-size: 18px; font-weight: 600; margin: 0; }
   background: var(--track); color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
 }
 .pill.running { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.pill.paused { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
 .pill.done { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
 .pill.lost { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
 .sub { color: var(--muted); font-size: 13px; margin-left: auto; text-align: right; }
@@ -51,6 +52,20 @@ h1 { font-size: 18px; font-weight: 600; margin: 0; }
 .plots h2 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--muted); }
 canvas { width: 100%; aspect-ratio: 1 / 1; display: block; }
 #energy { aspect-ratio: 4 / 3; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.controls .spacer { flex: 1; }
+button, select, input {
+  font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 7px; padding: 6px 12px; min-height: 34px;
+}
+button { cursor: pointer; font-weight: 600; }
+button:hover, select:hover, input:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; min-width: 92px; }
+button:disabled { opacity: .5; cursor: default; }
+input { width: 110px; font-variant-numeric: tabular-nums; }
+label.inline { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.msg { color: var(--bad); font-size: 13px; }
+kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; color: var(--muted); }
 @media (max-width: 720px) {
   .plots { grid-template-columns: 1fr; }
   .epochs { grid-template-columns: 1fr; }
@@ -76,6 +91,20 @@ canvas { width: 100%; aspect-ratio: 1 / 1; display: block; }
       <div><div class="label">Current epoch (TDB)</div><div class="value" id="now">–</div></div>
       <div><div class="label">Target epoch (TDB)</div><div class="value" id="target">–</div></div>
     </div>
+    <div class="controls">
+      <button class="primary" id="pause" title="Pause or resume (space)">Pause</button>
+      <button id="step" title="Take one step, then pause (.)">Step</button>
+      <span class="sub" style="margin-left:0"><kbd>space</kbd> <kbd>.</kbd></span>
+      <span class="spacer"></span>
+      <label class="inline">Integrator
+        <select id="integratorSel">
+          <option>IAS15</option><option>WisdomHolman</option><option>Leapfrog</option><option>Trace</option>
+        </select>
+      </label>
+      <label class="inline">Timestep (d) <input id="timestepIn" type="number" step="any"></label>
+      <button id="apply">Apply</button>
+      <span class="msg" id="msg"></span>
+    </div>
   </section>
 
   <section class="stats">
@@ -83,7 +112,7 @@ canvas { width: 100%; aspect-ratio: 1 / 1; display: block; }
     <div class="panel stat"><div class="label">Steps per second</div><div class="value" id="rate">–</div></div>
     <div class="panel stat"><div class="label">Timestep (days)</div><div class="value" id="dt">–</div></div>
     <div class="panel stat"><div class="label">Simulated days per second</div><div class="value" id="speed">–</div></div>
-    <div class="panel stat"><div class="label">Elapsed</div><div class="value" id="elapsed">–</div></div>
+    <div class="panel stat"><div class="label">Elapsed (running)</div><div class="value" id="elapsed">–</div></div>
     <div class="panel stat"><div class="label">Particles (massive)</div><div class="value" id="np">–</div></div>
     <div class="panel stat"><div class="label">Integrator</div><div class="value" id="integrator">–</div></div>
     <div class="panel stat"><div class="label">Energy error |ΔE/E₀|</div><div class="value" id="de">–</div></div>
@@ -177,10 +206,43 @@ function drawEnergy(s) {
   ctx.stroke();
 }
 
+async function control(params) {
+  $("msg").textContent = "";
+  try {
+    const r = await fetch("control?" + new URLSearchParams(params), { method: "POST", headers: { "X-Spacerocks": "1" } });
+    if (!r.ok) $("msg").textContent = await r.text();
+  } catch (e) { $("msg").textContent = "not connected"; }
+  setTimeout(pollOnce, 50);
+}
+let editing = false;
+$("pause").onclick = () => control({ action: last && last.paused ? "resume" : "pause" });
+$("step").onclick = () => control({ action: "step" });
+$("apply").onclick = () => {
+  editing = false;
+  const name = $("integratorSel").value, h = $("timestepIn").value;
+  if (last && name === last.integrator) control({ action: "timestep", timestep: h });
+  else control({ action: "integrator", name, timestep: h });
+};
+for (const id of ["integratorSel", "timestepIn"]) {
+  $(id).addEventListener("focus", () => editing = true);
+  $(id).addEventListener("input", () => editing = true);
+}
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input, select")) return;
+  if (e.key === " ") { e.preventDefault(); $("pause").click(); }
+  else if (e.key === ".") $("step").click();
+});
+
 let last = null;
 function render(s) {
   last = s;
   const pill = $("state"); pill.textContent = s.state; pill.className = `pill ${s.state}`;
+  if (s.paused && s.state !== "paused") { pill.textContent = `${s.state} · paused`; pill.className = "pill paused"; }
+  $("pause").textContent = s.paused ? "Resume" : "Pause";
+  if (!editing) {
+    if (s.integrator) $("integratorSel").value = s.integrator;
+    $("timestepIn").value = s.timestep ? Math.abs(s.timestep).toPrecision(6) * 1 : "";
+  }
   $("frame").textContent = s.integrator ? `${s.reference_plane} · origin ${s.origin}` : "";
   const bar = $("bar");
   if (s.t_target !== null && s.t_target !== s.t_start) {
@@ -208,10 +270,13 @@ function render(s) {
   drawOrbits(s); drawEnergy(s);
 }
 
+async function pollOnce() {
+  const r = await fetch("progress.json", { cache: "no-store" });
+  render(await r.json());
+}
 async function poll() {
   try {
-    const r = await fetch("progress.json", { cache: "no-store" });
-    render(await r.json());
+    await pollOnce();
     setTimeout(poll, 250);
   } catch (e) {
     const pill = $("state"); pill.textContent = "disconnected"; pill.className = "pill lost";
