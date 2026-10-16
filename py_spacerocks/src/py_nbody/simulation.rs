@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
@@ -125,8 +127,9 @@ impl PySimulation {
     /// # Arguments
     ///
     /// * `epoch` - The epoch to integrate to.
-    pub fn integrate(&mut self, epoch: &PyTime) {
-        self.inner.integrate(&epoch.inner.clone());
+    pub fn integrate(&mut self, py: Python<'_>, epoch: &PyTime) -> PyResult<()> {
+        let epoch = epoch.inner.clone();
+        run_interruptible(py, &mut self.inner, move |sim| sim.integrate(&epoch))
     }
 
     /// Integrate to an epoch with the integrator's own steps, then interpolate to it.
@@ -137,8 +140,9 @@ impl PySimulation {
     /// # Arguments
     ///
     /// * `epoch` - The epoch to integrate or interpolate to.
-    pub fn integrate_or_interpolate(&mut self, epoch: &PyTime) {
-        self.inner.integrate_or_interpolate(&epoch.inner);
+    pub fn integrate_or_interpolate(&mut self, py: Python<'_>, epoch: &PyTime) -> PyResult<()> {
+        let epoch = epoch.inner.clone();
+        run_interruptible(py, &mut self.inner, move |sim| sim.integrate_or_interpolate(&epoch))
     }
     
     /// Serve a live progress page for this simulation and return its URL.
@@ -157,7 +161,7 @@ impl PySimulation {
     ///
     /// The page's Pause holds the simulation before its next step, Step lets one step through,
     /// and the integrator and timestep can be switched there. While paused, the call that is
-    /// integrating waits (Ctrl-C included) until the page resumes it.
+    /// integrating waits until the page resumes it, or until Ctrl-C.
     #[pyo3(signature = (port=0, open_browser=true, paused=false, track=None))]
     pub fn monitor(&mut self, py: Python<'_>, port: u16, open_browser: bool, paused: bool, track: Option<&str>) -> PyResult<String> {
         let url = self.inner.monitor(port).map_err(|e| PyErr::new::<pyo3::exceptions::PyOSError, _>(e.to_string()))?;
@@ -213,14 +217,14 @@ impl PySimulation {
     }
 
     /// Step the simulation by one timestep.
-    pub fn step(&mut self) {
-        self.inner.step();
+    pub fn step(&mut self, py: Python<'_>) -> PyResult<()> {
+        run_interruptible(py, &mut self.inner, |sim| sim.step())
     }
 
     /// Step the simulation by `n` timesteps: the same result as calling `step` `n` times, but
     /// WisdomHolman and Trace then split test particles between threads.
-    pub fn steps(&mut self, n: usize) {
-        self.inner.steps(n);
+    pub fn steps(&mut self, py: Python<'_>, n: usize) -> PyResult<()> {
+        run_interruptible(py, &mut self.inner, move |sim| sim.steps(n))
     }
 
     /// Move the simulation to the center of mass.
@@ -403,4 +407,31 @@ impl PySimulation {
         PyIntegrator { inner: self.inner.integrator.clone() }
     }
 
+}
+
+/// Run `f` on the simulation without holding the GIL, so other Python threads keep running, and
+/// stop it between steps when Python has a signal to handle (Ctrl-C raises KeyboardInterrupt,
+/// with the simulation left at the last step it finished).
+fn run_interruptible<F>(py: Python<'_>, sim: &mut Simulation, f: F) -> PyResult<()>
+where
+    F: FnOnce(&mut Simulation) + Send,
+{
+    let error: Arc<Mutex<Option<PyErr>>> = Arc::new(Mutex::new(None));
+    let seen = error.clone();
+    sim.set_interrupt(Some(Arc::new(move || {
+        Python::attach(|py| match py.check_signals() {
+            Ok(()) => false,
+            Err(e) => {
+                *seen.lock().unwrap() = Some(e);
+                true
+            }
+        })
+    })));
+    py.detach(|| f(&mut *sim));
+    sim.set_interrupt(None);
+    let caught = error.lock().unwrap().take();
+    match caught {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
 }
