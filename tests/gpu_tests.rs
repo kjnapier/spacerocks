@@ -1,5 +1,6 @@
 //! GPU integrators against the CPU ones. Runs on whatever adapter wgpu finds (in CI, Mesa's
-//! software Vulkan driver); without one the tests print a note and pass.
+//! software Vulkan driver); without one the tests print a note and pass, unless
+//! `SPACEROCKS_GPU_REQUIRED` is set.
 #![cfg(feature = "gpu")]
 
 mod common;
@@ -16,10 +17,11 @@ fn context() -> Option<Arc<GpuContext>> {
             eprintln!("GPU: {}", ctx.describe());
             Some(ctx)
         }
-        Err(e) => {
+        Err(e) if std::env::var_os("SPACEROCKS_GPU_REQUIRED").is_none() => {
             eprintln!("skipping, no GPU: {e}");
             None
         }
+        Err(e) => panic!("no GPU: {e}"),
     }
 }
 

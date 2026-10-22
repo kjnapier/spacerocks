@@ -113,6 +113,7 @@ impl IAS15 {
     /// accelerations at its start, and its coefficients (the trajectory within the step, as
     /// [`Integrator::interpolate`] evaluates it).
     #[allow(clippy::type_complexity)]
+    #[cfg_attr(not(feature = "gpu"), allow(dead_code))]
     pub(crate) fn last_step(&self) -> Option<(f64, f64, &[Vector3<f64>], &[Vector3<f64>], &[Vector3<f64>], &[CoefficientSeptet])> {
         let d = self.dense.as_ref()?;
         Some((d.t0, d.dt, &d.x0, &d.v0, &d.a0, &self.bs_last))

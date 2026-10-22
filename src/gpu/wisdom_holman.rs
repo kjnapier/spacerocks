@@ -48,11 +48,12 @@ pub struct GpuWisdomHolman {
 /// Where a GPU integrator's time went, summed over its calls.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct GpuStats {
-    /// Test-particle steps taken on the GPU.
+    /// Test-particle steps taken on the GPU (for IAS15, accepted steps).
     pub particle_steps: f64,
     /// Seconds stepping the massive bodies on the CPU.
     pub cpu_seconds: f64,
-    /// Seconds waiting for the GPU (after the CPU's own work for the block).
+    /// Seconds waiting for the GPU (Wisdom–Holman: after the CPU's own work for the block;
+    /// IAS15: all of the GPU's work, which doesn't overlap the CPU's).
     pub gpu_wait_seconds: f64,
     /// Seconds in the GPU calls, end to end.
     pub total_seconds: f64,
@@ -97,7 +98,7 @@ impl GpuWisdomHolman {
     /// isn't available on `ctx` or its arithmetic fails the self-test there.
     pub fn new(timestep: f64, ctx: Arc<GpuContext>, precision: Precision) -> Result<GpuWisdomHolman, GpuError> {
         ctx.check(precision)?;
-        Ok(GpuWisdomHolman {
+        let wh = GpuWisdomHolman {
             timestep,
             precision,
             fast_kick: false,
@@ -107,13 +108,17 @@ impl GpuWisdomHolman {
             ctx,
             kernels: Arc::new(Mutex::new(Vec::new())),
             stats: Arc::new(Mutex::new(GpuStats::default())),
-        })
+        };
+        // Compile the kernel now rather than in the first call.
+        wh.pipeline();
+        Ok(wh)
     }
 
     pub fn context(&self) -> &Arc<GpuContext> {
         &self.ctx
     }
 
+    /// Where the time went, summed over the calls of this integrator and its clones.
     pub fn stats(&self) -> GpuStats {
         *self.stats.lock().unwrap()
     }

@@ -59,7 +59,21 @@ pub fn giants(integrator: Box<dyn Integrator + Send + Sync>) -> Simulation {
 /// [`giants`] plus `n` Kuiper belt test particles (a in 35..50 au, e < 0.2, i < 10 deg, random
 /// angles, heliocentric elements), moved to the barycenter.
 pub fn kuiper(integrator: Box<dyn Integrator + Send + Sync>, n: usize, seed: u64) -> Simulation {
-    let mut sim = giants(integrator);
+    system(integrator, n, seed, true, 0.0)
+}
+
+/// [`kuiper`], optionally without the giants (`planets` false: the Sun alone, so the test
+/// particles' orbits are fixed ellipses), and with every test particle's x multiplied by
+/// `1 + shift`.
+pub fn system(integrator: Box<dyn Integrator + Send + Sync>, n: usize, seed: u64, planets: bool, shift: f64) -> Simulation {
+    let mut sim = if planets {
+        giants(integrator)
+    } else {
+        let mut sim = Simulation::new(&Time::new(T0, "tdb", "jd").unwrap(), "ECLIPJ2000", "SSB").unwrap();
+        sim.integrator = integrator;
+        sim.add(rock("sun", 1.0 + 6.0e-6, [0.0; 6])).unwrap();
+        sim
+    };
     let mu = GRAVITATIONAL_CONSTANT * (1.0 + 6.0e-6);
     let mut rnd = Lcg(seed);
     for k in 0..n {
@@ -67,8 +81,27 @@ pub fn kuiper(integrator: Box<dyn Integrator + Send + Sync>, n: usize, seed: u64
         let e = 0.2 * rnd.next();
         let i = (10.0 * rnd.next()).to_radians();
         let tau = std::f64::consts::TAU;
-        let s = state::from_kepler(a * (1.0 - e), e, i, tau * rnd.next(), tau * rnd.next(), tau * rnd.next(), mu).unwrap();
+        let mut s = state::from_kepler(a * (1.0 - e), e, i, tau * rnd.next(), tau * rnd.next(), tau * rnd.next(), mu).unwrap();
+        s[0] *= 1.0 + shift;
         sim.add(rock(&format!("tp{k}"), 0.0, s)).unwrap();
+    }
+    sim.move_to_center_of_mass().unwrap();
+    sim
+}
+
+/// [`giants`] plus `n` Centaurs (a in 6..30 au, e in 0.1..0.6, i < 20 deg), planet crossers with
+/// close encounters now and then, moved to the barycenter.
+pub fn centaurs(integrator: Box<dyn Integrator + Send + Sync>, n: usize, seed: u64) -> Simulation {
+    let mut sim = giants(integrator);
+    let mu = GRAVITATIONAL_CONSTANT * (1.0 + 6.0e-6);
+    let mut rnd = Lcg(seed);
+    let tau = std::f64::consts::TAU;
+    for k in 0..n {
+        let a = 6.0 + 24.0 * rnd.next();
+        let e = 0.1 + 0.5 * rnd.next();
+        let i = (20.0 * rnd.next()).to_radians();
+        let s = state::from_kepler(a * (1.0 - e), e, i, tau * rnd.next(), tau * rnd.next(), tau * rnd.next(), mu).unwrap();
+        sim.add(rock(&format!("c{k}"), 0.0, s)).unwrap();
     }
     sim.move_to_center_of_mass().unwrap();
     sim

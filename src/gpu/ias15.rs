@@ -52,7 +52,8 @@ pub struct GpuIAS15 {
 }
 
 impl Clone for GpuIAS15 {
-    /// A copy that shares the GPU and the compiled kernels but not the particles kept there.
+    /// A copy that shares the GPU, the compiled kernels and the stats, but not the particles
+    /// kept on the GPU.
     fn clone(&self) -> Self {
         GpuIAS15 {
             timestep: self.timestep,
@@ -65,7 +66,7 @@ impl Clone for GpuIAS15 {
             planets_end: self.planets_end.clone(),
             cpu: self.cpu.clone(),
             resident: None,
-            stats: Arc::new(Mutex::new(GpuStats::default())),
+            stats: self.stats.clone(),
         }
     }
 }
@@ -96,7 +97,7 @@ impl GpuIAS15 {
     /// `ctx` or its arithmetic fails the self-test there.
     pub fn new(timestep: f64, ctx: Arc<GpuContext>, precision: Precision) -> Result<GpuIAS15, GpuError> {
         ctx.check(precision)?;
-        Ok(GpuIAS15 {
+        let ias = GpuIAS15 {
             timestep,
             epsilon: 1e-9,
             precision,
@@ -108,9 +109,13 @@ impl GpuIAS15 {
             cpu: IAS15::new(timestep.min(10.0)),
             resident: None,
             stats: Arc::new(Mutex::new(GpuStats::default())),
-        })
+        };
+        // Compile the kernels now rather than in the first step.
+        ias.kernels();
+        Ok(ias)
     }
 
+    /// Where the time went, summed over the calls of this integrator and its clones.
     pub fn stats(&self) -> GpuStats {
         *self.stats.lock().unwrap()
     }
@@ -236,13 +241,16 @@ impl GpuIAS15 {
         let mut max_steps = 8u32;
         let tic = Instant::now();
         let mut rounds = 0;
+        let mut particle_steps = 0.0;
         loop {
             params.c = max_steps;
             ctx.write(&params_buf, bytemuck::bytes_of(&params));
             ctx.write(&running, &[0u8; 16]);
             let t_dispatch = Instant::now();
             ctx.dispatch(&run_k, &group, groups);
-            let left = u32::from_le_bytes(ctx.read(&running)[..4].try_into().unwrap());
+            let counts = ctx.read(&running);
+            let left = u32::from_le_bytes(counts[..4].try_into().unwrap());
+            particle_steps += u32::from_le_bytes(counts[4..8].try_into().unwrap()) as f64;
             let took = t_dispatch.elapsed().as_secs_f64();
             rounds += 1;
             if left == 0 {
@@ -291,6 +299,7 @@ impl GpuIAS15 {
         *t += h;
 
         let mut stats = self.stats.lock().unwrap();
+        stats.particle_steps += particle_steps;
         stats.cpu_seconds += cpu_seconds;
         stats.gpu_wait_seconds += gpu_seconds;
         stats.total_seconds += start.elapsed().as_secs_f64();

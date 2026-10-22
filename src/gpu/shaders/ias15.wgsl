@@ -32,8 +32,8 @@ struct Params {
 @group(0) @binding(3) var<storage, read> coef: array<R>;
 // Per particle: status (0 running, 1 arrived, 2 failed) and the table row it is in.
 @group(0) @binding(4) var<storage, read_write> status: array<u32>;
-// Particles still running after this dispatch.
-@group(0) @binding(5) var<storage, read_write> running: atomic<u32>;
+// Particles still running after this dispatch, and steps taken in it (accepted ones).
+@group(0) @binding(5) var<storage, read_write> counts: array<atomic<u32>, 2>;
 
 const ST: u32 = 51u;
 
@@ -173,6 +173,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     var b: array<V3, 7>;
     var e: array<V3, 7>;
     var g: array<V3, 7>;
+    var taken = 0u;
     for (var steps = 0u; steps < P.max_steps; steps = steps + 1u) {
         if (!rlt(t, t_end)) {
             state = 1u;
@@ -311,6 +312,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 el[k] = e[k];
             }
             accepted = true;
+            taken = taken + 1u;
             break;
         }
         if (!accepted || !(rto(x0.x) == rto(x0.x))) {
@@ -334,6 +336,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     status[2u * i] = state;
     status[2u * i + 1u] = cur;
     if (state == 0u) {
-        atomicAdd(&running, 1u);
+        atomicAdd(&counts[0], 1u);
     }
+    atomicAdd(&counts[1], taken);
 }
