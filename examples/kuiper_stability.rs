@@ -5,7 +5,7 @@
 //! `n` (21), `a_min` (35), `a_max` (39), `e0` (0.01), `i0` (0.5, deg), `seed` (20261022),
 //! `years` (1e7), `dt` (P_Jup/20 = 216.63 days), `sample` (1e4, years), `out` (1e3, years),
 //! `run` (directory for `elements.txt` and `checkpoint.txt`; without it, elements go to stdout
-//! and nothing is checkpointed), `checkpoint` (1e7, years).
+//! and nothing is checkpointed; with it, progress goes to `log.txt` there), `checkpoint` (1e7, years).
 //!
 //! The Sun (with the inner planets' masses added) and the four giant-planet barycenters come
 //! from the kernel; the simulation is in the invariable plane about its barycenter. Test
@@ -155,20 +155,27 @@ fn main() {
             (sim, 0.0, e)
         }
     };
-    let mut out: Box<dyn Write> = match &run {
+    if let Some(r) = &run {
+        fs::create_dir_all(r).unwrap();
+    }
+    // With `run`, open, append and close the files each time, so what is written survives the
+    // process (or the machine) going away; elements go before the checkpoint that covers them.
+    let emit = |file: &str, text: &str| match &run {
         Some(r) => {
-            fs::create_dir_all(r).unwrap();
-            Box::new(OpenOptions::new().create(true).append(true).open(r.join("elements.txt")).unwrap())
+            let mut f = OpenOptions::new().create(true).append(true).open(r.join(file)).unwrap();
+            f.write_all(text.as_bytes()).unwrap();
+            f.sync_all().unwrap();
         }
-        None => Box::new(std::io::stdout()),
+        None if file == "log.txt" => eprint!("{text}"),
+        None => print!("{text}"),
     };
     let mu = GRAVITATIONAL_CONSTANT * sim.masses().iter().sum::<f64>();
     let resumed = t_days > 0.0;
     if !resumed {
-        writeln!(out, "# {}", std::env::args().skip(1).collect::<Vec<_>>().join(" ")).unwrap();
+        emit("elements.txt", &format!("# {}\n", std::env::args().skip(1).collect::<Vec<_>>().join(" ")));
     }
-    eprintln!("{} at {:.3} Myr with {} test particles", if resumed { "resuming" } else { "starting" }, t_days / 365.25e6,
-              sim.masses().iter().filter(|&&m| m == 0.0).count());
+    emit("log.txt", &format!("{} at {:.3} Myr with {} test particles\n", if resumed { "resuming" } else { "starting" }, t_days / 365.25e6,
+                             sim.masses().iter().filter(|&&m| m == 0.0).count()));
 
     let mut extremes: HashMap<String, Extremes> = HashMap::new();
     let mut buffer = String::new();
@@ -211,15 +218,14 @@ fn main() {
         t_days = (k * steps_per_sample) as f64 * dt;
         sample(&mut sim, t_days / 365.25, k % samples_per_out == 0, &mut buffer);
         if k % samples_per_checkpoint == 0 || k == total_samples {
-            out.write_all(buffer.as_bytes()).unwrap();
-            out.flush().unwrap();
+            emit("elements.txt", &buffer);
             buffer.clear();
             if let Some(path) = &checkpoint {
                 write_checkpoint(path, &sim, t_days, e_start);
             }
             let left = sim.masses().iter().filter(|&&m| m == 0.0).count();
-            eprintln!("t = {:.1} Myr, {:.0} s elapsed, {left} test particles left, |dE/E| = {:.2e}",
-                      t_days / 365.25e6, start.elapsed().as_secs_f64(), ((sim.energy() - e_start) / e_start).abs());
+            emit("log.txt", &format!("t = {:.1} Myr, {:.0} s elapsed, {left} test particles left, |dE/E| = {:.2e}\n",
+                                     t_days / 365.25e6, start.elapsed().as_secs_f64(), ((sim.energy() - e_start) / e_start).abs()));
         }
     }
 }
