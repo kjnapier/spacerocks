@@ -19,3 +19,7 @@ pub use self::context::{GpuContext, GpuError, Precision};
 
 pub mod wisdom_holman;
 pub use self::wisdom_holman::GpuWisdomHolman;
+
+pub mod ias15;
+pub use self::ias15::GpuIAS15;
+pub use self::wisdom_holman::GpuStats;

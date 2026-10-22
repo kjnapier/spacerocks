@@ -129,3 +129,24 @@ fn kepler_step_matches_cpu() {
         }
     }
 }
+
+#[test]
+fn ias15_matches_cpu() {
+    use spacerocks::gpu::GpuIAS15;
+    use spacerocks::nbody::IAS15;
+    let Some(ctx) = context() else { return };
+    for p in precisions(&ctx) {
+        // Ten years in one-year blocks.
+        let gpu = GpuIAS15::new(365.25, ctx.clone(), p).unwrap();
+        let mut a = kuiper(Box::new(gpu), 64, 4);
+        let mut b = kuiper(Box::new(IAS15::new(10.0)), 64, 4);
+        let end = spacerocks::Time::new(common::kuiper::T0 + 3652.5, "tdb", "jd").unwrap();
+        let tic = std::time::Instant::now();
+        a.integrate(&end);
+        let ta = tic.elapsed();
+        b.integrate(&end);
+        let (dx, dv) = max_relative(&a, &b);
+        eprintln!("{p:?}: after 10 years ({ta:.2?} on the GPU), relative differences {dx:e} in position, {dv:e} in velocity");
+        assert!(dx < 1e-9 && dv < 1e-9, "{p:?}: {dx:e} {dv:e}");
+    }
+}

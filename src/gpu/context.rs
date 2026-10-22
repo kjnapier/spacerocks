@@ -86,16 +86,27 @@ impl Precision {
         }
     }
 
-    /// A WGSL constant of type `R` with value `v`, as close as this precision gets.
-    pub(crate) fn constant(self, name: &str, v: f64) -> String {
+    /// A WGSL expression of type `R` with value `v`, as close as this precision gets.
+    pub(crate) fn literal(self, v: f64) -> String {
         match self {
-            Precision::F32 => format!("const {name}: R = {:?};\n", v as f32),
+            Precision::F32 => format!("{:?}", v as f32),
             Precision::DF64 => {
                 let [hi, lo] = split(v);
-                format!("const {name}: R = vec2<f32>({hi:?}, {lo:?});\n")
+                format!("vec2<f32>({hi:?}, {lo:?})")
             }
-            Precision::F64 => format!("const {name}: R = {v:e}lf;\n"),
+            Precision::F64 => format!("{v:e}lf"),
         }
+    }
+
+    /// A WGSL constant of type `R` with value `v`.
+    pub(crate) fn constant(self, name: &str, v: f64) -> String {
+        format!("const {name}: R = {};\n", self.literal(v))
+    }
+
+    /// A WGSL constant array of `R`.
+    pub(crate) fn constant_array(self, name: &str, v: &[f64]) -> String {
+        let items: Vec<String> = v.iter().map(|&x| self.literal(x)).collect();
+        format!("const {name} = array<R, {}>({});\n", v.len(), items.join(", "))
     }
 }
 
@@ -372,8 +383,15 @@ impl GpuContext {
     }
 
     pub(crate) fn bind_group(&self, pipeline: &wgpu::ComputePipeline, buffers: &[&wgpu::Buffer]) -> wgpu::BindGroup {
-        let entries: Vec<wgpu::BindGroupEntry> = buffers.iter().enumerate()
-            .map(|(i, b)| wgpu::BindGroupEntry { binding: i as u32, resource: b.as_entire_binding() })
+        let all: Vec<(u32, &wgpu::Buffer)> = buffers.iter().enumerate().map(|(i, b)| (i as u32, *b)).collect();
+        self.bind_group_at(pipeline, &all)
+    }
+
+    /// A bind group with the given bindings only (an entry point's layout has just the ones it
+    /// uses).
+    pub(crate) fn bind_group_at(&self, pipeline: &wgpu::ComputePipeline, buffers: &[(u32, &wgpu::Buffer)]) -> wgpu::BindGroup {
+        let entries: Vec<wgpu::BindGroupEntry> = buffers.iter()
+            .map(|(i, b)| wgpu::BindGroupEntry { binding: *i, resource: b.as_entire_binding() })
             .collect();
         self.device.create_bind_group(&wgpu::BindGroupDescriptor { label: None, layout: &pipeline.get_bind_group_layout(0), entries: &entries })
     }
