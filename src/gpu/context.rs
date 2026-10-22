@@ -210,9 +210,12 @@ impl GpuContext {
         let mut checked = self.checked.lock().unwrap();
         if precision == Precision::DF64 && !checked.contains_key(&precision) {
             // Exact products with fma if the driver fuses it, with Dekker's splitting if not.
+            // Decided on the products alone, so a failure elsewhere doesn't hide fma.
             *self.fma_exact.lock().unwrap() = Some(true);
-            if self.self_test(precision).is_err() {
-                *self.fma_exact.lock().unwrap() = Some(false);
+            if let Err(e) = self.self_test(precision) {
+                if e.contains("product") {
+                    *self.fma_exact.lock().unwrap() = Some(false);
+                }
             }
         }
         let result = checked.entry(precision).or_insert_with(|| self.self_test(precision)).clone();

@@ -7,7 +7,8 @@
 // The error-free transformations only work if each operation is rounded as written. Shader
 // compilers don't promise that: SPIR-V lets drivers fuse a * b + c into an fma and Mesa's
 // optimizer rewrites inexact float expressions, Metal compiles with fast math. So every
-// intermediate they depend on goes through keep(), a bitwise AND with a mask that is all ones at
+// intermediate they depend on goes through keep() (every one: with fast math, Metal reassociates
+// sums of values it can't see into, too), a bitwise AND with a mask that is all ones at
 // run time but unknown to the compiler: an integer operation it can't see through, which pins
 // the rounded value. The host checks these primitives against f64 on each adapter before it uses
 // them (see `GpuContext::check`), and the Kepler test checks them inside a large kernel.
@@ -20,31 +21,35 @@ fn keep(x: f32) -> f32 {
 fn two_sum(a: f32, b: f32) -> vec2<f32> {
     let s = keep(a + b);
     let bb = keep(s - a);
-    let e = (a - (s - bb)) + (b - bb);
-    return vec2<f32>(s, e);
+    let av = keep(s - bb);
+    let ea = keep(a - av);
+    let eb = keep(b - bb);
+    return vec2<f32>(s, keep(ea + eb));
 }
 
 fn quick_two_sum(a: f32, b: f32) -> vec2<f32> {
     let s = keep(a + b);
-    let e = b - (s - a);
-    return vec2<f32>(s, e);
+    let d = keep(s - a);
+    return vec2<f32>(s, keep(b - d));
 }
 
 fn split(a: f32) -> vec2<f32> {
     let c = keep(4097.0 * a);
     let hi = keep(c - keep(c - a));
-    return vec2<f32>(hi, a - hi);
+    return vec2<f32>(hi, keep(a - hi));
 }
 
 fn two_prod(a: f32, b: f32) -> vec2<f32> {
     let p = keep(a * b);
     if (FMA_EXACT) {
-        return vec2<f32>(p, fma(a, b, -p));
+        return vec2<f32>(p, keep(fma(a, b, -p)));
     }
     let sa = split(a);
     let sb = split(b);
-    let e = ((sa.x * sb.x - p) + sa.x * sb.y + sa.y * sb.x) + sa.y * sb.y;
-    return vec2<f32>(p, e);
+    let e1 = keep(keep(sa.x * sb.x) - p);
+    let e2 = keep(e1 + keep(sa.x * sb.y));
+    let e3 = keep(e2 + keep(sa.y * sb.x));
+    return vec2<f32>(p, keep(e3 + keep(sa.y * sb.y)));
 }
 
 fn rf(x: f32) -> R { return vec2<f32>(x, 0.0); }
