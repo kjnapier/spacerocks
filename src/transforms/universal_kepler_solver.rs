@@ -267,7 +267,7 @@ pub fn universal_kepler_step(r0: &Vector3<f64>, v0: &Vector3<f64>, mu: f64, dt: 
     // Initial guess. When the body moves a small fraction of its distance, the Taylor series of
     // x(t) (dx/dt = 1/r) to third order. Otherwise, on a bound orbit, Danby's starter for
     // Kepler's equation in the eccentric anomaly (x = dE / sqrt(beta)), and on an unbound one
-    // the series to second order.
+    // the same for the hyperbolic anomaly.
     let (t, ir) = (dt_red, 1.0 / r0n);
     let mut x = if t * t * v0.norm_squared() < 0.09 * r0n * r0n {
         t * ir * (1.0 - t * ir * ir * (0.5 * eta0 - t * ir * (0.5 * eta0 * eta0 * ir - zeta0 / 6.0)))
@@ -285,7 +285,15 @@ pub fn universal_kepler_step(r0: &Vector3<f64>, v0: &Vector3<f64>, mu: f64, dt: 
         de += std::f64::consts::TAU * ((n_dt - de) / std::f64::consts::TAU).round();
         de / sb
     } else {
-        t * ir - 0.5 * eta0 * t * t * ir * ir * ir
+        // Unbound: the usual starter for the hyperbolic Kepler equation e sinh F - F = N
+        // (x = dF / sqrt(-beta)). The series guess sent Halley's method astray on long steps.
+        let sb = (-beta).sqrt();
+        let (ecosh, esinh) = (1.0 - r0n * beta / mu, eta0 * sb / mu);
+        let e = (ecosh * ecosh - esinh * esinh).max(1e-24).sqrt();
+        let f0 = (esinh / e).asinh();
+        let n_end = esinh - f0 + sb * sb * sb / mu * dt_red;
+        let f1 = n_end.signum() * (2.0 * n_end.abs() / e + 1.8).ln();
+        (f1 - f0) / sb
     };
 
     let mut converged = false;
@@ -559,6 +567,8 @@ mod tests {
             (Vector3::new(1.0, 0.0, 0.0), Vector3::new(0.0, 0.03, 0.0), 400.0),       // hyperbolic
             (Vector3::new(1.0, 0.0, 0.0), Vector3::new(0.0, 0.0172, 0.0), 3650.25),   // many periods
             (Vector3::new(1.0, 0.0, 0.0), Vector3::new(0.0, 0.0172, 0.0), -123.4),    // backwards
+            // hyperbolic with a step of many times the pericenter passage (solved wrong before)
+            (Vector3::new(1.4241602657808228, 1.553043384543945, 0.02107172564576669), Vector3::new(-0.005396764903875535, 0.022491025482140544, 0.0), 5633.915992379083),
             // hyperbolic near pericenter with a long step
             (Vector3::new(0.12550094620688393, 0.027550727404811702, 0.0), Vector3::new(-0.0071336265344599335, 0.06930541831091576, 0.0), 54.536383668498914),
         ];

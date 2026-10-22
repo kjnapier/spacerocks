@@ -58,4 +58,7 @@ pub mod batch;
     pub use batch::{BatchOptions, Ephemeris};
 
 pub mod checker;
+
+#[cfg(feature = "gpu")]
+pub mod gpu;
     pub use checker::Catalog;
