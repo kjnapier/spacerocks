@@ -19,6 +19,21 @@ jobs:
       - name: cargo test
         run: cargo test
 
+  gpu:
+    name: GPU integrators (software Vulkan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Mesa's software Vulkan driver (lavapipe)
+        run: sudo apt-get update && sudo apt-get install -y mesa-vulkan-drivers
+      - name: cargo test --features gpu
+        env:
+          SPACEROCKS_GPU: llvmpipe
+          SPACEROCKS_GPU_REQUIRED: '1'
+        run: cargo test --features gpu --test gpu_tests -- --nocapture
+
   python:
     name: Python bindings
     runs-on: ubuntu-latest

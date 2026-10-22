@@ -263,14 +263,14 @@ pub(crate) fn for_each_maybe_par<T: Send, F: Fn(&mut T) + Sync + Send>(items: &m
 #[derive(Clone, Copy, Default)]
 pub(crate) struct Frame {
     /// Central body's position and the barycenter's velocity when the step loads the state.
-    xc_load: Vector3<f64>,
-    v_cm_load: Vector3<f64>,
+    pub(crate) xc_load: Vector3<f64>,
+    pub(crate) v_cm_load: Vector3<f64>,
     /// The two jumps.
-    dq1: Vector3<f64>,
-    dq2: Vector3<f64>,
+    pub(crate) dq1: Vector3<f64>,
+    pub(crate) dq2: Vector3<f64>,
     /// Central body's position and the barycenter's velocity when the step writes it back.
-    xc_out: Vector3<f64>,
-    v_cm_out: Vector3<f64>,
+    pub(crate) xc_out: Vector3<f64>,
+    pub(crate) v_cm_out: Vector3<f64>,
 }
 
 /// The massive bodies of a simulation stepped on their own, for integrators that then take the
@@ -390,7 +390,7 @@ impl MassiveRun {
 }
 
 impl WisdomHolman {
-    fn steps_blocked(&mut self, states: &mut [State], masses: &[f64], t: &mut f64, central: usize, forces: &[Box<dyn Force + Send + Sync>], n: usize) {
+    pub(crate) fn steps_blocked(&mut self, states: &mut [State], masses: &[f64], t: &mut f64, central: usize, forces: &[Box<dyn Force + Send + Sync>], n: usize) {
         let h = self.timestep;
         let mut run = MassiveRun::new(states, masses, central);
         let test_idx: Vec<usize> = (0..states.len()).filter(|&i| masses[i] == 0.0).collect();

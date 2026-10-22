@@ -5,7 +5,9 @@
 //! `n` (21), `a_min` (35), `a_max` (39), `e0` (0.01), `i0` (0.5, deg), `seed` (20261022),
 //! `years` (1e7), `dt` (P_Jup/20 = 216.63 days), `sample` (1e4, years), `out` (1e3, years),
 //! `run` (directory for `elements.txt` and `checkpoint.txt`; without it, elements go to stdout
-//! and nothing is checkpointed; with it, progress goes to `log.txt` there), `checkpoint` (1e7, years).
+//! and nothing is checkpointed; with it, progress goes to `log.txt` there), `checkpoint` (1e7, years),
+//! `gpu` (none; `df64`, `f64` or `f32` takes the test particles' steps on the GPU with
+//! `GpuWisdomHolman` in that precision; needs `--features gpu`).
 //!
 //! The Sun (with the inner planets' masses added) and the four giant-planet barycenters come
 //! from the kernel; the simulation is in the invariable plane about its barycenter. Test
@@ -57,8 +59,27 @@ impl Extremes {
 fn new_simulation(dt: f64) -> Simulation {
     let epoch = Time::new(J2000, "tdb", "jd").unwrap();
     let mut sim = Simulation::new(&epoch, PLANE, "SSB").unwrap();
-    sim.integrator = Box::new(WisdomHolman::new(dt));
+    sim.integrator = integrator(dt);
     sim
+}
+
+/// `WisdomHolman`, or with `gpu=<precision>` its GPU version.
+fn integrator(dt: f64) -> Box<dyn spacerocks::nbody::Integrator + Send + Sync> {
+    let gpu = std::env::args().find_map(|a| a.strip_prefix("gpu=").map(str::to_string));
+    match gpu {
+        None => Box::new(WisdomHolman::new(dt)),
+        #[cfg(feature = "gpu")]
+        Some(p) => {
+            use spacerocks::gpu::{GpuContext, GpuWisdomHolman, Precision};
+            let ctx = GpuContext::new().unwrap();
+            let precision = Precision::parse(&p).unwrap_or_else(|| panic!("gpu={p}: expected df64, f64 or f32"));
+            let mut wh = GpuWisdomHolman::new(dt, ctx, precision).unwrap();
+            wh.min_work = 0;
+            Box::new(wh)
+        }
+        #[cfg(not(feature = "gpu"))]
+        Some(_) => panic!("gpu=...: build with --features gpu"),
+    }
 }
 
 /// Giants from the kernel plus `n` test particles, about the barycenter.

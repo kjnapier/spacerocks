@@ -34,3 +34,15 @@ dirs = "6"
 strsim = "0.11.1"
 
 # plotly = { version = "0.8", features = ["kaleido"] }
+
+# GPU integrators (feature "gpu").
+wgpu = { version = "30", optional = true }
+pollster = { version = "0.4", optional = true }
+bytemuck = { version = "1", features = ["derive"], optional = true }
+
+[features]
+gpu = ["dep:wgpu", "dep:pollster", "dep:bytemuck"]
+
+[[example]]
+name = "gpu_bench"
+required-features = ["gpu"]
